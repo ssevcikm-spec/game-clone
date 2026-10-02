@@ -1,13 +1,15 @@
-; Vstupní scéna projektu (docs/02 §2.5).
+; Vstupni scena projektu (docs/02 §2.5).
 ;
-; ZATÍM ZÁMĚRNĚ PRÁZDNÁ: kořen Node2D a žádný skript. app/main.gd patří granuli
-; app.main (M0, závisí na sim.world_loop); kdyby na něj scéna odkazovala dřív,
-; Godot ohlásí SCRIPT ERROR a G11 (smoke) spadne právem.
-;
-; Otevřený požadavek pro člověka: roadmapa .tscn soubor nezná v žádném "owns"
-; (boot.project vlastní jen project.godot, app.main jen app/main.gd), takže
-; připojení skriptu k tomuto uzlu je integrační krok bez vlastníka.
+; Skript je pripojeny: `app/main.gd` vlastni granule app.main (M0) a scenu
+; vlastni bootstrap granule boot.project. Pripojeni skriptu bylo integracni
+; krok - roadmapa .tscn soubor nezná v zadnem "owns" (boot.project vlastni jen
+; project.godot, app.main jen app/main.gd), takze ho provedl bootstrap, ktery
+; scenu zavedl. Scena sama nema herni pravidla: vytvori sim, nacte data
+; a prida app/loop.gd.
 
-[gd_scene format=3]
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://app/main.gd" id="1_main"]
 
 [node name="Main" type="Node2D"]
+script = ExtResource("1_main")

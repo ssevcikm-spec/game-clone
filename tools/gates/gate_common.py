@@ -198,12 +198,41 @@ def godot_bin() -> Path | None:
     return local if local.exists() else None
 
 
+_IMPORT_DONE: set[str] = set()
+
+
+def ensure_import(root: Path) -> None:
+    """V cerstvem stromu chybi `.godot/global_script_class_cache.cfg`, takze
+    `class_name` tridy nejsou známe a kazdy beh Godotu skonci na parse erroru
+    ("Identifier ... not declared", namEReno 2026-10-02). Import se proto pred
+    prvnim behaem udela jednou - stejne to dela i CI (docs/08 §8.4)."""
+    key = str(root)
+    if key in _IMPORT_DONE:
+        return
+    _IMPORT_DONE.add(key)
+    if (root / ".godot" / "global_script_class_cache.cfg").exists():
+        return
+    binary = godot_bin()
+    if binary is None:
+        return
+    env = dict(os.environ)
+    env["APPDATA"] = str(root / ".cache" / "godot-appdata")
+    (root / ".cache" / "godot-appdata" / "Godot" / "app_userdata").mkdir(parents=True, exist_ok=True)
+    try:
+        subprocess.run([str(binary), "--headless", "--path", str(root), "--import"],
+                       capture_output=True, text=True, encoding="utf-8",
+                       errors="replace", timeout=300, env=env)
+    except Exception:
+        pass  # import je jen priprava; co se nepovede, se projevi v behu
+
+
 def godot_run(root: Path, args: list[str], timeout: int = 180) -> tuple[int, str]:
     """Spusti Godot headless s presmerovanym APPDATA (docs/02 §2.1) a vrati
     (exit kod, vystup). Cesta k projektu je root."""
     binary = godot_bin()
     if binary is None:
         return 127, "GODOT nenalezen (nastav $GODOT)"
+    ensure_import(root)
     userdata = root / ".cache" / "godot-appdata"
     (userdata / "Godot" / "app_userdata").mkdir(parents=True, exist_ok=True)
     env = dict(os.environ)

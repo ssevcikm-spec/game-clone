@@ -20,9 +20,17 @@ SIM_WORLD = "sim/sim_world.gd"
 
 
 def parse_probe(output: str) -> dict[str, str]:
+    """Precte vsechny dvojice `klic=hodnota` z radku zacinajicich `PROBE`.
+
+    Na jednom radku jich muze byt vic (`PROBE save=true load=true`); prvni
+    verze umela jen jednu a `load` pak vyslo jako None, i kdyz round-trip
+    fungoval (namEReno 2026-10-02: brana G7 hlasila vadu, ktera nebyla)."""
     values: dict[str, str] = {}
-    for match in re.finditer(r"^PROBE\s+([A-Za-z_]+)=(.*)$", output, re.M):
-        values[match.group(1)] = match.group(2).strip()
+    for line in output.splitlines():
+        if not line.startswith("PROBE"):
+            continue
+        for match in re.finditer(r"([A-Za-z_][A-Za-z0-9_]*)=(\S+)", line):
+            values[match.group(1)] = match.group(2)
     return values
 
 

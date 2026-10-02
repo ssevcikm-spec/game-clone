@@ -34,6 +34,17 @@ const MOUNT_WALK_MS: int = 200  # chuze na mountu
 const MOUNT_RUN_MS: int = 100   # beh na mountu
 const TURN_MS: int = 80         # otoceni na miste (a frame animace)
 
+# -- smery (docs/04 §4.3: dir 0..7) ----------------------------------------
+# Smlouva cisla smeru nepinuje; z prikladu v docs/04 §4.8 (pohyb na vychod
+# prikazem dir 0) plyne, ze 0 = vychod. Poradi jde od vychodu proti smeru
+# hodinovych rucicek ve svetovych osach (x na vychod, y na jih):
+#   0=E(+1,0) 1=NE(+1,-1) 2=N(0,-1) 3=NW(-1,-1) 4=W(-1,0) 5=SW(-1,+1) 6=S(0,+1) 7=SE(+1,+1)
+# Tabulka je jedina - pouziva ji input, movement i walk (aby cislo smeru
+# neznamenalo na dvou mistech neco jineho). Pozn.: PackedInt32Array se neda
+# pouzit jako `const` ("isn't a constant expression", namEReno 2026-10-02).
+const DIR_DX := [1, 1, 0, -1, -1, -1, 0, 1]
+const DIR_DY := [0, -1, -1, -1, 0, 1, 1, 1]
+
 # -- postava a predmety ----------------------------------------------------
 const PERSON_HEIGHT: int = 16   # vyska postavy ve svetovych jednotkach
 const STEP_HEIGHT: int = 2      # max. schod, ktery se da vyjit

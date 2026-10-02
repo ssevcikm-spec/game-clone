@@ -1,0 +1,27 @@
+{
+  "_popis": [
+    "Vyvážení a éry hry (granule data.balance). Hodnoty jsou ROZHODNUTÍ z docs/05 §5.16,",
+    "ne měření. Každá má v 'sources' napsáno, odkud je - aby se za půl roku dalo zjistit,",
+    "proč je zrovna taková, a co je potřeba přeměřit (docs/11 §11.6).",
+    "Hodnoty v 'constants' se srovnávají s core/const.gd bránou G1 (docs/08 §8.3)."
+  ],
+  "constants": {
+    "SKILL_CAP": 7000,
+    "STAT_CAP": 225
+  },
+  "combat_era": "aos",
+  "stamina_drain_model": "run_only",
+  "ggs_on": true,
+  "insurance_on": false,
+  "anti_macro": false,
+  "sources": {
+    "combat_era": "docs/05 §5.16 (rozhodnutí: AoS vzorce pro swing a hit chance)",
+    "stamina_drain_model": "docs/05 §5.16 (stamina se spotřebovává jen při běhu)",
+    "ggs_on": "docs/05 §5.16 + ZADANI §2 (GGS zapnutý, krok +0.1)",
+    "insurance_on": "docs/05 §5.16 (pojištění předmětů je vypnuté)",
+    "anti_macro": "docs/05 §5.16 (žádné anti-macro kontroly, jsme offline)",
+    "constants.SKILL_CAP": "docs/04 §4.2 core.const (700.0 v desetinách)",
+    "constants.STAT_CAP": "ZADANI §10 bod 9 (stat cap 225)",
+    "UNVERIFIED": "stamina_drain_model, stat loss a světelný cyklus nejsou v UO ověřené - viz docs/11 §11.6"
+  }
+}

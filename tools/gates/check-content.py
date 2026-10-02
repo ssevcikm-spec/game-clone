@@ -19,6 +19,7 @@ Spousteni:
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 from pathlib import Path
 
@@ -56,6 +57,60 @@ def as_records(data, key_guess: str) -> tuple[list[dict], str]:
     return [], type(data).__name__
 
 
+METADATA_KEYS = {"_popis", "sources", "note", "notes"}
+
+
+def declared_settings(root: Path, path: Path) -> list[str]:
+    """Jmena klice, ktera u souboru nastaveni pozaduje smlouva (`provides`).
+
+    `data/balance.json` neni seznam zaznamu jako items.json - je to soubor
+    nastaveni, a jeho smlouva vypocitava klice ("combat_era, ggs_on, ...").
+    Brana je proto bere z roadmapy a overi, ze v souboru opravdu jsou."""
+    rel = path.relative_to(root).as_posix()
+    for grain in grains_by_id(root).values():
+        if rel not in grain.get("owns", []):
+            continue
+        names: list[str] = []
+        for entry in grain.get("provides", []):
+            for part in entry.split(","):
+                name = part.strip().strip("`")
+                if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name):
+                    names.append(name)
+        return names
+    return []
+
+
+def flattened_keys(value, depth: int = 2) -> set[str]:
+    """Jmena klicu (malymi pismeny) do dane hloubky - kvuli constants.SKILL_CAP."""
+    keys: set[str] = set()
+    if depth <= 0:
+        return keys
+    if isinstance(value, dict):
+        for key, item in value.items():
+            keys.add(str(key).lower())
+            keys |= flattened_keys(item, depth - 1)
+    return keys
+
+
+def check_settings(root: Path, path: Path, data, gate: Gate) -> None:
+    rel = path.name
+    wanted = declared_settings(root, path)
+    present = flattened_keys(data, 2) - METADATA_KEYS
+    if not wanted:
+        if present:
+            gate.note(f"{rel}: soubor nastavení, {len(present)} klíčů (smlouva klíče nevyjmenovává)")
+            gate.measure(f"{rel}_nastaveni", len(present))
+        else:
+            gate.error(f"{rel}: 0 záznamů i 0 klíčů (prázdný soubor není úspěch, docs/08 §8.6)")
+        return
+    missing = [k for k in wanted if k.lower() not in present]
+    gate.measure(f"{rel}_nastaveni", len(wanted) - len(missing))
+    if missing:
+        gate.error(f"{rel}: soubor nastavení nemá klíče ze smlouvy: " + ", ".join(missing))
+    else:
+        gate.note(f"{rel}: soubor nastavení, všech {len(wanted)} klíčů ze smlouvy je v souboru")
+
+
 def check(root: Path, gate: Gate) -> None:
     by_id = grains_by_id(root)
     data_grains = sorted(g["id"] for g in by_id.values()
@@ -85,7 +140,11 @@ def check(root: Path, gate: Gate) -> None:
         gate.measure(f"{rel}_zaznamu", len(records))
         gate.note(f"{rel}: tvar {shape}, záznamů {len(records)}")
         if not records:
-            gate.error(f"{rel}: 0 záznamů (prázdný soubor není úspěch, docs/08 §8.6)")
+            # Není seznam záznamů - může to být soubor nastavení (data/balance.json).
+            if isinstance(data, dict) and data:
+                check_settings(root, path, data, gate)
+            else:
+                gate.error(f"{rel}: 0 záznamů (prázdný soubor není úspěch, docs/08 §8.6)")
             continue
 
         required = REQUIRED_FIELDS.get(rel)
@@ -150,7 +209,12 @@ def selftest() -> int:
          "provides": [], "consumes": [], "acceptance": ["content"]},
         {"id": "data.recipes", "kind": "data", "owns": ["data/recipes.json"], "depends_on": [],
          "provides": [], "consumes": [], "acceptance": ["content"]},
+        {"id": "data.balance", "kind": "data", "owns": ["data/balance.json"], "depends_on": [],
+         "provides": ["combat_era, ggs_on, skill_cap"], "consumes": [], "acceptance": ["content"]},
     ]}
+    nastaveni = {"combat_era": "aos", "ggs_on": True, "constants": {"SKILL_CAP": 7000},
+                 "sources": {"combat_era": "docs/05 §5.16"}}
+    nastaveni_chybi = {"combat_era": "aos", "ggs_on": True}
     item = {"tile": 0x1BEF, "name": "iron ingot", "category": "resource",
             "weight": 1, "value": 5, "source": "tiledata"}
     # vysledek i material musi byt v items.json, jinak je to (spravne) vada
@@ -177,6 +241,8 @@ def selftest() -> int:
                                      {"items.json": [{k: v for k, v in item.items() if k != "value"}]}), VADA),
         ("vadny_prazdny", fixture("vadny_prazdny", {"items.json": []}), VADA),
         ("vadny_json", fixture("vadny_json", {}, raw={"items.json": "{tohle neni json"}), VADA),
+        ("dobry_nastaveni", fixture("dobry_nastaveni", {"balance.json": nastaveni}), OK),
+        ("vadny_nastaveni_chybi_klic", fixture("vadny_nastaveni_chybi_klic", {"balance.json": nastaveni_chybi}), VADA),
         ("bez_dat", fixture("bez_dat", {}), NEMERENO),
     ]
     return selftest_cli(NAME, check, [(l, e) for l, _, e in cases],

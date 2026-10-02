@@ -1,0 +1,56 @@
+extends Node
+# Smycka hry: JEDINE misto, kde se potkava cas enginu a cas simulace
+# (docs/04 §4.2). Fixni krok 50 ms; kdyz FPS poklesne, ticky se dohani,
+# ale maximalne 5 za frame - aby se sim nezasekla ve smycce dohaneni
+# (prompt granule).
+#
+# `extends Node` je vyjmecne zde: smycka potrebuje frame callback enginu
+# (docs/02 §2.6.2 dovoluje Node nebo RefCounted s uvedenim duvodu).
+# Herni pravidla tu NEJSOU - jen pumpovani tiku a prevod vstupu na Command.
+
+const Const = preload("res://core/const.gd")
+
+const MAX_CATCHUP_TICKS: int = 5
+const REPORT_EVERY_TICKS: int = 20   # 1x za sekundu herniho casu (M0: "simulace tickuje")
+
+var sim = null
+var input_map = null
+var camera_offset: Vector2 = Vector2.ZERO
+var player_tile: Vector2i = Vector2i.ZERO
+
+var _accumulator_ms: float = 0.0
+var _ticks: int = 0
+
+
+func _process(delta: float) -> void:
+	if sim == null:
+		return
+	_accumulator_ms += delta * 1000.0
+	var done: int = 0
+	while _accumulator_ms >= float(Const.TICK_MS) and done < MAX_CATCHUP_TICKS:
+		if input_map != null:
+			for command in input_map.poll(player_tile, camera_offset, 0, get_viewport().get_mouse_position()):
+				sim.enqueue(command)
+		sim.tick(Const.TICK_MS)
+		_accumulator_ms -= float(Const.TICK_MS)
+		_ticks += 1
+		done += 1
+		if _ticks % REPORT_EVERY_TICKS == 0:
+			print("[loop] tick ", _ticks, " (", sim.world_time(), " ms herniho casu)")
+	if done >= MAX_CATCHUP_TICKS:
+		# Zbytek se zahodi - dohanet hodiny tiku v jednom frame nema smysl.
+		_accumulator_ms = 0.0
+	_deliver_events()
+
+
+func tick_count() -> int:
+	return _ticks
+
+
+func _deliver_events() -> void:
+	# Udalosti si klient vybere jednou za frame (docs/04 §4.4); zatim je jen
+	# predame dal - UI (žurnál) si je prevezme v M2.
+	var snapshot: Dictionary = sim.snapshot()
+	for event in snapshot.get("events", []):
+		if event.get("name") == "message":
+			print("[sim] ", str(event.get("data", {}).get("text", "")))
