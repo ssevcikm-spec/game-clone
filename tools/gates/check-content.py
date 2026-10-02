@@ -46,11 +46,15 @@ COUNTS_UNPINNED = "počty C1–C10: SCHÉMA NEURČENO (docs/06 §6.x) - kontrola
 
 
 def as_records(data, key_guess: str) -> tuple[list[dict], str]:
-    """Vrati seznam zaznamu a popis tvaru (docs/04 §4.5 tvar souboru nepinuje)."""
+    """Vrati seznam zaznamu a popis tvaru (docs/04 §4.5 tvar souboru nepinuje).
+
+    `rows` je tvar, ktery pouzivaji extrahovana textova data (doors, stairs,
+    teleports, misc, mobtypes, skill_groups) - bez nej by je brana povazovala
+    za "soubor nastaveni" a pocitala klice misto zaznamu (namEReno 2026-10-02)."""
     if isinstance(data, list):
         return [r for r in data if isinstance(r, dict)], "seznam"
     if isinstance(data, dict):
-        for key in (key_guess, "items", "records", "data"):
+        for key in (key_guess, "rows", "items", "records", "data"):
             if isinstance(data.get(key), list):
                 return [r for r in data[key] if isinstance(r, dict)], f"{{{key}: [...]}}"
         return [], "slovník bez seznamu"
