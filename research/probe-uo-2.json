@@ -1,0 +1,1215 @@
+{
+  "land": {
+    "best": [
+      0.0528,
+      26,
+      6
+    ],
+    "all": [
+      [
+        0.0528,
+        26,
+        6,
+        865,
+        16384
+      ],
+      [
+        0.0526,
+        32,
+        6,
+        862,
+        16384
+      ],
+      [
+        0.0526,
+        26,
+        10,
+        861,
+        16384
+      ],
+      [
+        0.0524,
+        30,
+        6,
+        859,
+        16384
+      ],
+      [
+        0.0519,
+        32,
+        10,
+        851,
+        16384
+      ],
+      [
+        0.0516,
+        34,
+        14,
+        846,
+        16384
+      ],
+      [
+        0.0516,
+        34,
+        10,
+        845,
+        16384
+      ],
+      [
+        0.0514,
+        30,
+        10,
+        842,
+        16384
+      ],
+      [
+        0.0511,
+        32,
+        12,
+        837,
+        16384
+      ],
+      [
+        0.0508,
+        36,
+        10,
+        833,
+        16384
+      ],
+      [
+        0.0508,
+        34,
+        6,
+        833,
+        16384
+      ],
+      [
+        0.0505,
+        36,
+        16,
+        828,
+        16384
+      ],
+      [
+        0.05,
+        36,
+        6,
+        819,
+        16384
+      ]
+    ]
+  },
+  "item": {
+    "best": [
+      0.0602,
+      26,
+      425984,
+      16384
+    ],
+    "all": [
+      [
+        0.0602,
+        26,
+        425984,
+        16384,
+        987,
+        16384
+      ],
+      [
+        0.0533,
+        34,
+        557056,
+        16384,
+        873,
+        16384
+      ],
+      [
+        0.0431,
+        32,
+        524288,
+        16384,
+        706,
+        16384
+      ],
+      [
+        0.0419,
+        30,
+        491520,
+        16384,
+        686,
+        16384
+      ],
+      [
+        0.0399,
+        26,
+        425984,
+        65536,
+        2614,
+        65536
+      ],
+      [
+        0.0362,
+        34,
+        557056,
+        65536,
+        2321,
+        64187
+      ],
+      [
+        0.036,
+        30,
+        491520,
+        65536,
+        2361,
+        65536
+      ],
+      [
+        0.0348,
+        32,
+        524288,
+        65536,
+        2264,
+        64986
+      ]
+    ]
+  },
+  "item_residue": [
+    [
+      38,
+      855
+    ],
+    [
+      22,
+      814
+    ],
+    [
+      35,
+      799
+    ],
+    [
+      9,
+      778
+    ]
+  ],
+  "item_names_count": 4374,
+  "item_last": [
+    16316,
+    "ield of Poison"
+  ],
+  "tail_bytes": 2091008,
+  "keyword_hits": {
+    "ore": [
+      [
+        "0x3428",
+        "Corporeal Brume"
+      ]
+    ],
+    "ingot": [],
+    "forge": [],
+    "anvil": [],
+    "log": [
+      [
+        "0x32d5",
+        "\u0003log roof"
+      ],
+      [
+        "0x32d6",
+        "\u0003log roof"
+      ],
+      [
+        "0x32d7",
+        "\u0003log roof"
+      ],
+      [
+        "0x32d8",
+        "\u0003log roof"
+      ],
+      [
+        "0x32d9",
+        "\u0003log roof"
+      ],
+      [
+        "0x32da",
+        "\u0003log roof"
+      ],
+      [
+        "0x32db",
+        "\u0003log roof"
+      ],
+      [
+        "0x32dc",
+        "\u0003log roof"
+      ],
+      [
+        "0x32dd",
+        "\u0003log roof"
+      ],
+      [
+        "0x32de",
+        "\u0003log roof"
+      ],
+      [
+        "0x32df",
+        "\u0003log roof"
+      ],
+      [
+        "0x32e0",
+        "\u0003log roof"
+      ],
+      [
+        "0x32e1",
+        "\u0003log roof"
+      ],
+      [
+        "0x32e2",
+        "\u0003log roof"
+      ]
+    ],
+    "board": [
+      [
+        "0x12b3",
+        "g board"
+      ],
+      [
+        "0x12b4",
+        "g board"
+      ],
+      [
+        "0x1b6a",
+        "board"
+      ],
+      [
+        "0x1b6b",
+        "board"
+      ],
+      [
+        "0x24b6",
+        "dartboard"
+      ],
+      [
+        "0x24b7",
+        "dartboard"
+      ],
+      [
+        "0x24b8",
+        "dartboard w/axe"
+      ],
+      [
+        "0x24b9",
+        "dartboard w/axe"
+      ],
+      [
+        "0x24ba",
+        "dartboard w/knives"
+      ],
+      [
+        "0x24bb",
+        "dartboard w/knives"
+      ],
+      [
+        "0x299d",
+        "board"
+      ],
+      [
+        "0x299e",
+        "board"
+      ]
+    ],
+    "hide": [
+      [
+        "0x3802",
+        "\u0001Hide Chest"
+      ],
+      [
+        "0x3803",
+        "\u0001Hide Gloves"
+      ],
+      [
+        "0x3804",
+        "\u0001Hide Gorget"
+      ],
+      [
+        "0x3805",
+        "\u0001Hide Paldrons"
+      ],
+      [
+        "0x3807",
+        "\u0001Hide Female Chest"
+      ]
+    ],
+    "leather": [
+      [
+        "0x974",
+        "e_leather_arm\u0002@@"
+      ],
+      [
+        "0x975",
+        "e_leather_arm\u0002@@"
+      ],
+      [
+        "0x976",
+        "e_leather_che\u0002@@"
+      ],
+      [
+        "0x977",
+        "e_leather_che\u0002@@"
+      ],
+      [
+        "0x978",
+        "e_leather_leg\u0002@@"
+      ],
+      [
+        "0x979",
+        "e_leather_leg\u0002@@"
+      ],
+      [
+        "0x983",
+        "e_leather_kil\u0002@@"
+      ],
+      [
+        "0x984",
+        "e_leather_kil"
+      ]
+    ],
+    "cloth": [],
+    "bandage": [],
+    "pickaxe": [],
+    "shovel": [],
+    "hatchet": [],
+    "axe": [
+      [
+        "0x1a7a",
+        "large battle axe"
+      ],
+      [
+        "0x1a7b",
+        "large battle axe"
+      ],
+      [
+        "0x24b8",
+        "dartboard w/axe"
+      ],
+      [
+        "0x24b9",
+        "dartboard w/axe"
+      ],
+      [
+        "0x2bf5",
+        "eaxe"
+      ]
+    ],
+    "hammer": [
+      [
+        "0x1a63",
+        "smith's hammer"
+      ],
+      [
+        "0x1a64",
+        "smith's hammer"
+      ]
+    ],
+    "tongs": [],
+    "saw": [],
+    "sewing": [],
+    "mortar": [],
+    "dagger": [],
+    "sword": [],
+    "katana": [
+      [
+        "0x1a7e",
+        "katana"
+      ],
+      [
+        "0x1a7f",
+        "katana"
+      ]
+    ],
+    "mace": [],
+    "bow": [
+      [
+        "0x1a7c",
+        "heavy crossbow"
+      ],
+      [
+        "0x1a7d",
+        "heavy crossbow"
+      ],
+      [
+        "0x2d52",
+        "rossbow"
+      ],
+      [
+        "0x2d5c",
+        "rossbow"
+      ],
+      [
+        "0x33bf",
+        "tbow"
+      ]
+    ],
+    "arrow": [
+      [
+        "0x270e",
+        "Arrow"
+      ],
+      [
+        "0x3e3a",
+        "arrow"
+      ]
+    ],
+    "bolt": [
+      [
+        "0x25df",
+        "y Bolt Scroll"
+      ],
+      [
+        "0x2733",
+        "ergy Bolt"
+      ],
+      [
+        "0x3432",
+        "Nether Bolt"
+      ]
+    ],
+    "potion": [],
+    "bottle": [
+      [
+        "0x1018",
+        "bottles of ale"
+      ],
+      [
+        "0x1019",
+        "bottles of ale"
+      ],
+      [
+        "0x101a",
+        "bottles of ale"
+      ]
+    ],
+    "reagent": [],
+    "garlic": [],
+    "ginseng": [],
+    "nightshade": [],
+    "mandrake": [],
+    "sulfur": [],
+    "spider silk": [],
+    "black pearl": [],
+    "blood moss": [],
+    "gold": [],
+    "backpack": [
+      [
+        "0x102a",
+        "backpack"
+      ]
+    ],
+    "bag": [],
+    "chest": [
+      [
+        "0x97c",
+        "e_plate_chest\u0002@@"
+      ],
+      [
+        "0x97d",
+        "e_plate_chest\u0002@@"
+      ],
+      [
+        "0x1023",
+        "metal chest"
+      ],
+      [
+        "0x3802",
+        "\u0001Hide Chest"
+      ],
+      [
+        "0x3807",
+        "\u0001Hide Female Chest"
+      ],
+      [
+        "0x380e",
+        "\u0001FShirt1_Chest"
+      ],
+      [
+        "0x380f",
+        "\u0001FShirt2_Chest"
+      ],
+      [
+        "0x3812",
+        "\u0005Lt_Armor_Chest"
+      ]
+    ],
+    "key": [
+      [
+        "0x168b",
+        "opper key"
+      ],
+      [
+        "0x168c",
+        "old key"
+      ],
+      [
+        "0x168d",
+        "ron key"
+      ],
+      [
+        "0x168f",
+        "agic key"
+      ],
+      [
+        "0x1690",
+        "usty iron key"
+      ]
+    ],
+    "lockpick": [],
+    "spellbook": [
+      [
+        "0x3431",
+        "MysticSpellBook East"
+      ]
+    ],
+    "scroll": [
+      [
+        "0x25b8",
+        "od Scroll"
+      ],
+      [
+        "0x25b9",
+        "d Scroll"
+      ],
+      [
+        "0x25bb",
+        "ow Scroll"
+      ],
+      [
+        "0x25bc",
+        "ht Scroll"
+      ],
+      [
+        "0x25c2",
+        "p Scroll"
+      ],
+      [
+        "0x25c4",
+        "n Scroll"
+      ],
+      [
+        "0x25c5",
+        "Scroll"
+      ],
+      [
+        "0x25c7",
+        "Scroll"
+      ],
+      [
+        "0x25c8",
+        "k Scroll"
+      ],
+      [
+        "0x25c9",
+        "n Scroll"
+      ],
+      [
+        "0x25ca",
+        "inisis Scroll"
+      ],
+      [
+        "0x25cb",
+        "ort Scroll"
+      ],
+      [
+        "0x25cc",
+        "k Scroll"
+      ],
+      [
+        "0x25ce",
+        "ure Scroll"
+      ]
+    ],
+    "rune": [],
+    "fish": [
+      [
+        "0x249d",
+        "fish"
+      ],
+      [
+        "0x249e",
+        "fish"
+      ],
+      [
+        "0x249f",
+        "fish"
+      ],
+      [
+        "0x24a0",
+        "fish"
+      ],
+      [
+        "0x24a4",
+        "ed fish"
+      ],
+      [
+        "0x24a5",
+        "ed fish"
+      ],
+      [
+        "0x24a6",
+        "ed fish"
+      ]
+    ],
+    "flour": [],
+    "dough": [],
+    "water": [
+      [
+        "0x1675",
+        "er of water"
+      ],
+      [
+        "0x1676",
+        "er of water"
+      ],
+      [
+        "0x1677",
+        "t of water"
+      ],
+      [
+        "0x25f5",
+        "ummon Water Eleme"
+      ],
+      [
+        "0x2749",
+        "mmon Water"
+      ]
+    ],
+    "pitcher": [
+      [
+        "0x101f",
+        "glass pitcher"
+      ],
+      [
+        "0x1025",
+        "pitcher of milk"
+      ],
+      [
+        "0x1673",
+        "pitcher"
+      ],
+      [
+        "0x1674",
+        "pitcher"
+      ]
+    ],
+    "torch": [],
+    "lantern": [],
+    "shield": [
+      [
+        "0x1cb6",
+        "shields"
+      ],
+      [
+        "0x1cb7",
+        "shields"
+      ],
+      [
+        "0x1cb8",
+        "shields"
+      ],
+      [
+        "0x1cb9",
+        "shields"
+      ],
+      [
+        "0x21f8",
+        "shield"
+      ],
+      [
+        "0x21fc",
+        "shield"
+      ],
+      [
+        "0x21fd",
+        "shield"
+      ],
+      [
+        "0x2200",
+        "shield"
+      ],
+      [
+        "0x2201",
+        "shield"
+      ]
+    ],
+    "helm": [
+      [
+        "0x37ff",
+        "\u0001Raven Helm"
+      ],
+      [
+        "0x3800",
+        "\u0001Vulture Helm"
+      ],
+      [
+        "0x3801",
+        "\u0001Winged Helm"
+      ]
+    ],
+    "gorget": [
+      [
+        "0x1a47",
+        "her gorget"
+      ],
+      [
+        "0x1a56",
+        "ded gorget"
+      ],
+      [
+        "0x37f7",
+        "\u0001Elven Plate Gorget"
+      ],
+      [
+        "0x3804",
+        "\u0001Hide Gorget"
+      ],
+      [
+        "0x3814",
+        "\u0002Lt_Armor_Gorget"
+      ]
+    ],
+    "tunic": [
+      [
+        "0x1a3d",
+        "l tunic"
+      ],
+      [
+        "0x1a3f",
+        "l tunic"
+      ],
+      [
+        "0x1a42",
+        "nmail tunic"
+      ],
+      [
+        "0x1a44",
+        "nmail tunic"
+      ],
+      [
+        "0x1a4a",
+        "her tunic"
+      ],
+      [
+        "0x1a4c",
+        "her tunic"
+      ],
+      [
+        "0x1a51",
+        "her tunic"
+      ],
+      [
+        "0x1a53",
+        "her tunic"
+      ],
+      [
+        "0x1a59",
+        "ded tunic"
+      ],
+      [
+        "0x1a5b",
+        "ded tunic"
+      ],
+      [
+        "0x1a60",
+        "studded tunic"
+      ],
+      [
+        "0x1a62",
+        "studded tunic"
+      ],
+      [
+        "0x1a6c",
+        "ringmail tunic"
+      ],
+      [
+        "0x1a6d",
+        "ringmail tunic"
+      ]
+    ],
+    "legging": [
+      [
+        "0x1a3c",
+        "l leggings"
+      ],
+      [
+        "0x1a3e",
+        "l leggings"
+      ],
+      [
+        "0x1a41",
+        "nmail leggings"
+      ],
+      [
+        "0x1a43",
+        "nmail leggings"
+      ],
+      [
+        "0x1a49",
+        "her leggings"
+      ],
+      [
+        "0x1a4b",
+        "her leggings"
+      ],
+      [
+        "0x1a50",
+        "her leggings"
+      ],
+      [
+        "0x1a52",
+        "her leggings"
+      ],
+      [
+        "0x1a58",
+        "ded leggings"
+      ],
+      [
+        "0x1a5a",
+        "ded leggings"
+      ],
+      [
+        "0x1a5f",
+        "ded leggings"
+      ],
+      [
+        "0x1a61",
+        "studded leggings"
+      ],
+      [
+        "0x1a65",
+        "ringmail leggings"
+      ],
+      [
+        "0x1a66",
+        "ringmail leggings"
+      ]
+    ],
+    "glove": [
+      [
+        "0x1a46",
+        "her Gloves"
+      ],
+      [
+        "0x1a4e",
+        "her Gloves"
+      ],
+      [
+        "0x1a55",
+        "ded gloves"
+      ],
+      [
+        "0x1a5d",
+        "ded gloves"
+      ],
+      [
+        "0x1a6b",
+        "ringmail gloves"
+      ],
+      [
+        "0x1a72",
+        "ringmail gloves"
+      ],
+      [
+        "0x37f8",
+        "\u0001Elven Plate Gloves"
+      ],
+      [
+        "0x3803",
+        "\u0001Hide Gloves"
+      ],
+      [
+        "0x3813",
+        "\u0001Lt_Armor_Gloves"
+      ]
+    ],
+    "boot": [
+      [
+        "0x3811",
+        "\u0001Elven_Boot"
+      ]
+    ],
+    "cloak": [],
+    "robe": [
+      [
+        "0x380a",
+        "\u0001M_Elven_Robe01"
+      ],
+      [
+        "0x380b",
+        "\u0001M_Elven_Robe02"
+      ]
+    ],
+    "ring": [
+      [
+        "0x113b",
+        "t fringe"
+      ],
+      [
+        "0x113c",
+        "t fringe"
+      ],
+      [
+        "0x113e",
+        "t fringe"
+      ],
+      [
+        "0x1172",
+        "arpet fringe"
+      ],
+      [
+        "0x168e",
+        "ey ring"
+      ],
+      [
+        "0x1a65",
+        "ringmail leggings"
+      ],
+      [
+        "0x1a66",
+        "ringmail leggings"
+      ],
+      [
+        "0x1a67",
+        "ringmail armor"
+      ],
+      [
+        "0x1a68",
+        "ringmail armor"
+      ],
+      [
+        "0x1a69",
+        "ringmail sleeves"
+      ],
+      [
+        "0x1a6a",
+        "ringmail sleeves"
+      ],
+      [
+        "0x1a6b",
+        "ringmail gloves"
+      ],
+      [
+        "0x1a6c",
+        "ringmail tunic"
+      ],
+      [
+        "0x1a6d",
+        "ringmail tunic"
+      ]
+    ],
+    "bracelet": [],
+    "candle": [],
+    "pouch": [
+      [
+        "0x1028",
+        "belt pouch"
+      ]
+    ],
+    "feather": [],
+    "wool": [
+      [
+        "0x169c",
+        "ile%s% of wool"
+      ]
+    ],
+    "spool": [],
+    "flax": [],
+    "sand": [
+      [
+        "0xb11",
+        "sandstone paver"
+      ],
+      [
+        "0xb12",
+        "sandstone paver"
+      ],
+      [
+        "0xb13",
+        "sandstone paver"
+      ],
+      [
+        "0x2af1",
+        "and sand"
+      ],
+      [
+        "0x2af2",
+        "and sand"
+      ],
+      [
+        "0x2af3",
+        "and sand"
+      ],
+      [
+        "0x2af4",
+        "and sand"
+      ],
+      [
+        "0x3418",
+        "Lady Melisande"
+      ]
+    ],
+    "glass": [
+      [
+        "0x101f",
+        "glass pitcher"
+      ],
+      [
+        "0x3031",
+        "tained glass windo"
+      ],
+      [
+        "0x3032",
+        "tained glass windo"
+      ],
+      [
+        "0x3033",
+        "tained glass windo"
+      ],
+      [
+        "0x3034",
+        "tained glass windo"
+      ],
+      [
+        "0x3035",
+        "tained glass windo"
+      ],
+      [
+        "0x3036",
+        "tained glass windo"
+      ],
+      [
+        "0x3037",
+        "tained glass windo"
+      ],
+      [
+        "0x3038",
+        "tained glass windo"
+      ],
+      [
+        "0x3039",
+        "tained glass windo"
+      ],
+      [
+        "0x303a",
+        "tained glass windo"
+      ],
+      [
+        "0x303b",
+        "tained glass windo"
+      ],
+      [
+        "0x303c",
+        "tained glass windo"
+      ],
+      [
+        "0x303d",
+        "tained glass windo"
+      ]
+    ]
+  },
+  "hues": {
+    "best": [
+      0.767,
+      96,
+      2764
+    ],
+    "all": [
+      [
+        0.767,
+        96,
+        2764
+      ],
+      [
+        0.767,
+        88,
+        3000
+      ],
+      [
+        0.763,
+        100,
+        2654
+      ],
+      [
+        0.763,
+        90,
+        2949
+      ],
+      [
+        0.734,
+        64,
+        3000
+      ],
+      [
+        0.732,
+        66,
+        3000
+      ]
+    ],
+    "size": 265500
+  },
+  "skill_names": [
+    "Alchemy",
+    "Anatomy",
+    "Animal Lore",
+    "Item Identification",
+    "Arms Lore",
+    "Parrying",
+    "Begging",
+    "Blacksmithy",
+    "Bowcraft/Fletching",
+    "Peacemaking",
+    "Camping",
+    "Carpentry",
+    "Cartography",
+    "Cooking",
+    "Detecting Hidden",
+    "Discordance",
+    "Evaluating Intelligence",
+    "Healing",
+    "Fishing",
+    "Forensic Evaluation",
+    "Herding",
+    "Hiding",
+    "Provocation",
+    "Inscription",
+    "Lockpicking",
+    "Magery",
+    "Resisting Spells",
+    "Tactics",
+    "Snooping",
+    "Musicianship",
+    "Poisoning",
+    "Archery",
+    "Spirit Speak",
+    "Stealing",
+    "Tailoring",
+    "Animal Taming",
+    "Taste Identification",
+    "Tinkering",
+    "Tracking",
+    "Veterinary",
+    "Swordsmanship",
+    "Mace Fighting",
+    "Fencing",
+    "Wrestling",
+    "Lumberjacking",
+    "Mining",
+    "Meditation",
+    "Stealth",
+    "Remove Trap",
+    "Necromancy",
+    "Focus",
+    "Chivalry",
+    "Bushido",
+    "Ninjitsu",
+    "Spellweaving",
+    "Throwing",
+    "Imbuing",
+    "Mysticism"
+  ]
+}

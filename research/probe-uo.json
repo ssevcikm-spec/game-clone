@@ -1,0 +1,391 @@
+{
+  "tiledata": {
+    "size": 3188736,
+    "strings": 32640,
+    "land_candidates": [
+      [
+        26,
+        382,
+        443,
+        0.862
+      ],
+      [
+        30,
+        380,
+        443,
+        0.858
+      ],
+      [
+        32,
+        364,
+        443,
+        0.822
+      ]
+    ],
+    "top_diffs": [
+      [
+        41,
+        25643
+      ],
+      [
+        30,
+        3790
+      ],
+      [
+        45,
+        843
+      ],
+      [
+        82,
+        654
+      ],
+      [
+        123,
+        280
+      ],
+      [
+        34,
+        113
+      ]
+    ],
+    "tail_diffs": [
+      [
+        41,
+        8927
+      ],
+      [
+        82,
+        379
+      ],
+      [
+        45,
+        313
+      ],
+      [
+        123,
+        210
+      ],
+      [
+        86,
+        37
+      ],
+      [
+        127,
+        14
+      ]
+    ]
+  },
+  "hues": {
+    "size": 265500,
+    "first24": [
+      "0x0",
+      "0x0",
+      "0x1",
+      "0x1",
+      "0x1",
+      "0x1",
+      "0x1",
+      "0x1",
+      "0x1",
+      "0x1",
+      "0x1",
+      "0x1",
+      "0x1",
+      "0x1",
+      "0x1",
+      "0x1",
+      "0x1",
+      "0x1",
+      "0x1",
+      "0x1",
+      "0x1",
+      "0x1",
+      "0x1",
+      "0x1"
+    ]
+  },
+  "skills": {
+    "skills.mul": {
+      "size": 704,
+      "strings": [
+        "Alchemy",
+        "Anatomy",
+        "Animal Lore",
+        "Item Identification",
+        "Arms Lore",
+        "Parrying",
+        "Begging",
+        "Blacksmithy",
+        "Bowcraft/Fletching",
+        "Peacemaking",
+        "Camping",
+        "Carpentry",
+        "Cartography",
+        "Cooking",
+        "Detecting Hidden",
+        "Discordance",
+        "Evaluating Intelligence",
+        "Healing",
+        "Fishing",
+        "Forensic Evaluation",
+        "Herding",
+        "Hiding",
+        "Provocation",
+        "Inscription",
+        "Lockpicking",
+        "Magery",
+        "Resisting Spells",
+        "Tactics",
+        "Snooping",
+        "Musicianship",
+        "Poisoning",
+        "Archery",
+        "Spirit Speak",
+        "Stealing",
+        "Tailoring",
+        "Animal Taming",
+        "Taste Identification",
+        "Tinkering",
+        "Tracking",
+        "Veterinary",
+        "Swordsmanship",
+        "Mace Fighting",
+        "Fencing",
+        "Wrestling",
+        "Lumberjacking",
+        "Mining",
+        "Meditation",
+        "Stealth",
+        "Remove Trap",
+        "Necromancy",
+        "Focus",
+        "Chivalry",
+        "Bushido",
+        "Ninjitsu",
+        "Spellweaving",
+        "Throwing",
+        "Imbuing",
+        "Mysticism"
+      ]
+    },
+    "skills.idx": {
+      "size": 3072,
+      "strings": []
+    },
+    "skillgrp.mul": {
+      "size": 338,
+      "strings": [
+        "Combat",
+        "Trade Skills",
+        "Magic",
+        "Wilderness",
+        "Thieving",
+        "Bard"
+      ]
+    }
+  },
+  "sizes": {
+    "anim.idx": 1785720,
+    "anim.mul": 194950053,
+    "anim2.mul": 212120796,
+    "animinfo.mul": 4000,
+    "animdata.mul": 4486748,
+    "multi.idx": 101760,
+    "multi.mul": 994832,
+    "radarcol.mul": 163768,
+    "texidx.mul": 196608
+  },
+  "uop": {
+    "artLegacyMUL.uop": {
+      "magic": "MYP\u0000",
+      "version": 5,
+      "fields": [
+        4246989891,
+        8266,
+        0,
+        1000,
+        43760,
+        1,
+        1,
+        0
+      ],
+      "size": 156335066
+    },
+    "gumpartLegacyMUL.uop": {
+      "magic": "MYP\u0000",
+      "version": 4,
+      "fields": [
+        4246989891,
+        40,
+        0,
+        100,
+        5579,
+        0,
+        0,
+        0
+      ],
+      "size": 81491907
+    },
+    "map0LegacyMUL.uop": {
+      "magic": "MYP\u0000",
+      "version": 5,
+      "fields": [
+        4246989891,
+        803464,
+        0,
+        1000,
+        113,
+        1,
+        1,
+        0
+      ],
+      "size": 89965542
+    },
+    "soundLegacyMUL.uop": {
+      "magic": "MYP\u0000",
+      "version": 4,
+      "fields": [
+        4246989891,
+        40,
+        0,
+        100,
+        1655,
+        0,
+        0,
+        0
+      ],
+      "size": 168385870
+    },
+    "AnimationFrame1.uop": {
+      "magic": "MYP\u0000",
+      "version": 4,
+      "fields": [
+        4246989891,
+        40,
+        0,
+        100,
+        492,
+        0,
+        0,
+        0
+      ],
+      "size": 107079799
+    },
+    "AnimationSequence.uop": {
+      "magic": "MYP\u0000",
+      "version": 4,
+      "fields": [
+        4246989891,
+        40,
+        0,
+        100,
+        391,
+        0,
+        0,
+        0
+      ],
+      "size": 119581
+    },
+    "MultiCollection.uop": {
+      "magic": "MYP\u0000",
+      "version": 4,
+      "fields": [
+        4246989891,
+        40,
+        0,
+        100,
+        873,
+        0,
+        0,
+        0
+      ],
+      "size": 568698
+    },
+    "tileart.uop": {
+      "magic": "MYP\u0000",
+      "version": 4,
+      "fields": [
+        4246989891,
+        40,
+        0,
+        100,
+        40750,
+        0,
+        0,
+        0
+      ],
+      "size": 6133768
+    },
+    "MainMisc.uop": {
+      "magic": "MYP\u0000",
+      "version": 4,
+      "fields": [
+        4246989891,
+        40,
+        0,
+        100,
+        4,
+        0,
+        0,
+        0
+      ],
+      "size": 117376
+    },
+    "string_dictionary.uop": {
+      "magic": "MYP\u0000",
+      "version": 4,
+      "fields": [
+        4246989891,
+        40,
+        0,
+        100,
+        1,
+        0,
+        0,
+        0
+      ],
+      "size": 425427
+    }
+  },
+  "cliloc": {
+    "size": 5110078,
+    "first": [
+      [
+        2388730639,
+        50889659,
+        3216,
+        "̈ಐ\u0002ѵ\u0002ා\u0002ᙯ\u0002ጱ\u0002ᔸ\u0002⃓\u0002ᥩ\u0002ڼ\u0002Ѷ\u0002Ȗ\u0002ʈ\u0002೐\u0002ȩ\u0002砤\u0002꿓\u0002혜\u0002⏲\u0002᫉\u0002ʺ\u0002ʣ\u0002Ȭ\u0002₭\u0002ɭ\u0002ɽ\u0002⮽\u0002ʞ\u0002ʐ\u0002Ⱦ\u0002Ⱦ\u0002ɢ\u0002̭䓧\u0002ⶕ\u0002ႄ\u0002㟄\u0002ઓ\u0002ഃ\u0002伶\u0002❷"
+      ],
+      [
+        33883140,
+        84215042,
+        1028,
+        "ԅЄČЃȒ؉܅ЁА܄\u0004ဃ̆܄ฎԇ̀ऀ̉Ȓ؉ँࠂ̂ІȀāĂĄ̀̆ЅȎ؅Ԅ܂́ऍԂȇȂࠀ\u0001̃̄܆ఈ́܁ȂԃంԅЄंࠄȃЂ̍\u0002ĆԂଂȃЀȁȄą̄ą̂Ȃ̇ĂĆĆȅ̃ā؃"
+      ],
+      [
+        201524231,
+        251922946,
+        2307,
+        "༄ः܁༄༁ईଆȍంఄഃଃă\u0001ࠁ\u0001ĂЊ܈ȃ\u0005ԅāЃȁ̋ᐃܐā༑ԃഄंȂЄĆ਑᠏Ȃ\u0001ĉ഍ЊāଂȄЄā༂\u0004Ѐခȃ\u0000ăഃԃ̆\u0005Ԅ\u0002అ̄āఁሁଃȁࠁఄ̊̃ଃąँЇБ଄ဂȉ"
+      ],
+      [
+        34212101,
+        67503110,
+        4096,
+        "Іက̂అІЊЈЄЄЄЄЄЄЄЄЄȑ̑ऊ܆ĀࠄȄЄЅ\u0003ȏ̅ԅ̄ԀȅЃЂ̄ĄЄ\u0001Ԁ́Ȇആȁࠄआ܅ЇࠉЁ̃\u0001ःआ،\u0003\u0005؂ȃ਀ЃЄĂ܏ЂĀȆ\u0005Ą؂ဂ̆Ѐ؁ȂЅ̇Ѓĉ\u0002Ĉ"
+      ],
+      [
+        50660367,
+        16974848,
+        2048,
+        "ăࠀԌȀ܅Ёࠆ؊؇\u0000จȁ਄́ਈЀЄЄሀЋȊȅ̊ЄइȃȈԅЁЅȂ\u0000ԉࠈ܇܄̇ࠂԂąԄȄ\u0002̀Ȃȃ\u0002ࠀԃЄȃȆԆЋāĀข\u0005ԇ̂\u0003ċȅ଄ȄԁЅ؃؎ਃȁĆĆЇЈ̑ԅइĊ؍"
+      ],
+      [
+        84082948,
+        101320715,
+        6,
+        "؊\u0006\u0000"
+      ]
+    ]
+  }
+}

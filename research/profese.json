@@ -1,0 +1,142 @@
+[
+  {
+    "name": "Samurai",
+    "true_name": "Samurai",
+    "name_id": 1062948,
+    "desc_id": 1062950,
+    "top_level": true,
+    "type": "Profession",
+    "gump": 5591,
+    "skills": {
+      "Bushido": 30,
+      "Swordsmanship": 30,
+      "Focus": 30,
+      "Parrying": 30
+    },
+    "stats": {
+      "Str": 40,
+      "Dex": 30,
+      "Int": 20
+    }
+  },
+  {
+    "name": "Ninja",
+    "true_name": "Ninja",
+    "name_id": 1062949,
+    "desc_id": 1062951,
+    "top_level": true,
+    "type": "Profession",
+    "gump": 5589,
+    "skills": {
+      "Ninjitsu": 30,
+      "Hiding": 30,
+      "Fencing": 30,
+      "Stealth": 30
+    },
+    "stats": {
+      "Str": 40,
+      "Dex": 30,
+      "Int": 20
+    }
+  },
+  {
+    "name": "Paladin",
+    "true_name": "Paladin",
+    "name_id": 1061177,
+    "desc_id": 1061227,
+    "top_level": true,
+    "type": "Profession",
+    "gump": 5587,
+    "skills": {
+      "Chivalry": 30,
+      "Tactics": 30,
+      "Focus": 30,
+      "Swordsmanship": 30
+    },
+    "stats": {
+      "Str": 45,
+      "Dex": 20,
+      "Int": 25
+    }
+  },
+  {
+    "name": "Necromancer",
+    "true_name": "Necromancer",
+    "name_id": 1061178,
+    "desc_id": 1061228,
+    "top_level": true,
+    "type": "Profession",
+    "gump": 5557,
+    "skills": {
+      "Necromancy": 30,
+      "Spirit Speak": 30,
+      "Swordsmanship": 30,
+      "Meditation": 30
+    },
+    "stats": {
+      "Str": 25,
+      "Dex": 20,
+      "Int": 45
+    }
+  },
+  {
+    "name": "Warrior",
+    "true_name": "Warrior",
+    "name_id": 1061180,
+    "desc_id": 1061230,
+    "top_level": true,
+    "type": "Profession",
+    "gump": 5577,
+    "skills": {
+      "Tactics": 30,
+      "Healing": 30,
+      "Swordsmanship": 30,
+      "Anatomy": 30
+    },
+    "stats": {
+      "Str": 45,
+      "Dex": 35,
+      "Int": 10
+    }
+  },
+  {
+    "name": "Mage",
+    "true_name": "Mage",
+    "name_id": 1061179,
+    "desc_id": 1061229,
+    "top_level": true,
+    "type": "Profession",
+    "gump": 5569,
+    "skills": {
+      "Magery": 30,
+      "Meditation": 30,
+      "Evaluate Intelligence": 30,
+      "Wrestling": 30
+    },
+    "stats": {
+      "Str": 25,
+      "Dex": 20,
+      "Int": 45
+    }
+  },
+  {
+    "name": "Blacksmith",
+    "true_name": "Blacksmith",
+    "name_id": 1061181,
+    "desc_id": 1061231,
+    "top_level": true,
+    "type": "Profession",
+    "gump": 5555,
+    "skills": {
+      "Blacksmith": 30,
+      "Tinkering": 30,
+      "Mining": 30,
+      "Tailoring": 30
+    },
+    "stats": {
+      "Str": 60,
+      "Dex": 15,
+      "Int": 15
+    }
+  }
+]

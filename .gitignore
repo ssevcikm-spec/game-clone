@@ -1,0 +1,33 @@
+# Co se necommituje
+
+# --- extrahované assety z instalace UO (autorská díla, generuje si je každý sám) ---
+assets/uo/
+assets/atlas/
+*.mul
+*.uop
+*.idx
+Cliloc.*
+
+# --- klony referenčních zdrojů (BSD/GPL kód, jen ke čtení) ---
+_src/
+.research-src/
+research/refs/
+research/_src/servuo/
+research/_src/modernuo/
+.cache/
+
+# --- Godot ---
+.godot/
+*.import
+export/
+export_presets.cfg
+
+# --- dočasné a pracovní ---
+.tmp/
+*.tmp
+*.log
+_analyza/
+
+# --- poznámka ---
+# research/*.md, research/*.json (parse), research/probe/, tools/, docs/, .forge/
+# se COMMITUJÍ: jsou to podklady zadání a důkazy měření, ne assety.
