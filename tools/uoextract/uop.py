@@ -146,6 +146,112 @@ def hash_candidates(name: str) -> dict[str, int]:
     }
 
 
+_BWT_TABLES: dict[int, list[int]] = {}
+
+
+def _bwt_build_table(start: int) -> list[int]:
+    # Tabulka je pro dany start porad stejna a stavi se z 65 536 hodnot -
+    # bez cache by se u tisicu gumpu pocitala porad dokola.
+    table = _BWT_TABLES.get(start)
+    if table is None:
+        table = sorted((start + i) & 0xFFFF for i in range(65536))
+        _BWT_TABLES[start] = table
+    return table.copy()
+
+
+def _bwt_shift_left(symbols: list[int], upto: int) -> None:
+    for i in range(upto):
+        symbols[i] = symbols[i + 1]
+
+
+def _bwt_frequency(counts: list[int]) -> list[int]:
+    """Indexy symbolu serazene podle cetnosti (selection sort jako v C#)."""
+    work = list(counts[:256])
+    order: list[int] = []
+    for _ in range(256):
+        best_index, best_value = 0, 0
+        for j in range(256):
+            if work[j] > best_value:
+                best_index, best_value = j, work[j]
+        if best_value == 0:
+            break
+        order.append(best_index)
+        work[best_index] = 0
+    return order
+
+
+def _bwt_internal(data: bytes, length: int = 0) -> bytes:
+    """Druha cast BWT dekomprese (MTF + tabulka cetnosti) - port z ClassicUO."""
+    if len(data) < 1024:
+        return b""
+    counts = list(struct.unpack_from("<256I", data, 0))
+    total = sum(counts)
+    if length == 0:
+        length = total
+    if total != length:
+        return b""
+    symbols = list(range(256))
+    starts = [0] * 256
+    ends = [0] * 256
+    non_zero = sum(1 for c in counts if c)
+    order = _bwt_frequency(counts)
+    m = 0
+    for i in range(non_zero):
+        symbol = order[i]
+        symbols[data[m + 1024]] = symbol
+        starts[symbol] = m + 1
+        m += counts[symbol]
+        ends[symbol] = m
+    out = bytearray()
+    value = symbols[0]
+    while len(out) < length:
+        first = starts[value]
+        out.append(value)
+        if first >= ends[value]:
+            old = non_zero
+            non_zero -= 1
+            if old > 0:
+                _bwt_shift_left(symbols, non_zero)
+                value = symbols[0]
+        else:
+            index = data[first + 1024]
+            starts[value] = first + 1
+            if index != 0:
+                _bwt_shift_left(symbols, index)
+                symbols[index] = value
+                value = symbols[0]
+    return bytes(out)
+
+
+def bwt_decompress(buffer: bytes) -> bytes:
+    """Port `BwtDecompress` z ClassicUO (src/ClassicUO.Utility/BwtDecompress.cs, BSD-2).
+
+    Hlavicka: u32 (nepouziva se) + 1 B firstChar. Pak se pro kazdy dalsi bajt
+    otoci tabulkou 65536 hodnot; vysledek je MTF proud pro druhou cast.
+    Pouziva ji gumpart (flag 3) i Cliloc.enu - proto je na vrstve kontejneru.
+    """
+    if len(buffer) < 6:
+        return b""
+    table = _bwt_build_table(buffer[4])
+    out = bytearray(len(buffer) - 4)
+    first = buffer[4]
+    pos = 5
+    index = 0
+    while index < len(out):
+        value = table[first]
+        current = first
+        while current > 0:
+            table[current] = table[current - 1]
+            current -= 1
+        table[0] = value
+        out[index] = value & 0xFF
+        index += 1
+        if pos < len(buffer):
+            first = buffer[pos]
+            pos += 1
+    return _bwt_internal(bytes(out), 0)
+
+
 class UopEntry:
     __slots__ = ("offset", "header_length", "compressed_length", "decompressed_length",
                  "hash", "data_hash", "flag")
@@ -194,11 +300,14 @@ class UopFile:
             return None
         start = entry.offset + entry.header_length
         raw = self.raw[start:start + entry.compressed_length]
-        if entry.flag == 1:
-            return zlib.decompress(raw)
+        # Flagy podle ClassicUO CompressionType: 0 = raw, 1 a 2 = zlib,
+        # 3 = zlib + BWT (gumpart ma v teto instalaci VSECHNY zaznamy flag 3).
+        if entry.flag in (1, 2, 3):
+            data = zlib.decompress(raw)
+            return bwt_decompress(data) if entry.flag == 3 else data
         if entry.flag == 0:
             return self.raw[start:start + entry.decompressed_length]
-        raise NotImplementedError(f"flag {entry.flag} (3 = zlib+bwt) zatim nepodporovan")
+        raise NotImplementedError(f"neznama komprese flag {entry.flag}")
 
     def hashes(self) -> set[int]:
         return {e.hash for e in self.entries if e.hash}
