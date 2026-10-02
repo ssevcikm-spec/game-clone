@@ -156,7 +156,7 @@ class UopEntry:
 
 
 class UopFile:
-    """Cteni MYP0 kontejneru. `raw` je jen pro offline testy."""
+    """Cteni MYP0 kontejneru. `raw` je jen pro offline testy (self-test)."""
 
     def __init__(self, path: str | Path | None = None, raw: bytes | None = None) -> None:
         self.path = str(path) if path else "<memory>"
@@ -219,6 +219,13 @@ class UopFile:
     def get(self, name: str, mode: str = "jenkins_pc_pb") -> bytes | None:
         entry = self.resolve(name, mode)
         return None if entry is None else self.read_data(entry)
+
+
+# Zpetna kompatibilita: vyzkumne sondy (areas_4_7, debug_diamond, gumps,
+# gump_bwt, gump_header, hash_probe) importuji `UOFileUop`. Pri prepsani na
+# smluvni API se trida jmenuje `UopFile`; alias drzi sondy funkcni, aby se
+# mericí historie dala kdykoli spustit znovu.
+UOFileUop = UopFile
 
 
 def verify(path: Path, indices: int = 2000, mode_out: list[str] | None = None) -> tuple[int, list[str]]:
