@@ -5,7 +5,7 @@ extends RefCounted
 #   core.const ... docs/04 §4.2 (tabulka core) + docs/02 §2.4
 #   core.iso ..... docs/02 §2.4 (projekce a inverze), prompt granule (1000 bodu)
 #   core.rng ..... docs/04 §4.2, docs/02 §2.3; znamy vektor PCG32 je overeny
-#                  nezavislou implementaci (.cache/pcg32_ref.py, 2026-10-02)
+#                  nezavislou implementaci (tools/gates/pcg32_reference.py --check)
 #
 # Kontroly NEPODMINENE: dokud soubor neexistuje, spadnou (docs/09 §9.5).
 
@@ -32,8 +32,18 @@ func run(t) -> void:
 	_check_rng(t)
 
 
+# Nacteni souboru granule - case si to resi sam, harness dava jen _check().
+func _load_script(path: String):
+	return load(path) if FileAccess.file_exists(path) else null
+
+
+func _consts(path: String) -> Dictionary:
+	var script = _load_script(path)
+	return {} if script == null else script.get_script_constant_map()
+
+
 func _check_const(t) -> void:
-	var c: Dictionary = t.consts("res://core/const.gd")
+	var c: Dictionary = _consts("res://core/const.gd")
 	if c.is_empty():
 		t._pending("core.const NENI HOTOVA: core/const.gd chybi nebo nema konstanty")
 		return
@@ -53,7 +63,7 @@ func _check_const(t) -> void:
 
 
 func _check_iso(t) -> void:
-	var script = t.load_script("res://core/iso.gd")
+	var script = _load_script("res://core/iso.gd")
 	if script == null:
 		t._pending("core.iso NENI HOTOVA: core/iso.gd chybi")
 		return
@@ -88,7 +98,7 @@ func _check_iso(t) -> void:
 
 
 func _check_rng(t) -> void:
-	var script = t.load_script("res://core/rng.gd")
+	var script = _load_script("res://core/rng.gd")
 	if script == null:
 		t._pending("core.rng NENI HOTOVA: core/rng.gd chybi")
 		return

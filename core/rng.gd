@@ -1,24 +1,19 @@
 extends RefCounted
 # Deterministicky generator nahody: PCG32 (PCG-XSH-RR 64/32), docs/02 §2.3.
+# Stav je ulozitelny (`state()`/`restore()`) a cely zije v simulaci - proto se
+# v sim/ NESMI pouzivat `randf()` ani `randi()` (docs/09 §9.10.4).
 #
-# Stav je uložitelny (`state()` / `restore()`) a cely zije v simulaci - proto
-# se v sim/ NESMI pouzivat `randf()` ani `randi()` (docs/09 §9.10.4).
+#   state = state * MULT + inc      (mod 2^64, int64 v GDScriptu)
+#   xorshifted = ((state >> 18) ^ state) >> 27   (LOGICKY posun)
+#   rot = state >> 59;  out = rotr32(xorshifted, rot)
 #
-# Algoritmus (kanonicky PCG32):
-#   state = state * MULT + inc            (mod 2^64, int64 v GDScriptu)
-#   xorshifted = ((state >> 18) ^ state) >> 27
-#   rot = state >> 59
-#   out = rotr32(xorshifted, rot)
+# PAST (namEReno 2026-10-02): GDScript `>>` je ARITMETICKY (siri znamenko) a
+# maskovat az vysledek NESTACI - znamenkovy bit se posunem >> 27 dostane do
+# bitu 19, tedy dovnitr povinneho rozsahu (5 z 10 hodnot vektoru vyslo spatne).
+# Proto ma kazdy logicky posun helper `_shr`; vektor v tests/cases/core.gd
+# pocita nezavisla reference: python tools/gates/pcg32_reference.py --check.
 #
-# Pozn. k posunu: GDScript `>>` je ARITMETICKY (siri znamenko), PCG chce logicky.
-# Maskovat az vysledek NESTACI - znamenkovy bit se pri posunu >> 27 posune do
-# bitu 19, tedy dovnitr povinneho rozsahu (namEReno 2026-10-02: 5 z 10 hodnot
-# znameho vektoru vyslo spatne, stavova posloupnost byla pritom spravna).
-# Proto ma kazdy logicky posun vlastni helper `_shr`, ktery znamenkove bity
-# vstupu vymaskuje. Spravnost overuje znamy vektor v tests/cases/core.gd.
-#
-# Seedovani je kanonicke `pcg32_srandom_r`: inc = (stream << 1) | 1, pak dva
-# kroky s prictenim seedu mezi nimi. Stream je defaultni (jen jeden proud).
+# Seedovani je kanonicke `pcg32_srandom_r` (jeden defaultni proud).
 
 const MULT: int = 6364136223846793005
 const DEFAULT_STREAM: int = 1442695040888963407
@@ -46,10 +41,8 @@ func next_u32() -> int:
 
 
 func _shr(value: int, bits: int) -> int:
-	# Logicky posun vpravo na 64bitovem vzoru ulozenem v int64.
-	if bits <= 0:
-		return value
-	if value >= 0:
+	# Logicky posun vpravo na 64bitovem vzoru v int64 (GDScript umi jen aritmeticky).
+	if bits <= 0 or value >= 0:
 		return value >> bits
 	return (value >> bits) & ((1 << (64 - bits)) - 1)
 

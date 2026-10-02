@@ -2,20 +2,16 @@ extends SceneTree
 # Headless test harness (docs/04 §4.8). Spousteni:
 #   godot --headless --path . --script res://tests/run_tests.gd
 #
-# Testy jsou SPEC (docs/09 §9.5) - agent je NEMENI. Kazda kontrola je
-# NEPODMINENA: kdyz soubor granule jeste neexistuje, kontrola SPADNE.
-# Podmineny test je casovana bomba - mlci presne do chvile, kdy ma merit.
+# Testy jsou SPEC (docs/09 §9.5) - agent je NEMENI. Kontroly v tests/cases/*.gd
+# jsou NEPODMINENE: kdyz soubor granule chybi, kontrola SPADNE (podmineny test
+# je casovana bomba - mlci presne do chvile, kdy ma merit).
+# Vystup: "N kontrol, M selhani"; exit 0 = ok, 1 = selhalo, 2 = 0 kontrol.
 #
-# Vystup: "N kontrol, M selhani" a nenulovy exit kod:
-#   0 = vsechno proslo, 1 = neco selhalo, 2 = 0 kontrol (NEMERENO neni uspech).
-#
-# Kontroly jsou v tests/cases/*.gd - kazdy case ma `func run(t) -> void`.
-
+# Harness dava k dispozici jen `_check()` a `_pending()` (coz je deklarovane
+# `provides`); nacteni souboru a konstant si resi kazdy case sam.
 const CASES_DIR := "res://tests/cases"
-
 var _checks: int = 0
 var _failed: int = 0
-
 
 func _check(ok: bool, name: String) -> void:
 	_checks += 1
@@ -24,28 +20,20 @@ func _check(ok: bool, name: String) -> void:
 	_failed += 1
 	print("[test] FAIL ", name)
 
-
 func _pending(text: String) -> void:
-	# Kontrola, ktera se neda provest (granule neni hotova). NENI zelena.
+	# Kontrola, ktera se neda provest (granule neni hotova) - NENI zelena.
 	_check(false, text)
 
-
-func has_file(path: String) -> bool:
-	return FileAccess.file_exists(path)
-
-
-func load_script(path: String) -> Variant:
-	if not FileAccess.file_exists(path):
-		return null
-	return load(path)
-
-
-func consts(path: String) -> Dictionary:
-	var script = load_script(path)
+func _init_case(path: String):
+	var script = load(path) if FileAccess.file_exists(path) else null
 	if script == null:
-		return {}
-	return script.get_script_constant_map()
-
+		_pending("case soubor " + path + " nelze nacist")
+		return null
+	var test_case = script.new()
+	if test_case == null or not test_case.has_method("run"):
+		_pending("case " + path + " nema run(t)")
+		return null
+	return test_case
 
 func _initialize() -> void:
 	var dir := DirAccess.open(CASES_DIR)
@@ -61,14 +49,8 @@ func _initialize() -> void:
 	files.sort()
 	print("[test] case souboru: ", files.size())
 	for name in files:
-		var path: String = CASES_DIR + "/" + name
-		var script = load_script(path)
-		if script == null:
-			_pending("case soubor " + path + " nelze nacist")
-			continue
-		var test_case = script.new()
-		if test_case == null or not test_case.has_method("run"):
-			_pending("case " + path + " nema run(t)")
+		var test_case = _init_case(CASES_DIR + "/" + name)
+		if test_case == null:
 			continue
 		print("[test] -- ", name)
 		test_case.run(self)
