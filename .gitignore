@@ -7,6 +7,11 @@ assets/atlas/
 *.uop
 *.idx
 Cliloc.*
+# POZOR (namEReno 2026-10-02): git na Windows porovnava vzory BEZ OHLEDU NA
+# VELIKOST PISMEN, takze `Cliloc.*` pohlcuje i nastroj tools/uoextract/cliloc.py.
+# Vysledek: soubor existoval na disku, ale v gitu nebyl - a "hotovo" znamena
+# soubor v main. Vyjimka proto musi byt vyslovna a posledni.
+!tools/uoextract/cliloc.py
 
 # --- klony referenčních zdrojů (BSD/GPL kód, jen ke čtení) ---
 _src/
