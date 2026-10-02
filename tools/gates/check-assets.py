@@ -48,13 +48,86 @@ def collect_entries(data) -> tuple[list[dict], str]:
     return [], "neznámý tvar"
 
 
+def check_extraction_outputs(root: Path, gate: Gate) -> int:
+    """Zkontroluje, co uz je extrahovane na disku (assets/uo/...).
+
+    Proc: G6 dosud umela jen manifest atlasu, ktery v CI neni - takze vždy
+    NEMERENO. Extrahovana data pritom vznikaji uz v M1 (mapa, barvy, nahledy)
+    a jdou zkontrolovat hned. Kdyz nic z toho neni, vraci 0 a brana se chova
+    jako predtim (SKIP kvuli chybejicim assetum, docs/08 §8.4).
+
+    Vse se overuje proti CISLUM V SOUBORECH, ne proti dojmu: meta.json mapy
+    musi sedet na velikosti souboru, ktere popisuje.
+    """
+    checked = 0
+
+    meta_path = root / "assets" / "uo" / "world" / "map0.meta.json"
+    if meta_path.exists():
+        try:
+            meta = load_json(meta_path)
+        except Exception as exc:
+            gate.error(f"world/map0.meta.json se nedá přečíst ({exc})")
+            return checked
+        checked += 1
+        land_path = root / "assets" / "uo" / "world" / "map0.land"
+        bin_path = root / "assets" / "uo" / "world" / "map0.statics.bin"
+        idx_path = root / "assets" / "uo" / "world" / "map0.statics.idx"
+        blocks = int(meta.get("blocks_x", 0)) * int(meta.get("blocks_y", 0))
+        gate.measure("mapa_bloku", blocks)
+        gate.measure("mapa_dlazdic", int(meta.get("land_tiles", 0)))
+        if land_path.exists():
+            expected = blocks * int(meta.get("block_bytes", 0))
+            actual = land_path.stat().st_size
+            gate.measure("mapa_land_bajtu", actual)
+            if expected and actual != expected:
+                gate.error(f"map0.land má {actual} B, meta.json říká {expected} B")
+        else:
+            gate.error("world/map0.meta.json je, ale map0.land chybí")
+        if idx_path.exists() and bin_path.exists():
+            rows = idx_path.stat().st_size // 12
+            if rows != blocks:
+                gate.error(f"map0.statics.idx má {rows} bloků, meta.json říká {blocks}")
+        else:
+            gate.error("world/map0.meta.json je, ale statics .idx/.bin chybí")
+
+    hues_path = root / "assets" / "uo" / "hues.json"
+    if hues_path.exists():
+        try:
+            hues = load_json(hues_path)
+        except Exception as exc:
+            gate.error(f"hues.json se nedá přečíst ({exc})")
+            return checked
+        sets = hues.get("sets", [])
+        checked += 1
+        gate.measure("hues_sad", len(sets))
+        if len(sets) != 3000:
+            gate.error(f"hues.json má {len(sets)} sad, docs/03 §3.2b říká 3000")
+        empty = [s for s in sets if len(s.get("colors", [])) != 32]
+        if empty:
+            gate.error(f"{len(empty)} sad nemá 32 barev (první: {empty[0].get('set')})")
+        named = sum(1 for s in sets if s.get("name"))
+        gate.measure("hues_pojmenovanych", named)
+        if named == 0:
+            gate.error("hues.json nemá ani jednu pojmenovanou sadu")
+
+    if checked:
+        gate.note("assety z instalace UO (lokálně vyextrahované) - měřeno, viz measured")
+    return checked
+
+
 def check(root: Path, gate: Gate) -> None:
+    measured_outputs = check_extraction_outputs(root, gate)
     manifest = find_manifest(root)
     if manifest is None:
-        gate.skip(
-            "manifest atlasu není (assety se extrahují lokálně z instalace UO; "
-            "v CI chybí - kontrola NEPROBĚHLA, docs/08 §8.4)"
-        )
+        if measured_outputs:
+            # Neco jsme zmerili, takze NEMERENO nema smysl; chybejici manifest
+            # je jen poznamka (v CI assety nejsou, docs/08 §8.4).
+            gate.note("manifest atlasu není (v CI chybí; kontrola manifestu NEPROBĚHLA)")
+        else:
+            gate.skip(
+                "manifest atlasu není (assety se extrahují lokálně z instalace UO; "
+                "v CI chybí - kontrola NEPROBĚHLA, docs/08 §8.4)"
+            )
         return
 
     try:
