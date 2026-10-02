@@ -1,0 +1,13 @@
+; Vstupní scéna projektu (docs/02 §2.5).
+;
+; ZATÍM ZÁMĚRNĚ PRÁZDNÁ: kořen Node2D a žádný skript. app/main.gd patří granuli
+; app.main (M0, závisí na sim.world_loop); kdyby na něj scéna odkazovala dřív,
+; Godot ohlásí SCRIPT ERROR a G11 (smoke) spadne právem.
+;
+; Otevřený požadavek pro člověka: roadmapa .tscn soubor nezná v žádném "owns"
+; (boot.project vlastní jen project.godot, app.main jen app/main.gd), takže
+; připojení skriptu k tomuto uzlu je integrační krok bez vlastníka.
+
+[gd_scene format=3]
+
+[node name="Main" type="Node2D"]

@@ -1,0 +1,21 @@
+# Konce řádků jednotně LF.
+#
+# Důvod (naměřeno na této stanici): `core.autocrlf=true` překlápí soubory na
+# CRLF, takže se pracovní strom rozchází s indexem a příští session to čte jako
+# "necommitnutou změnu, která neexistuje". U skriptů je to horší: `.sh`
+# s CRLF přestane fungovat v bash na Linuxu.
+#
+# Godot, Python i bash zvládají LF na Windows bez problému.
+
+* text=auto eol=lf
+
+# Binární soubory - v těch se nic nepřekládá
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.wav binary
+*.mp3 binary
+*.ogg binary
+*.mul binary
+*.uop binary
+*.idx binary

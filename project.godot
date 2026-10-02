@@ -1,0 +1,37 @@
+; Konfigurace projektu — UO klon (single-player, offline).
+;
+; Vlastní jen bootstrap granule boot.project; granule do tohoto souboru nesmí
+; zasahovat (docs/07 §7.1.5, docs/09 §9.2).
+;
+; HERNÍ KONSTANTY SEM NEPATŘÍ. TILE_W, ISO_STEP, WALK_MS, capy apod. mají jediné
+; místo — core/const.gd — protože G1 (check-schema) hlásí rozpor, když tutéž
+; hodnotu tvrdí dva zdroje (docs/08 §8.3). Tady jsou jen věci enginu.
+
+config_version=5
+
+[application]
+
+config/name="UO klon"
+config/description="Věrný single-player klon Ultima Online nad originálními daty UO Classic (docs/01)."
+run/main_scene="res://app/main.tscn"
+config/features=PackedStringArray("4.7", "GL Compatibility")
+
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/stretch/mode="canvas_items"
+window/stretch/aspect="keep"
+
+[rendering]
+
+; gl_compatibility kvůli snímkům v CI (docs/02 §2.1, docs/08 §8.4).
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+; 0 = Nearest: art UO je pixel-art, lineární filtr ho rozmazává (docs/02 §2.4).
+textures/canvas_textures/default_texture_filter=0
+
+[debug]
+
+; Konvence z docs/02 §2.1: GDScript je typovaný. 1 = upozornit na netypovaný var.
+gdscript/warnings/untyped_declaration=1

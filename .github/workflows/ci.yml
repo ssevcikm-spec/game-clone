@@ -1,0 +1,84 @@
+# CI - brány a testy (docs/08 §8.2, §8.4).
+#
+# Poznámka pro člověka: tenhle soubor vlastní bootstrap granule `boot.gates`
+# a granule do něj nesmí zasahovat (docs/07 §7.1.5).
+#
+# UNVERIFIED (2026-10-02): workflow se na této stanici NEDÁ spustit - repo nemá
+# remote ani GitHub běžce. Ověřeno lokálně je jen to, co jde: `run-all.py`
+# včetně self-testů všech bran, `ci-godot.sh` (syntaxe) a to, že každá brána má
+# nenulový počet měřených objektů. Ověřit při prvním běhu: přesná URL a SHA-256
+# linuxového Godotu 4.7.2 (záměrně tu není vymyšlené číslo) a chování
+# `--write-movie` v CI.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  gates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GODOT_BIN: ${{ github.workspace }}/.cache/godot/godot
+      GODOT_VERSION: 4.7.2-stable
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Závislosti bran (Pillow, numpy)
+        run: python -m pip install --disable-pip-version-check Pillow numpy
+
+      - name: Godot ${{ env.GODOT_VERSION }}
+        run: |
+          set -euo pipefail
+          mkdir -p .cache/godot
+          # UNVERIFIED: URL i kontrolní součet je potřeba ověřit při prvním běhu
+          # (docs/11 §11.6 - otevřené otázky). Verze musí odpovídat docs/02 §2.1.
+          url="https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_linux.x86_64.zip"
+          curl -fsSL -o godot.zip "$url"
+          unzip -q godot.zip -d .cache/godot
+          mv ".cache/godot/Godot_v${GODOT_VERSION}_linux.x86_64" "$GODOT_BIN"
+          chmod +x "$GODOT_BIN"
+          "$GODOT_BIN" --headless --version
+
+      - name: Důkaz, že brány umí selhat (self-testy)
+        env:
+          GODOT: ${{ env.GODOT_BIN }}
+        run: python tools/gates/run-all.py --self-test
+
+      - name: Godot: import, testy, snímek (boot.ci_env)
+        run: bash tools/gates/ci-godot.sh .
+
+      - name: Brány v závazném pořadí (G1 → G3 → G5 → … → G10)
+        env:
+          GODOT: ${{ env.GODOT_BIN }}
+        run: python tools/gates/run-all.py
+
+      - name: Souhrn bran do přehledu běhu
+        if: always()
+        run: |
+          if [ -f .cache/gates/summary.json ]; then
+            echo '```json' >> "$GITHUB_STEP_SUMMARY"
+            cat .cache/gates/summary.json >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'Souhrn bran nevznikl - brány NEPROBĚHLY' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Artefakty (souhrn bran + snímek)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gates
+          path: |
+            .cache/gates/
+            .cache/render/
+          if-no-files-found: warn
+          retention-days: 14

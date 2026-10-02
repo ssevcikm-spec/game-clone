@@ -27,6 +27,8 @@ export_presets.cfg
 *.tmp
 *.log
 _analyza/
+__pycache__/
+*.pyc
 
 # --- poznámka ---
 # research/*.md, research/*.json (parse), research/probe/, tools/, docs/, .forge/
