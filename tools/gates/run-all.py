@@ -172,8 +172,16 @@ def main() -> int:
     return worst
 
 
+EXTRACTOR_SELFTESTS = ["uop", "art", "gump", "worldmap", "cliloc", "tiledata", "hues", "textdata"]
+
+
 def selftest_all(root: Path) -> int:
-    """Kazda brana dokaze, ze umi selhat - jinak je to dekorace (docs/08 §8.1)."""
+    """Kazda brana dokaze, ze umi selhat - jinak je to dekorace (docs/08 §8.1).
+
+    Zamerne se pousteji i self-testy extrakcnich nastroju (tools/uoextract/):
+    jsou OFFLINE (nepotrebuji instalaci UO), takze je CI muze overit vzdy -
+    dosud se poustely jen rucne a v CI by tedy nikdo nepoznal, ze se rozbily.
+    """
     failures = 0
     checked = 0
     for label, filename in build_plan(None):
@@ -193,7 +201,33 @@ def selftest_all(root: Path) -> int:
         if proc.returncode != 0:
             sys.stdout.write(proc.stdout)
             sys.stderr.write(proc.stderr)
-    print(f"[{NAME}] self-testy: {checked} bran, {failures} chyb")
+
+    extract_dir = root / "tools" / "uoextract"
+    for name in EXTRACTOR_SELFTESTS:
+        path = extract_dir / f"{name}.py"
+        if not path.exists():
+            # Nastroj, ktery v repu neni, se nesmi tise preskocit.
+            failures += 1
+            checked += 1
+            print(f"  {'X':<5} {name + '.py':<24} {'CHYBI':<6} nastroj v repu neni")
+            continue
+        proc = subprocess.run(
+            [sys.executable, str(path), "--self-test"],
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
+        )
+        checked += 1
+        tail = [ln for ln in proc.stdout.splitlines() if "self-test:" in ln]
+        status = "OK" if proc.returncode == 0 else "CHYBA"
+        if proc.returncode != 0:
+            failures += 1
+        print(f"  {'EX':<5} {name + '.py':<24} {status:<6} {tail[-1] if tail else ''}")
+        if proc.returncode != 0:
+            sys.stdout.write(proc.stdout)
+            sys.stderr.write(proc.stderr)
+
+    print(f"[{NAME}] self-testy: {checked} celkem "
+          f"({checked - len(EXTRACTOR_SELFTESTS)} bran + {len(EXTRACTOR_SELFTESTS)} extrakcnich nastroju), "
+          f"{failures} chyb")
     return VADA if failures else OK
 
 
