@@ -4,7 +4,7 @@ extends RefCounted
 # Vzorce jsou ze zadani (ZADANI §10 body 8 a 9, docs/01 §1.2):
 #   hits_max = 50 + STR/2,  stam_max = DEX,  mana_max = INT,  stat cap = 225.
 # Vse je v CELYCH cislech - staty jsou ve stavu, kde float nepatri
-# (docs/01 §1.5.3). Deleni je celociselne, tedy u licheho STR se zaokrouhluje
+# (docs/09 §9.10 bod 3). Deleni je celociselne, tedy u licheho STR se zaokrouhluje
 # dolu; to je soucast vzorce, ne nahoda.
 #
 # `int` je v GDScriptu klicove slovo, proto se pouziva `int_` - presne jak

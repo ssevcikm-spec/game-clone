@@ -216,12 +216,13 @@ za běhu hry**. Extrakce vytvoří tři soubory:
 | Soubor | Formát | Proč |
 |---|---|---|
 | `assets/uo/world/map0.land` | syrové bloky 196 B = `u32 hlavička` + **64 × 3 B** (`tile_id:u16`, `z:i8`) — **buňka je 3bajtová, ne 4bajtová** (ověřeno dekompresí bloku na přesných 0xC4000 B se všemi 262 144 tile id < 0x4000) | přesná kopie originální geometrie, čte se po blocích |
-| `assets/uo/world/map0.statics.bin` + `.idx` | `.idx` = 12 B na blok (`offset:u32`, `length:u32`, `extra:u32`), `.bin` = záznamy 7 B (`tile_id:u16`, `x:u16`, `y:u16`, `z:i8`) | statiky se čtou po blocích, stejná matematika jako originál |
+| `assets/uo/world/map0.statics.bin` + `.idx` | `.idx` = 12 B na blok (`offset:u32`, `length:u32`, `extra:u32`; nepoužitý blok má `offset` i `length` = 0xFFFFFFFF), `.bin` = záznamy **7 B = `[tile_id:u16][x:u8][y:u8][z:i8][hue:u16]`** (OPRAVENO 2026-10-02: dřív tu stálo `x:u16, y:u16`; souřadnice jsou **jeden bajt** a `0..7` v rámci bloku, na konci je navíc `hue`) | statiky se čtou po blocích, stejná matematika jako originál |
 | `assets/uo/world/map0.meta.json` | `{width, height, blocks_x, blocks_y, block_size, land_tiles, versions, source_sha256}` | co je potřeba k načtení a k ověření |
 
 **Matematika (musí být v testu, ne v hlavě):** blok `bx,by` obsahuje dlaždice
-`x = bx*8 + i`, `y = by*8 + j`; index bloku v `.land` = `by * blocks_x + bx`;
-`blocks_x = width / 8`. Ověřeno: faceta 0 = 7168 × 4096 → 896 × 512 = 458 752
+`x = bx*8 + i`, `y = by*8 + j`; **index bloku v `.land` je `bx * blocks_y + by`**
+(x-major — OPRAVENO 2026-10-02, dřív tu stálo `by * blocks_x + bx`, což je
+obráceně); `blocks_x = width / 8`, `blocks_y = height / 8`. Ověřeno: faceta 0 = 7168 × 4096 → 896 × 512 = 458 752
 bloků; `statics0.mul` 19,4 MB při průměru ~6 B/blok je konzistentní.
 
 **Zdroj mapy (rozpor R3 v §3.5.4):** `map0LegacyMUL.uop` má jen **113
@@ -409,3 +410,62 @@ Zásady:
 **neobsahují českou diakritiku**. Pro české UI texty proto přibal **jeden OFL
 font** (Google Fonts) a bitmapové fonty UO používej jen pro „UO vzhled"
 anglických textů. Zdroj a licence patří do `CREDITS.md`.
+
+## 3.9 Opravy a rozhodnutí naměřená 2026-10-02
+
+> Tohle je **zápis měření**, ne změna zadání. Vzniklo při implementaci granulí
+> `assets.*` a `world.*` (commity `a37a55d` … `a67968d` v `main`); každé číslo
+> je reprodukovatelné příkazem, který je u něj uvedený. Co je tady, **platí před
+> dřívějším textem** tohoto dokumentu (zejména před §3.4 a §3.5.4).
+
+### 3.9.1 Opravy v §3.3.1 a §3.4
+
+| Co | Dřív v dokumentu | Naměřeno |
+|---|---|---|
+| `LAND blok: offset 4` | čte se jako začátek bloku | je to offset **prvního záznamu** (za 4bajtovou hlavičkou první skupiny); blok začíná na 0. Kdyby se do `ITEM_OFF` přičetly další 4 B, vyjde 3 188 740 B místo přesných 3 188 736 B a načtení spadne (`tools/uoextract/tiledata.py --verify`) |
+| index bloku mapy | `by * blocks_x + bx` | **`bx * blocks_y + by`** (x-major); `ClassicUO MapLoader.cs:623`. Při obráceném pořadí vychází blok Britainu (1495,1630) jako prázdný (0 statiků místo 60) a vykreslený náhled je pruhovaný |
+| záznam statiky | `[u16 tile][u16 x][u16 y][i8 z]` | **`[u16 tile][u8 x][u8 y][i8 z][u16 hue]`** (7 B); `ClassicUO StaticsBlock`. Souřadnice jsou 0..7 v rámci bloku — při špatném čtení vycházejí hodnoty 251, 513 … (v jednom vzorku 7255 ze 7644 statiků „mimo blok") |
+| blok Britainu | 20 záznamů | **60 statiků**; v okolí ±6 bloků 9 329 statiků |
+| vodní dlaždice | neurčeno | id **168, 169, 170, 171, 310, 311** (podle jmen v `tiledata`); dlaždice 168 se jmenuje `water`, ne „sand" |
+
+### 3.9.2 Rozhodnutí R1–R4 (měřením, ne podle zdroje)
+
+| # | Otázka | Výsledek |
+|---|---|---|
+| **R1** | hash funkce pro jména záznamů UOP | `CreateHash` z ClassicUO **pokrývá 43 760/43 760 záznamů archivu (100 %)**; varianta `(pc << 32) \| pb` z `hashlittle2` dává 0/43 760. Dokumentovaných „1636 z 2000" je **jiné počítadlo** (indexy artu, ne záznamy archivu): 364 chybějících artů v této instalaci prostě není. `python tools/uoextract/uop.py --verify` |
+| **R2** | komprese gumpart (BWT vs. zlib) | **„zlib stačí" neplatí**: všech **5 579 záznamů má flag 3 = zlib + BWT**; bez BWT se nerozbalí ani jeden gump. Rozhodl obrázek: batoh (gump 60) je 230×204 a je na něm kožený batoh. `python tools/uoextract/gump.py --verify` |
+| **R3** | členění chunků mapy | **112 chunků je plných** (802 816 B = 4 096 bloků × 196 B → 458 752 bloků = **přesně celý svět**) a **113. chunk má jeden blok navíc**. Formulace „113 × 4096 = 462 848 ≥ 458 752" je tím zpřesněná, ne vyvrácená. `python tools/uoextract/worldmap.py --extract <out>` |
+| **R4** | kliloky: BWT a kódování | potvrzeno: 3. bajt `Cliloc.enu` je `0x8E` → BWT (5 110 078 → 5 093 682 B); **124 433 záznamů**, text **UTF-8** (ne UTF-16), např. `500000 'Reputation aversion triggered.'`, `'iron'` ve 207 záznamech. `python tools/uoextract/cliloc.py --verify` |
+
+### 3.9.3 Přesná čísla, která §3.5.4 uvádí přibližně
+
+- land art: **4 244 dlaždic, všechny přesně 1 012 pixelů** (diamant 44×44) —
+  ověřeno na celém archivu, ne na vzorku.
+- statický art: **39 516 záznamů**; vzorek 3 000 dekódován bez chyby.
+- mapa: **29 360 128 dlaždic**, max tile id **16 379**, mimo rozsah 0; statiky
+  **121 056 použitých bloků**, součet délek **20 386 415 B = přesně** velikost
+  `map0.statics.bin`.
+- `hues.mul`: 3 000 sad; shoda textu `Hue (X->Y)` s poli `start`/`end`
+  **1000/1000** (skupinový model) vs. **47/49** (plochý) — docs/10 P24.
+- `skillgrp.mul`: `u32` (7) + 6× 17 B jmen + **58× u32** = 338 B; tabulka používá
+  **7 id skupin**, pojmenovaných je 6 — id 6 mají 4 bard skilly (`Peacemaking`,
+  `Discordance`, `Provocation`, `Musicianship`) bez jména; UI to musí zvládnout.
+- `skills.mul`: `[1 B flag][NUL-ukončené jméno]` spotřebuje **celých 704 B**
+  a dává 58 jmen; význam flagu dokument nepopsuje (v datech je zachovaný).
+
+### 3.9.4 Co zůstává neověřené
+
+- **`animinfo.mul`** (4 000 B) — obsah je jen opakující se vzor `04 02`; formát
+  žádný dokument nepínuje, proto se neparsuje. Rozhodnutí patří granuli
+  `assets.anim`, stejně jako volba mezi `anim*.mul` a `AnimationFrame*.uop`.
+- **Světelný cyklus** (`docs/11` §11.6): v `world.time` je hranice noci
+  (22:00–06:00) **rozhodnutí** a noční osvětlení je zatím stejné jako denní (12).
+
+### 3.9.5 Mezery roadmapy (patří generátoru `tools/roadmap-gen.py`)
+
+- `sim.world_loop` má `size_lines: "<= 60", model: "any"`, ale jeho vlastní prompt
+  říká „size_lines > 60 → model strong" a soubor má ~192 neprázdných řádků;
+  obdobně přesahují `sim.commands` (118) a `app.input` (89).
+- **`app/main.tscn` nemá vlastníka** v žádném `owns` — `boot.project` vlastní jen
+  `project.godot` a `app.main` jen `app/main.gd`; připojení skriptu ke scéně je
+  proto integrační krok, který provedl bootstrap.

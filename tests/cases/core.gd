@@ -54,7 +54,7 @@ func _check_const(t) -> void:
 		if value == null:
 			t._check(false, "core.const: chybi konstanta %s (docs/04 §4.2)" % key)
 			continue
-		# float ve stavu = drift (docs/01 §1.5.3) - proto i typ
+		# float ve stavu = drift (docs/09 §9.10 bod 3) - proto i typ
 		t._check(typeof(value) == TYPE_INT, "core.const: %s musi byt int (je %s)" % [key, typeof(value)])
 		t._check(value == WANT_CONST[key], "core.const: %s == %s (namEReno %s)" % [key, WANT_CONST[key], value])
 	# vazby, ktere musi platit nezavisle na tabulce (docs/02 §2.4)

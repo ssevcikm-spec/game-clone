@@ -279,3 +279,73 @@ přesně jedna 4bajtová hlavička na 32 záznamů. Model bez hlaviček předpov
    náhoda **786**.
 4. **Hledej důkaz nezávislý na modelu** (tady: histogram mezer mezi jmény
    a text v záznamu, který musí odpovídat číslům).
+
+## P25 — `JSON.parse_string` vrací všechna čísla jako `float`
+
+**Jak vypadá:** `var v = row["piece1"]` je `TYPE_FLOAT`, i když je v souboru
+`1721`. Kontrola `typeof(v) != TYPE_INT` je tedy **vždy pravdivá**.
+**Naměřeno dvakrát (2026-10-02):** (a) u ukládání hry se 64bitový stav RNG tiše
+poškodil (`748695878776107324` → `748695878776107264`); (b) `world.doors`
+a `world.stairs` hlásily **0 kategorií a 0 skupin** — všechny řádky byly tiše
+zahozeny a nikde nebyla chyba.
+**Co dělat:** čísla z `data/*.json` vždy převádět `int()` a do stavu pouštět až
+po převodu (float ve stavu je drift, `docs/09` §9.10 bod 3). Hodnoty nad 2⁵³
+ukládat jako **řetězec** a číst `int(str)`.
+
+## P26 — `.gitignore` je na Windows case-insensitive
+
+**Jak vypadá:** vzor `Cliloc.*` (míněný na datové soubory z instalace UO) pohlcuje
+i nástroj `tools/uoextract/cliloc.py`. Soubor na disku existuje, testy procházejí,
+ale `git add -A` řekne **„nothing to commit"** — a „hotovo" v tomhle projektu
+znamená *soubor v `main`*.
+**Co dělat:** po vytvoření souboru ověřit `git ls-files <cesta>` (ne `Test-Path`)
+a u obecných vzorů přidat výjimku `!cesta/k/souboru`.
+
+## P27 — Godot spuštěný z `C:` nemůže zapisovat (a tvrdí, že ano)
+
+**Jak vypadá:** `DirAccess.make_dir_recursive_absolute("user://logs")` vrátí `0`
+(OK), ale adresář nevznikne; `FileAccess.open(..., WRITE)` vrátí `null` s `err=12`;
+v logu je `Failed to open log file for writing` a `Failed to read the root
+certificate store`.
+**Naměřeno 2026-10-02:** engine
+`C:\Users\Ssevc\Local-Deepseek\orchestra\tools\godot\Godot_v4.7.2-stable_win64_console.exe`
+nemůže zapsat **nikam** (workspace, `user://`, `%TEMP%`); **kopie ve workspace
+zapisuje bez problému**.
+**Co dělat:** spouštět Godot z kopie uvnitř workspace (`.cache/godot/`, 172 MB,
+gitignore) — brány si ji připraví samy (`gate_common.godot_bin()`); v CI cestu
+předá `$GODOT`. Bez toho nejdou G7 (ukládání), G10 a G13 (snímky).
+
+## P28 — Počítadla řádků lžou dvěma způsoby
+
+**Jak vypadá:** `Get-Content x | Measure-Object -Line` hlásí u téhož souboru
+**62**, zatímco `len(text.splitlines())` v Pythonu **74** — `Measure-Object`
+nepočítá prázdné řádky. Podobně `git show <soubor> | Measure-Object -Line`
+nedopočítá poslední řádek bez koncového newline.
+**Co dělat:** počty řádků (např. proti `size_lines` v roadmapě) měřit Pythonem
+a vždy uvést, která metrika to je (celkem / neprázdné / bez komentářů).
+
+## P29 — Tři jazykové pasti Godotu, které vypadají jako chyba logiky
+
+- **`class_name` je známý jen přes cache importu** (`.godot/global_script_class_cache.cfg`):
+  v čerstvém stromu skončí i správný kód na `Identifier "SimWorld" not declared`.
+  Řešení: před během udělat `--import` (brány to dělají v `gate_common`).
+- **`PackedInt32Array` nejde použít jako `const`** (`isn't a constant expression`).
+  Použij literál pole.
+- **`Input.get_mouse_position()` v Godotu 4 neexistuje** — pozici myši dává
+  viewport; komponenta bez stromu ji musí dostat parametrem.
+
+## P30 — Mutační důkaz na necommitnutém souboru nic nedokáže
+
+**Jak vypadá:** vložíš vadu, spustíš bránu, ta spadne — a pak `git checkout --`
+soubor **tiše neudělá nic**, protože soubor ještě není v gitu. Vada zůstane
+v pracovním stromu a ty si myslíš, že je po všem.
+**Co dělat:** mutovat až po commitu, nebo vadu vracet ručně a ověřit
+`git status`/`git diff` (a že soubor je v `git ls-files`).
+
+## P31 — Godot při importu zapisuje do klonů, které mají být jen ke čtení
+
+**Jak vypadá:** `--import` projíždí `_src/` a `research/refs/` a sype
+`ERROR: Cannot create file 'res://_src/servuo/Data/…'` (jména s `?` na Windows)
+nebo `WARNING: Detected another project.godot at res://research/refs/…`.
+**Co dělat:** dát do těch složek `.gdignore` (funguje i pro `research/refs/`
+a `.cache/`); import je pak tichý a rychlý.

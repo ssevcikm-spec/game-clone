@@ -10,7 +10,7 @@ extends RefCounted
 #   * zadna hodnota se nesmi objevit dvakrat v projektu - kdo ji pouziva,
 #     preloaduje tento soubor (G1 to hlida),
 #   * cas v ms (int), skilly v desetinach (int), pozice v dlazdicich (int).
-#     Float ve stavu je drift (docs/01 §1.5.3), proto jsou vsechny int.
+#     Float ve stavu je drift (docs/09 §9.10 bod 3), proto jsou vsechny int.
 
 # -- izometrie a svet (docs/02 §2.4) ---------------------------------------
 const TILE_W: int = 44          # sirka artu dlazdice

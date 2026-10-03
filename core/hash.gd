@@ -31,7 +31,7 @@ func _canonical(value: Variant) -> String:
 		TYPE_INT:
 			return str(value)
 		TYPE_FLOAT:
-			# Float ve stavu je vada (docs/01 §1.5.3). Hash ho musi zpracovat
+			# Float ve stavu je vada (docs/09 §9.10 bod 3). Hash ho musi zpracovat
 			# deterministicky, aby se vada dala najit - ne aby shodila beh.
 			return "f:" + str(roundi(float(value) * 1000000.0))
 		TYPE_STRING, TYPE_STRING_NAME:
