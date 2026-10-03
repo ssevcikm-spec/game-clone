@@ -94,10 +94,116 @@ pustit `git ls-files <cesta>`; `check-ignore` je rychlá předzvěst.
 
 ---
 
+### 2026-10-03 — Sandbox `workspace-write` zakázal i zápis DO workspace; vypadalo to jako vada ukládání (past-nástroje)
+**Co se stalo:** první běh testů hlásil `[test] FAIL sim.world_loop: save() vraci true`
+a **238 kontrol, 1 selhání**. Vypadalo to jako vada ukládání v `sim/sim_world.gd`.
+Nebyla to vada kódu: sonda ukázala, že v tom režimu **nešel zapsat žádný soubor** —
+ani `user://`, ani `res://` (Godot `err=12`), a **stejně tak Python**
+(`PermissionError: [Errno 13]` i na `core/`). Po přepnutí file policy na
+`danger-full-access` byly testy **238 / 0** bez jakékoli změny kódu. Druhá část
+pasti: skript `diagnose-windows-sandbox-acl` skončil `NOT_THIS_CLASS` (exit 2),
+protože cesta, kterou jsem mu dal, **neexistovala** — sonda po sobě soubor uklidila.
+**Doklad:** `save()` = `FileAccess.get_open_error()` 12 vs. 7; po přepnutí policy
+`[test] 238 kontrol, 0 selhani` (exit 0).
+**Ponaučení:** když **jeden** test selže na práci se souborem, **nejdřív zjisti, jestli
+jde zapsat vůbec něco** (sonda na `user://` + `res://` + Pythonem) — a teprve pak
+hledej chybu v kódu. A pro `diagnose-windows-sandbox-acl` je nutné dát cestu, která
+**skutečně existuje** (ne takovou, kterou předchozí sonda smazala).
+
+### 2026-10-03 — Bootstrap i W0 už byly hotové; „udělej je znovu" by byla práce navíc (postup)
+**Co se stalo:** zadání znělo „udělej bootstrap granule a pak vlnu W0". Všechny čtyři
+bootstrap granule i `core.const`, `core.iso`, `core.rng` **v repu byly** a procházely
+(`check-docs-refs` 128 odkazů, `check-zadani` 11 dokumentů/101 granulí,
+`roadmap-gen --check`, testy **238/0**, brány **9 měřeno / 2 NEMĚŘENO / 0 chyb**,
+self-testy **19/0**). Místo přepisování funkčních souborů jsem každou funkci **zavolal**
+a změřil (28 naměřených hodnot, 1 NEMĚŘENO, 0 vad).
+**Doklad:** `.cache/analysis/bootstrap-verify.py` → `bootstrap-vysledek.json`;
+`core/const.gd` 59 ř., `core/iso.gd` 38 ř., `core/rng.gd` 78 ř. — všechny v `git ls-files`.
+**Ponaučení:** granule se neposuzuje podle toho, co je v zadání za úkol, ale podle
+toho, **co je v repu a co projde měřením**. Když je hotová, řekni to a jdi dál —
+„udělat znovu" by rozbilo zelené kontroly a nepřineslo nic.
+
+### 2026-10-03 — Chybějící PRODUCENT, ne chybějící kód: W1 neměla z čeho stavět (vada-zadani)
+**Co se stalo:** `world.tiledata` (W1) má podle smlouvy číst `data/tiles.json`, ale
+**takový soubor neměl kdo vyrobit**. `tools/uoextract/tiledata.py` uměl jen
+`--verify` a **nic nezapisoval**, zatímco `worldmap.py` i `hues.py` do `assets/uo/`
+zapisují. Celá W1 tím byla zablokovaná: `world.tiledata` → `world.map` →
+`render.sort`, a `data.items` → `world.tiledata`. Zároveň **`data.items` deklaruje
+`depends_on: [assets.tiledata]`**, ale samotné čtení tiledata žádný artefakt nevyrábí —
+v DAGu tedy chyběl krok „extrakce zapíše data".
+**Doklad:** `docs/04 §4.2` slibuje `data/tiles.json`; v repu byl jen
+`assets/uo/world/*` a `hues.json`; `--help` nástroje neměl `--extract`.
+**Ponaučení:** než začnu psát granuli, ověř, že **všechny její vstupy mají producenta**
+(`depends_on` říká „hotové a funkční", ne „existuje jméno v DAGu"). Chybějící vstup
+není důvod si ho domyslet — je to nález do `HANDOFF.md`.
+
+### 2026-10-03 — Dokumentovaná tabulka bitů na TATO data nesedí; každý bit se musí ověřit (chyba)
+**Co se stalo:** kategorizoval jsem předměty podle tabulky `TileFlag` z
+`research/05-data-formats.md` (bit 2 = `Weapon`, bit 27 = `Armor`). Na datech to
+vyšlo **1126 „zbraní"** — včetně `leather cap` a `gargoyle_leather_chest`, protože
+bit 2 má nastavený **všech 1268** Wearable předmětů. Bit 27 (`Armor`) má jen 25
+předmětů a **ani jeden není zbroj**.
+**Doklad:** `probe-overit-bity.py`: bit 2 → 1177 předmětů (184 se slovem zbraně,
+218 se slovem zbroje); po přepisu na `layer` + jméno vyšlo 673 zbraní / 204 štítů /
+269 zbrojí / 18 nástrojů.
+**Ponaučení:** **každý použitý bit se ověří na jménech, která o sobě něco říkají**
+(„chest" má být zbroj, „sword" zbraň). Tabulka v `research/` je zdroj, ne důkaz —
+a stejná chyba se dá udělat dvakrát, když se ověří jen jeden bit.
+
+### 2026-10-03 — `%s` v jménech UO je znak plurálu, ne vada dat (past-nástroje)
+**Co se stalo:** generator vyřazoval jména obsahující `%` jako „placeholdery" — a tím
+zahodil **všechny ingoty** (`iron ingot%s`), obvazy (`clean bandage%s%`), šípy
+(`shaft%s`) a další. Skutečné placeholdery jsou jen `Missing_Name` (92×), `NoName`
+(29×), `nodraw` (19×) — celkem 142 záznamů.
+**Doklad:** `probe-dosuroviny.py`: `'iron ingot'` přesně → 0 nálezů, ale
+`'iron ingot%s'` a `'iron ingots'` existují; po opravě `items.json` ingoty obsahuje.
+**Ponaučení:** než něco vyřadím jako „rozbité", podívám se, **kolik toho je a jak to
+vypadá** — 5 podezřelých jmen a 142 záznamů proti tisícům skutečných předmětů.
+Filtr podle jednoho znaku (`%`) je příliš hrubý; vyřazuje se **konkrétní seznam**.
+
+### 2026-10-03 — Hledání podřetězcem vybírá smetí; jména se hledají přesně (chyba)
+**Co se stalo:** kategorie jsem plnil hledáním podřetězce. `log` chytil 113 nálezů
+(`log wall`, `log post`), `hide` chytil `hide wall`, `loom` chytil `Bloom Firework`,
+`pan` chytil `pants`, `cap` by chytil `capacity`. Výsledkem byl katalog plný zdí.
+**Doklad:** `probe-vzorky-jmen.py`; po přechodu na přesná jména + varianty
+`jmeno`/`jmeno%s`/`jmenos` se vybírá `logs` (7134), `boards` (7128), `cloth` (5989).
+**Ponaučení:** jméno předmětu se hledá **přesně** (a u UO i s variantou plurálu).
+Podřetězec je přijatelný jen tam, kde je předem vidět, co všechno chytí — a to se
+u 65 536 předmětů nedá udržet v hlavě.
+
+### 2026-10-03 — `Measure-Object -Line` nepočítá prázdné řádky (past-nástroje)
+**Co se stalo:** `anim.py` měl podle `HANDOFF.md` 451 řádků, `Measure-Object -Line`
+dalo 451 a Python `splitlines()` **516**. Nebyl to spor: soubor **nekončí newline**
+a obě metriky měří jinou věc. `HANDOFF` uváděl **neprázdné** řádky (451, 192, 118),
+skutečné délky souborů jsou **516, 232, 137**.
+**Doklad:** `probe-radky.py` — `anim.py`: všech 516, neprázdných 451, prázdných 65.
+**Ponaučení:** `size_lines` se měří **všemi řádky** (Python `splitlines()`), protože
+deklarace je o velikosti souboru. `Measure-Object -Line` je na tohle špatný nástroj
+a jeho číslo je potřeba pojmenovat („neprázdné řádky"), ne přepsat.
+
+### 2026-10-03 — Statická kontrola si sama naletěla na komentář (chyba)
+**Co se stalo:** do vlastní ověřovací sondy jsem dal kontrolu „nejsou v `project.godot`
+herní konstanty?" a hledal `TILE_W|ISO_STEP|WALK_MS` v **celém textu** — našlo to
+komentář, který vysvětluje, že tam být **nemají**. Sonda hlásila `True` (vada), i když
+konstanty v konfiguraci nejsou. Přesně past z `docs/09` §9.6.2, kterou ten soubor sám
+popisuje.
+**Doklad:** `probe-project-konstanty.py`: s komentáři `True`, bez komentářů `False`,
+12 klíčů a mezi nimi žádná herní konstanta.
+**Ponaučení:** komentáře se odstraňují **i ve vlastní sondě**, ne jen v branách
+(`ln.split(";", 1)[0]` u `.godot` ini, `#` u Pythonu). Kdo si myslí, že se ho to
+netýká, píše právě tu chybu.
+
+---
+
 ## Vytvořené nástroje (co, kde a čím ověřené)
 
 | Nástroj | K čemu | Ověření |
 |---|---|---|
+| `tools/uoextract/tiledata.py --extract` | **nově**: zapíše `assets/uo/tiles.json` (land+item, 81 920 záznamů) | `--self-test` **15 kontrol** (7 nových offline); živý běh 2 405 685 B |
+| `data/items.json` (granule `data.items`) | katalog 8 748 předmětů s `source`, `value_source`, `category_rule` | G5 `check-content` OK (`items.json_zaznamu: 8748`) |
+| `sim/world/tiledata.gd` (granule `world.tiledata`) | vlastnosti dlaždic/předmětů z JSONu, dvě id prostranství (0x4000) | sonda `probe-tiledata.gd` **18 kontrol, 0 selhání** |
+| `.cache/analysis/bootstrap-verify.py` | měří bootstrap granule zavoláním (28 hodnot) | `bootstrap-vysledek.json`, 0 vad, 1 NEMĚŘENO |
+| `.cache/analysis/gen-items.py` | generator `data/items.json` (běh ze session) | idempotentní; kategorie+role se vypisují k pohledu |
 | `tools/uoextract/anim.py` | zdroj animací (`anim.mul` vs `AnimationFrame*.uop`), tabulky framů | `--self-test` 22 kontrol, `--verify` 22 kontrol proti instalaci |
 | `research/probe/anim_pokryti.py` | reprodukovatelné měření pokrytí těl | dává 270 / 318 těl, prunik 2 — zapsáno v `research/anim-mereni.md` |
 | `tools/gates/check-assets.py` (G6) | nově měří i manifest animací | `--self-test` 4 případy; běh nad repem `OK` |
