@@ -20,6 +20,7 @@ a nemela smluvni API `land()`/`item()`. Sondy *tiledata*.py zustavaji jako
 historie mereni.
 
 Pouziti:
+  python tools/uoextract/tiledata.py --install "<UO>" --extract assets/uo
   python tools/uoextract/tiledata.py --install "<UO>" --verify
   python tools/uoextract/tiledata.py --self-test
 """
@@ -27,6 +28,8 @@ Pouziti:
 from __future__ import annotations
 
 import argparse
+import hashlib
+import json
 import struct
 import sys
 from pathlib import Path
@@ -195,6 +198,96 @@ def verify(td: TileData) -> tuple[int, list[str]]:
     return checks, errors
 
 
+# Polozky zaznamu v tiles.json. Poradi je ZAVAZNE - je to schema souboru,
+# ne nahoda: hra cte `land[i][2]` podle téhož poradi (docs/04 §4.2 world.tiledata).
+LAND_FIELDS = ("flags", "texture", "name")
+ITEM_FIELDS = ("flags", "weight", "layer", "count", "anim_id", "hue", "light",
+               "height", "name")
+
+
+def _presnost_ok(hodnota: int) -> bool:
+    """Projde hodnota cestou JSON -> float -> int beze zmeny?
+
+    Godotuv `JSON.parse_string` vraci VSECHNA cisla jako float a `int()` z nej
+    udela zpet cele cislo. To je presne tehdy, kdyz `int(float(x)) == x`.
+    Cislo NAD 2^53 pritom vubec nemusi byt problem (0x4E55000000000000 ma
+    53 nulovych bitu na konci, takze float64 ho drzi presne) - proto se to
+    OVERUJE pro kazdou hodnotu, ne odhaduje z meze.
+    """
+    return int(float(hodnota)) == hodnota
+
+
+def extract(install: str | Path, out_dir: str | Path, raw: bytes | None = None) -> int:
+    """Zapise `tiles.json` - land i item zaznamy vcetne flagu a jmen.
+
+    Proč soubor vznika tady a ne ve hre: hra nesmi cist .mul (docs/09 §9.10.2),
+    takze vlastnosti dlazdic se musi prevest do JSONu jednou, tady.
+
+    `raw` je jen pro offline self-test (stejne jako u `TileData`).
+    """
+    if raw is None:
+        src = Path(install) / "tiledata.mul"
+        if not src.exists():
+            print(f"[tiledata] CHYBA: {src} neexistuje")
+            return 1
+        raw = src.read_bytes()
+    td = TileData(raw=raw)
+
+    land: list[list] = []
+    item: list[list] = []
+    nepresne: list[str] = []
+
+    for tile in range(LAND_COUNT):
+        rec = td.land(tile)
+        for key in LAND_FIELDS:
+            if key == "flags" and not _presnost_ok(rec[key]):
+                nepresne.append(f"land[{tile}].flags={rec[key]}")
+        land.append([rec[k] for k in LAND_FIELDS])
+
+    for tile in range(ITEM_COUNT):
+        rec = td.item(tile)
+        if not _presnost_ok(rec["flags"]):
+            nepresne.append(f"item[{tile}].flags={rec['flags']}")
+        item.append([rec[k] for k in ITEM_FIELDS])
+
+    # Pojistka: kdyby nekdy nejaka hodnota pres float neprosla, tise by se
+    # poskodila. Radsi spadni s jasnou hlaskou, nez abys vyrobil spatna data.
+    if nepresne:
+        print(f"[tiledata] CHYBA: {len(nepresne)} hodnot nejde pres JSON presne "
+              f"(napr. {nepresne[0]}) - flagy by musely byt desetinne retezce")
+        return 1
+
+    payload = {
+        "version": 1,
+        "source": {
+            "file": "tiledata.mul",
+            "bytes": len(raw),
+            "sha256": hashlib.sha256(raw).hexdigest(),
+            "install_version": "1.25.35",
+        },
+        "layout": {
+            "land_fields": list(LAND_FIELDS),
+            "item_fields": list(ITEM_FIELDS),
+            "land_count": LAND_COUNT,
+            "item_count": ITEM_COUNT,
+        },
+        "land": land,
+        "item": item,
+    }
+    # Deterministicky vystup (docs/03 §3.7): serazene klice, bez casovych znamek.
+    text = json.dumps(payload, ensure_ascii=False, sort_keys=True,
+                      separators=(",", ":"))
+    out = Path(out_dir) / "tiles.json"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(text, encoding="utf-8")
+    print(f"[tiledata] zapsano {out} ({out.stat().st_size} B, "
+          f"sha256 {hashlib.sha256(text.encode()).hexdigest()[:16]}..., "
+          f"land {len(land)}, item {len(item)})")
+    print(f"[tiledata] vsechny flagy jdou pres JSON presne (overeno pro "
+          f"{len(land) + len(item)} zaznamu)")
+    return 0
+
+
 def _synthetic(corrupt: bool = False) -> bytes:
     """Buffer presne o TOTAL bajtech s par znamymi predmety (offline test)."""
     raw = bytearray(TOTAL)
@@ -267,19 +360,64 @@ def self_test() -> int:
     except ValueError as exc:
         check(True, f"kratsi buffer je odhalen ({exc})")
 
-    print(f"[tiledata] self-test: 8 kontrol, {failures} chyb")
+    # --- extract(): offline test zapisu tiles.json ---------------------------
+    # Bez nej by se "zapis funguje" overovalo jen na zive instalaci (pomale
+    # a v CI nedostupne) - presne ta vada, na kterou upozornuje docs/08 §8.1.5.
+    import json as _json
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        rc = extract("", tmp, raw=_synthetic())
+        check(rc == 0, f"extract() na syntetickem bufferu vraci 0 (namEReno {rc})")
+        out = Path(tmp) / "tiles.json"
+        check(out.exists(), "extract() zapsal tiles.json")
+        data = _json.loads(out.read_text(encoding="utf-8"))
+        check(data["layout"]["land_count"] == LAND_COUNT,
+              f"tiles.json ma land_count {LAND_COUNT}")
+        check(data["layout"]["item_count"] == ITEM_COUNT,
+              f"tiles.json ma item_count {ITEM_COUNT}")
+        check(len(data["land"]) == LAND_COUNT and len(data["item"]) == ITEM_COUNT,
+              f"tiles.json ma {len(data['land'])} land a {len(data['item'])} item zaznamu")
+        # POZOR: poradi poli je schema souboru - hra cte podle nej.
+        check(data["layout"]["land_fields"] == list(LAND_FIELDS),
+              f"poradi land poli sedi: {data['layout']['land_fields']}")
+        check(data["layout"]["item_fields"] == list(ITEM_FIELDS),
+              f"poradi item poli sedi: {data['layout']['item_fields']}")
+        # zapsana hodnota musi po ceste JSON -> float -> int vyjit stejna
+        fi = ITEM_FIELDS.index("flags")
+        li = LAND_FIELDS.index("texture")
+        check(int(float(data["land"][3][li])) == 3,
+              "land[3].texture prezilo zapis (3)")
+        check(int(float(data["item"][2482][fi])) == FLAG_WEARABLE,
+              "item[2482].flags prezilo zapis (Wearable)")
+        # a hlavne: zapis je DETERMINISTICKY (docs/03 §3.7)
+        prvni = out.read_bytes()
+        extract("", tmp, raw=_synthetic())
+        check(out.read_bytes() == prvni, "dva behy extract() daji bajtove shodny soubor")
+
+    # hodnota, ktera pres float NEPROJDE, musi extract() odmitnout (ne tise poskodit)
+    neexaktni = bytearray(_synthetic())
+    off = _record_offset(ITEM_OFF, ITEM_REC, 0)
+    struct.pack_into("<Q", neexaktni, off, (1 << 53) + 1)      # 2^53+1 neni ve float64
+    with tempfile.TemporaryDirectory() as tmp:
+        rc = extract("", tmp, raw=bytes(neexaktni))
+        check(rc == 1, f"extract() odmitne flag, ktery nejde pres JSON (namEReno {rc})")
+
+    print(f"[tiledata] self-test: 15 kontrol, {failures} chyb")
     return 1 if failures else 0
 
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="tiledata.mul -> vlastnosti dlaždic a předmětů")
     ap.add_argument("--install", default=DEFAULT_INSTALL)
+    ap.add_argument("--extract", default=None, help="vystupni adresar (assets/uo)")
     ap.add_argument("--verify", action="store_true")
     ap.add_argument("--self-test", action="store_true")
     ap.add_argument("--sample", type=int, default=0, help="vypiš N vzorků")
     args = ap.parse_args()
     if args.self_test:
         return self_test()
+    if args.extract:
+        return extract(args.install, Path(args.extract))
 
     try:
         td = TileData(args.install)
