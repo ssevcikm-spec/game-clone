@@ -1,9 +1,11 @@
-# Předání — UO-klon (stav po odemčení W1: `tiledata --extract` → `data.items` → `world.tiledata`)
+# Předání — UO-klon (stav po ověření prostředí: testy i brány měří; W1 čeká na `world.map`)
 
 > Tento soubor je pro **další session agenta**. Všechno podstatné je v repu
 > a v `git log`; tady je jen to, co by jinak stálo hodiny znovuobjevování.
-> Datum: 2026-10-03 (předchozí verze byla ze 2026-10-03 a popsala `assets.anim`;
-> její zjištění o animacích **platí dál** a jsou níž zkrácená).
+> Datum: 2026-10-03. Předchozí verze popsala odemčení W1
+> (`tiledata --extract` → `data.items` → `world.tiledata`) — ta zjištění **platí dál**.
+> **Tato session neudělala žádnou granuli**: spravila přístup k workspace (sandbox
+> blokoval zápis do všech podsložek) a znovu naměřila testy i brány.
 
 ## ⚠ POVINNÉ: na konci každé session (rozhodnutí uživatele, 2026-10-03)
 
@@ -27,9 +29,9 @@ následuje předání**. Proto platí:
 |---|---|
 | **Ponaučení a nástroje** | **`LESSONS.md`** — čti prvních pár záznamů, ať neopakuješ chyby |
 | Projekt | `E:\Workspaces\game-clone` (git, `main`) |
-| Testy | `godot --headless --path . --script res://tests/run_tests.gd` → **238 kontrol / 0 selhání** |
-| Brány | `python tools/gates/run-all.py` → **9 měřeno / 2 NEMĚŘENO / 0 chyb** (exit 2 = něco neměřeno) |
-| Self-testy bran | `python tools/gates/run-all.py --self-test` → 10 bran + **9 extrakčních nástrojů**, 0 chyb |
+| Testy | `godot --headless --path . --script res://tests/run_tests.gd` → **238 kontrol / 0 selhání** (znovu naměřeno 2026-10-03, s `APPDATA` v `.cache/godot-appdata`) |
+| Brány | `python tools/gates/run-all.py` → **9 měřeno / 2 NEMĚŘENO / 0 chyb** (exit 2 = něco neměřeno); znovu naměřeno 2026-10-03 |
+| Self-testy bran | `python tools/gates/run-all.py --self-test` → **19 celkem (10 bran + 9 extrakčních nástrojů), 0 chyb** (znovu naměřeno 2026-10-03) |
 | Godot (binárka) | **KOPIE ve workspace**: `.cache/godot/Godot_v4.7.2-stable_win64_console.exe` |
 | Python | `C:\Users\Ssevc\.dsh\dsh-runtimes\dsh-primary-runtime\dependencies\python\python.exe` |
 | Instalace UO | `D:\Games\Electronic Arts\Ultima Online Classic` (jen čtení) |
@@ -42,6 +44,11 @@ bootstrap 4 · W0 8 · M0 5 · M1 8 (**uop, tiledata, art, gump, worldmap, hues,
 textdata, cliloc**) · M2 4 (world.doors, world.stairs, entity.stats, world.time) ·
 assets.anim 1 · **NOVĚ: `data.items` 8 748 záznamů · `world.tiledata` (18 kontrol sondy)**.
 
+**Tato session (2026-10-03, druhá):** žádná granule — spravený **přístup k workspace**
+a znovu naměřené hodnoty: testy **238/0**, brány **9 měřeno / 2 NEMĚŘENO / 0 chyb**,
+`check-docs-refs` / `check-zadani` / `roadmap-gen --check` **exit 0**. Dvě brány, které
+předtím hlásily `VADA` (G3, G7), byly **celé prostředí**, ne kód — viz past 1.
+
 **Bootstrap i W0 jsem v této session jen OVĚŘIL, nedělal znovu** (byly hotové):
 28 naměřených hodnot, 1 NEMĚŘENO, 0 vad (`LESSONS.md` 2026-10-03 „Bootstrap i W0…").
 Nástroj: `.cache/analysis/bootstrap-verify.py` → `.cache/analysis/bootstrap-vysledek.json`.
@@ -49,7 +56,7 @@ Jediné NEMĚŘENO: **`tools/gates/ci-godot.sh` nejde na této stanici spustit**
 `bash`/`sh` tu není a WSL není nainstalované. Je jen volaný z CI a přečtený;
 jeho obsah (APPDATA + import + testy) jsem ověřil ručně.
 
-## Jak je teď zapojený řetěz M1 (tohle je dnešní hlavní zjištění)
+## Jak je zapojený řetěz M1 (zjištění z předchozí session, platí dál)
 
 ```
 instalace UO (read-only)
@@ -156,6 +163,17 @@ uživatelem, stejný vzor jako `worldmap.py --extract` / `hues.py --out`).
    test hlásil 1 selhání. **Nebyla to vada kódu** — nešlo zapsat nic (ani Pythonem).
    Po přepnutí file policy na `danger-full-access`: 238/0 bez změny kódu.
    **Když selže jeden test na soubory, nejdřív ověř, že jde zapsat vůbec něco.**
+   **Doplněno 2026-10-03 (druhá session) — přesná příčina:** `workspace-write` pouští
+   podprocesy jako **Low integrity** (`whoami /groups` → `Mandatory Label\Low Mandatory
+   Level`), a Low proces nesmí zapsat do objektu **bez Low labelu** — bez ohledu na ACL.
+   Kořen workspace label má (`icacls` → `Mandatory Label\Low Mandatory Level:(OI)(CI)(NW)`),
+   **existující podsložky ne** (label se k nim nikdy nedostal), takže zápis prošel
+   v kořeni a v nové složce, ale v `sim/`, `tools/`, `.cache/`, `.git/` ne.
+   Sonda `_analyza/sonda-zapisu.py`: **1/19 před, 19/19 po** přepnutí na plný přístup.
+   Skript `diagnose-windows-sandbox-acl` (14 grantů, vše ověřené) to **nevyřeší** —
+   spraví DACL, ale label zůstane; jeho vlastní výstup to reportuje jako `LOW_LABEL=`.
+   **Postup:** změř label (`icacls <cesta> | Select-String Mandatory`), a když chybí,
+   přepni session na plný přístup; nepřesvědčuj se opravou práv.
 2. **Godot z `C:\...\orchestra\tools\godot` NEMŮŽE ZAPISOVAT** (sandbox) a přitom
    lže `err=0`. Řešení: kopie ve workspace (`.cache/godot/`, gitignore);
    brány si ji připraví (`gate_common.godot_bin()`).

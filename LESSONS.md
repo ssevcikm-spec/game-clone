@@ -193,6 +193,31 @@ popisuje.
 (`ln.split(";", 1)[0]` u `.godot` ini, `#` u Pythonu). Kdo si myslí, že se ho to
 netýká, píše právě tu chybu.
 
+### 2026-10-03 — Zápis do podsložek blokuje INTEGRITNÍ LABEL, ne ACL (past-nástroje)
+**Co se stalo:** v režimu `workspace-write` selhával zápis do **všech existujících**
+podsložek workspace (`PermissionError`), ale do **kořene** a do **nově vytvořené**
+složky procházel. Vypadalo to na rozbité ACL — a skript
+`diagnose-windows-sandbox-acl` tomu odpovídal: udělal 14 grantů (WRITE_DAC/WRITE_OWNER),
+všechny **ověřené**, 0 odmítnutých, rollback nebyl potřeba — a **původní operace
+selhala dál**. Oprava tedy byla správná, ale neúčinná: příčina je v SACL, ne v DACL.
+**Doklad (měření, ne dohad):** `whoami /groups` v sandboxu → `Mandatory Label\Low
+Mandatory Level (S-1-16-4096)`; `icacls <kořen>` → `Mandatory Label\Low Mandatory
+Level:(OI)(CI)(NW)`, ale `icacls tools`, `sim`, `.cache`, `app` → **žádný label**;
+nová složka v kořeni label zdědí a zápis do ní projde. Sonda `_analyza/sonda-zapisu.py`:
+před opravou **1/19**, po přepnutí na plný přístup **19/19** (token je pak `Medium`).
+Důsledek pro brány: G3 i G7 hlásily `VADA` (`save()/load() … save=false`), i když byl
+kód v pořádku — `tools/gates/gate_common.py:219` posílá `APPDATA` natvrdo do
+`.cache/godot-appdata`, kam Low proces nesmí. Po přepnutí: G3 OK, G7 OK, **9/2/0**.
+**Ponaučení:** když zápis selže v podsložkách a v kořeni ne, **změř nejdřív integritní
+label** (`icacls <cesta> | Select-String Mandatory` + `whoami /groups`), ne ACL. Low
+proces nesmí zapsat do objektu bez Low labelu **bez ohledu na DACL** — samotné přidání
+práv to nevyřeší a vypadá to jako neúčinná oprava. Label potřebuje právo, které sandbox
+nemá (`icacls /setintegritylevel` v něm skončil `Access is denied`), takže jediná
+dostupná cesta je plný přístup pro session. Druhý důsledek téhož: nástroje harnessu
+(`write`/`edit`) **nejdou přes sandbox** — zapisují i tam, kam podproces nesmí, ale
+smazat odtud nejde (dědičný `Everyone DENY (DeleteSubdirectoriesAndFiles)`), takže
+sonda zanechá soubor, který musí uklidit až session s plným přístupem.
+
 ---
 
 ## Vytvořené nástroje (co, kde a čím ověřené)
@@ -208,3 +233,5 @@ netýká, píše právě tu chybu.
 | `research/probe/anim_pokryti.py` | reprodukovatelné měření pokrytí těl | dává 270 / 318 těl, prunik 2 — zapsáno v `research/anim-mereni.md` |
 | `tools/gates/check-assets.py` (G6) | nově měří i manifest animací | `--self-test` 4 případy; běh nad repem `OK` |
 | `tools/gates/run-all.py --self-test` | nově pouští i `anim.py` | 19 self-testů (10 bran + 9 extrakčních nástrojů), 0 chyb |
+| `_analyza/sonda-zapisu.py` (gitignore) | zapíše a smaže soubor v 19 cestách stromu — rozliší „nejde zapsat nic" od „nejde zapsat do podsložek" | před opravou 1/19, po přepnutí na plný přístup 19/19 |
+| `_analyza/acl/` (gitignore) | zálohy ACL + protokol `acl-report-*.jsonl` (14 grantů, všechny ověřené) | `RECAP` v protokolu: `GRANTED=14 REFUSED=0 RESTORED=0` |
