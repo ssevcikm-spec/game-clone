@@ -4,10 +4,27 @@
 > a v `git log`; tady je jen to, co by jinak stálo hodiny znovuobjevování.
 > Datum: 2026-10-03 (předchozí verze byla ze 2026-10-02 a v číslech zastarala).
 
+## ⚠ POVINNÉ: na konci každé session (rozhodnutí uživatele, 2026-10-03)
+
+Uživatel volá **na každý krok novou session** a **po každé implementaci hned
+následuje předání**. Proto platí:
+
+1. **`LESSONS.md`** — přidej záznamy za tuhle session (ponaučení, chyby,
+   osvědčené postupy, nové nástroje). Šablona je v hlavičce toho souboru.
+   Piš i to, co **nevyšlo**; zápis bez měření je dohad.
+2. **`HANDOFF.md`** — přepiš ho na stav po své práci, ale **tuhle sekci
+   zkopíruj doslova dál** (jinak pravidlo zmizí). Aktualizuj hlavně: co je
+   hotové a ověřené, co je **otevřené a proč**, a co je příští krok.
+3. **Ověř před předáním:** brány (`run-all.py`), testy hry, self-testy —
+   a napiš do předání **skutečná čísla**, ne ta z minula.
+4. **Commitni** (strom čistý) — `LESSONS.md` i `HANDOFF.md` patří do gitu,
+   protože další session je čte odtud.
+
 ## Kde co je
 
 | Věc | Cesta / příkaz |
 |---|---|
+| **Ponaučení a nástroje** | **`LESSONS.md`** — čti prvních pár záznamů, ať neopakuješ chyby |
 | Projekt | `E:\Workspaces\game-clone` (git, `main`) |
 | Testy | `godot --headless --path . --script res://tests/run_tests.gd` → **238 kontrol / 0 selhání** |
 | Brány | `python tools/gates/run-all.py` → **9 měřeno / 2 NEMĚŘENO / 0 chyb** (exit 2 = něco neměřeno) |
@@ -27,7 +44,7 @@ textdata, cliloc**) · M2 4 (world.doors, world.stairs, entity.stats, world.time
 
 Měření a rozhodnutí: **`research/anim-mereni.md`** (surová data
 `research/anim-pokryti.json`, reprodukce `research/probe/anim_pokryti.py`).
-Nástroj `tools/uoextract/anim.py` (22 kontrol `--verify`, 18 `--self-test`).
+Nástroj `tools/uoextract/anim.py` (22 kontrol `--verify`, 22 `--self-test`).
 
 **Rozhodnutí o zdroji (měřeno, ne opsané z dokumentu):** dokument radil
 „UOP, MUL jen fallback" — **měření to vyvrací**. Těla se téměř nepotkávají:

@@ -11,7 +11,9 @@
 ```text
 Pracovní složka: E:\Workspaces\game-clone
 
-Zadání je v ZADANI-UO-KLON.md — přečti ho celé. Pak v tomto pořadí:
+NEJDŘÍV si přečti HANDOFF.md (stav po předchozí session) a prvních pár záznamů
+z LESSONS.md (co už někoho stálo čas). Teprve pak zadání v ZADANI-UO-KLON.md —
+přečti ho celé. Pak v tomto pořadí:
 docs/01 (cíl), docs/04 (architektura a smlouvy), docs/07 (granule a milníky),
 docs/08 (brány), docs/09 (pravidla pro agenta). Než je nemáš přečtené,
 nepiš kód.
@@ -47,6 +49,10 @@ Prostředí:
 - Instalace UO (D:\Games\Electronic Arts\Ultima Online Classic) je read-only.
 
 Než začneš psát, řekni mi: co jsi přečetl, co budeš dělat první a proč.
+
+NA KONCI (povinné, viz HANDOFF.md): přidej do LESSONS.md záznamy za tuhle
+session (ponaučení, chyby, nové nástroje) a přepiš HANDOFF.md na stav po své
+práci — včetně sekce o povinném předání, kterou zkopíruj dál. Pak commitni.
 ```
 
 **Proč je v textu krok 2:** bootstrap granule záměrně nejsou pro agenty
@@ -98,12 +104,19 @@ Tenhle balíček je na to připravený — `roadmap.json` má klíč `grains`:
 
 | Co | Jak | Očekáváno |
 |---|---|---|
-| Workspace je repo | `git -C E:\Workspaces\game-clone log --oneline -1` | jeden commit se zadáním |
-| Nic velkého v gitu | `git -C ... ls-files | Measure-Object` | ~152 souborů, ~4 MB |
+| Je co číst | `Test-Path HANDOFF.md, LESSONS.md` | `True` (předání i ponaučení z minula) |
+| Workspace je repo | `git -C E:\Workspaces\game-clone log --oneline -1` | poslední commit je předání |
+| Nic velkého v gitu | `git -C ... ls-files | Measure-Object` | řádově stovky souborů, jednotky MB |
 | Kontroly procházejí | `python tools/check-docs-refs.py` a `check-zadani.py` | `OK` (obě mají mutační test) |
 | DAG je konzistentní | `python tools/roadmap-gen.py --check` | `OK: DAG je konzistentní` |
 | Instalace UO na místě | `Test-Path 'D:\Games\Electronic Arts\Ultima Online Classic\tiledata.mul'` | `True` |
 | Godot běží | `& <godot> --headless --version` | `4.7.2.stable` |
+
+**Předávací smyčka (platí od 2026-10-03):** každý krok = **nová session** a po
+každé implementaci **rovnou předání**. Nová session začíná přečtením
+`HANDOFF.md` + `LESSONS.md` a končí jejich aktualizací a commitem. Když
+v `HANDOFF.md` chybí sekce „POVINNÉ: na konci každé session", je předání
+neúplné — doplň ji podle `LESSONS.md`.
 
 ---
 
