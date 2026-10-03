@@ -106,6 +106,11 @@ nerostou / rozměr 0×0); nástroj je přeskočí a je to vidět v `--verify`.
    `research/05-data-formats.md` §5.2 má místo variant výsledek měření.
 7. **`.forge/roadmap.json` (generátor)**: `sim.world_loop` deklaruje `<= 60`, ale
    má ~192 řádků; podobně `sim.commands` (118) a `app.input` (89).
+   **Nově naměřeno: `assets.anim` deklaruje `<= 150`, soubor má 451 řádků**
+   (`tools/uoextract/anim.py`, počítáno Pythonem). Buď deklaraci uvolnit, nebo
+   granuli rozdělit — teď je to stejná vada jako u `sim.world_loop`, jen větší.
+   Nástroj je záměrně „učebnicový" (komentáře nesou naměřená čísla), takže
+   dělení na `anim.py` + `anim_uop.py` by šlo bez ztráty.
 8. **`app/main.tscn` nemá vlastníka** v roadmapě.
 
 ## Prostředí a konvence
