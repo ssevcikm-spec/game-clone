@@ -254,12 +254,40 @@ to musí potvrdit na dalším chunku, ale jako pracovní model je to podložené
 | Animace těl | `anim*.mul` **nebo** `AnimationFrame*.uop` (rozhodnout!) | atlas `anim_<body>_<action>_<dir>.png` + JSON s framy a časováním | `animdata.mul` dává počty framů a palety |
 | Barvy | `hues.mul` (ověřeno) | `hues.json` (3000 sad × 32 barev + rozsah + jméno) | tónování za běhu z grayscale artu (index 0 = „použij hue") |
 
-**Rozhodnutí o animacích:** použij **jeden** zdroj a zapiš ho do `docs/`.
-Doporučení: novější `AnimationFrame*.uop` + `AnimationSequence.uop`, protože
-pokrývá moderní těla; `anim*.mul` jako fallback pro těla, která v novém
-formátu nejsou. Když se to ukáže jako příliš velké, **zúžit na těla, která
-obsah (`data/monsters.json`, profese, mounti) skutečně potřebuje** — typicky
-~120 těl × 5 akcí × 5 směrů × ~8 framů.
+**Rozhodnutí o animacích — ROZHODNUTO MĚŘENÍM 2026-10-03 (O3), a je to jinak,
+než dokument dřív doporučoval:**
+
+Použij **oba zdroje**, ale **`anim*.mul` je ten povinný** (ne fallback):
+
+| Zdroj | Těl s obsahem | Akcí | Co v něm je |
+|---|---|---|---|
+| `anim*.mul` + `anim*.idx` | **270** | 7 165 | monstra 1–199 (60), zvířata 200–399 (35), **lidé 400+ (175 těl × 35 akcí)** |
+| `AnimationFrame1..4,6.uop` | **318** | 10 989 | nová těla 400+ (282), zvířata (30), monstra (4) |
+| průnik | **2** (826, 990) | — | — |
+
+Těla se **téměř nepotkávají**: hráč (tělo 400 muž, 401 žena) i oblečení
+(404–410) mají v MUL 175 bloků (35 akcí × 5 směrů) a v UOP **nula** — bez
+`anim.mul` se hráč nepohne. Naopak těla 130, 334, 666 (gargoyle) jsou **jen
+v UOP**. Pravidlo tedy je: **blok v MUL → MUL, jinak UOP** (totéž dělá
+ClassicUO přes `UseUopAnimation` a UOFiddler přes `IsUopBody`).
+
+Měření i reprodukce: `research/anim-mereni.md`, `research/probe/anim_pokryti.py`.
+
+Dvě věci, které z měření plynou a musí se respektovat při plánování:
+
+1. **Pixely z `anim.mul` zatím extrahovat nelze.** Rozměry, počty framů,
+   offsety a terminátory RLE jsou ověřené (tabulka framů na bajtu 512, terminátor
+   4 B před koncem framu), ale tvar hlavičky a kódování indexů v RLE proudu
+   rozluštěné nejsou — `x` z hlavičky běhu vychází mimo rozměr framu. Kdo na tom
+   staví (`assets.atlas`, `render.anim`), staví na **otevřené otázce**.
+2. **Prvních 512 B bloku je ve všech blocích stejných** (tělo 400/200/9 shodně
+   bit po bitu) → pixely těl **nemají vlastní paletu**, barva jde z
+   `animdata.mul`/`hues.mul`, jak uvádí `research/05-data-formats.md` §5.2.
+   Varianta „paleta na začátku bloku" (UOFiddler, ServUO) v této instalaci nesedí.
+
+Rozsah extrakce se i tak **zúží na těla, která obsah skutečně potřebuje**
+(`data/monsters.json`, profese, mounti) — typicky ~120 těl × 5 akcí × 5 směrů
+× ~8 framů.
 
 ### 3.5.2 Atlas a manifest
 
@@ -456,8 +484,14 @@ anglických textů. Zdroj a licence patří do `CREDITS.md`.
 ### 3.9.4 Co zůstává neověřené
 
 - **`animinfo.mul`** (4 000 B) — obsah je jen opakující se vzor `04 02`; formát
-  žádný dokument nepínuje, proto se neparsuje. Rozhodnutí patří granuli
-  `assets.anim`, stejně jako volba mezi `anim*.mul` a `AnimationFrame*.uop`.
+  žádný dokument nepínuje, proto se neparsuje.
+- **`anim*.mul` — pixely těl** (rozhodnutí o zdroji je hotové, viz §3.5.1):
+  rozměry, počty framů a offsety ověřené jsou, ale tvar hlavičky framu a
+  kódování indexů v RLE proudu ne — `x` z hlavičky běhu vychází mimo rozměr
+  framu. Podrobně `research/anim-mereni.md`.
+- **`AnimationFrame*.uop` — pixely těl**: záznam a jméno (`create_hash`) ověřené,
+  ale rozměry framu z payloadu v této instalaci nesedí na známý tvar
+  (ClassicUO/UOFiddler) — stejná otevřená otázka jako u MUL.
 - **Světelný cyklus** (`docs/11` §11.6): v `world.time` je hranice noci
   (22:00–06:00) **rozhodnutí** a noční osvětlení je zatím stejné jako denní (12).
 

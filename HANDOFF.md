@@ -1,112 +1,118 @@
-# Předání — UO-klon (stav po 13 commitech)
+# Předání — UO-klon (stav po naměření `assets.anim`)
 
 > Tento soubor je pro **další session agenta**. Všechno podstatné je v repu
 > a v `git log`; tady je jen to, co by jinak stálo hodiny znovuobjevování.
-> Datum: 2026-10-02. Větev `main`, strom čistý, 241 souborů v gitu.
+> Datum: 2026-10-03 (předchozí verze byla ze 2026-10-02 a v číslech zastarala).
 
 ## Kde co je
 
 | Věc | Cesta / příkaz |
 |---|---|
-| Projekt | `E:\Workspaces\game-clone` (git, `main`, 13 commitů) |
-| Testy | `godot --headless --path . --script res://tests/run_tests.gd` → **222 kontrol / 0 selhání** |
-| Brány | `python tools/gates/run-all.py` → **8 měří / 3 NEMĚŘENO / 0 chyb** |
-| Self-testy bran | `python tools/gates/run-all.py --self-test` → 10 bran, 0 chyb |
-| Self-testy extrakce | `python tools/uoextract/<nástroj>.py --self-test` → 60/60 celkem |
-| Godot (binárka) | **KOPIE ve workspace**: `.cache/godot/Godot_v4.7.2-stable_win64_console.exe` (viz past 1) |
+| Projekt | `E:\Workspaces\game-clone` (git, `main`) |
+| Testy | `godot --headless --path . --script res://tests/run_tests.gd` → **238 kontrol / 0 selhání** |
+| Brány | `python tools/gates/run-all.py` → **9 měřeno / 2 NEMĚŘENO / 0 chyb** (exit 2 = něco neměřeno) |
+| Self-testy bran | `python tools/gates/run-all.py --self-test` → 10 bran + **9 extrakčních nástrojů** |
+| Godot (binárka) | **KOPIE ve workspace**: `.cache/godot/Godot_v4.7.2-stable_win64_console.exe` |
 | Python | `C:\Users\Ssevc\.dsh\dsh-runtimes\dsh-primary-runtime\dependencies\python\python.exe` |
 | Instalace UO | `D:\Games\Electronic Arts\Ultima Online Classic` (jen čtení) |
-| Roadmapa | `.forge/roadmap.json` (101 granul; hotovo ~26, zbytek M1–M8) |
+| Roadmapa | `.forge/roadmap.json` (101 granul; `done` je u všech `false` — stav se pozná jen měřením) |
 
 ## Co je hotové a ověřené (ne „soubor existuje")
 
-bootstrap 4 · W0 8 (const, iso, rng, clock, events, hash, serial, balance) ·
-M0 5 (sim.commands, sim.world_loop, app.input, app.loop, app.main) ·
-M1 6 (uop, tiledata, art, gump, worldmap, hues, textdata, cliloc) ·
-M2 3 (world.doors, world.stairs, entity.stats).
+bootstrap 4 · W0 8 · M0 5 · M1 8 (**uop, tiledata, art, gump, worldmap, hues,
+textdata, cliloc**) · M2 4 (world.doors, world.stairs, entity.stats, world.time) ·
+**assets.anim 1 (rozhodnutí o zdroji + extraktor)**.
 
-Extrakce funguje nad skutečnou instalací: art (land 4244 dlaždic × přesně 1012
-pixelů), gump (5579 záznamů, BWT), mapa (29 360 128 dlaždic, statiky 20 386 415 B),
-hues (1000/1000), textdata (37/19/58/6), cliloc (124 433 záznamů).
+## `assets.anim` — co je hotové a co NE (přečti, než na tom začneš stavět)
+
+Měření a rozhodnutí: **`research/anim-mereni.md`** (surová data
+`research/anim-pokryti.json`, reprodukce `research/probe/anim_pokryti.py`).
+Nástroj `tools/uoextract/anim.py` (22 kontrol `--verify`, 18 `--self-test`).
+
+**Rozhodnutí o zdroji (měřeno, ne opsané z dokumentu):** dokument radil
+„UOP, MUL jen fallback" — **měření to vyvrací**. Těla se téměř nepotkávají:
+
+| Zdroj | Těl | Akcí | Co v něm je |
+|---|---|---|---|
+| `anim*.mul` | 270 | 7 144 | monstra, zvířata, **lidé 400+ (175 bloků na tělo)** |
+| `AnimationFrame*.uop` | 318 | 10 989 | nová těla 400+ (282), gargoyle |
+| průnik | **2** (826, 990) | — | — |
+
+Tělo 400 (hráč) a 401 mají v MUL 35 akcí × 5 směrů, v UOP **nula** → MUL je
+povinný. Pravidlo: **blok v MUL → MUL, jinak UOP** (jako ClassicUO/UOFiddler).
+
+**Co je ověřené:** sloty v `anim.idx` (148 810 slotů; prázdný slot = `-1,-1,-1`);
+tabulka framů = `[u32 počet]` na bajtu 512 + offsety od 516; terminátor RLE
+`0x7FFF7FFF` 4 B před koncem framu; jméno UOP záznamu
+`build/animationlegacyframe/{tělo:06d}/{akce:02d}.bin` + hash `create_hash`
+(4 747 nálezů; `jenkins_pc_pb` 0); **prvních 512 B bloku je ve VŠECH blocích
+stejných** → pixely těl nemají vlastní paletu (barva jde z `animdata`/`hues`).
+
+**Co ověřené NENÍ (a co z toho plyne):** tvar hlavičky framu a kódování indexů
+v RLE proudu. `x` z hlavičky běhu vychází 1020–1023, tedy mimo rozměr framu
+(24×64). **Pixely těl se proto neextrahují** a `anim.py` je záměrně nevyrábí.
+Kdo staví `assets.atlas` nebo `render.anim`, staví na **otevřené otázce** —
+ne na hotovém dekodéru. 18 z 7 162 bloků má navíc jinou tabulku framu (offsety
+nerostou / rozměr 0×0); nástroj je přeskočí a je to vidět v `--verify`.
 
 ## Další kroky (v tomto pořadí)
 
-1. **`assets.anim`** — změřit pokrytí těl v `anim*.mul` vs `AnimationFrame*.uop`
-   a rozhodnout zdroj (docs/03 §3.5.1, O3). Rozhoduje měření, ne dokument.
+1. **Pixely animací** — dorazit hlavičku framu a kódování indexů (viz výše).
+   Je to **blokátor pro `assets.atlas`** v části `anim`.
 2. **`data.items`** — katalog podle **vlastností** (v této instalaci NEJSOU
-   klasická jména: `gold`, `bandage`, `iron ingot`, `log` neexistují; z 113
-   dokumentovaných jmen jich je 79). Musí mít `source` u každé položky.
-3. **`world.time`**, **`world.tiledata`**, **`world.map`**, pak `render.*`
-   (tím se zapne G6 a G10, které jsou teď NEMĚŘENO).
-4. **`assets.atlas`** (manifest) — bez něj je G6 slepá.
+   klasická jména: `gold`, `bandage`, `iron ingot`, `log` neexistují). Každá
+   položka musí mít `source`.
+3. **`world.tiledata`**, **`world.map`**, pak **`render.*`** (tím se zapne G10,
+   které je teď NEMĚŘENO) a **`assets.atlas`** (bez něj je G6 v části atlasu slepá).
 
-## Jak to dělat (a co se už osvědčilo)
+## Jak to dělat (co se osvědčilo)
 
-- **Každou granuli ověřit měřením**: spustit funkci, dostat konkrétní hodnotu.
-  „Soubor existuje" nestačí — u `assets.tiledata` existovala sonda, která měla
-  25 % dat a žádné smluvní API, a Fronta ji počítala za hotovou.
-- **Dívat se na obrázky** (`read_image`): pruhovaný náhled Britainu odhalil dvě
-  chyby v zadání, které čísla neodhalila.
-- **Nepřítomnost věci není vada nástroje**: 364 chybějících artů a 34 prázdných
-  gumpů jsou vlastnosti dat, ne chyby dekodéru. Počítej je zvlášť.
-- **Mutační test u každé brány** (vlož vadu → musí spadnout). Hotové příklady:
-  `ISO_STEP=23`, rozbitý posun v RNG, `Input.` v `sim/`, Godot 3 API,
-  `rng_state` bez převodu na řetězec.
+- **Každou granuli ověřit měřením**; „soubor existuje" ani `done: true`
+  v roadmapě nic neznamená.
+- **Dívat se na obrázky** (`read_image`) — u animací to bylo poprvé, co se
+  měření a realita rozešly (rozměry framu seděly, pixely ne).
+- **Když se dvě měření rozcházejí, hledej, čím se liší** — ne které je „správné".
+- **Mutační test u každé brány** (vlož vadu → musí spadnout).
 
 ## Pasti, které už někoho stály čas (naměřené)
 
-1. **Godot spuštěný z `C:\...\orchestra\tools\godot` NEMŮŽE ZAPISOVAT** — sandbox
-   ho blokuje a Godot přitom u `res://`/`user://` lže `err=0`. Řešení: **kopie
-   ve workspace** (`.cache/godot/`, 172 MB, gitignore); brány si ji samy připraví
-   (`gate_common.godot_bin()`). Bez toho nejdou G7/G10/G13.
-2. **`JSON.parse_string` vrací VŠECHNA čísla jako `float`.** U ukládání to tiše
-   poškodilo int64 stav RNG (`…107324 → …107264`), v `world.doors`/`world.stairs`
-   to zahodilo všechny řádky (0 kategorií, bez chyby). Vždy `int()`; hodnoty
-   > 2^53 ukládat jako řetězec.
+1. **Godot z `C:\...\orchestra\tools\godot` NEMŮŽE ZAPISOVAT** (sandbox) a přitom
+   lže `err=0`. Řešení: kopie ve workspace (`.cache/godot/`, gitignore);
+   brány si ji připraví (`gate_common.godot_bin()`).
+2. **`JSON.parse_string` vrací VŠECHNA čísla jako `float`** — u int64 stavu RNG
+   to tiše poškodilo data. Vždy `int()`; hodnoty > 2^53 jako řetězec.
 3. **`.gitignore` je na Windows case-insensitive** — vzor `Cliloc.*` pohltil
-   `tools/uoextract/cliloc.py`. Soubor existoval, testy procházely, ale **v gitu
-   nebyl** („nothing to commit"). Kontroluj `git ls-files`, ne `Test-Path`.
-4. **`Measure-Object -Line` nepočítá prázdné řádky** (62 vs 74 u téhož souboru).
-   Počty řádků měř Pythonem.
-5. **`class_name` je známý jen přes cache importu** (`.godot/global_script_class_cache.cfg`)
-   — v čerstvém stromu spadne parse. Brány si import samy zajistí.
-6. **`PackedInt32Array` nejde použít jako `const`** a **`Input.get_mouse_position()`
-   v Godotu 4 neexistuje** (pozici myši dává viewport).
-7. **Mutační důkaz na necommitnutém souboru nic nevrátí** — `git checkout` u
-   netrackovaného souboru tiše neudělá nic. Mutuj až po commitu.
-8. **Godot zapisuje do klonů v `_src/`/`research/refs/` při importu** — pomáhají
-   `.gdignore` v těch složkách (už zavedeno).
+   `tools/uoextract/cliloc.py`. Kontroluj `git ls-files`, ne `Test-Path`.
+4. **`class_name` je známý jen přes cache importu** (`.godot/global_script_class_cache.cfg`).
+5. **`Measure-Object -Line` nepočítá prázdné řádky** — počty řádků měř Pythonem.
+6. **Brána, která nic nezměří, není zelená** — `run-all.py` vrací 2 = NEMĚŘENO.
+7. **Zápis „mezi tím" do souboru, který čte jiný běh, vypadá jako změna souboru**
+   — `write` pak odmítne zápis; soubor znovu přečti a zapiš znovu.
+8. **U nové pasti: zapiš ji sem i do `research/`** — příští session ji jinak
+   objeví znovu (starý HANDOFF tvrdil „13 commitů / 241 souborů", obojí jinak).
 
 ## Vady ZADÁNÍ, které je potřeba opravit (agent je needituje)
 
 1. **`docs/03` §3.4 — index bloku mapy**: správně je `bx * blocks_y + by`
    (x-major), ne `by * blocks_x + bx`. `MapLoader.cs:623`.
-2. **`docs/03` §3.4 — záznam statiky**: je `[u16 tile][u8 x][u8 y][i8 z][u16 hue]`
-   (7 B), ne `[u16][u16][u16][i8]`. `StaticsBlock` v ClassicUO.
-   (Při špatném čtení vycházejí „souřadnice" 251, 513…)
-3. **`docs/03` §3.4 — Britain**: blok (1495,1630) má **60** statiků (ne 20);
-   v okolí ±6 bloků 9 329 statiků. Vodní dlaždice: id 168,169,170,171,310,311.
-4. **`docs/03` §3.5.4 — R1**: uzavřeno měřením. `create_hash` (ClassicUO) pokrývá
-   **43 760/43 760** záznamů archivu; varianta `(pc<<32)|pb` 0/43 760.
-   Dokumentovaných „1636/2000" je **jiné počítadlo** (indexy, ne záznamy):
-   364 chybějících artů v této instalaci není.
-5. **`docs/03` §3.5.4 — R2**: „zlib stačí" NEPLATÍ — všech 5 579 gumpů má flag 3
-   (zlib + BWT); bez BWT se nerozbalí ani jeden.
-6. **`docs/03` §3.5.4 — R3**: 112 chunků je plných (458 752 bloků = přesně celý
-   svět) + 113. chunk má 1 blok navíc.
-7. **`docs/03` §3.3.1 — „LAND blok: offset 4"**: je to offset prvního *záznamu*
-   (za hlavičkou první skupiny), ne začátek bloku.
-8. **`.forge/roadmap.json` (generátor)**: `sim.world_loop` má deklarováno
-   `<= 60 / any`, ale jeho vlastní prompt říká „size_lines > 60 → model strong";
-   soubor má ~192 neprázdných řádků. Podobně přesahují `sim.commands` (118),
-   `app.input` (89). Buď uvolnit deklarace, nebo granule rozdělit.
-9. **`app/main.tscn` nemá vlastníka** v roadmapě (založil ho bootstrap).
+2. **`docs/03` §3.4 — záznam statiky**: `[u16 tile][u8 x][u8 y][i8 z][u16 hue]`
+   (7 B), ne `[u16][u16][u16][i8]`.
+3. **`docs/03` §3.4 — Britain**: blok (1495,1630) má **60** statiků (ne 20).
+4. **`docs/03` §3.5.4 — R1/R2/R3**: uzavřeno měřením (`create_hash` 43 760/43 760;
+   všech 5 579 gumpů má flag 3 = zlib **+ BWT**; 112 chunků = celý svět).
+5. **`docs/03` §3.3.1 — „LAND blok: offset 4"**: je to offset prvního *záznamu*.
+6. **`docs/03` §3.5.1 — doporučení „UOP, MUL jako fallback"**: **naměřeno obráceně**
+   (viz `research/anim-mereni.md`); text v `docs/03` je už opravený a
+   `research/05-data-formats.md` §5.2 má místo variant výsledek měření.
+7. **`.forge/roadmap.json` (generátor)**: `sim.world_loop` deklaruje `<= 60`, ale
+   má ~192 řádků; podobně `sim.commands` (118) a `app.input` (89).
+8. **`app/main.tscn` nemá vlastníka** v roadmapě.
 
 ## Prostředí a konvence
 
-- Kód píšu česky v komentářích, identifikátory anglicky (docs/02 §2.6.8).
-- Píšu **jen do `owns` své granule**; `tests/`, `tools/gates/`, `project.godot`,
-  `.forge/`, `docs/` needituju (výjimkou byly bootstrap granule a `.gitignore`).
+- Kód česky v komentářích, identifikátory anglicky (docs/02 §2.6.8).
+- Píšu **jen do `owns`** své granule; `tests/`, `tools/gates/`,
+  `project.godot`, `.forge/`, `docs/` needituju (výjimkou jsou bootstrap granule).
 - `python tools/check-docs-refs.py`, `check-zadani.py`, `roadmap-gen.py --check`
   musí procházet (exit 0) — po každé změně spustit.
 - `run-all.py` vrací 0 = vše změřeno, 1 = vada, **2 = něco NEMĚŘENO** (to není

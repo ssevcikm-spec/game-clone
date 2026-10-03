@@ -172,7 +172,7 @@ def main() -> int:
     return worst
 
 
-EXTRACTOR_SELFTESTS = ["uop", "art", "gump", "worldmap", "cliloc", "tiledata", "hues", "textdata"]
+EXTRACTOR_SELFTESTS = ["uop", "art", "gump", "worldmap", "cliloc", "tiledata", "hues", "textdata", "anim"]
 
 
 def selftest_all(root: Path) -> int:

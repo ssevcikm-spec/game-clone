@@ -115,8 +115,52 @@ def check_extraction_outputs(root: Path, gate: Gate) -> int:
     return checked
 
 
+def check_anim_manifest(root: Path, gate: Gate) -> int:
+    """Manifest animaci (assets/uo/anim-manifest.json) - granule assets.anim.
+
+    Proc prave takhle: rozhodnuti "blok v anim.mul -> anim.mul, jinak
+    AnimationFrame*.uop" (docs/03 §3.5.1) je TVRZENI o datech, ktere se da
+    overit jen na konkretnich telesech. Kdyz manifest u tela 400 (hrac) rekne
+    neco jineho nez anim.mul, je rozhodnuti rozbite - a to je vada, ne detail.
+    """
+    cesta = root / "assets" / "uo" / "anim-manifest.json"
+    if not cesta.exists():
+        return 0
+    try:
+        data = load_json(cesta)
+    except Exception as exc:
+        gate.error(f"uo/anim-manifest.json se nedá přečíst ({exc})")
+        return 1
+    tela = data.get("bodies", {})
+    zdroje = data.get("sources", {})
+    gate.measure("anim_tel", len(tela))
+    gate.measure("anim_mul_tel", int(zdroje.get("anim*.mul", {}).get("bodies", 0)))
+    gate.measure("anim_uop_tel", int(zdroje.get("AnimationFrame*.uop", {}).get("bodies", 0)))
+    if not tela:
+        gate.error("anim-manifest.json nemá žádné tělo (prázdný manifest není úspěch)")
+        return 1
+    if not data.get("sha256"):
+        gate.error("anim-manifest.json nemá SHA-256 vstupů (docs/03 §3.5.3 bod 5)")
+    for telo, ocekavany in (("400", "anim.mul"), ("401", "anim.mul"), ("334", "AnimationFrame.uop")):
+        zaznam = tela.get(telo)
+        if zaznam is None:
+            gate.error(f"anim-manifest.json nezná tělo {telo} (měření: v datech je)")
+            continue
+        if zaznam.get("source") != ocekavany:
+            gate.error(f"tělo {telo} má zdroj {zaznam.get('source')}, "
+                       f"měření (docs/03 §3.5.1) říká {ocekavany}")
+        if not zaznam.get("actions"):
+            gate.error(f"tělo {telo} nemá v manifestu žádnou akci")
+    if data.get("pixels_decoded") is True:
+        gate.error("manifest tvrdí pixels_decoded=true, ale dekodér pixelů "
+                   "v této instalaci ověřený není (research/anim-mereni.md)")
+    gate.note("anim manifest: zdroj u každého těla je měřený, ne odhadnutý")
+    return 1
+
+
 def check(root: Path, gate: Gate) -> None:
     measured_outputs = check_extraction_outputs(root, gate)
+    measured_outputs += check_anim_manifest(root, gate)
     manifest = find_manifest(root)
     if manifest is None:
         if measured_outputs:

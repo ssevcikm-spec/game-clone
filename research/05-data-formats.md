@@ -1987,9 +1987,15 @@ All under `E:\Workspaces\game-clone\research\probe\`:
    the modern item set. Known-good anchor: 41-byte-spaced names begin at byte `2,405,559`. **Resolve
    by** dumping `[1,193,984, 1,194,080)` and looking for a third block header, then re-running the
    41-byte stride. **Biggest single win available.**
-2. **The `anim.mul` frame payload header** (§5.2) — specifically whether a per-frame palette block
-   precedes the frames and in what encoding (three variants circulate). **Resolve by** porting
-   `AnimationsLoader.ReadMULAnimationFrames` (~line 1457). Biggest remaining animation gap.
+2. **The `anim.mul` frame payload header** (§5.2) — **partly resolved 2026-10-03**
+   (`research/anim-mereni.md`, `research/probe/anim_pokryti.py`): the first 512 bytes of a block are
+   **identical in every block** (body 400/200/9, different actions — bit for bit), so there is
+   **no per-frame palette**; colour comes from `animdata.mul`/`hues.mul`, as variant (c) below
+   guessed. The frame table is `[u32 count]` at byte 512 with `count × u32` offsets from 516, and
+   the RLE terminator `0x7FFF7FFF` sits **4 bytes before the end of each frame** (verified on all
+   10 frames of one block). **Still open:** the frame header layout and the index encoding inside
+   the RLE stream — the run header's `x` decodes to 1020–1023, i.e. outside the frame (24×64), so
+   the bit layout of `[u32 header]` in this install is not the one `ClassicUO`/`UOFiddler` use.
 3. **`tiledata.mul` item-block phase** (§4.1) — the field *values* all validate, but I could not
    close an exact arithmetic identity on the name offset, so the item record's internal offsets are
    **provisional at ±1 byte**. **Resolve by** cross-checking a second client's `tiledata.mul`, or
