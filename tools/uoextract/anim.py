@@ -167,6 +167,10 @@ class UopAnim:
     def __init__(self, install: str | Path) -> None:
         self.install = Path(install)
         self.files: list[tuple[int, UopFile, set[int]]] = []
+        # Index hash -> (cislo souboru, zaznam). Bez nej je kazde hledani linearni
+        # pruchod vsemi zaznamy (dohromady ~11 tisic) a mEReni pokryti trva
+        # minuty - a to je u brany, ktera se pousti po kazde zmene, moc.
+        self.index: dict[int, tuple[int, object]] = {}
         for i in range(1, 11):
             cesta = self.install / f"AnimationFrame{i}.uop"
             if not cesta.exists():
@@ -174,15 +178,20 @@ class UopAnim:
             u = UopFile(cesta)
             u.read_entries()
             self.files.append((i, u, {e.hash for e in u.entries if e.hash}))
+            for e in u.entries:
+                if e.hash:
+                    self.index.setdefault(e.hash, (i, e))
 
     def entry(self, body: int, action: int):
         """(index souboru, UopFile, UopEntry) nebo (None, None, None)."""
         hodnota = create_hash(UOP_NAME.format(body, action))
-        for i, u, hashe in self.files:
-            if hodnota in hashe:
-                for e in u.entries:
-                    if e.hash == hodnota:
-                        return i, u, e
+        nalezeny = self.index.get(hodnota)
+        if nalezeny is None:
+            return None, None, None
+        cislo, zaznam = nalezeny
+        for i, u, _hashe in self.files:
+            if i == cislo:
+                return i, u, zaznam
         return None, None, None
 
     def actions(self, body: int) -> list[int]:
@@ -363,6 +372,16 @@ def self_test() -> int:
           f"jmeno zaznamu je '{jmeno}'")
     check(create_hash(jmeno) != create_hash(UOP_NAME.format(400, 5)),
           "ruzne akce maji ruzny hash")
+
+    # 2b) PRAVIDLO ROZHODNUTI musi byt testovane OFFLINE. Mutační test to
+    # odhalil: s obracenym poradim zdroju (UOP pred MUL) bylo `--verify` zelene,
+    # protoze se pravidlo zkouselo jen na zivych datech - a ta jsou pomalá.
+    mul_f, uop_f = {400: [0], 826: [0]}, {334: [0], 826: [0]}
+    check(zdroj(400, mul_f, uop_f) == "mul", "telo jen v MUL -> 'mul'")
+    check(zdroj(334, mul_f, uop_f) == "uop", "telo jen v UOP -> 'uop'")
+    check(zdroj(826, mul_f, uop_f) == "mul",
+          "telo v OBOU -> 'mul' (MUL ma prednost)")
+    check(zdroj(9999, mul_f, uop_f) == "zadny", "telo v nicem -> 'zadny'")
 
     # 3) tabulka framu na syntetickem bloku
     blok = _synthetic_block()
