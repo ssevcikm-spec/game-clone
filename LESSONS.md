@@ -24,6 +24,95 @@ Typy: `chyba` (moje vada) · `past-nástroje` (prostředí/nástroj, ne logika) 
 
 ---
 
+### 2026-10-04 — Stabilita na 3 prvcích se neprokáže, na 1000 ano (postup)
+**Co se stalo:** kontrola „tři mobily na jedné dlaždici se stejným `z` si drží
+pořadí vstupu“ **prošla i s mutací**, která porovnává jen `a[0] < b[0]` (bez
+stabilizace) — `sort_custom` na třech prvcích se chová jako stabilní. Po
+doplnění stejné kontroly na **1000 objektů se stejným klíčem** mutace spadla.
+**Doklad:** `.cache/analysis/mutace-sort.py`, mutace „nestabilni razeni“: před
+posílením `18 kontrol, 0 selhani`; po posílení `FAIL 1000 objektu se stejnym
+klicem: poradi vstupu se zachova`, exit 1.
+**Ponaučení:** kontrolu stability dělej na seznamu, kde je **shoda hojná**, ne na
+třech stejných prvcích. „Malý vstup prošel“ je u třídění totéž co „malý vstup se
+chová jinak“.
+
+### 2026-10-04 — Složený klíč: chyba je v přenosu mezi poli, ne v porovnání (postup)
+**Co se stalo:** `sort_key` skládá `((x+y) * 3 + vrstva) * 256 + z`. Mutace
+`LAYERS 3 → 2` **prošla**, protože kontrola porovnávala jen dvě země (obě ve
+vrstvě land) a pár objektů na *jedné* dlaždici. S `LAYERS = 2` má mobilní na
+diagonále `d` **stejný klíč** jako land na diagonále `d+1` a pořadí mezi nimi
+rozhodne až pořadí vstupu. Padlo to až při kontrole „vše z diagonály 8 před vším
+z diagonály 9“ (18 objektů = 3 vrstvy × 3 výšky `z`).
+**Doklad:** táž mutace: před posílením `18 kontrol, 0 selhani`, po posílení
+`FAIL vsechny objekty diagonaly 8 pred vsemi z diagonaly 9 (18 objektu)`, exit 1.
+**Ponaučení:** když cpakuješ víc hodnot do jednoho `int`, **netestuj, že jsou pole
+správně seřazená, ale že jedno pole nepřeteče do druhého**. Na to nestačí jeden
+příklad na dlaždici — potřeba je sousední pole s **horší** hodnotou.
+
+### 2026-10-04 — Mutace, která projde, nemusí být slepá kontrola (chyba)
+**Co se stalo:** třetí z 7 mutací (`z - Z_MIN` → `z + Z_MIN`) **prošla** a nebyla
+to chyba sondy: posun o konstantu pořadí nemění. Ukázala ale jinou věc — můj
+komentář tvrdil, že se klíč dá použít jako `z_index`. **Nejde:** klíč roste s
+`(x+y)` (pro mapu 7168×4096 až ~8,6 mil.) a Godot bere `z_index` jen
+**−4096…4096**. Komentář jsem opravil, klíč je na porovnávání.
+**Doklad:** `render/sort.gd:29-31` po opravě; sonda teď piny i význam čísla
+(`klic 0 = dlazdice (0,0), vrstva land, z = Z_MIN`), takže smysl je zakotvený.
+**Ponaučení:** když mutace projde, nepiš hned „kontrola je slepá“. Zeptej se
+nejdřív, **zda je mutace vůbec vadná** (zde: ne, je zachovávající pořadí). Když
+vadná není, hledej druhý důsledek — tady se v ní schovalo **nepravdivé tvrzení v
+komentáři**, což je horší vada než neprohozená kontrola.
+
+### 2026-10-04 — G10 přešla z NEMĚŘENO na VADA jen tím, že vznikl první `render/` (namereno)
+**Co se stalo:** po `render/sort.gd` se G10 (`check-render.py`) poprvé dostala od
+`render/ neobsahuje žádný .gd` k měření snímku a **spadla**: `snapshot.png
+1280x720, barev 1` → „snímek je jednolitý — nic se nevykreslilo“. Ten snímek je
+**stará artefakt z 2026-10-02 19:24** (uniformní `(77,77,77)`; v `.cache/render/`
+leží i `frame*.png` a `frame.wav` po Movie Makeru z bootstrapu). Brána kontroluje
+jen `exists()`, **ne stáří** — dnes tedy měří čtyři dny starý prázdný obrázek.
+**Doklad:** `python tools/gates/run-all.py` → před změnou `NEMĚŚENO` (exit 2,
+souhrn `měřeno 9, čeká 2, chyb 0`), po změně `G10 VADA` (exit 1, `měřeno 9,
+čeká 1, chyb 1`); `LastWriteTime .cache/render/snapshot.png = 10/2/2026 7:24 PM`;
+Pillow: 1 barva.
+**Ponaučení:** červená G10 je **pravdivá** („na obrazovce nic není“), ale její
+příčina není dnešní build. Dva závěry: (a) NEMĚŠENO u G10 znamenalo „chybí kód“,
+ne „chybí měření“; (b) **uměřený soubor musí mít stáří**, jinak se včerejší
+artefakt propírá jako dnešní měření. Patří do `tools/gates/check-render.py`
+(agent ho nemá měnit) a do hlavičky `app/`, ať snímek vzniká při běhu.
+
+### 2026-10-04 — `check-wiring` nerozliší volání od proměnné (namereno)
+**Co se stalo:** po přidání `render/sort.gd` klesl `neintegrovano` z 26 na 25.
+Měřením (soubor odložen → brána → soubor vrácen → rozdíl seznamů názvů) vyšlo,
+že **`world.tiledata.layer` přestal být „mrtvý“ jen proto, že mám lokální
+proměnnou `layer`** — brána hledá jméno slovem, ne voláním `layer(`. Současně
+korektně přibyly dvě opravdu zapojené konstanty (`Z_MIN`, `Z_MAX`).
+**Doklad:** `check-wiring.py` bez souboru `{… 'volanych_z_produkce': 26,
+'neintegrovano': 26}`, s souborem `{… 29, … 25}`; `Compare-Object` názvů:
+`+ render.sort.draw_order`, `+ render.sort.sort_key`, `− core.const.Z_MIN`,
+`− core.const.Z_MAX`, `− world.tiledata.layer`.
+**Ponaučení:** **proměnnou jsem nepřejmenoval** — kód je správný, chyba je v
+nástroji a přejmenovat kvůli metrice je reflex, který pravidla zakazují.
+Konkrétní oprava pro vlastníka bran: v `provides` rozlišit jména funkcí (`name(`)
+od konstant a u funkcí hledat tvar volání. Zatím tento nález jen **zmenšuje**
+počet „mrtvého“ kódu, tedy je u tohoto typu optimistický.
+
+### 2026-10-04 — Sandbox: `Low` label má jen kořen workspace (past-nástroje)
+**Co se stalo:** znovu naměřeno, tentokrát poprvé v této session: podprocesy
+běží na `Low Mandatory Level`, ale `Mandatory Label\Low` je jen na kořeni
+`E:\Workspaces\game-clone`. Zápis do kořene projde, do `.cache`, `data`, `sim`,
+`tools` ne. Důsledek: `run-all.py` končí `PermissionError` na `summary.json` a
+**G3, G7, G11 nemohou zapsat do `user://`** (`gate_common.py:219` má adresář Godot
+natvrdo v `.cache/godot-appdata`).
+**Doklad:** `Set-Content` do kořene OK / do `.cache` „Access denied“;
+`icacls … | findstr Mandatory` — label jen na kořeni; `run-all.py` v tomto stavu
+→ `měřeno 6, čeká 3, chyb 2`, exit 1.
+**Ponaučení:** pro **Godot testy** stačí nasměrovat `APPDATA` do adresáře
+**přímo pod kořenem** (kořen label dědí, takže se do něj dá psát) — pak testy
+běží (`238 kontrol, 0 selhani`). Na **brány** to nepomůže, ty si cestu píšou samy.
+Oprava je session na plný přístup. Nové adresáře vytvořené přes `write` label
+**dědí**, takže do nich podproces psát může.
+
+---
+
 ### 2026-10-04 — Recepty: jména nejsou v `research/04`, jsou v `Cliloc.enu` (postup)
 **Co se stalo:** `research/04-craft-data.json` (11 řemesel, 1053 receptů) jména
 výsledku ani materiálu **neobsahuje** — je to C# typ (`GoldRing`) a číslo kliloku

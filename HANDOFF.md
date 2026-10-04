@@ -1,11 +1,11 @@
-# Předání — UO-klon (stav po `data.recipes`: `recipes.json` má generátor v repu)
+# Předání — UO-klon (stav po `render.sort`: první soubor v `render/`, G10 poprvé měří)
 
 > Tento soubor je pro **další session agenta**. Všechno podstatné je v repu
 > a v `git log`; tady je jen to, co by jinak stálo hodiny znovuobjevování.
 > Datum: 2026-10-04. Zjištění o odemčení W1 (`tiledata --extract` → `data.items`
 > → `world.tiledata`) **platí dál**.
-> **Poslední session udělala granuli `data.recipes`** (druhý generátor obsahu).
-> Předchozí (`data.gen_content`, `items.json`) stále platí.
+> **Poslední session udělala granuli `render.sort`** (`render/sort.gd`).
+> Předchozí (`data.recipes`, `data.gen_content`) stále platí.
 
 ## ⚠ POVINNÉ: na konci každé session (rozhodnutí uživatele, 2026-10-03)
 
@@ -31,8 +31,10 @@ následuje předání**. Proto platí:
 | Projekt | `E:\Workspaces\game-clone` (git, `main`) |
 | Generátor obsahu | `python tools/gates/gen-content.py [--check] [--only items\|recipes]` |
 | Testy | `godot --headless --path . --script res://tests/run_tests.gd` → **238 kontrol / 0 selhání** (znovu naměřeno 2026-10-04) |
-| Brány | `python tools/gates/run-all.py` → **9 měřeno / 2 NEMĚŘENO / 0 chyb** (exit 2 = něco neměřeno; znovu naměřeno 2026-10-04) |
+| Brány | `python tools/gates/run-all.py` → **9 měřeno / 1 NEMĚŘENO / 1 chyba, exit 1** (znovu naměřeno 2026-10-04, viz níže — **změna proti minulému předání**) |
 | Self-testy bran | `python tools/gates/run-all.py --self-test` → **19 celkem (10 bran + 9 extrakčních nástrojů), 0 chyb** (znovu naměřeno 2026-10-04) |
+| Sonda `render.sort` | `.cache/analysis/probe-sort.gd` (gitignore) → **21 kontrol / 0 selhání** |
+| Mutace sondy | `.cache/analysis/mutace-sort.py` → **7 z 7 mutací spadlo** |
 | Godot (binárka) | **KOPIE ve workspace**: `.cache/godot/Godot_v4.7.2-stable_win64_console.exe` |
 | Python | `C:\Users\Ssevc\.dsh\dsh-runtimes\dsh-primary-runtime\dependencies\python\python.exe` |
 | Instalace UO | `D:\Games\Electronic Arts\Ultima Online Classic` (jen čtení) |
@@ -44,163 +46,196 @@ následuje předání**. Proto platí:
 bootstrap 4 · W0 8 · M0 5 · M1 8 (**uop, tiledata, art, gump, worldmap, hues,
 textdata, cliloc**) · M2 4 (world.doors, world.stairs, entity.stats, world.time) ·
 assets.anim 1 · `data.items` 8 748 záznamů · `world.tiledata` · `world.map` ·
-`data.gen_content` — `tools/gates/gen-content.py` · **`data.recipes`
-(`recipes.json`, 1053 receptů)**.
+`data.gen_content` — `tools/gates/gen-content.py` · `data.recipes` (1053 receptů)
+· **`render.sort` (`render/sort.gd`)**.
 
-**Poslední session (2026-10-04, `data.recipes`):**
+**Poslední session (2026-10-04, `render.sort`):**
 
-- **`tools/gates/gen-content.py` má druhý generátor — `recipes.json`**
-  (585 410 B, 1053 receptů z `research/04-craft-data.json`, 11 řemesel).
+- **`render/sort.gd`** — **60 řádků** proti deklarovaným `<= 60`, jediná funkce
+  řazení kreslení. Smlouva z roadmapy: `sort_key(obj) -> int`,
+  `draw_order(objects) -> Array`.
+  Klíč je **jedno číslo**: `((x + y) * 3 + vrstva) * 256 + (z − Z_MIN)`,
+  vrstvy `land` 0 / `static` 1 / `mobile` 2 (`item` = předmět na zemi jde s
+  mobily). Pořadí je **stabilní** (poradí vstupu jako třídící klik), `z` se
+  **svěruje** do `Z_MIN..Z_MAX` (jinak objekt přeběhne o celé diagonály),
+  neznámý `kind` se kreslí jako mobilní a vyvolá **jedno varování** (ticho by
+  byla zelená nad vadou).
+- **Pořadí je potvrzené dvěma nezávislými zdroji**: `docs/02 §2.4` (hlavní klíč
+  `x + y`, `z` až v rámci diagonály) a `research/05 §8.2` (ClassicUO
+  `View.CalculateDepthZ`: `depth = (x + y) + (127 + z) * 0.01`). Rozdíl: UO
+  škáluje `z` desetinně a shody řeší `>=` (pořadí v seznamu) — u nás
+  diagonály odděluje celočíselná základna, takže `z` nikdy nepresáhne na další.
+- **Ověření (sonda, ne test):** `.cache/analysis/probe-sort.gd` →
+  **21 kontrol / 0 selhání**, exit 0. Kontroly jsou z **pravidel v `docs/02 §2.4`**,
+  ne z toho, jak je kód napsaný: přijímací kritérium granule (dva statiky na
+  jedné dlaždici s různým `z`), vrstva land → statics → mobiles, diagonala
+  `x + y`, stabilita na **1000** shodných klíčů, determinismus, `z` mimo rozsah,
+  shoda `sort_key` a `draw_order`, a **reálná data**: blok 8×8 v Britainu =
+  **64 dlaždic + 3778 statik = 3842 objektů**, land před statikami, statiky podle `z`.
+- **Mutační test — 7 z 7 spadlo:** vrstvy prohozeny · `z` descendo · diagonála
+  `x−y` · bez svěření `z` · nestabilní řazení · špatný základ vrstev (`LAYERS 2`) ·
+  `z + Z_MIN` místo `z − Z_MIN`. Každá mutace se navíc **ověřila na disku** (sha
+  + `stare not in mutant`), aby „spadlo“ nebylo „mutace se neprovedla“.
+  **Tři z nich prošly poprvé** a odhalily, že kontrola je slabá — viz
+  `LESSONS.md` (stabilita na 3 prvcích; přenos mezi poli u složeného klíče).
+  Jedna z nich (`z + Z_MIN`) odhalila **nepravdivé tvrzení v mém komentáři**
+  (`sort_key` není použitelné jako `z_index`, Godot bere jen ±4096) — opraveno.
+- **Sonda není test.** `tests/` needituje člověk (`docs/09 §9.5`); `render.sort`
+  **nemá test v `tests/cases/`** — viz otevřené věci č. 2.
+- **Kontroly po změně:** `check-docs-refs.py` **0**, `check-zadani.py` **0**,
+  `roadmap-gen.py --check` **0**, testy hry **238/0**, self-testy bran **19/19**.
+
+### ⚠ `run-all.py` dnes vrací **exit 1** — a to je pravda, ne regrese
+
+`9 měřeno / 1 NEMĚŘENO (G9) / 1 chyba (G10)`, exit 1. Před touto session bylo
+`9 / 2 / 0`, exit 2. Rozdíl je celý v **G10**:
+
+| bráňa | před | teď | proč |
+|---|---|---|---|
+| G10 `check-render` | **NEMĚŚENO** „`render/` neobsahuje žádný `.gd`“ | **VADA** „snímek je jednolitý — nic se nevykreslilo“ | vznikl první soubor v `render/`, takže brána poprvé **změřila pixely** |
+
+Snímek, který G10 měří, je `.cache/render/snapshot.png` — **stará artefakt z
+2026-10-02 19:24** (uniformní `(77,77,77)`, 1280×720; v téže složce leží
+`frame*.png` a `frame.wav` po Movie Makeru z bootstrapu). Brána kontroluje jen
+`exists()`, **ne stáří**, takže dnes měří čtyři dny starý prázdný obrázek.
+
+**Červená je pravdivá** („na obrazovce nic není“ — renderer v repu zatím
+neexistuje), ale **nejde o vadu `render/sort.gd`** a neopraví se přejmenováním
+nebo smazáním souboru. Otočit ji na zelenou může až `render.chunk` +
+`render.textures` + `assets.atlas`, které skutečně něco nakreslí. **Nemaž ten
+snímek** a nehledej chybu ve svém kódu — viz otevřené věci č. 4 a 5.
+
+**Předchozí session (2026-10-04, `data.recipes`):**
+
+- **`tools/gates/gen-content.py` má generátor `recipes.json`** (585 410 B,
+  1053 receptů z `research/04-craft-data.json`, 11 řemesel).
   Záznam má `id, skill, type, min_skill, max_skill, result, materials,
-  use_all_res, era, source, group` — tvar `#id/skill/min_skill/result/materials`
-  hlídá G5 (`REQUIRED_FIELDS`), `result`/`materials` mají `tile` jen když se
+  use_all_res, era, source, group`; `result`/`materials` mají `tile` jen když se
   jméno přeložilo.
-- **Řešení jmen:** `research/04` jména **nemá** — je to C# typ (`GoldRing`)
-  a číslo kliloku (`["expr", "1044176 + offset"]`). Text z `Cliloc.enu`
-  (`tools/uoextract/cliloc.py`), druhý pokus rozčlenění C# typu, `tile` z
-  `items.json` (poradi shoda → plural `%s`/`s`).
-- **Naměřený stav překladu:** výsledek má `tile` **354 z 1053**, materiál
-  **1035 z 1696**; nevyřešených referencí **1360** (895 různých) jde do
-  `assets/uo/content-report.json`. **Nejsou to chyby párování** — `platemail
-  (tunic)`, `turquoise`, `blank scroll` v tiledata této instalace nejsou.
-  Kontrola kvality párování (`.cache/analysis/probe-recipes.py`, gitignore):
-  po normalizaci pluralu a `%s` **nesedí 0 z 1389** vyřešených referencí.
-- **Reprodukovatelnost:** `--only recipes --check` **exit 0**, sha256
-  `8759e697cefc0d0e…`, dva běhy shodné. Plný `--check` → **exit 2**
-  (13 generátorů zbývá), `--only items` → **0** (sha `f6c9a6122fcb17127…`
-  pořád sedí, `items.json` se nezměnil).
-- **Mutační test:** změna 4 bajtů → **exit 1**; `{}` → **exit 1**; smazáno →
-  **exit 1**; po regeneraci `--check` → **0**.
-- **G5 poprvé měří křížové odkazy na recepty:** `check-content.py` →
-  `recipes.json: tvar seznam, záznamů 1053`, `OK (exit 0)`.
-- Kontroly po změně: `check-docs-refs.py` **0**, `check-zadani.py` **0**,
-  `roadmap-gen.py --check` **0**, `run-all.py` **9/2/0 (exit 2)**,
-  `--self-test` **19/19**, Godot testy **238/0**.
-
-**Předchozí session (2026-10-04, `data.gen_content`):**
-
-- **`tools/gates/gen-content.py`** (349 řádků / 303 neprázdných) — generátor
-  `data/*.json` podle `docs/06 §6.1`. Tabulka `POZADAVKY` má **15 cílů** se
-  zdrojem; zabudovaný je zatím **jen `items.json`**, ostatní se hlásí jako
-  `NEMERENO … generator chybí` (**nikdy** jako hotové) a jdou do
-  `assets/uo/content-report.json`.
-- **Reprodukuje data beze změny:** `--only items --check` → **exit 0**,
-  `items.json` **sha256 `f6c9a6122fcb17127…`** = ta, která je v gitu od
-  `data.items`. Shodu jsem navíc ověřil **porovnáním se starým skriptem**
-  (`.cache/analysis/gen-items.py`, gitignore): 8748 záznamů, jediný rozdíl byl
-  `sand`, který jsem v nové verzi omylem vynechal — opraveno, viz `LESSONS.md`.
-- **Mutační test:** změna 1 bajtu → **exit 1** (`na disku je jiná verze`);
-  prázdné `{}` → **exit 1**; po opravě `git status` čistý.
-- **Návratové kody** (0 ok / 1 vada / **2 = něco neměřeno**, stejně jako brány):
-  plný `--check` → **2** (14 generátorů chybí), `--only items` → **0**,
-  `--only xyz` (neznámý cíl) → **1**.
-- **`assets/uo/content-report.json`**: po plném běhu `unresolved: 2`
-  (`clean bandage`, `blank scroll` — v tiledata nejsou pod tím jménem),
-  `bez_generatoru: 14`. Dílčí `--only` běh hlavní report **nepřepisuje**
-  (jde do `.cache/gen-content/`).
-- Kontroly po změně: `check-docs-refs.py` **0**, `check-zadani.py` **0**,
-  `roadmap-gen.py --check` **0**, `run-all.py` **9/2/0 (exit 2)**,
-  `--self-test` **19/19**, Godot testy **238/0**.
+- Výsledek má `tile` **354 z 1053**, materiál **1035 z 1696**; nevyřešených
+  referencí **1360** jde do `assets/uo/content-report.json`.
+- `--only recipes --check` **exit 0**, sha256 `8759e697cefc0d0e…`.
+- G5: `recipes.json: tvar seznam, záznamů 1053`, křížové odkazy **1389 vyřešeno,
+  0 chyb**.
 
 ## Nová rozhodnutí, která jsem musel udělat
 
-1. **`sand` (tile 9310, váha 255 = statika) zůstává v `items.json`.** Původní
-   generátor měl mrtvou sadu `SUROVINY_VYLOUCENE = {"sand"}`. Generátor musí
-   data reprodukovat; oprava dat je zvláštní krok u granule `data.items`.
-2. **`items.json` má `tile` = tiledata item id** (bez `+0x4000`) — stejně jako u
-   `world.map`; rozhodnutí je popsáno v `LESSONS.md` a v hlavičce
-   `gen-content.py`.
-3. **Generátor sdílí kódové konstanty s branami** (`gate_common.ROOT/OK/VADA/
-   NEMERENO`), ačkoliv není brána — jinak by měl jiné návratové kody než
-   `run-all.py`, a to je past, kterou člověk čte jako chybu.
+1. **Tvar objektu pro `sort_key` — smlouva ho nepínuje.** `docs/04 §4.2` má jen
+   řádek „**jediná** funkce řazení“, `docs/02 §2.4` popisuje pořadí, ale
+   **žádný tvar objektu**. Zvolil jsem
+   `{"kind": "land"|"static"|"mobile"|"item", "x": int, "y": int, "z": int}`
+   a zapsal to do hlavičky souboru (stejně jako `sim_world.gd` zapisuje své
+   mezery). `docs/` agent nemění (`docs/09 §9.10.7`) — **patří do zadání pro
+   člověka**: doplnit tvar do tabulky `render` v `docs/04 §4.2`.
+2. **`item` (předmět na zemi) jde do vrstvy s mobily.** V UO je předmět na zemi
+   v jednom kreslicím seznamu s mobily (`research/05 §8.2`); `docs/02 §2.4`
+   píše jen „land → statiky → mobilové“. Nešlo o to vymyslet 4. vrstvu.
+3. **`z` se svěruje do `Z_MIN..Z_MAX`.** Bez toho by `z` mimo rozsah (např.
+   `z_at()` mimo mapy vrací `-1`) posunul objekt o celé diagonály. Otestováno
+   mutací „bez svěření z“.
+4. **Špatný základ vrstev (`LAYERS 2`) je past, ne kosmetika.** Mobilní na
+   diagonále `d` by měl stejný klíč jako land na `d+1`. Prošlo to při testu na
+   jedné dlaždici — viz `LESSONS.md`.
+5. **Proměnnou `layer` jsem nepřejmenoval, aby brána nehlásila falešné zapojení.**
+   `check-wiring.py` hledá jméno slovem, takže lokální `layer` v `render/sort.gd`
+   nechal zmizet `world.tiledata.layer` ze seznamu mrtvého kódu (26 → 25,
+   změřeno odložením souboru). Kód je správný, chyba je v nástroji — patří do
+   `tools/gates/check-wiring.py`.
+6. **`sand` (tile 9310) zůstává v `items.json`**, `tile` = tiledata item id bez
+   `+0x4000` (rozhodnutí z předchozích session, platí dál).
 
 ## Otevřené věci a co je potřeba dodělat
 
-## Otevřené věci a co je potřeba dodělat
-
-0. **`recipes.json` potřebuje rozhodnutí uživatele:** 1360 nevyřešených referencí
-   je **obsah pozdních eras**, ne chyba párování. Varianty: (a) nechat to tak a
-   filtrovat `era` až ve hře, (b) zahodit záznamy, jejichž `result` nemá `tile`
-   (z 1053 by zůstalo 354), (c) doplnit tiledata novější instalace — mimo zadání.
-   Dnes je (a) a každý nevyřešený odkaz je vidět v
-   `assets/uo/content-report.json` i ve výpisu `gen-content.py`.
-1. **13 generátorů v `POZADAVKY` chybí** — `weapons.json`, `armor.json`,
-   `spells.json`, `item_properties.json`, `monsters.json`, `spawns.json`,
-   `vendors.json`, `regions.json`, `moongates.json`, `dungeons.json`,
-   `professions.json`, `skills.json`, `balance.json` (`recipes.json` je hotový).
-   Jejich zdroje jsou zatím jen markdown `research/03` / `research/06`
-   (plus `Prof.txt` a `skills.mul`).
-2. **`data.items`, `data.recipes`, `world.tiledata` i `world.map` nemají test v
-   `tests/cases/`** — stejná mezera jako předtím. Sonda v `.cache/analysis/` není
-   test; v **čerstvém klonu** ji nikdo nespustí. `gen-content.py --check` kryje
-   jen idempotenci, ne správnost dat.
-3. **`size_lines` nesedí u 17 z 27 dosavadních souborů** (stav převzatý z
-   minulého předání; `gen-content.py` ho zvýšil na **18 z 28** — dnes už
-   **474 řádků** (414 neprázdných) proti deklarovaným `<= 150`). **Buď uvolnit deklarace, nebo dělit granule** —
-   `docs/09 §9.2`. **Je to rozhodnutí pro uživatele.**
+0. **`recipes.json` potřebuje rozhodnutí uživatele** (z předchozí session, stále
+   otevřené): 1360 nevyřešených referencí je **obsah pozdních eras**, ne chyba
+   párování. Dnes je varianta (a) — nechat to a filtrovat `era` až ve hře;
+   každý nevyřešený odkaz je vidět v `assets/uo/content-report.json`.
+1. **`render.sort` nemá test v `tests/cases/`** — stejná mezera jako u
+   `data.items` a `data.recipes`. Sonda v `.cache/analysis/` měří, ale **v čerstvém
+   klonu ji nikdo nespustí**. Kandidát na první případ: „dva statiky na jedné
+   dlaždici s různým `z` vyjdou v pořadí podle `z`“ + to, co dnes drží mutace
+   (stabilita na shodných klíčích, přenos mezi poli u `LAYERS`).
+2. **`size_lines` nesedí u 17 z 27 dosavadních souborů** (`gen-content.py` ho
+   zvýšil na **18 z 28**). `render/sort.gd` je **60/60**, tedy sedí.
+   **Je to rozhodnutí pro uživatele:** uvolnit deklarace, nebo dělit granule —
+   `docs/09 §9.2`. Brána to neměří, je to tichá regrese plánování.
    **Pozor na metriku:** `Measure-Object -Line` nepočítá prázdné řádky;
    `size_lines` se měří všemi řádky (Python `splitlines()`).
-4. **Pixely animací** (z minulého handoffu, **platí dál**): tvar hlavičky framu a
+3. **Tvar objektu pro `render.sort` patří do `docs/04 §4.2`** (viz rozhodnutí 1).
+   Dokud tam není, kdokoliv implementuje `render.chunk` bude vymýšlet objekt
+   znovu — a to je přesně to, co `docs/09 §9.3` zakazuje.
+4. **G10 potřebuje snímek z běhu a kontrolu stáří.** Dnes měří artefakt
+   z bootstrapu (viz výše). Patří do `tools/gates/check-render.py` a do `app/`:
+   snímek musí vznikat při běhu hry a brána musí odmítnout stará data
+   (`docs/08 §8.3` — „brána, která nemá jak selhat“). Agent `tools/gates/`
+   nemění.
+5. **13 generátorů v `POZADAVKY` chybí** — `weapons.json`, `armor.json`,
+   `spells.json`, `item_properties.json`, `monsters.json`, `spawns.json`,
+   `vendors.json`, `regions.json`, `moongates.json`, `dungeons.json`,
+   `professions.json`, `skills.json`, `balance.json`.
+6. **Pixely animací** (z minulého handoffu, **platí dál**): tvar hlavičky framu a
    kódování indexů v RLE proudu jsou neověřené. Zdroj je rozhodnutý měřením:
    **blok v MUL → MUL, jinak UOP**.
-5. **`assets.uop` (2 rozpory k rozhodnutí testem)** a **`assets.atlas`/
+7. **`assets.uop` (2 rozpory k rozhodnutí testem)** a **`assets.atlas`/
    `assets.verify`/`assets.extract_cli`** nejsou hotové — bez `atlas.py` není
    `manifest.json`, takže G6 je v části atlasu slepá a `render.textures` nemá
    z čeho číst.
-6. **Staré poznámky v `tools/uoextract/worldmap.py` (10–11, 60–63, 87–90) jsou
+8. **Staré poznámky v `tools/uoextract/worldmap.py` (10–11, 60–63, 87–90) jsou
    zastaralé** — tvrdí, že `docs/03 §3.4` uvádí špatné pořadí bloku a špatné
    šířky polí. `docs/03` je opravený (§3.9.1) a kód `struct.unpack_from("<HBBbH")`
    je správný. Není to vada kódu, ale člověk, který to čte, se zbytečně bojí.
 
 ## Další kroky (v tomto pořadí)
 
-1. **`render.sort`** (`render/sort.gd`, `any`, `<= 60`) — DAG splněný: závisí na
-   `core.iso` + **`world.map` (hotový)**. Smlouva: `sort_key(obj) -> int`,
-   `draw_order(objects) -> Array`; pořadí land → statiky podle z → mobilové podle z,
-   dlaždice podle `(x+y)` (`docs/02 §2.4`, past P21).
-2. **`assets.atlas`** (tím se zapne G10, které je teď NEMĚŘENO), pak
-   **`render.textures`** — až po `manifest.json`.
-3. **`tests/cases/` pro data** (mezera č. 2) — první případ může být
-   `recipes.json`: „každý záznam s `tile` v `result` má stejně pojmenovaný
-   záznam v `items.json`" — přesně to, co se dnes měří ručně v `.cache/analysis/`.
+1. **`assets.atlas`** (`tools/uoextract/atlas.py`, `strong`, `<= 150`) — tím se
+   zapne G10 v části manifestu a vznikne `manifest.json`, bez kterého
+   `render.textures` nemá z čeho číst.
+2. **`render.textures`** (`render/texture_cache.gd`, `<= 60`) — cache z manifestu.
+3. **`render.chunk`** (`render/chunk_renderer.gd`) — první věc, která **něco
+   nakreslí**, a tím otočí G10 ze žluté na zelenou. Až tehdy bude
+   `render.sort` zavolaný z produkce (dnes G4 hlásí `sort_key` i `draw_order`
+   jako „čeká na integraci“ — to je správně, `acceptance` granule `wiring`
+   nežádá).
+4. **`tests/cases/` pro `render.sort`** a pro data (`items.json`, `recipes.json`) —
+   mezera č. 1. Psát ho má člověk; v zadání stojí, co musí držet.
 
 ## Jak to dělat (co se osvědčilo)
 
-- **Každou granuli ověřit měřením**; „soubor existuje" ani `done: true`
+- **Každou granuli ověřit měřením**; „soubor existuje“ ani `done: true`
   v roadmapě nic neznamená.
-- **Nástroj, který vyrábí data v gitu, musí reprodukovat data.** Nejdřív
-  shoda bajtů s tím, co je commitnuté; pak teprve úpravy (a to jako samostatný
-  krok s viditelným diffem dat).
-- **Návratový kód musí říct, co se změřilo**: 2 = „něco neměřeno“ u
-  `--check` celého seznamu je správný stav, ne selhání.
-- **Vedlejší výpis (ukázky, souhrny) nesmí změnit kód měření** — viz dva
-  záznamy v `LESSONS.md` z této session.
-- **Než začneš psát, ověř, že všechny vstupy granule mají PRODUCENTA** —
-  `depends_on` znamená „hotové a funkční", ne „jméno existuje v DAGu".
-- **Binární formát ověř dvěma implementacemi.** Rozsahová kontrola je slabá
-  brána: chybný posun o 4 B v `map0.land` dával plausibilní `z` v `-128..127`.
-- **Dívat se na data, ne na počty.** 1126 „zbraní" vypadalo jako úspěch;
-  teprve výpis jmen ukázal, že jsou to helmy. Každý generátor ať **vypíše ukázky**.
-- **Mutační test u každé brány, sondy i nové funkce** (otoč vztah → musí spadnout).
-- **Dokumentovaná tabulka není důkaz** — každé číslo ověř na datech.
+- **Mutační test je to, co odlišuje měření od dojmu.** Z 7 mutací mi **tři
+  prošly** a každá ukázala jinou slabost kontroly (stabilita malého seznamu,
+  přenos mezi poli, nepravdivý komentář). Bez nich bych do předání napsal
+  „7 kontrol prošlo“ a byl bych o tři kontroly chudší.
+- **Mutace se musí ověřit, že se provedla** (sha textu + `stále not in mutant`),
+  jinak „spadlo“ a „neprovedlo se“ vypadají stejně.
+- **Nástroj, který vyrábí data v gitu, musí reprodukovat data.**
+- **Vedlejší výpis (ukázky, souhrny) nesmí změnit kód měření.**
+- **Dívat se na data, ne na počty.** 3842 objektů z jednoho bloku mapy je
+  lepší důkaz řazení než syntetická trojice objektů.
+- **Než začneš psát, ověř, že všechny vstupy granule mají PRODUCENTA.**
+- **Binární formát ověř dvěma implementacemi.**
+- **Když implementace odhalí díru ve smlouvě, napiš ji do hlavičky souboru
+  stejně jako `sim_world.gd`** a zaznamenej jako otevřenou věc — `docs/`
+  agent nemění.
 
 ## Pasti, které už někoho stáhly čas (naměřené)
 
-1. **Sandbox `workspace-write` umí zakázat zápis i DO workspace** a vypadá to jako
-   vada ukládání. Přesná příčina: `workspace-write` pouští podprocesy jako
-   **Low integrity**, a Low proces nesmí zapsat do objektu **bez Low labelu**.
-   Naměřeno 2026-10-04 znovu: label má **jen kořen workspace**, podsložky `sim/`,
-   `tools/`, `.cache/`, `data/`, `assets/` **nemají** → `PermissionError` při zápisu
-   do `data/items.json` i do `$env:TEMP` (takže „napiš si do tempu“ taky nejde).
-   **Postup:** změř label (`icacls <cesta> | findstr Mandatory`), a když chybí,
-   přepni session na plný přístup; skript `diagnose-windows-sandbox-acl` spraví
-   DACL, ne label.
+1. **Sandbox `workspace-write` blokuje zápis do podsložek, i když je kořen
+   zapisovatelný.** Podprocesy běží na `Low` a label má jen kořen workspace.
+   Znovu naměřeno 2026-10-04: `Set-Content` do kořene OK, do `.cache`/`.data`
+   „Access denied“. `gate_common.py:219` má `user://` Godotu natvrdo v
+   `.cache/godot-appdata`, takže **G3, G7 a G11 v tomto režimu nemohou zapsat**
+   a `run-all.py` spadne na `summary.json`. Pro **Godot testy** stačí
+   `$env:APPDATA` do adresáře **přímo pod kořenem** (label se dědí) — pak
+   běží. Na brány nepomůže, ty si cestu píšou samy. Řešení pro celou práci:
+   session na **plný přístup**.
 2. **`map0.land` má na každém bloku 4B hlavičku** — čti od `key * 196 + 4`.
 3. **Godot s nerozjetým skriptem visí, ne selže** — `Parse Error` → prázdná
    smyčka, proces s 0,05 s CPU. Každý `--script` běh spouštěj **s `--quit-after N`**
    a výstup **přesměruj do souboru** (`| Out-File`).
 4. **`.uid` vzniká jen při `godot --headless --path . --import`**, ne při testech
-   a ne při branách. Po každém novém `.gd` ho zkontroluj v `git status`.
+   a ne při branách — a **patří do gitu** (`git ls-files` → 36 `.uid`).
 5. **Godot z `C:\...\orchestra\tools\godot` NEMŮŽE ZAPISOVAT** (sandbox) a přitom
    lže `err=0`. Řešení: kopie ve workspace (`.cache/godot/`, gitignore).
 6. **`JSON.parse_string` vrací VŠECHNA čísla jako `float`** — u int64 stavu RNG
@@ -214,12 +249,16 @@ assets.anim 1 · `data.items` 8 748 záznamů · `world.tiledata` · `world.map`
     — `write` pak odmítne zápis; soubor znovu přečti a zapiš znovu.
 11. **Statická kontrola musí číst kód, ne komentáře — i ta tvoje vlastní.**
 12. **`& skript.ps1` na této stanici neprojde** (`running scripts is disabled`).
-13. **Hledání podřetězcem u jmen předmětů vybírá smetí** (`log` → `log wall`,
-    `loom` → `Bloom Firework`, `pan` → `pants`). Hledej přesně, u UO i s plurálem.
+13. **Hledání podřetězcem u jmen předmětů vybírá smetí** (`log` → `log wall`).
 14. **Python bez `$env:PYTHONIOENCODING='utf-8'` padá na českém výstupu**
-    (`UnicodeEncodeError`, konzole cp1252) — a to i při čtení `.forge/roadmap.json`.
-15. **U nové pasti: zapiš ji sem i do `LESSONS.md`** — příští session ji jinak
-    objeví znovu.
+    (`UnicodeEncodeError`, konzole cp1252).
+15. **`check-wiring.py` hledá jméno slovem, ne voláním** — lokální proměnná
+    `layer` nechala zmizet `world.tiledata.layer` ze seznamu mrtvého kódu.
+16. **Uměřený soubor musí mít stáří** — `check-render.py` hlásí „nic se
+    nevykreslilo“ ze snímku starého čtyři dny.
+17. **Při editaci cizího dokumentu hledej, jestli jsi nesmazal jeho nadpis.**
+    (Dnes: `edit` v `LESSONS.md` smazal hlavičku záznamu „Recepty…“; našel jsem
+    to čtením, ne pamětí.)
 
 ## Vady ZADÁNÍ, které je potřeba opravit (agent je needituje)
 
@@ -230,13 +269,14 @@ assets.anim 1 · `data.items` 8 748 záznamů · `world.tiledata` · `world.map`
    a `data/items.json`.
 4. **`docs/04 §4.2` u `world.map` nerozlišuje `tiledata id` a `art id`** u statiků:
    soubor v této instalaci ukládá **id bez `+0x4000`** (naměřeno 37…4758).
-5. **`docs/06 §6.2` uvádí 6 nástrojů, které v této instalaci NEJSOU**:
+5. **`docs/04 §4.2` u `render.sort` neuvádí tvar objektu** — viz rozhodnutí 1.
+6. **`docs/06 §6.2` uvádí 6 nástrojů, které v této instalaci NEJSOU**:
    `skillet` (je `frypan`), `flour mill` (je `millstone`), `spinning wheel`,
    `loom`, `oven`, `bellows`. Navíc `clean bandage` a `blank scroll` v tiledata
    nejsou pod zadaným jménem (naměřeno v `content-report.json`).
-6. **`.forge/roadmap.json` — `size_lines` nesedí u 18 z 28 souborů** (viz bod 3
-   otevřených věcí). **Brána to neměří** — je to tichá regrese plánování.
-7. **`app/main.tscn` nemá vlastníka** v roadmapě.
+7. **`.forge/roadmap.json` — `size_lines` nesedí u 18 z 28 souborů** (viz
+   otevřené věci č. 2). **Brána to neměří.**
+8. **`app/main.tscn` nemá vlastníka** v roadmapě.
 
 ## Prostředí a konvence
 
@@ -247,7 +287,7 @@ assets.anim 1 · `data.items` 8 748 záznamů · `world.tiledata` · `world.map`
   `data.gen_content` ho vlastní — viz `.forge/roadmap.json`.)
 - `python tools/check-docs-refs.py`, `check-zadani.py`, `roadmap-gen.py --check`
   musí procházet (exit 0) — po každé změně spustit.
-- `run-all.py` vrací 0 = vše změřeno, 1 = vada, **2 = něco NEMĚŘENO** (to není
+- `run-all.py` vrací 0 = vše změřeno, 1 = vada, **2 = něco NEMĚŚENO** (to není
   zelená). `--strict` dělá z NEMĚŘENO vadu (pro M8). Stejné kódy má teď
   `gen-content.py`.
 - Testy potřebují `APPDATA` ve workspace, jinak `user://` míří mimo:
