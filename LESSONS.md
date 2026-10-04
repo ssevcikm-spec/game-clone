@@ -24,6 +24,54 @@ Typy: `chyba` (moje vada) · `past-nástroje` (prostředí/nástroj, ne logika) 
 
 ---
 
+### 2026-10-04 — Generátor musí reprodukovat data, ne „vylepšit" je (chyba)
+**Co se stalo:** při přenosu `.cache/analysis/gen-items.py` do repa jsem při
+čtení narazil na `SUROVINY_VYLOUCENE = {"sand"}` — sada, která nikde nebyla
+použitá, a `sand` (váha 255 = statika) přitom **byl** v `items.json`. V nové verzi
+jsem ho „opravil“ ven ze seznamu a `--check` hned hlásil `VADA` — **a měl pravdu**.
+Chyba by nebyla v generátoru, ale v tom, že bych přepsal data, která jsou v gitu a
+která nikdo neposoudil.
+**Doklad:** porovnání obou generátorů na `tiles.json`: 8748 vs 8747 záznamů,
+jediný rozdíl = `tile 9310 'sand'`; po vrácení `sand` → `--check` OK,
+`items.json` sha256 `f6c9a6122fcb17127…` identická s dávno commitnutou.
+**Ponaučení:** migrace nástroje, který **vyrábí data v gitu**, se nedělá
+„přepisem, jak to vypadá správně“. Buď reprodukuj bajty a vadu zapiš jako
+otevřenou věc, nebo ji oprav ve zvláštním kroku, kde je vidět diff dat.
+
+### 2026-10-04 — `--only` tiše přepsal celý `content-report.json` (chyba)
+**Co se stalo:** `gen-content.py --only items` zapsal svůj (užší) report do
+`assets/uo/content-report.json` a **smazal z něj 14 položek „generator chybí“**.
+`--only` jsem přitom považoval za „jen něco vygeneruj“, ne „přepiš stav všeho“.
+**Doklad:** po `--only items` měl report `bez_generatoru: 0`; po plném běhu znovu
+14 (a `unresolved: 2` — `clean bandage`, `blank scroll`, které v tiledata nejsou).
+**Ponaučení:** u přepisovaných stavových souborů odděl **plný běh** od
+**dílčího** — dílčí výsledek jde vedle (`.cache/gen-content/`), a to se musí
+vypsat, ne jen udělat. Stejně jako u `save_game`: „částečný zápis“ není totéž co
+„hotový stav“.
+
+### 2026-10-04 — Vedlejší výpis ukončil běh tracebackem (chyba)
+**Co se stalo:** vypisování ukázek kategorií na konci `gen-content.py` čte
+`data/items.json` z disku. Když `--check` běžel nad **poškozeným** souborem,
+padl `JSONDecodeError` a běh skončil tracebackem místo `VADA`. Tedy: kontrola
+shody se sice provedla a správně našla rozpor, ale navratovy kod ani hlaska
+o rozporu se už neprosly.
+**Doklad:** `--check` nad souborem s jedním změněným bajtem → dřív
+`JSONDecodeError` na řádku 327, po opravě `VADA items.json: na disku je jiná
+verze…` + `ukazky nelze vypisat (…) - výsledek běhu výše platí` + **exit 1**.
+**Ponaučení:** vše, co je **vedlejší produkt** (ukázky, souhrny, náhledy), patří do
+`try/except` a nesmí to změnit navratovy kod měření. Jinak se vada převede na
+stack trace, ktery neumi rict, zda kontrola zmerila nebo ne.
+
+### 2026-10-04 — `data.items` nemá test v `tests/cases/` (postup)
+**Co se stalo:** `data/items.json` (8748 záznamů) vznikl během session a nikdo
+nemá v `tests/` nic, co by ho četlo. G5 ho sice počítá, ale jen jako „kolik
+záznamů“, ne jako „je správný“.
+**Doklad:** `data/` vlastní jen granule z roadmapy, `tests/cases/` žádný případ
+neobsahuje; `check-content.py` měří `items.json_zaznamu` a `items_tiles`.
+**Ponaučení:** „generator existuje a je idempotentní“ je jiné tvrzení než
+„data jsou správná“. První teď platí (`gen-content.py --check` + mutace),
+druhé je pořád nezakryté — viz HANDOFF.
+
 ### 2026-10-04 — `map0.land` se čte o 4 bajty vedle (chyba)
 **Co se stalo:** `map.gd` četl blok od `key * 196`, ale numpy reference
 (`worldmap.py:287`) kreslí z `key * 196 + 4` — do bufferu se mi 4B hlavička bloku
@@ -274,7 +322,7 @@ sonda zanechá soubor, který musí uklidit až session s plným přístupem.
 | `data/items.json` (granule `data.items`) | katalog 8 748 předmětů s `source`, `value_source`, `category_rule` | G5 `check-content` OK (`items.json_zaznamu: 8748`) |
 | `sim/world/tiledata.gd` (granule `world.tiledata`) | vlastnosti dlaždic/předmětů z JSONu, dvě id prostranství (0x4000) | sonda `probe-tiledata.gd` **18 kontrol, 0 selhání** |
 | `.cache/analysis/bootstrap-verify.py` | měří bootstrap granule zavoláním (28 hodnot) | `bootstrap-vysledek.json`, 0 vad, 1 NEMĚŘENO |
-| `.cache/analysis/gen-items.py` | generator `data/items.json` (běh ze session) | idempotentní; kategorie+role se vypisují k pohledu |
+| `tools/gates/gen-content.py` (granule `data.gen_content`) | **nově**: generátor `data/*.json` z `tiles.json`; `--check` = idempotence bez zápisu, `--only`, nevyřešené do `content-report.json` | `--only items --check` **exit 0** (sha256 `f6c9a612…`); plný `--check` **exit 2** = 14 generátorů chybí; **mutace** (1 bajt / prázdné `{}`) → **exit 1**; neznámé `--only` → exit 1 |
 | `tools/uoextract/anim.py` | zdroj animací (`anim.mul` vs `AnimationFrame*.uop`), tabulky framů | `--self-test` 22 kontrol, `--verify` 22 kontrol proti instalaci |
 | `research/probe/anim_pokryti.py` | reprodukovatelné měření pokrytí těl | dává 270 / 318 těl, prunik 2 — zapsáno v `research/anim-mereni.md` |
 | `tools/gates/check-assets.py` (G6) | nově měří i manifest animací | `--self-test` 4 případy; běh nad repem `OK` |
