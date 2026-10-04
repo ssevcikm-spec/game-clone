@@ -1,11 +1,11 @@
-# Předání — UO-klon (stav po `data.gen_content`: `items.json` má generátor v repu)
+# Předání — UO-klon (stav po `data.recipes`: `recipes.json` má generátor v repu)
 
 > Tento soubor je pro **další session agenta**. Všechno podstatné je v repu
 > a v `git log`; tady je jen to, co by jinak stálo hodiny znovuobjevování.
 > Datum: 2026-10-04. Zjištění o odemčení W1 (`tiledata --extract` → `data.items`
 > → `world.tiledata`) **platí dál**.
-> **Tato session udělala granuli `data.gen_content`** a znovu naměřila testy,
-> brány i self-testy.
+> **Poslední session udělala granuli `data.recipes`** (druhý generátor obsahu).
+> Předchozí (`data.gen_content`, `items.json`) stále platí.
 
 ## ⚠ POVINNÉ: na konci každé session (rozhodnutí uživatele, 2026-10-03)
 
@@ -29,7 +29,7 @@ následuje předání**. Proto platí:
 |---|---|
 | **Ponaučení a nástroje** | **`LESSONS.md`** — čti prvních pár záznamů, ať neopakuješ chyby |
 | Projekt | `E:\Workspaces\game-clone` (git, `main`) |
-| Generátor obsahu | `python tools/gates/gen-content.py [--check] [--only items]` |
+| Generátor obsahu | `python tools/gates/gen-content.py [--check] [--only items\|recipes]` |
 | Testy | `godot --headless --path . --script res://tests/run_tests.gd` → **238 kontrol / 0 selhání** (znovu naměřeno 2026-10-04) |
 | Brány | `python tools/gates/run-all.py` → **9 měřeno / 2 NEMĚŘENO / 0 chyb** (exit 2 = něco neměřeno; znovu naměřeno 2026-10-04) |
 | Self-testy bran | `python tools/gates/run-all.py --self-test` → **19 celkem (10 bran + 9 extrakčních nástrojů), 0 chyb** (znovu naměřeno 2026-10-04) |
@@ -44,9 +44,40 @@ následuje předání**. Proto platí:
 bootstrap 4 · W0 8 · M0 5 · M1 8 (**uop, tiledata, art, gump, worldmap, hues,
 textdata, cliloc**) · M2 4 (world.doors, world.stairs, entity.stats, world.time) ·
 assets.anim 1 · `data.items` 8 748 záznamů · `world.tiledata` · `world.map` ·
-**NOVĚ `data.gen_content` — `tools/gates/gen-content.py`**.
+`data.gen_content` — `tools/gates/gen-content.py` · **`data.recipes`
+(`recipes.json`, 1053 receptů)**.
 
-**Tato session (2026-10-04):**
+**Poslední session (2026-10-04, `data.recipes`):**
+
+- **`tools/gates/gen-content.py` má druhý generátor — `recipes.json`**
+  (585 410 B, 1053 receptů z `research/04-craft-data.json`, 11 řemesel).
+  Záznam má `id, skill, type, min_skill, max_skill, result, materials,
+  use_all_res, era, source, group` — tvar `#id/skill/min_skill/result/materials`
+  hlídá G5 (`REQUIRED_FIELDS`), `result`/`materials` mají `tile` jen když se
+  jméno přeložilo.
+- **Řešení jmen:** `research/04` jména **nemá** — je to C# typ (`GoldRing`)
+  a číslo kliloku (`["expr", "1044176 + offset"]`). Text z `Cliloc.enu`
+  (`tools/uoextract/cliloc.py`), druhý pokus rozčlenění C# typu, `tile` z
+  `items.json` (poradi shoda → plural `%s`/`s`).
+- **Naměřený stav překladu:** výsledek má `tile` **354 z 1053**, materiál
+  **1035 z 1696**; nevyřešených referencí **1360** (895 různých) jde do
+  `assets/uo/content-report.json`. **Nejsou to chyby párování** — `platemail
+  (tunic)`, `turquoise`, `blank scroll` v tiledata této instalace nejsou.
+  Kontrola kvality párování (`.cache/analysis/probe-recipes.py`, gitignore):
+  po normalizaci pluralu a `%s` **nesedí 0 z 1389** vyřešených referencí.
+- **Reprodukovatelnost:** `--only recipes --check` **exit 0**, sha256
+  `8759e697cefc0d0e…`, dva běhy shodné. Plný `--check` → **exit 2**
+  (13 generátorů zbývá), `--only items` → **0** (sha `f6c9a6122fcb17127…`
+  pořád sedí, `items.json` se nezměnil).
+- **Mutační test:** změna 4 bajtů → **exit 1**; `{}` → **exit 1**; smazáno →
+  **exit 1**; po regeneraci `--check` → **0**.
+- **G5 poprvé měří křížové odkazy na recepty:** `check-content.py` →
+  `recipes.json: tvar seznam, záznamů 1053`, `OK (exit 0)`.
+- Kontroly po změně: `check-docs-refs.py` **0**, `check-zadani.py` **0**,
+  `roadmap-gen.py --check` **0**, `run-all.py` **9/2/0 (exit 2)**,
+  `--self-test` **19/19**, Godot testy **238/0**.
+
+**Předchozí session (2026-10-04, `data.gen_content`):**
 
 - **`tools/gates/gen-content.py`** (349 řádků / 303 neprázdných) — generátor
   `data/*.json` podle `docs/06 §6.1`. Tabulka `POZADAVKY` má **15 cílů** se
@@ -85,20 +116,27 @@ assets.anim 1 · `data.items` 8 748 záznamů · `world.tiledata` · `world.map`
 
 ## Otevřené věci a co je potřeba dodělat
 
-1. **14 generátorů v `POZADAVKY` chybí** — `recipes.json`, `weapons.json`,
-   `armor.json`, `spells.json`, `item_properties.json`, `monsters.json`,
-   `spawns.json`, `vendors.json`, `regions.json`, `moongates.json`,
-   `dungeons.json`, `professions.json`, `skills.json`, `balance.json`.
-   Nejblíž je `data.recipes`: `research/04-craft-data.json` (539 920 B,
-   slovník skill → 6 klíčů) už existuje, chybí mapování na `tile` v `items.json`
-   a zbytek 12 má zdroje jen v markdownu `research/03`/`research/06`.
-2. **`data.items`, `world.tiledata` i `world.map` nemají test v `tests/cases/`** —
-   stejná mezera jako předtím. Sonda v `.cache/analysis/` není test; ve
-   **čerstvém klonu** ji nikdo nespustí. `gen-content.py --check` kryje jen
-   idempotenci, ne správnost dat.
+## Otevřené věci a co je potřeba dodělat
+
+0. **`recipes.json` potřebuje rozhodnutí uživatele:** 1360 nevyřešených referencí
+   je **obsah pozdních eras**, ne chyba párování. Varianty: (a) nechat to tak a
+   filtrovat `era` až ve hře, (b) zahodit záznamy, jejichž `result` nemá `tile`
+   (z 1053 by zůstalo 354), (c) doplnit tiledata novější instalace — mimo zadání.
+   Dnes je (a) a každý nevyřešený odkaz je vidět v
+   `assets/uo/content-report.json` i ve výpisu `gen-content.py`.
+1. **13 generátorů v `POZADAVKY` chybí** — `weapons.json`, `armor.json`,
+   `spells.json`, `item_properties.json`, `monsters.json`, `spawns.json`,
+   `vendors.json`, `regions.json`, `moongates.json`, `dungeons.json`,
+   `professions.json`, `skills.json`, `balance.json` (`recipes.json` je hotový).
+   Jejich zdroje jsou zatím jen markdown `research/03` / `research/06`
+   (plus `Prof.txt` a `skills.mul`).
+2. **`data.items`, `data.recipes`, `world.tiledata` i `world.map` nemají test v
+   `tests/cases/`** — stejná mezera jako předtím. Sonda v `.cache/analysis/` není
+   test; v **čerstvém klonu** ji nikdo nespustí. `gen-content.py --check` kryje
+   jen idempotenci, ne správnost dat.
 3. **`size_lines` nesedí u 17 z 27 dosavadních souborů** (stav převzatý z
-   minulého předání; `gen-content.py` ho zvýšil na **18 z 28** — 349 řádků proti
-   deklarovaným `<= 150`). **Buď uvolnit deklarace, nebo dělit granule** —
+   minulého předání; `gen-content.py` ho zvýšil na **18 z 28** — dnes už
+   **474 řádků** (414 neprázdných) proti deklarovaným `<= 150`). **Buď uvolnit deklarace, nebo dělit granule** —
    `docs/09 §9.2`. **Je to rozhodnutí pro uživatele.**
    **Pozor na metriku:** `Measure-Object -Line` nepočítá prázdné řádky;
    `size_lines` se měří všemi řádky (Python `splitlines()`).
@@ -116,16 +154,15 @@ assets.anim 1 · `data.items` 8 748 záznamů · `world.tiledata` · `world.map`
 
 ## Další kroky (v tomto pořadí)
 
-1. **`data.recipes`** — první chybějící generátor v `gen-content.py`. Zdroj
-   (`research/04-craft-data.json`) je v repu; potřeba rozhodnout mapování
-   názvů na `tile` (křížový odkaz musí sednout, jinak G5 `check-content` hlásí
-   `odkazuje na tile X, který není v items.json`).
-2. **`render.sort`** (`render/sort.gd`, `any`, `<= 60`) — DAG splněný: závisí na
+1. **`render.sort`** (`render/sort.gd`, `any`, `<= 60`) — DAG splněný: závisí na
    `core.iso` + **`world.map` (hotový)**. Smlouva: `sort_key(obj) -> int`,
    `draw_order(objects) -> Array`; pořadí land → statiky podle z → mobilové podle z,
    dlaždice podle `(x+y)` (`docs/02 §2.4`, past P21).
-3. **`assets.atlas`** (tím se zapne G10, které je teď NEMĚŘENO), pak
+2. **`assets.atlas`** (tím se zapne G10, které je teď NEMĚŘENO), pak
    **`render.textures`** — až po `manifest.json`.
+3. **`tests/cases/` pro data** (mezera č. 2) — první případ může být
+   `recipes.json`: „každý záznam s `tile` v `result` má stejně pojmenovaný
+   záznam v `items.json`" — přesně to, co se dnes měří ručně v `.cache/analysis/`.
 
 ## Jak to dělat (co se osvědčilo)
 

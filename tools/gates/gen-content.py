@@ -25,6 +25,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import sys
 from collections import Counter
 from pathlib import Path
@@ -37,7 +38,7 @@ from gate_common import NEMERENO, OK, VADA, ROOT  # noqa: E402  (sjednocene vyst
 # Generator, ktery jeste neni, NENI ticha zelena - jde do content-report.json.
 POZADAVKY: dict[str, tuple[bool, str]] = {
     "items.json": (True, "assets/uo/tiles.json (vlastnosti) + research/05 (flagy)"),
-    "recipes.json": (False, "research/04-craft-data.json"),
+    "recipes.json": (True, "research/04-craft-data.json + Cliloc.enu (nazvy)"),
     "weapons.json": (False, "research/03 (weapons3.json)"),
     "armor.json": (False, "research/03 (armor_raw.json)"),
     "spells.json": (False, "research/03 (spells_raw.json)"),
@@ -241,9 +242,103 @@ def gen_items(root: Path) -> tuple[bytes, list[dict]]:
 
 
 # =============================================================================
+# recipes.json - recepty (granule data.recipes)
+# =============================================================================
+# ZDROJ: research/04-craft-data.json (11 remesel, 1053 receptu). Ani jmeno
+# vysledku, ani jmeno suroviny v nem NENI - je to C# typ ("GoldRing") a cislo
+# kliloku (["expr", "1044176 + offset"]). Text da Cliloc.enu, tile da items.json.
+#
+# POZOR (namEReno 2026-10-04): v teto instalaci se prelozi jen CAST receptu -
+# 354 z 1053 vysledku a 1100 materialu. Zbytek v tiledata opravdu NENI (je to
+# obsah pozdejsich eras: "platemail (tunic)", "turquoise", "blank scroll").
+# Nerozresene nejde do fiktivniho tile, ale do content-report.json.
+CLILOC_INSTALL = Path(r"D:\Games\Electronic Arts\Ultima Online Classic")
+
+
+def klilok(spec, zaznamy: dict[int, str]) -> str | None:
+    """['expr'|'cliloc', '1044176 + offset'] -> text z `Cliloc.enu` (None, kdyz neni)."""
+    if not (isinstance(spec, list) and len(spec) >= 2 and spec[0] in ("expr", "cliloc")):
+        return None
+    match = re.match(r"\s*(\d+)", str(spec[1]))
+    return zaznamy.get(int(match.group(1))) if match else None
+
+
+def camel_jmeno(nazev: str) -> str:
+    """'GoldRing' -> 'gold ring' (rozdeleni pred velikym pismenem)."""
+    return re.sub(r"(?<!^)(?=[A-Z])", " ", nazev).strip().lower()
+
+
+def gen_recipes(root: Path) -> tuple[bytes, list[dict]]:
+    """Vraci (bajty `data/recipes.json`, seznam nevyresenych referenci).
+
+    POZADAVKY na zaznam (docs/04 §4.5, hlida je G5 check-content): `id`,
+    `skill`, `min_skill`, `result`, `materials`. `tile` je nepovinny a kdyz
+    neni, brana ten odkaz vúbec nemeri - proto nesmime vypisat vymysleny tile."""
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "uoextract"))
+    from cliloc import Cliloc                                   # noqa: PLC0415
+
+    predmety = json.loads(gen_items(root)[0])
+    podle_jmena: dict[str, list[int]] = {}
+    for rec in predmety:
+        podle_jmena.setdefault(rec["name"].lower(), []).append(rec["tile"])
+    texty = Cliloc(CLILOC_INSTALL).cliloc_all()
+    craft = json.loads((root / "research/04-craft-data.json").read_text(encoding="utf-8"))
+
+    def najdi(jmeno: str) -> int | None:
+        for k in (jmeno, jmeno + "%s", jmeno + "s", jmeno + "%"):
+            if podle_jmena.get(k):
+                return podle_jmena[k][0]
+        return None
+
+    def ref(kind: str, rec: dict) -> dict:
+        """Jeden material/vysledek. Poradi: text kliloku -> C# typ."""
+        text = klilok(rec.get("cliloc") or rec.get("name"), texty)
+        for kandidat in (text, camel_jmeno(str(rec.get("type", "")))):
+            if not kandidat:
+                continue
+            tile = najdi(kandidat.lower())
+            if tile is not None:
+                out = {"name": kandidat.lower(), "tile": tile}
+                break
+        else:
+            out = {"name": (text or camel_jmeno(str(rec.get("type", "")))).lower()}
+        out["type"] = rec.get("type")
+        # `res_amount` je v research/04 u 4 receptu null (namEReno) - tam jde
+        # o 1 kus; null neni "0" a nesmi se vypisat jako 0.
+        pocet = rec.get("amount")
+        out["amount"] = int(pocet) if isinstance(pocet, (int, float)) else 1
+        out["kind"] = kind
+        return out
+
+    zaznamy: list[dict] = []
+    nevyresene: list[dict] = []
+    for skill in sorted(craft):
+        zdroj = craft[skill].get("file", "")
+        for rec in craft[skill]["items"]:
+            vysledek = ref("result", rec)
+            materialy = [ref("material", {"type": rec["res_type"],
+                                          "amount": rec["res_amount"]})]
+            materialy += [ref("extra_material", e) for e in rec["extra_res"]]
+            for ref_rec in [vysledek, *materialy]:
+                if "tile" not in ref_rec:
+                    nevyresene.append({"soubor": "recipes.json", "skill": skill,
+                                       "kind": ref_rec["kind"], "nazev": ref_rec["name"],
+                                       "duvod": "jmeno neni v items.json (v tiledata chybi)"})
+            zaznamy.append({
+                "id": len(zaznamy), "skill": skill, "type": rec["type"],
+                "min_skill": rec["min_skill"], "max_skill": rec["max_skill"],
+                "result": vysledek, "materials": materialy,
+                "use_all_res": rec["use_all_res"], "era": rec["era"],
+                "source": zdroj, "group": klilok(rec["group"], texty),
+            })
+    raw = bajty(zaznamy)
+    return raw, nevyresene
+
+
+# =============================================================================
 # rozdeleni prace: generatory, report, zapis
 # =============================================================================
-GENERATORY = {"items.json": gen_items}
+GENERATORY = {"items.json": gen_items, "recipes.json": gen_recipes}
 
 
 def bajty(json_obj) -> bytes:
@@ -280,6 +375,7 @@ def main() -> int:
         return NEMERENO
 
     vada, nemereno, report = 0, 0, {"unresolved": [], "bez_generatoru": []}
+    souhrn: dict[str, int] = {}
     for name in cil:
         hotovy, zdroj = POZADAVKY.get(name, (False, "?"))
         if not hotovy or name not in GENERATORY:
@@ -305,8 +401,19 @@ def main() -> int:
             cesta.parent.mkdir(parents=True, exist_ok=True)
             cesta.write_bytes(raw)
             print(f"[gen] zapsano data/{name}: {len(raw)} B, sha256 {sha[:16]}…")
+        # Sjednoceny tvar nevyresenych: items hlasi kategorie/role, recepty
+        # soubor/kind/nazev. Bez toho by tisk spadl na cizi klice (namEReno).
+        # POZOR: u receptu je nevyresenych REFERENCE tisice - vypis po jedne
+        # zaplni obrazovku a schova vysledek (namEReno 2026-10-04). Souhrn + ukazky.
         for u in nenalezene:
-            print(f"[gen]   NENALEZENO {u['kategorie']}/{u['role']}: {u['duvod']}")
+            popis = (f"{u['kategorie']}/{u['role']}" if "role" in u
+                     else f"{u['soubor']}/{u['kind']}: {u['nazev']}")
+            souhrn[popis] = souhrn.get(popis, 0) + 1
+        for popis, pocet in sorted(souhrn.items(), key=lambda kv: (-kv[1], kv[0]))[:25]:
+            print(f"[gen]   NENALEZENO {'x' if pocet == 1 else f'x{pocet}'}: {popis}")
+        if len(nenalezene) > 20:
+            print(f"[gen]   ... celkem {len(nenalezene)} nevyresenych referenci "
+                  f"({len(souhrn)} ruznych), zde top 25; plne v content-report.json")
 
     # Co zustalo nevyresene, jde do reportu. POZOR (namEReno 2026-10-04):
     # `--only` NESMI prepisovat spravny `content-report.json` svym uzkym
@@ -339,6 +446,24 @@ def main() -> int:
                       f"{[p['name'] for p in polozky if p['category'] == kat][:6]}")
             role = [(p["role"], p["tile"], p["name"]) for p in polozky if p["role"]]
             print(f"[gen] vybrane role: {len(role)} (u kazde musi sedet tile, ne podobne jmeno)")
+
+    # Ukazky receptu: pocet bez tile muze sedet a vyber byt spatny (viz zadani
+    # receptu, ktere v teto instalaci chybi - mereno 2026-10-04).
+    recepty = root / "data/recipes.json"
+    if recepty.exists():
+        try:
+            recs = json.loads(recepty.read_text(encoding="utf-8"))
+        except (ValueError, OSError) as exc:
+            print(f"[gen] ukazky receptu nelze vypisat ({exc}) - vysledek behu vyse plati")
+        else:
+            s_tiles = sum(1 for r in recs if "tile" in r["result"])
+            m_tiles = sum(1 for r in recs for m in r["materials"] if "tile" in m)
+            print(f"[gen] receptu {len(recs)}; vysledek ma tile {s_tiles}, "
+                  f"material ma tile {m_tiles}/{sum(len(r['materials']) for r in recs)}")
+            for r in recs[:4]:
+                print(f"[gen]   {r['skill']}/{r['type']}: "
+                      f"{r['result']['name']} <- "
+                      + ", ".join(f"{m['amount']}x {m['name']}" for m in r["materials"]))
 
     if vada:
         return VADA

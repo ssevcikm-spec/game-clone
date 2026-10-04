@@ -24,6 +24,59 @@ Typy: `chyba` (moje vada) · `past-nástroje` (prostředí/nástroj, ne logika) 
 
 ---
 
+### 2026-10-04 — Recepty: jména nejsou v `research/04`, jsou v `Cliloc.enu` (postup)
+**Co se stalo:** `research/04-craft-data.json` (11 řemesel, 1053 receptů) jména
+výsledku ani materiálu **neobsahuje** — je to C# typ (`GoldRing`) a číslo kliloku
+(`["expr", "1044176 + offset"]`). Řešení je dvojí: text z `Cliloc.enu` (klíč
+`cliloc.py`, už existoval) a teprve pak `tile` z `items.json`; druhý pokus je
+rozdělení C# typu (`GoldRing` → `gold ring`).
+**Doklad:** `gen-content.py --only recipes --check` → **exit 0**, sha256
+`8759e697cefc0d0e…`; dva běhy za sebou dávají shodné bajty.
+**Ponaučení:** když zdroj dat jména neobsahuje, je to **vlastnost zdroje**, ne
+vada generátoru — text ber z kliloků a do záznamu piš i `type` i číslo kliloku,
+aby se dal odkaz zpátky dohledat.
+
+### 2026-10-04 — V této instalaci chybí dvě třetiny obsahu receptů (namereno)
+**Co se stalo:** z 1053 receptů má výsledek `tile` jen **354** a materiál 1035
+z 1696. Nefektnost není chyba párování: ty předměty v `tiles.json` opravdu nejsou
+(„platemail (tunic)“, „turquoise“, „blank scroll“, „star sapphire ring“ — obsah
+pozdějších eras, ne T2A).
+**Doklad:** `.cache/analysis/probe-recipes.py` (gitignore) — po normalizaci
+pluralu/`%s` **nesedí 0 z 1389** vyřešených referencí, takže mapování není
+náhodná shoda; `check-content.py` na `recipes.json`: `recipes.json_odkazu`
+měřeno, chyba 0.
+**Ponaučení:** nerozřešené reference **nepozoruj jako fiktivní `tile`** — bez
+`tile` je to „neměřeno“ (G5 odkaz přeskočí), s vymyšleným tile by to byla tichá
+zelena. Výsledek patří do `assets/uo/content-report.json`.
+
+### 2026-10-04 — Výpis nevyřešených po jedné řádku schoval vlastní výsledek (chyba)
+**Co se stalo:** generátor vypisoval každou nevyřešenou referenci na vlastní řádek
+— **1360 řádků** (895 různých jmen). Výstup se uložil do spill souboru, z původního
+běhu nebylo vidět `receptu 1053; vysledek ma tile 354`, návratový kód ani OK řádky.
+**Doklad:** první běh `--only recipes` měl 1360 řádků `NENALEZENO`; po souhrnu
+(top 25) má výstup ~40 řádků a na konci jsou obě metriky i `sha256`.
+**Ponaučení:** vedlejší výpis musí mít **svůj strop** a říkat, kolik položek
+zanechalo (`… celkem 1360, zde top 25`), jinak se hlučina čte jako výsledek.
+
+### 2026-10-04 — Vedlejší výpis se opírá o cizí klíče a padne na `KeyError` (chyba)
+**Co se stalo:** tisk nevyřešených položek je sdílený mezi `items` a `recipes`, ale
+ty dva zdroje mají **jiný tvar záznamu** (`kategorie`/`role` proti
+`soubor`/`skill`/`kind`/`nazev`). Po zápisu `recipes.json` spadl běh na
+`KeyError: 'kategorie'` — **exit 1 a žádný `sha256`**, přestože data byla správně
+zapsaná. Podobně `rec["file"]` patří na úroveň řemesla, ne receptu.
+**Doklad:** dvě tracebacky z `gen-content.py` (řádky 404 a 458); po opravě
+`--only recipes` → exit 0 a `zapsano … sha256 8759e697cefc0d0e…`.
+**Ponaučení:** sdílený výpis si musí sjednotit tvar (`.get()` na alternativu),
+ne předpokládat jeden. A **výstup, který něco vypíše, patří do testu**: bez
+výpisu by chyba přešla do commitnutého kodu a selftesty by ji nechaly projít.
+
+### 2026-10-04 — `res_amount: null` není nula (postup)
+**Co se stalo:** `int(rec["amount"])` spadl na `TypeError` — u **4 receptů** z
+1053 je `res_amount` v `research/04` `null`.
+**Ponaučení:** `null` při převodu na číslo není „0 kusů“ a není to ani „jeden“ bez
+změření; tady jde o 1 kus a je to rozhodnutí zaznamenané v kódu i datech
+(`amount: 1`).
+
 ### 2026-10-04 — Generátor musí reprodukovat data, ne „vylepšit" je (chyba)
 **Co se stalo:** při přenosu `.cache/analysis/gen-items.py` do repa jsem při
 čtení narazil na `SUROVINY_VYLOUCENE = {"sand"}` — sada, která nikde nebyla
