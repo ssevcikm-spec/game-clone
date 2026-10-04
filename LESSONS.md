@@ -24,6 +24,52 @@ Typy: `chyba` (moje vada) · `past-nástroje` (prostředí/nástroj, ne logika) 
 
 ---
 
+### 2026-10-04 — `map0.land` se čte o 4 bajty vedle (chyba)
+**Co se stalo:** `map.gd` četl blok od `key * 196`, ale numpy reference
+(`worldmap.py:287`) kreslí z `key * 196 + 4` — do bufferu se mi 4B hlavička bloku
+a poslední 4B bloku chyběly. **Kontrola rozsahu to nechytila**: `z` lezlo v
+`-128..127` i po chybě, protože posun o 4 B dává pořád plausibilní bajty.
+Statiky prošly (jiný soubor, `.idx`/`.bin`), takže 60 statiků v Britainu bylo
+správně a jen land byl posunutý.
+**Doklad:** `.cache/analysis/probe-map-python.py` (numpy) vs `probe-map.gd`;
+před opravou land id v okolí Britainu lezlo do **65521**, po opravě **1..16379**,
+shoda `True`; sonda `.cache/analysis/probe-map.gd` 18/18.
+**Ponaučení:** rozsahová kontrola je slabá brána — **porovnej bajty s druhou
+implementací** (`seek(offset); get_buffer(12)` proti `cells[b][inner]`) a piš do
+hlavičky souboru, **proč je ten offset správně** (`+LAND_HEADER_BYTES`), ne jen
+kolik je.
+
+### 2026-10-04 — Godot s nerozjetým skriptem VÍSÍ, ne selže (past-nástroje)
+**Co se stalo:** překlep v konstantě (`STATIC_INDEX_PATH` místo
+`STATICS_INDEX_PATH`) → `Parse Error` → skript se nenačte → `_initialize` spadne
+na `Nonexistent function 'new'` → Godot běží dál v prázdné smyčce. Běžel **8 minut
+s 0,05 s CPU a 6,8 MB paměti**; bez `--quit-after` by visel do konce session.
+**Doklad:** `.cache/dbg-map.log` (log) a `Get-Process Godot*` → `CPU=0.047`.
+**Ponaučení:** každý `--script` běh pouštěj **s `--quit-after N`** a rozhoduj
+podle **obsahu logu**, ne podle exit kódu. Navíc `& $godot ... | Select-Object
+-Last 40` **bufferuje do konce** — při visícím procesu neuvidíš vůbec nic;
+přesměruj do souboru (`| Out-File $log`) a ten čti.
+
+### 2026-10-04 — `.uid` vzniká jen při `--import`, ne při `--script` (postup)
+**Co se stalo:** nový `sim/world/map.gd` neměl `.uid` ani po spuštění testů i
+všech bran. `sim/world/tiledata.gd` (granule z předchozí session) ho neměl taky.
+**Doklad:** `godot --headless --path . --import` → vznik `map.gd.uid`
+(`uid://6xjky2sxuae0`) i `tiledata.gd.uid`; po tom `git status` = 3 položky.
+**Ponaučení:** po novém `.gd` pusti `--import` a zkontroluj `git status`, že
+`.uid` je mezi změnami. Oba chybějící `.uid` byly důsledkem toho, že past #5
+z HANDOFFu není součástí kroku „granule hotová".
+
+### 2026-10-04 — Mutační test musí jít proti matematice, ne proti souboru (postup)
+**Co se stalo:** po opravě offsetu jsem záměrně otočil index bloku na
+`by * blocks_x + bx` a spustil sondu. Spadla 3 kontroly včetně
+`britansky blok ma 60 statiku (naměřeno 0)` — přesně symptom z `docs/03 §3.9.1`.
+**Doklad:** `.cache/probe-map-mutace.log` (15 kontrol, 3 selhání).
+**Ponaučení:** mutuj **vztah**, ne výstup. „Sondě to vadí" je nejlepší důkaz, že
+sonda měří to, co má — a mutační zápis zůstává v logu, takže ho nemusíš
+vymýšlet znovu.
+
+---
+
 ### 2026-10-03 — Sedmnáct sond na formát animací místo přečtení repu (chyba)
 **Co se stalo:** `anim.mul` jsem se snažil rozluštit vlastními sondami, jednu po
 druhé; pokaždé jsem uvěřil číslům, která vypadala rozumně, a stavěl na nich další
