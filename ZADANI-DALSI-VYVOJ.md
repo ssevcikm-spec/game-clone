@@ -62,27 +62,44 @@ tady jsou jen ta, která mění plán.
 | F8 | Data i mapa **jsou hotové a ověřené** | sonda mapy 18/0 (60 statik v britském bloku, 9 329 v okolí ±6 bloků); `manifest.json` 17 436 spritů |
 | F9 | `atlas.py` **není v gitu** a má vadu | `git status` → `??`; **117 překryvů**, **17 prázdných spritů** |
 | F10 | Atlas **není jen „nehotový"** — jeho self-test je slepý | `--self-test` hlásí 30 kontrol / 0 chyb, ale kontrolu překryvů pouští na **6 spritech** místo 17 436 |
-| F11 | **12 commitů není před GitHubem** a CI nikdy neběželo | `git rev-list --count origin/main..HEAD` → 12; `ci.yml` sám sebe značí `UNVERIFIED` |
+| F11 | *(ve svém čase správné)* **12 commitů nebylo před GitHubem** a CI nikdy neproběhlo | `git rev-list --count origin/main..HEAD` → 12; `ci.yml` sám sebe značí `UNVERIFIED`. **Dnes už neplatí — viz F12 a F13** |
+| F12 | **Během auditu se to vyřešilo a CI ukázalo svou vadu** | push `819c9a3..7a4f3e7` dorazil (`ahead 0`); **oba běhy CI `failure` s 0 jobů a 0 check-runs** (#1 2026-10-03 nad `819c9a3`, #2 2026-10-06 nad `7a4f3e7`) — **žádný krok se nikdy nespustil**, podpis odpovídá vyčerpané kvóte minut u privátního repa |
+| F13 | `atlas.py` **je v gitu** (commit `7a4f3e7`) | `git status` → prázdný strom |
 
 ---
 
 ## 3. ÚKOLY — v tomto pořadí
 
-### Úkol 1 — Zajistit práci v gitu (rozhoduje uživatel, ne agent)
+### Úkol 1 — Zprovoznit CI na GitHubu (rozhoduje uživatel, ne agent)
 
-**Co je potřeba:** dostat 12 commitů a `tools/uoextract/atlas.py` do `origin/main`
-a nechat proběhnout CI.
+**Stav:** **HOTOVO** je push — 2026-10-06 dorazil `819c9a3..7a4f3e7`,
+`git rev-list --count origin/main..HEAD` → `0`.
 
-**Proč první:** práce z M1 a M2 existuje **jen na jednom disku** a CI o ní neví.
-Než se začne psát renderer, musí být předchozí práce v bezpečí.
+**Nový nález (měřený v API, ne odhad):** CI sice **běželo**, ale **oba běhy
+skončily `failure` s 0 jobů, 0 check-runs a bez logů**:
 
-**Postup:** ukázat uživateli `git status` a `git diff --stat`, **vyžádat
-souhlas s pushem** (pravidlo: nepushovat bez vyžádání), pak ověřit, že CI
-proběhlo **na správném commitu** a co řeklo (workflow to nikdy nezkoušelo —
-první běh je sám měření).
+| běh | kdy | commit | výsledek |
+|---|---|---|---|
+| `#1` | 2026-10-03 12:45 | `819c9a3` | `failure`, 0 jobů |
+| `#2` | 2026-10-06 10:59 | `7a4f3e7` | `failure`, 0 jobů, `created_at == updated_at` |
 
-**Přijímací kritérium:** `git rev-list --count origin/main..HEAD` → `0`
-**a** je vidět výsledek CI běhu s konkrétním závěrem.
+**Žádný krok workflow se nikdy nespustil** — neproběhl ani download Godotu,
+takže `UNVERIFIED` URL a SHA v `ci.yml` zůstávají neověřené. Podpis „běh selhal
+okamžitě bez jobů" odpovídá **vyčerpané kvótě minut u privátního repa**
+(repo je `private: true`; ověřeno tokenem). **Billing API token nevidí (404)**,
+takže příčinu je potřeba **potvrdit v UI**.
+
+**Co udělat:**
+1. Otevřít `Settings → Billing → Actions` a zjistit stav kvóty.
+2. Rozhodnout, jak dál — a to je **rozhodnutí uživatele, ne agenta**:
+   platit minuty, nebo **zveřejnit repo** (public repo má minuty zdarma;
+   v gitu jsou jen kód a dokumentace — `assets/uo/` je gitignore, autorská díla
+   UO tam nejsou), případně přesunout běhy na vlastní runner.
+3. Po odblokování nechat CI proběhnout a **podívat se, co řeklo** — první
+   skutečný běh je sám měření a odhalí, co je v `ci.yml` neověřené.
+
+**Přijímací kritérium:** existuje běh CI s **nenulovým počtem jobů** a je
+u něj vidět, které kroky prošly a které ne (i kdyby výsledek byl `failure`).
 
 ### Úkol 2 — Opravit rozložení v `atlas.py` (granule `assets.atlas`)
 
@@ -192,8 +209,10 @@ v `.cache/analysis/` je gitignore — v čerstvém klonu ji nikdo nespustí.
 Tyhle věci **nejsou technické** — rozhoduje je uživatel. Agent je smí jen
 předložit s naměřenými důsledky.
 
-1. **Push na GitHub** — 12 commitů čeká. Má se pushnout? (Bez toho CI nikdy
-   neproběhne a práce je na jednom disku.)
+1. **CI na GitHubu** — push je hotový, ale **CI selhává s 0 jobů** (běhy #1 a #2).
+   Zkontrolovat kvótu minut (Settings → Billing → Actions) a rozhodnout:
+   platit minuty, nebo **zveřejnit repo** (public má minuty zdarma; v gitu jsou
+   jen kód a dokumentace, assety UO jsou gitignore)?
 2. **`size_lines` u 21 z 31 souborů přetéká deklaraci** (až 8×: `anim.py`
    516/150, `sim_world.gd` 232/60). Uvolnit deklarace, nebo dělit granule?
 3. **Světelný cyklus:** `ZADANI §10` a `docs/05 §5.11` uvádějí „den 12",
@@ -249,5 +268,7 @@ uvolňovat, musí být jasné, který počet je správný — a to je rozhodnut�
 3. **`check-wiring` bez `render.sort` v seznamu neintegrovaných.**
 4. **Testy** s aktuálním počtem (`238 + nové`) a **jménem každého selhání**,
    které zůstalo — včetně rozlišení „vada kódu" vs „prostředí".
-5. **`atlas.py` v gitu a `--verify` s 0 chybami.**
-6. **`HANDOFF.md` přepsaný** na stav po práci + `LESSONS.md` s novými záznamy.
+5. **`atlas.py` s `--verify` na 0 chybách** (v gitu je od `7a4f3e7`).
+6. **Běh CI s nenulovým počtem jobů** — i kdyby červený, musí být vidět, které
+   kroky proběhly (dnes je to 0 jobů, takže se neměří nic).
+7. **`HANDOFF.md` přepsaný** na stav po práci + `LESSONS.md` s novými záznamy.

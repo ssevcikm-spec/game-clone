@@ -26,16 +26,23 @@ následuje předání**. Proto platí:
 
 ## ⚠⚠ DVA BLOKÁTORY, KTERÉ JE POTŘEBA VYŘEŠIT PRVNÍ
 
-1. **`origin/main` je 12 commitů pozadu** (měřeno 2026-10-06:
-   `git rev-list --count origin/main..HEAD` → `12`). Veškerá práce M1+M2 —
-   tiledata, art, gump, mapa, recepty, `render.sort` — existuje **jen na tomto
-   disku**. **Workflow `.github/workflows/ci.yml` se v GitHub Actions NIKDY
-   nespustil** a sám sebe označuje jako `UNVERIFIED` (ř. 6–11, 42) — URL
-   i SHA-256 linuxového Godotu jsou neověřené. Push **čeká na vyžádání
-   uživatele** (pravidlo: nepushovat bez vyžádání).
-2. **`tools/uoextract/atlas.py` není v gitu** — jediná untracked položka
-   (`git status` → `??`). Přitom vygeneroval `assets/uo/manifest.json`
-   (3 565 629 B, 17 436 spritů, 198 stran) — a **má vadu** (viz „Otevřené věci" č. 9).
+1. **CI na GitHubu NEBĚŽÍ — a není to chyba kódu.** Push 2026-10-06 dorazil
+   (`819c9a3..7a4f3e7`, `ahead 0`), ale oba běhy workflow skončily **okamžitě
+   s `failure`, 0 jobů a 0 check-runs** (run #1 `2026-10-03T12:45:32Z` nad
+   `819c9a3`, run #2 `2026-10-06T10:59:54Z` nad `7a4f3e7`; u #2 je
+   `created_at == updated_at`). **Žádný krok workflow se nikdy nespustil** —
+   neproběhl ani download Godotu, takže `UNVERIFIED` URL a SHA v `ci.yml`
+   zůstávají neověřené. Podpis „běh selhal bez jobů" je na GitHubu typicky
+   **vyčerpaná kvóta minut u privátního repa** (repo je `private: true`;
+   ověřeno tokenem) — billing API token nevidí, takže **příčinu je potřeba
+   potvrdit v UI** (Settings → Billing → Actions). **Co s tím:** zkontrolovat
+   kvótu, a pokud je vyčerpaná, rozhodnout se mezi placenými minutami
+   a **zveřejněním repa** (public repo má minuty zdarma; v gitu jsou jen kód
+   a dokumentace — `assets/uo/` je gitignore, autorská díla UO tam nejsou).
+2. **`tools/uoextract/atlas.py` je v gitu, ale má vadu** (commit `7a4f3e7`).
+   Vygeneroval `assets/uo/manifest.json` (3 565 629 B, 17 436 spritů, 198 stran),
+   ve kterém je **117 překryvů** spritů a **17 jich je plně průhledných**
+   (item 4410 a další). Podrobně „Otevřené věci" č. 9.
 
 ## Kde co je
 
@@ -43,7 +50,7 @@ následuje předání**. Proto platí:
 |---|---|
 | **Zadání pro další vývoj** | **`ZADANI-DALSI-VYVOJ.md`** (naměřená cesta k obrazovce, zapojení bez vlastníka) |
 | **Ponaučení a nástroje** | **`LESSONS.md`** — čti prvních pár záznamů, ať neopakuješ chyby |
-| Projekt | `E:\Workspaces\game-clone` (git, `main`, 12 commitů před `origin/main`) |
+| Projekt | `E:\Workspaces\game-clone` (git, `main`; **`origin/main` = `HEAD`** od 2026-10-06) |
 | Generátor obsahu | `python tools/gates/gen-content.py [--check] [--only items\|recipes]` |
 | Testy | `$env:APPDATA="E:\Workspaces\game-clone\.cache\godot-appdata"` pak `godot --headless --path . --script res://tests/run_tests.gd` → **238 kontrol / 1 selhání** |
 | Brány | `python tools/gates/run-all.py` → **5 měřeno / 2 NEMĚŘENO / 4 chyba, exit 1** (2026-10-06 — **jiné číslo než minule, viz „Co brány dnes měří"**) |
@@ -148,8 +155,9 @@ Doklad téhož podpisu: sonda mapy hlásí „NELZE ZAPSAT vystup (err 12)".
 | Co | Jak | Očekáváno (2026-10-06) |
 |---|---|---|
 | Přečtené zadání | `ZADANI-DALSI-VYVOJ.md` | cesta k obrazovce + zapojení bez vlastníka |
-| Nic nevisí na disku | `git status --porcelain -uall` | `?? tools/uoextract/atlas.py` (**a nic jiného**) |
-| Kolik je před GitHubem | `git rev-list --count origin/main..HEAD` | `12` (dokud se nepushne) |
+| Strom je čistý | `git status --porcelain -uall` | **prázdné** (od commitu `7a4f3e7`) |
+| Je před GitHubem | `git rev-list --count origin/main..HEAD` | `0` |
+| **Běží CI?** | `https://github.com/ssevcikm-spec/game-clone/actions` | zatím **NE** — oba běhy `failure` s **0 jobů** (viz blokátor 1) |
 | Testy | testy s `APPDATA` ve workspace | `238 kontrol, 1 selhání` (prostředí) |
 | Godot běží | `& .cache\godot\...exe --headless --version` | `4.7.2.stable.official.ed1daf0bf` |
 | Instalace UO na místě | `Test-Path 'D:\Games\...\tiledata.mul'` | `True` |
@@ -180,12 +188,12 @@ Doklad téhož podpisu: sonda mapy hlásí „NELZE ZAPSAT vystup (err 12)".
 8. **Zastaralé poznámky v `tools/uoextract/worldmap.py`** (ř. 10–11, 60–63,
    87–90) tvrdí, že `docs/03 §3.4` uvádí špatné pořadí bloku — **PLATÍ DÁL**;
    `docs/03` je opravený (§3.9.1), kód `struct.unpack_from("<HBBbH")` je správný.
-9. **`atlas.py`: hotový, necommitnutý, s vadu v rozložení** — **NOVÉ (2026-10-06).**
+9. **`atlas.py`: v gitu (`7a4f3e7`), ale s vadou v rozložení** — **NOVÉ (2026-10-06).**
    `manifest.json` má 17 436 spritů, ale **117 překryvů** na stejné poličce
    (až **27 px ze 44**) → **17 spritů je plně průhledných** (např. item 4410).
    `--self-test` přitom hlásí **„30 kontrol, 0 chyb"**, protože kontrolu překryvů
    pouští na **6 syntetických spritech** na stránce 256 px. Past „zelená, která
-   nic nezměřila" — viz `LESSONS.md`.
+   nic nezměřila" — viz `LESSONS.md`. **Oprava je úkol 2 v zadání.**
 10. **`docs/11 §11.6` vede O3 jako neuzavřené, `docs/03 §3.5.1` tvrdí
     „rozhodnuto měřením"** — **NOVÉ.** Vnitřní rozpor dokumentace.
 11. **Počet granul se v dokumentech rozchází: 101 / 100 / 75–90** — **NOVÉ.**
@@ -198,20 +206,33 @@ Doklad téhož podpisu: sonda mapy hlásí „NELZE ZAPSAT vystup (err 12)".
     neopakovaly:** (a) „`manifest.json` neexistuje" — existuje, 3 565 629 B;
     (b) „`world.time` vrací noc = den, je to vada" — je to **dokumentované
     rozhodnutí** v `time.gd:12-21`. **Vada byla v dokumentaci / v rešerši, ne v kódu.**
+14. **CI neproběhlo ani jednou — a příčina není v kódu** — **NOVÉ (2026-10-06).**
+    Dva běhy (`#1` 2026-10-03 nad `819c9a3`, `#2` 2026-10-06 nad `7a4f3e7`),
+    oba `failure` s **0 jobů, 0 check-runs a bez logů**; u `#2` je
+    `created_at == updated_at`. **Ani jeden krok se nespustil**, takže
+    `ci.yml` zůstává `UNVERIFIED` (URL i SHA Godotu). Podpis odpovídá
+    **vyčerpané kvótě minut u privátního repa** — potvrdit v UI
+    (Settings → Billing → Actions); billing API token nevidí (404).
 
 ## Už není otevřené (přesunuto, nemaže se)
 
+- **„12 commitů není před GitHubem"** — **vyřešeno 2026-10-06**: push
+  `819c9a3..7a4f3e7` dorazil, `ahead 0`.
+- **„`tools/uoextract/atlas.py` není v gitu"** — **vyřešeno**: commit `7a4f3e7`
+  (s poctivě popsanou vadou v commit message i tady v bodu 9).
 - **„`assets.atlas` není hotový"** (minulé předání, otevřená věc č. 7) — soubor
-  i výstupy **jsou**; zůstává jen commit a vada v rozložení (bod 9).
+  i výstupy **jsou**; zůstává vada v rozložení (bod 9).
 - **„Další krok = `assets.atlas`"** — krok 1 minulých „dalších kroků" je hotový.
 - **Podezření, že brány jsou zelené nad vadou** — v tomto režimu **nejsou**:
   4 červené, z toho 2 pravé vady (G6, G10).
 
 ## Další kroky (v tomto pořadí)
 
-1. **Rozhodnout a zapsat do gitu** — commit + push (push **jen na vyžádání**).
-2. **Opravit rozložení v `atlas.py`** (překryvy) **a předělat self-test na
+1. **Opravit rozložení v `atlas.py`** (překryvy) **a předělat self-test na
    reálný počet stránek**, ne na 6 spritů. Pak `--verify` musí dát 0 chyb.
+   (Uživatel 2026-10-06 rozhodl: **atlas dřív než renderer.**)
+2. **Zprovoznit CI** (nutné před orchestrou) — zkontrolovat kvótu minut
+   v Settings → Billing → Actions; dokud běh neproběhne, je `ci.yml` neověřený.
 3. **`render.textures`** (`render/texture_cache.gd`, ≤ 60) — cache z manifestu.
 4. **`render.chunk`** (`render/chunk_renderer.gd`, ≤ 150) — **první věc, která
    něco nakreslí.** Vstupy má všechny hotové.

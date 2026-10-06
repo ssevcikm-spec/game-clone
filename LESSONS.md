@@ -475,17 +475,35 @@ vydá artefakt, vypadá jako hotový.
 ### 2026-10-06 — Dvanáct commitů, které nikdo neviděl, není práce v bezpečí (past-nástroje)
 **Co se stalo:** `origin/main` byl **12 commitů zpátky** za `HEAD` — veškerá práce
 M1 a M2 (tiledata, art, gump, mapa, recepty, `render.sort`) existovala **jen na
-tomto disku**. Workflow `.github/workflows/ci.yml` se v GitHub Actions **nikdy
-nespustil** a sám sebe v hlavičce označuje jako `UNVERIFIED` (ř. 6–11, 42): URL
-i SHA-256 linuxového Godotu jsou neověřené. Předchozí předání stav gitu
-nezmiňovalo.
+tomto disku**. Předchozí předání stav gitu nezmiňovalo.
 **Doklad:** `git rev-list --count origin/main..HEAD` → `12`; `git log origin/main`
-končí commitem `819c9a3` (2026-10-03 14:44), zatímco `HEAD` je `3e7864c`
+končil commitem `819c9a3` (2026-10-03 14:44), zatímco `HEAD` byl `3e7864c`
 (2026-10-04 22:52); `git status` → `?? tools/uoextract/atlas.py`.
+**Doplnění téhož dne (po pushi):** domněnka „CI se nikdy nespustilo" **byla
+nesprávná** — spustilo se, ale **dvakrát selhalo s 0 jobů a bez logů**
+(`#1` nad `819c9a3`, `#2` nad `7a4f3e7`, `created_at == updated_at`).
+**Nezelené CI se tedy četlo jako „CI neběželo"** — a to je jiná věta.
 **Ponaučení:** „práce je hotová" a „práce je v bezpečí" jsou dvě tvrzení.
 Předání musí nést **stav gitu živě** (`rev-list --count origin/main..HEAD`),
-ne jen seznam hotových granulí — jinak se zelené testy čtou jako zelený projekt
-a CI neměří nic, protože o commitech neví.
+ne jen seznam hotových granulí. A **stav CI se měří v API** (`/actions/runs` →
+`conclusion`, `/jobs` → `total_count`), ne odhadem z toho, že workflow soubor
+v repu je — repo mělo `total_count: 2` běhů, o kterých dokumentace nevěděla.
+
+### 2026-10-06 — Běh CI s nulou jobů není chyba kódu (past-nástroje)
+**Co se stalo:** oba běhy workflow skončily `failure`, ale **0 jobů, 0 check-runs
+a žádné logy** — ani jeden krok se nespustil, takže se neprojevil žádný kód
+projektu. `Actions` v repu jsou přitom `enabled: true`, `allowed_actions: all`,
+workflow je `active` a token má scope `repo, workflow`. Podpis odpovídá
+**vyčerpané kvóte minut u privátního repa**.
+**Doklad:** `/repos/.../actions/runs` → 2 běhy, oba `failure`;
+`/actions/runs/<id>/jobs` → `total_count: 0` (u obou); `/actions/runs/<id>` →
+`created_at == updated_at`; `/actions/permissions` → `enabled: true`;
+`/users/<login>/settings/billing/actions` → **404** (token billing nevidí).
+**Ponaučení:** u červeného CI se **nejdřív ptej, jestli běželo** — počet jobů
+a existence logu to řeknou dřív než čtení workflow souboru. „Workflow je
+v repu a má `on: push`" nedokazuje, že někdy proběhlo. A **privátní repo má
+minuty omezené, veřejné ne** — u hry, jejíž assety jsou gitignore, je
+zveřejnění repa levná varianta, ale je to **rozhodnutí uživatele**.
 
 ### 2026-10-06 — Auditem zmizelo 5 granul z fronty: stav se nesmí opisovat (postup)
 **Co se stalo:** předání tvrdilo „M0 5" hotových granul a `run-all` fronta stavěla

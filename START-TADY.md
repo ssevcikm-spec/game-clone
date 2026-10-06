@@ -26,8 +26,8 @@ save=false, run-all.py spadne na summary.json. Neopravuj kvůli tomu kód.
 Stav k 2026-10-06 (naměřeno, ne opsáno): hotových 31 granul z 101 (+5, které
 předání neuvádělo: app.main, app.loop, app.input, sim.commands, sim.world_loop
 — M0 je tím hotové celé); na obrazovce NENÍ NIC (render/ má 1 soubor ze 7);
-12 commitů není před GitHubem a CI nikdy neběželo; atlas.py není v gitu a má
-117 překryvů spritů.
+atlas.py je v gitu, ale má 117 překryvů spritů; práce JE pushnutá (ahead 0),
+ale CI na GitHubu selhalo dvakrát s 0 jobů — viz ZADANI-DALSI-VYVOJ.md úkol 1.
 
 Pak postupně:
 1. Spusť kontroly a ověř, že procházejí:
@@ -103,18 +103,20 @@ Přijímací kritéria jsou v .forge/roadmap.json u každé granule.
 ### C) Orchestra (automatické vydávání granulí)
 Tenhle balíček je na to připravený — `roadmap.json` má klíč `grains`:
 
-1. Repo je na GitHubu (`ssevcikm-spec/game-clone`), ale **`origin/main` je
-   12 commitů za lokálním stavem** (naměřeno 2026-10-06) — nejdřív push.
+1. Repo je na GitHubu (`ssevcikm-spec/game-clone`) a **práce je pushnutá**
+   (`ahead 0`, ověřeno 2026-10-06).
 2. Zaregistrujte hru: `POST /game {"game_id": "...", "repo": "vlastnik/repo",
    "roadmap_file": ".forge/roadmap.json"}`.
 3. Bootstrap granule (`boot.*`) jsou **hotové** (2026-10-02) — neopakovat.
 4. Pozor na invariant 15 z orchestra: nová granule se kvůli cooldownu
    `RETRY_HOURS` (3 h) nemusí vydat hned. Když „orchestra nic nedělá",
    zkontroluj nejdřív CI cílového repa, ne conductora.
-5. **⚠ CI cílového repa se NIKDY nespustilo** (`.github/workflows/ci.yml` má
-   v hlavičce `UNVERIFIED` — URL ani SHA linuxového Godotu nejsou ověřené).
-   Než orchestra zapnete, nechte CI proběhnout ručně (`workflow_dispatch`)
-   a podívejte se, co řeklo — jinak orchestra staví na zelené, která neexistuje.
+5. **⚠ CI cílového repa JE ČERVENÉ a neměří nic** (`.github/workflows/ci.yml` má
+   v hlavičce `UNVERIFIED`): dva běhy, oba `failure` s **0 jobů** a bez logů
+   (`#1` 2026-10-03, `#2` 2026-10-06) — neproběhl ani download Godotu. Podpis
+   odpovídá vyčerpané kvótě minut u privátního repa. **Než orchestra zapnete,
+   odblokujte CI** (úkol 1 v `ZADANI-DALSI-VYVOJ.md`) — jinak orchestra staví
+   na zelené, která neexistuje.
 6. **`docs/07 §7.3` (vlny) pokrývá 62 granul z 101** — chybí celá extrakční
    pipeline M1 (14 granul), všechny `data.*` (8) a 4 bootstrap granule. Orchestra
    vydávající podle vln by tuhle práci **nikdy nevydal**; musí se doplnit.
