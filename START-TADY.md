@@ -11,23 +11,35 @@
 ```text
 Pracovní složka: E:\Workspaces\game-clone
 
-NEJDŘÍV si přečti HANDOFF.md (stav po předchozí session) a prvních pár záznamů
-z LESSONS.md (co už někoho stálo čas). Teprve pak zadání v ZADANI-UO-KLON.md —
-přečti ho celé. Pak v tomto pořadí:
+NEJDŘÍV si přečti HANDOFF.md (stav projektu) a ZADANI-DALSI-VYVOJ.md (co dělat
+teď — vzniklo auditem 2026-10-06) a prvních pár záznamů z LESSONS.md (co už
+někoho stálo čas). Teprve pak zadání v ZADANI-UO-KLON.md — přečti ho celé.
+Pak v tomto pořadí:
 docs/01 (cíl), docs/04 (architektura a smlouvy), docs/07 (granule a milníky),
 docs/08 (brány), docs/09 (pravidla pro agenta). Než je nemáš přečtené,
 nepiš kód.
+
+⚠ TATO SESSION POTŘEBUJE PLNÝ PŘÍSTUP. V režimu workspace-write nejde zapsat do
+.cache (Low integritní label) → brány G3/G7/G11 hlásí vadu, testy hlásí
+save=false, run-all.py spadne na summary.json. Neopravuj kvůli tomu kód.
+
+Stav k 2026-10-06 (naměřeno, ne opsáno): hotových 31 granul z 101 (+5, které
+předání neuvádělo: app.main, app.loop, app.input, sim.commands, sim.world_loop
+— M0 je tím hotové celé); na obrazovce NENÍ NIC (render/ má 1 soubor ze 7);
+12 commitů není před GitHubem a CI nikdy neběželo; atlas.py není v gitu a má
+117 překryvů spritů.
 
 Pak postupně:
 1. Spusť kontroly a ověř, že procházejí:
    python tools/check-docs-refs.py ; python tools/check-zadani.py ;
    python tools/roadmap-gen.py --check
-2. Udělej BOOTSTRAP granule z .forge/roadmap.json (kind = "bootstrap"):
-   boot.project, boot.tests, boot.gates, boot.ci_env. V běžné vlně je agent
-   dostat nesmí (jsou to zakázané soubory), ale v téhle úvodní session je
-   udělej ty — bez nich nemůže nic dalšího běžet.
-3. Teprve pak první vlnu W0: core.const, core.iso, core.rng (tři nezávislé
-   soubory, můžou být hotové v jednom tahu).
+2. Udělej ÚKOLY 1–7 ze ZADANI-DALSI-VYVOJ.md v uvedeném pořadí. První tři
+   kroky k prvnímu obrázku: opravit atlas.py → render.textures → render.chunk,
+   a pak ZAPOJIT do scény (kamera + queue_redraw + main.tscn) — bez zapojení
+   zůstane i hotový renderer mrtvý kód.
+3. Než začneš psát nový kód, oprav tři vady ZAPOJENÍ z HANDOFF.md:
+   input_map se nikdy nepřidá do stromu, sim.systems plní jen testy,
+   time.world_time_ms nikdo nezapíše.
 
 Pravidla, která platí bez výjimky:
 - Piš jen do souborů z "owns" své granule. tests/, tools/gates/, project.godot,
@@ -41,7 +53,7 @@ Pravidla, která platí bez výjimky:
 - "Nula a prázdno nejsou úspěch": když kontrola nic nezměřila, nahlas to.
 
 Prostředí:
-- Godot: C:\Users\Ssevc\Local-Deepseek\orchestra\tools\godot\Godot_v4.7.2-stable_win64_console.exe
+- Godot (binárka ve workspace): .cache\godot\Godot_v4.7.2-stable_win64_console.exe
 - Python: C:\Users\Ssevc\.dsh\dsh-runtimes\dsh-primary-runtime\dependencies\python\python.exe
 - Klony referenčních zdrojů (_src/, research/refs/) jsou JEN KE ČTENÍ. Z GPL
   projektů (ServUO, ModernUO) se berou fakta (čísla, vzorce), NIKDY kód.
@@ -53,12 +65,14 @@ Než začneš psát, řekni mi: co jsi přečetl, co budeš dělat první a pro�
 NA KONCI (povinné, viz HANDOFF.md): přidej do LESSONS.md záznamy za tuhle
 session (ponaučení, chyby, nové nástroje) a přepiš HANDOFF.md na stav po své
 práci — včetně sekce o povinném předání, kterou zkopíruj dál. Pak commitni.
+Push na GitHub jen na vyžádání.
 ```
 
-**Proč je v textu krok 2:** bootstrap granule záměrně nejsou pro agenty
-(`kind: "bootstrap"`), protože vlastní `project.godot`, `tests/` a brány —
-tedy soubory, které si agenti nesmí přepisovat. Někdo je ale udělat musí,
-a v úvodní session je to ten nejsnazší okamžik.
+**Proč v textu není bootstrap:** bootstrap granule (`boot.project`, `boot.tests`,
+`boot.gates`, `boot.ci_env`) byly hotové **2026-10-02** a `boot.*` soubory
+(`project.godot`, `tests/`, brány) agenti needitují. Kdyby je orchestra vydala
+znovu, přepsala by základy projektu. Jejich stav se **měří** (viz předletová
+kontrola), neopakuje.
 
 ---
 
@@ -89,28 +103,38 @@ Přijímací kritéria jsou v .forge/roadmap.json u každé granule.
 ### C) Orchestra (automatické vydávání granulí)
 Tenhle balíček je na to připravený — `roadmap.json` má klíč `grains`:
 
-1. Repo nahrajte na GitHub (workspace je už `git init`nutý, 152 souborů, 4 MB).
+1. Repo je na GitHubu (`ssevcikm-spec/game-clone`), ale **`origin/main` je
+   12 commitů za lokálním stavem** (naměřeno 2026-10-06) — nejdřív push.
 2. Zaregistrujte hru: `POST /game {"game_id": "...", "repo": "vlastnik/repo",
    "roadmap_file": ".forge/roadmap.json"}`.
-3. **Než zapnete orchestra, udělejte bootstrap** (§1 krok 2) — conductor by
-   ho jinak vydal agentovi a ten by přepsal `project.godot` nebo brány.
+3. Bootstrap granule (`boot.*`) jsou **hotové** (2026-10-02) — neopakovat.
 4. Pozor na invariant 15 z orchestra: nová granule se kvůli cooldownu
    `RETRY_HOURS` (3 h) nemusí vydat hned. Když „orchestra nic nedělá",
    zkontroluj nejdřív CI cílového repa, ne conductora.
+5. **⚠ CI cílového repa se NIKDY nespustilo** (`.github/workflows/ci.yml` má
+   v hlavičce `UNVERIFIED` — URL ani SHA linuxového Godotu nejsou ověřené).
+   Než orchestra zapnete, nechte CI proběhnout ručně (`workflow_dispatch`)
+   a podívejte se, co řeklo — jinak orchestra staví na zelené, která neexistuje.
+6. **`docs/07 §7.3` (vlny) pokrývá 62 granul z 101** — chybí celá extrakční
+   pipeline M1 (14 granul), všechny `data.*` (8) a 4 bootstrap granule. Orchestra
+   vydávající podle vln by tuhle práci **nikdy nevydal**; musí se doplnit.
 
 ---
 
 ## 3. Předletová kontrola (5 minut)
 
-| Co | Jak | Očekáváno |
+| Co | Jak | Očekáváno (2026-10-06) |
 |---|---|---|
-| Je co číst | `Test-Path HANDOFF.md, LESSONS.md` | `True` (předání i ponaučení z minula) |
-| Workspace je repo | `git -C E:\Workspaces\game-clone log --oneline -1` | poslední commit je předání |
-| Nic velkého v gitu | `git -C ... ls-files | Measure-Object` | řádově stovky souborů, jednotky MB |
+| Je co číst | `Test-Path HANDOFF.md, LESSONS.md, ZADANI-DALSI-VYVOJ.md` | `True` (stav, ponaučení i zadání pro další vývoj) |
+| Workspace je repo | `git -C E:\Workspaces\game-clone log --oneline -1` | `3e7864c` (render.sort) — nebo novější, pokud session pracovala |
+| Nic nevisí na disku | `git status --porcelain -uall` | `?? tools/uoextract/atlas.py` **a nic jiného** |
+| Kolik je před GitHubem | `git rev-list --count origin/main..HEAD` | `12` (dokud se nepushne) |
+| Testy | `$env:APPDATA="E:\Workspaces\game-clone\.cache\godot-appdata"` + `godot --headless --path . --script res://tests/run_tests.gd` | `238 kontrol, 1 selhání` (to jedno je `user://` = prostředí) |
+| Nic velkého v gitu | `git -C ... ls-files \| Measure-Object` | **266 souborů, 7,4 MB** |
 | Kontroly procházejí | `python tools/check-docs-refs.py` a `check-zadani.py` | `OK` (obě mají mutační test) |
 | DAG je konzistentní | `python tools/roadmap-gen.py --check` | `OK: DAG je konzistentní` |
-| Instalace UO na místě | `Test-Path 'D:\Games\Electronic Arts\Ultima Online Classic\tiledata.mul'` | `True` |
-| Godot běží | `& <godot> --headless --version` | `4.7.2.stable` |
+| Instalace UO na místě | `Test-Path 'D:\Games\Electronic Arts\Ultima Online Classic\tiledata.mul'` | `True` (`map0.mul` tam **není**, mapa je v `map0LegacyMUL.uop`) |
+| Godot běží | `& .cache\godot\Godot_v4.7.2-stable_win64_console.exe --headless --version` | `4.7.2.stable.official.ed1daf0bf` |
 
 **Předávací smyčka (platí od 2026-10-03):** každý krok = **nová session** a po
 každé implementaci **rovnou předání**. Nová session začíná přečtením

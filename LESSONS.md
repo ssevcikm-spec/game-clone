@@ -454,6 +454,83 @@ dostupná cesta je plný přístup pro session. Druhý důsledek téhož: nástr
 smazat odtud nejde (dědičný `Everyone DENY (DeleteSubdirectoriesAndFiles)`), takže
 sonda zanechá soubor, který musí uklidit až session s plným přístupem.
 
+### 2026-10-06 — Self-test na 6 spritech prošel nad atlasem se 117 překryvy (chyba)
+**Co se stalo:** `tools/uoextract/atlas.py` má v `self_test()` kontrolu překryvů
+políček — a přesto vygeneroval atlas, ve kterém je **117 překryvů** (sprity se
+překrývají až o **27 px ze 44**) a **17 spritů je plně průhledných** (např. item
+4410), protože je pozdější sprite přepsal. Důvod: self-test pouštěl `rozloz()`
+na **6 syntetických spritech** na stránce **256 px**, zatímco reálný běh sází
+**17 436 spritů** na **2 048 px**. Malý vstup se chová jinak — police se v něm
+nikdy nezaplní.
+**Doklad:** `python tools/uoextract/atlas.py --self-test` → „30 kontrol, 0 chyb",
+exit 0; `--verify` a `.cache/analysis/atlas-build.log` → „17 chyb: prazdny sprite
+item 4410 …"; vlastní měření manifestu: `STEJNA POZICE` 0, ale **překryvů ve
+stejném pruhu 117**; `neprůhledných pixelů v rectu itemu 4410: 0`.
+**Ponaučení:** self-test, který má prokázat vlastnost **rozložení**, se musí
+pustit na **počtu stránek a spritech v měřítku reálného běhu** — jinak je to
+kontrola, která nemá jak selhat. A pozor na druhý důsledek: `--verify` sice vadu
+našel, ale build přesto **doběhl do konce** — nástroj, který vadu ohlásí a přesto
+vydá artefakt, vypadá jako hotový.
+
+### 2026-10-06 — Dvanáct commitů, které nikdo neviděl, není práce v bezpečí (past-nástroje)
+**Co se stalo:** `origin/main` byl **12 commitů zpátky** za `HEAD` — veškerá práce
+M1 a M2 (tiledata, art, gump, mapa, recepty, `render.sort`) existovala **jen na
+tomto disku**. Workflow `.github/workflows/ci.yml` se v GitHub Actions **nikdy
+nespustil** a sám sebe v hlavičce označuje jako `UNVERIFIED` (ř. 6–11, 42): URL
+i SHA-256 linuxového Godotu jsou neověřené. Předchozí předání stav gitu
+nezmiňovalo.
+**Doklad:** `git rev-list --count origin/main..HEAD` → `12`; `git log origin/main`
+končí commitem `819c9a3` (2026-10-03 14:44), zatímco `HEAD` je `3e7864c`
+(2026-10-04 22:52); `git status` → `?? tools/uoextract/atlas.py`.
+**Ponaučení:** „práce je hotová" a „práce je v bezpečí" jsou dvě tvrzení.
+Předání musí nést **stav gitu živě** (`rev-list --count origin/main..HEAD`),
+ne jen seznam hotových granulí — jinak se zelené testy čtou jako zelený projekt
+a CI neměří nic, protože o commitech neví.
+
+### 2026-10-06 — Auditem zmizelo 5 granul z fronty: stav se nesmí opisovat (postup)
+**Co se stalo:** předání tvrdilo „M0 5" hotových granul a `run-all` fronta stavěla
+na tom, že `app.main`, `app.loop`, `app.input`, `sim.commands` a `sim.world_loop`
+nejsou hotové. **Všechny mají soubor v gitu i testovací případ** — jen nebyly
+v seznamu. Po jejich uznání je **M0 hotové celé (17/17)** a počet granul ve frontě
+se změní z 14 na 22.
+**Doklad:** `git ls-files` + `tests/cases/` (`commands.gd`, `sim_world.gd`,
+`loop.gd`, `input.gd`); `sim/commands.gd` 137 řádků, `sim/sim_world.gd` 232.
+**Ponaučení:** stav hotových granulí se **měří** (soubor v gitu **a** jeho funkce
+jde zavolat), nikdy se neopisuje z předchozího předání. Ručně udržovaný seznam
+hotových věcí **tiše zaostává** — a čím déle, tím víc práce vypadá neudělaná.
+
+### 2026-10-06 — Hotový soubor bez volajícího je mrtvý kód (past-nástroje)
+**Co se stalo:** `render/sort.gd` je hotový a změřený sondou (21 kontrol) — a má
+**0 volajících z produkce**. Totéž `world.doors`, `world.stairs`, `world.time`:
+otestované funkce, které nikdo nevolá. Navíc tři **vady zapojení**, které nejsou
+vidět z existence souborů: `app/main.gd:30` přidává jako dítě jen `loop`, takže
+`input_map.poll()` se **nikdy nezavolá**; `sim.systems` plní **jen testy**
+(`tests/cases/sim_world.gd:85-87`), takže 15 systémů ze `SYSTEM_ORDER` je seznam
+jmen; `time.gd:23` má vlastní `world_time_ms`, které **nikdo nezapíše**, takže
+`hour()` vrací vždy 0.
+**Doklad:** grep `sort_key|draw_order|_draw|queue_redraw|Sprite2D` v celém stromě
+→ **3 nálezy, všechny uvnitř `render/sort.gd`**; `check-wiring.json` sám hlásí
+„render.sort.sort_key: zatím nevolané z produkce" (25 neintegrovaných,
+27 jen-z-testů); `systems[` jen na dvou místech (1 čtení, 1 zápis v testu).
+**Ponaučení:** u hotové granule se neptej „existuje soubor?", ale **„kdo to
+volá?"** — a to ověř greppem na **jméno funkce v produkčních složkách**. Jinak
+se stav „hotovo" počítá z mrtvého kódu a na obrazovce není nic, i když jsou
+všechny brány zelené.
+
+### 2026-10-06 — Dva nálezy z rešerše neobstály; vada byla v dokumentaci (postup)
+**Co se stalo:** nezávislé rešerše (tři subagenti nad týmž stromem) vrátily dva
+nálezy, které **nebyly vady kódu**: (a) „`assets/uo/manifest.json` neexistuje" —
+soubor existuje a má 3 565 629 B i klíč `sprites`, rešerše četla jen starší
+kandidátní cestu z `check-assets.py`; (b) „`world.time` vrací noc = den, je to
+vada" — v `time.gd:12-21` je to **dokumentované rozhodnutí** (noc se neměří,
+dokud se nezměří `light.mul`) a soubor to přiznává i v testu.
+**Doklad:** `assets/uo/manifest.json` (3 565 629 B, `generator: tools/uoextract/atlas.py`);
+`sim/world/time.gd:12-21`; `check-assets.py:28` (`MANIFEST_CANDIDATES`).
+**Ponaučení:** cizí měření se ověřuje **otevřením téhož souboru**, ne
+důvěrou — a to i když je měřil nástroj, který jsem si sám zadal. Když nález
+vypadá jako vada, ale v souboru je **napsaný důvod**, je to nález o dokumentaci
+(chybějící zmínka, rozpor sekcí), ne o kódu. Zapsat se má **obojí**.
+
 ---
 
 ## Vytvořené nástroje (co, kde a čím ověřené)
@@ -469,5 +546,6 @@ sonda zanechá soubor, který musí uklidit až session s plným přístupem.
 | `research/probe/anim_pokryti.py` | reprodukovatelné měření pokrytí těl | dává 270 / 318 těl, prunik 2 — zapsáno v `research/anim-mereni.md` |
 | `tools/gates/check-assets.py` (G6) | nově měří i manifest animací | `--self-test` 4 případy; běh nad repem `OK` |
 | `tools/gates/run-all.py --self-test` | nově pouští i `anim.py` | 19 self-testů (10 bran + 9 extrakčních nástrojů), 0 chyb |
+| `tools/uoextract/atlas.py` (granule `assets.atlas`) | shelf-pack do 2048² + `manifest.json` (17 436 spritů, 198 stran) s `ox`/`oy` z ClassicUO | `--self-test` **30 kontrol** — ale na 6 spritech, tedy **slepý na překryvy** (záznam 2026-10-06); živý běh `assets/uo/manifest.json` 3 565 629 B; `--verify` hlásí **17 prázdných spritů** = **neopravená vada**; **NENÍ v gitu** |
 | `_analyza/sonda-zapisu.py` (gitignore) | zapíše a smaže soubor v 19 cestách stromu — rozliší „nejde zapsat nic" od „nejde zapsat do podsložek" | před opravou 1/19, po přepnutí na plný přístup 19/19 |
 | `_analyza/acl/` (gitignore) | zálohy ACL + protokol `acl-report-*.jsonl` (14 grantů, všechny ověřené) | `RECAP` v protokolu: `GRANTED=14 REFUSED=0 RESTORED=0` |
