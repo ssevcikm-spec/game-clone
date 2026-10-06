@@ -161,7 +161,7 @@ srovnatelná: není to oprava, je to jiné prostředí.
 | Přečtené zadání | `ZADANI-DALSI-VYVOJ.md` | cesta k obrazovce + zapojení bez vlastníka |
 | Strom je čistý | `git status --porcelain -uall` | **prázdné** po commitu této session |
 | Je před GitHubem | `git rev-list --count origin/main..HEAD` | `0` (tato session **nepushuje bez vyžádání**) |
-| **Běží CI?** | `https://github.com/ssevcikm-spec/game-clone/actions` | **NE** — běhy `failure` s **0 jobů** (blokátor 1) |
+| **Běží CI?** | `https://github.com/ssevcikm-spec/game-clone/actions` | **NE** — běhy `failure` s **0 jobů** (blokátor 1). **Až ožije, bude červené** — chybí assety (otevřená věc 20) |
 | Repo je veřejné | `git ls-remote` bez přihlášení, nebo API bez tokenu | `visibility: public` |
 | Testy | testy s `APPDATA` ve workspace | `238 kontrol, 0 selhání` |
 | Brány | `python tools/gates/run-all.py` | `10/1/0`, `exit 2` |
@@ -241,6 +241,17 @@ srovnatelná: není to oprava, je to jiné prostředí.
     textury cachovat **v seznamu `render.chunk`** — a tím se změní platnost
     stropu paměti v `render.textures` (dnes platí proto, že seznam textury
     nedrží). Rozhodnout před M2.
+20. **⚠ AŽ CI OŽIJE, BUDE ČERVENÉ — a nebude to vada kódu.** `assets/uo/` je
+    v `.gitignore` (`git ls-files assets/uo` → **0 souborů**) a `ci.yml`
+    **extrakci nespouští**. Naměřeno v simulaci čerstvého klonu
+    (`.cache/analysis/dukaz-ci-bez-assetu/`): bez assetů `world.map` i
+    `render.textures` jen varují, svět má **0 objektů**, frame má **1 barvu
+    (77,77,77)** — a `check-render.py` na něm hlásí **VADA (exit 1)**.
+    Stejně tak G6 (`check-assets`) na datech z instalace. **Rozhodnutí pro
+    uživatele:** (a) nechat G6/G10 v CI `NEMĚŘENO`, když assety nejsou,
+    (b) dodat do CI fixture (malý atlas + blok mapy), nebo (c) generovat assety
+    v CI z instalace UO (ta tam ale není). Do té doby platí: **zelené brány
+    lokálně ≠ zelené CI.**
 
 ## Už není otevřené (přesunuto, nemaže se)
 
@@ -266,6 +277,8 @@ srovnatelná: není to oprava, je to jiné prostředí.
    takže to musí udělat člověk (nebo povolit výjimku). Sonda je hotová a může
    se přepsat 1:1.
 2. **Zprovoznit CI** (nutné před orchestrou) — přečíst hlášku v UI.
+   **Pozor:** jakmile CI poběží, G6/G10 budou červené kvůli chybějícím assetům
+   (otevřená věc 20) — vyřešit **dřív**, než se začne hledat vada v kódu.
 3. **`app/player_controller.gd` / pohyb kamery** — dnešní `world_view.gd` kameru
    jen **nastaví**, neposouvá; klávesy nejsou nikde namapované (bod 18).
 4. **Pixely animací** (`anim*.mul`, RLE) — **blokátor „postava se pohne"**.

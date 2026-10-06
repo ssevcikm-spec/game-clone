@@ -736,6 +736,25 @@ Po `git checkout -- app/input_map.gd`: 3536 B, `git status` čistý.
 obecnější: **hash textu rozpor nevidí** — rozhoduje bajt, ne výpis ani hash
 přečteného řetězce. (Táž třída jako `Measure-Object -Line` a UTF-16 z `git show >`.)
 
+### 2026-10-06 — Zelené brány lokálně ≠ zelené CI: chybí assety, a nikdo to neměří (past-nástroje)
+**Co se stalo:** dokončil jsem render a `run-all.py` je lokálně **10/1/0**. Jenže
+`assets/uo/` je v `.gitignore` (`git ls-files assets/uo` → **0 souborů**) a
+`ci.yml` **extrakci nespouští** — CI tedy dostane strom **bez mapy i atlasu**.
+**Naměřeno** v simulaci čerstvého klonu (zkopírované zdroje bez `assets/`):
+`world.map` i `render.textures` jen varují, svět má **0 objektů**, frame má
+**1 barvu (77,77,77)** a `check-render.py` na něm hlásí **VADA (exit 1)**.
+Zajímavý detail: těch **77,77,77** je přesně barva toho čtyři dny starého
+artefaktu z bootstrapu — tedy „prázdný snímek" má vždy stejný podpis, ať vznikne
+jakkoli.
+**Doklad:** `.cache/analysis/dukaz-ci-bez-assetu/{frame,snapshot}-bez-assets.png`
+(5322 B, 1 barva); `python tools/gates/check-render.py --snapshot …` → `VADA (exit 1)`.
+**Ponaučení:** brána, která měří **artefakt, jenž v CI nemůže vzniknout**, je pro
+CI slepá nebo nastražená — a rozdíl se pozná jedině **simulací prostředí CI**
+(zkopíruj strom BEZ gitignoreovaných dat a spusť to). Kdo to neudělá, hledá
+v den, kdy CI ožije, vadu v kódu, která není. A druhá polovina: simulaci je
+nutné po měření **uklidit** — zkopírovaný zdrojový strom v `.cache/` je mrtvá
+větev, kterou příští session může číst místo skutečné.
+
 ---
 
 ## Vytvořené nástroje (co, kde a čím ověřené)
