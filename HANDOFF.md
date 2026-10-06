@@ -1,4 +1,4 @@
-# Předání — UO-klon (DEMO chodí; rejstřík referencí hotový; 2026-10-06 noc, 2. session)
+# Předání — UO-klon (DEMO chodí a postava je BAREVNÁ; 2026-10-06 noc, 3. session)
 
 > **Co je tenhle soubor:** **stav projektu** pro další session agenta. Přepisuje
 > se celý; historie je v `git log`. **Současný stav se bere odtud** — a ověřuje
@@ -7,15 +7,18 @@
 > auditem, který neměnil kód). Tenhle soubor říká, **kde jsme**; tamten, **co dělat**.
 > **Kam pro co v referenčních zdrojích je `research/REJSTRIK-REFERENCI.md`**
 > (rozcestník, generovaný a kontrolovaný — není to stav).
-> **Datum:** 2026-10-06 (noc, 2. session). **Poslední změna kódu:** tato session
-> (pixely animací + M2 pohyb + zapojení do scény + rejstřík referencí).
-> Předchozí commit `c3617e5` = předání po zeleném CI; `8050096` = demo.
+> **Datum:** 2026-10-06 (noc, 3. session). **Poslední změna kódu:** tato session
+> (**granule `render.hue`** — postava už není šedá — + zapojení barvy do scény).
+> Předchozí commity: `8050096` = demo s chůzí a šedou postavou;
+> `c3617e5` = předání po zeleném CI.
 
-## 🎬 DEMO JE NA SVĚTĚ — mapa Britainu + postava, která po ní chodí
+## 🎬 DEMO JE NA SVĚTĚ — mapa Britainu + BAREVNÁ postava, která po ní chodí
 
 **Co je na obrazovce:** mapa Britainu (land + statiky) a **postava (tělo 400),
 která stojí, otáčí se a chodí** po klávesách; kamera ji sleduje po dlaždicích.
-Postava je **dekódovaná z `anim.mul`** (ne placeholder) — 10 framů chůze na směr.
+Postava je **dekódovaná z `anim.mul`** (ne placeholder) — 10 framů chůze na směr
+— a **tonovaná sadou barvy kůže** (`hues.mul` → `hues.json`, sada 1002
+„SkinHue #1001"), takže **od této session není šedá** (`render/hue_cache.gd`).
 
 **Jak si to spustit (lokálně, 30 s):**
 
@@ -39,12 +42,28 @@ otevřená věc 27).
 | Kreslí se i postava | `[demo] SOUHRN: kresleno objektu 5771, postava nakreslena true, chybi sprite false, animace dostupna true` |
 | Chůze má správné časování | test: posun **po 8 ticcích** (8 × 50 ms = 400 ms), prodleva běhu 200 ms |
 | Krok neprojde vodou/zdí | test: `{ok:false, reason:"blocked"}` + hláška „You cannot move there." |
+| **Postava je BAREVNÁ (3. session)** | snímek z běhu `.cache/render/snapshot.png` + výřez `.cache/analysis/hue-postava-zoom.png`, ověřeno **pohledem**; G10 měří **shodu s paletou** sady kůže: `kuze_pixelu: 8634`, `kuze_barva: R52 G42 B42`; tentýž snímek v šedé → **0 px** |
 
 **Co v demu NENÍ:** souboj, magie, obchod, řemeslo, UI okna, jména, světlo,
-výbava na postavě, jiné postavy (NPC), mount, pathfinding. Postava je navíc
-**šedá** — barvu kůže v UO dělá hue z `hues.mul` (granule `render.hue`, chybí).
+**výbava na postavě** (postava je nahá), jiné postavy (NPC), mount, pathfinding,
+zvuk. Barva kůže od této session **je** (věc 1 → vyřešeno, viz nová tabulka).
 
-## ✅ CO JE NOVÉHO (tato session) — a čím je to doložené
+## ✅ CO JE NOVÉHO (3. session) — a čím je to doložené
+
+| Co | Doklad (naměřeno dnes) |
+|---|---|
+| **`render.hue` (granule) — postava už není šedá** | `render/hue_cache.gd` (169 řádků): `hued(textura, hue, partial_hue) -> Texture2D`, cache s LRU, `stats()` s `missing`; `HUE_SKIN = 1002` (sada se jmenuje „SkinHue #1001" — číslo v názvu je **0-based**) |
+| **Recept na tonování je z referenčního klienta, ne z dojmu** | index barvy = **5 horních bitů R** (ClassicUO `IsometricWorld.fx:127–129`, `get_rgb(color.r, hue)`); partial hue přebarvuje **jen** pixely s R == G == B; tabulka 5 → 8 bitů je **opsaná** z `_src/classicuo/.../HuesHelper.cs` — **NENÍ to `v << 3` ani `round(v*255/31)`** (od vzorce se liší na **15 z 32** hodnot) |
+| **Test granule** | `tests/cases/render_hue.gd`: hue 0 = původní textura, převod pixelů, **alfa jako maska**, partial hue, **index z R (ne z G)**, cache (hit/miss/strop/kolize dvou textur), neznámý hue, chybějící data, **tabulka proti referenčnímu klientovi** a `hue_color()` proti `hues.json` u **všech 3000 sad × 32 úrovní** |
+| **Mutační důkaz** | `tools/gates/mutace-render-hue.py` → **12 z 12 chyceno**, `exit 0`; baseline 447/0; smlouva o vstupu OK (neexistující cesta test shodí) |
+| **G10 měří barvu postavy** | `check-render.py` měří **přesnou shodu s paletou** sady barvy kůže (32 barev z `hues.json`; sada se čte z `HUE_SKIN` v granuli, ne opisuje) a u **výchozího** snímku ji **vyžaduje** (`KUZE_MIN = 500`). Self-test **8 případů** (přibyl známý chybný „postava je sedá", „barva mimo paletu" a „chybí paleta" → NEMĚŘENO) |
+| **Vizuální důkaz** | `.cache/render/snapshot.png` z běhu `demo-hue.gd` + výřez `.cache/analysis/hue-postava-zoom.png` — **pohledem** (`read_image`) je vidět oranžovo-hnědá kůže, ne šedá |
+| **Hue se opravdu počítá** | `[hue-demo] SOUHRN: … barvy true, cache { "sad": 3000, "polozek": 1, "bytes": 5368, "hits": 0, "misses": 1 }` |
+| Testy hry | **447 kontrol, 0 selhání** (bylo 422; +25 za `render.hue`) |
+| Brány | **11 měřeno / 0 NEMĚŘENO / 0 vad**, `exit 0` |
+| **Dvě pasti, které mě stály čas** | `Image.duplicate()` **nezachová alfou** (128 → 255); `ImageTexture` vytvořená za běhu má **prázdný `resource_path`** → klíč cache se dělá **otiskem obsahu**. Obě i s příkladem v `LESSONS.md` |
+
+## ✅ CO JE NOVÉHO (2. session) — a čím je to doložené
 
 | Co | Doklad (naměřeno dnes) |
 |---|---|
@@ -111,18 +130,22 @@ následuje předání**. Proto platí:
 
 ## ⚠⚠ BLOKÁTORY
 
-**Žádný otevřený blokátor.** „Demo chodí" je naměřené (viz tabulka výš), brány
-jsou zelené (11/0/0) a testy taky (422/0).
+**Žádný otevřený blokátor.** „Demo chodí a postava je barevná" je naměřené
+(viz tabulky výš), brány jsou zelené (11/0/0) a testy taky (447/0).
 
 Dvě věci, které blokátor **nejsou**, ale je dobře je vědět:
 
-1. **Tři mutační harnessy nejsou v CI.** `mutace-tests.py` v CI je, ale
-   `mutace-anim.py`, `mutace-skills.py` a `mutace-render-anim.py` se pouští jen
-   ručně. Do `ci.yml` patří jako samostatné kroky — `ci.yml` vlastní `boot.gates`,
-   agent ho needituje (rozhodnutí uživatele).
+1. **Čtyři mutační harnessy nejsou v CI.** `mutace-tests.py` v CI je, ale
+   `mutace-anim.py`, `mutace-skills.py`, `mutace-render-anim.py`
+   a **`mutace-render-hue.py`** se pouští jen ručně. Do `ci.yml` patří jako
+   samostatné kroky — `ci.yml` vlastní `boot.gates`, agent ho needituje
+   (rozhodnutí uživatele).
 2. **`tests/run_tests.gd` pořád tiše přeskočí case soubor s parse errory**
    (otevřená věc 21 z minula). Dnes to **není akutní**: každá nová kontrola má
-   mutační důkaz, takže „0 selhání" je podložené.
+   mutační důkaz, takže „0 selhání" je podložené. **Ale dnes mě to málem
+   podvedlo**: při psaní testu jsem měl v case souboru parse error (GDScript
+   nemá `String.strip()`) a sada hlásila `422 kontrol, 0 selhání` — jako by nic
+   nechybělo.
 
 ## Kde co je
 
@@ -138,7 +161,7 @@ Dvě věci, které blokátor **nejsou**, ale je dobře je vědět:
 | Generátor obsahu | `python tools/gates/gen-content.py [--check] [--only items\|recipes\|skills]` |
 | Testy | `$env:APPDATA="E:\Workspaces\game-clone\.cache\godot-appdata"` pak `godot --headless --path . --script res://tests/run_tests.gd` → **422 kontrol / 0 selhání** |
 | Brány | `python tools/gates/run-all.py` → **11 měřeno / 0 NEMĚŘENO / 0 chyb**, `exit 0` |
-| Self-testy bran | `python tools/gates/run-all.py --self-test` → **19 self-testů (10 bran + 9 extrakčních nástrojů), 0 chyb**; G6 má uvnitř **7 případů** (dřív 4) |
+| Self-testy bran | `python tools/gates/run-all.py --self-test` → **19 self-testů (10 bran + 9 extrakčních nástrojů), 0 chyb**; **G10 má uvnitř 8 případů** (dřív 5) |
 | **Mutační důkaz testů** | `python tools/gates/mutace-tests.py [--only sort\|map\|walk\|movement]` → **34 z 34** (trvá minuty) |
 | **Mutační důkaz dekodéru animací** | `python tools/gates/mutace-anim.py` → **8 z 8** |
 | **Mutační důkaz `data.skills`** | `python tools/gates/mutace-skills.py` → **8 z 8** |
@@ -164,74 +187,81 @@ Dvě věci, které blokátor **nejsou**, ale je dobře je vědět:
 | `core/` | 7 | 339 | hotové a otestované |
 | `sim/` | **12** | **1 439** | nově `entity/skills.gd`, `entity/mobile.gd`, `world/walk.gd`, `systems/movement.gd`; `systems` **už není prázdné** (registruje `app/main.gd`) |
 | `render/` | **4** | **430** | `sort.gd`, `texture_cache.gd`, `chunk_renderer.gd`, **`anim_player.gd`**; `ui/` pořád neexistuje |
-| `app/` | **6** (5 kód) | **565** | nově **`player_controller.gd`** (bez granule); `main.gd` a `world_view.gd` rozšířené |
-| `tests/` | **33** (26 kód) | **2 713** | **23 case souborů** (+5 za tuhle session) |
+| `app/` | **6** (5 kód) | **575** | `main.gd` (barva hráče) a `world_view.gd` (tonování) rozšířené; **`player_controller.gd`** (bez granule) |
+| `tests/` | **34** (27 kód) | **2 900** | **24 case souborů** (+1 za 3. session: `render_hue.gd`) |
 | `tools/uoextract/` | 38 | 6 278 | `anim.py` umí pixely, `--export`, `--export-check` |
-| `tools/gates/` | **21** | **4 464** | nově `mutace-anim.py`, `mutace-skills.py`, `mutace-render-anim.py` |
+| `tools/gates/` | **22** | **4 760** | nově `mutace-render-hue.py` |
 
 *(Počty jsou Pythonem `splitlines()` nad kódovými soubory `.gd`/`.py`/`.sh`/`.mjs`,
 bez `.uid` a `__pycache__` — `python _analyza/radky.py`.)*
 
-**Zbývá 62 granul.** Hotové (souborem i měřením) navíc: `assets.anim` (pixely),
+**Zbývá 61 granul.** Hotové (souborem i měřením) navíc: `assets.anim` (pixely),
 `render.anim`, `data.skills`, `entity.skills`, `entity.mobile`, `world.walk`,
-`sim.movement` — **7 nových** proti minulému předání.
+`sim.movement`, **`render.hue`** (3. session) — **8 nových** proti předání
+z 2. session. `render/` má **5 souborů / 599 řádků** (nově `hue_cache.gd`).
 
 ## Co je hotové a ověřené (ne „soubor existuje")
 
 **M0 celek** · **W0** (8) · **M1: uop, tiledata, art, gump, worldmap, hues,
 textdata, cliloc, anim (VČETNĚ pixelů), data.items, data.gen_content,
 data.recipes, world.tiledata, world.map, render.sort, render.textures,
-render.chunk, render.anim** · **M2: world.doors, world.stairs, entity.stats,
-world.time, entity.skills, entity.mobile, world.walk, sim.movement,
-data.skills** · **integrace (bez granul): `app/player_controller.gd`,
-`app/world_view.gd` (kreslení postavy), `app/main.tscn` (uzly),
-`app/main.gd` (registrace systémů)**.
+render.chunk, render.anim, render.hue** · **M2: world.doors, world.stairs,
+entity.stats, world.time, entity.skills, entity.mobile, world.walk,
+sim.movement, data.skills** · **integrace (bez granul): `app/player_controller.gd`,
+`app/world_view.gd` (kreslení postavy + barva), `app/main.tscn` (uzly),
+`app/main.gd` (registrace systémů + barva hráče)**.
 
-Doklady, které jsem dnes viděl na vlastní oči (ne opsané z předání):
+Doklady, které jsem viděl na vlastní oči (ne opsané z předání):
 
-- **Na snímku je mapa Britainu i postava** — `read_image` na
-  `.cache/render/chuze/frame00000130.png`.
+- **Na snímku je mapa Britainu i BAREVNÁ postava** — `read_image` na
+  `.cache/render/snapshot.png` a na výřezu `.cache/analysis/hue-postava-zoom.png`
+  (3. session).
 - **Postava se pohnula po skutečných klávesách** — log řidiče `demo-chuze.gd`:
   6 pozic, směry 0/2/7/4, animace `4 ↔ 0`.
 - **Postava je z dat, ne kreslená**: výřez z `anim.mul` (tělo 400, 10 framů chůze),
   0 pixelů mimo frame na 30 blocích.
-- **Testy 422/0**, **brány 11/0/0** (`exit 0`), **mutace 34/34 + 8/8 + 8/8**.
+- **Barva je z dat**: `hues.json` sada 1002, reference na recept
+  (`IsometricWorld.fx:127–129`, `HuesHelper.cs`).
+- **Testy 447/0**, **brány 11/0/0** (`exit 0`), **mutace 34/34 + 8/8 + 8/8 +
+  9/9 + 12/12**.
 - **Hra nespadne**: G11 `smoke` → `framu 120, script_error 0, parse_error 0`.
 
 ### ⚠ Co na obrazovce ještě NENÍ
 
 Souboj, magie, obchod, řemeslo, UI (žurnál, status bar, paperdoll), jména nad
-postavami, světlo (`render.light`), výbava na postavě (vrstvy), druhé postavy,
-mount, pathfinding, zvuk. **Hratelná mechanika: chůze a otáčení.** Postava je
-šedá (paleta z bloku je šedý ramp; kůže = hue, `render.hue` chybí).
+postavami, světlo (`render.light`), **výbava na postavě** (postava je nahá),
+druhé postavy, mount, pathfinding, zvuk. **Hratelná mechanika: chůze, otáčení
+a barva kůže.** Statiky nesou barvu ze záznamu mapy, ale **nikdo ji nepoužívá**
+(věc 35).
 
-## Co brány dnes měří (2026-10-06 noc, 2. session)
+## Co brány dnes měří (2026-10-06 noc, 3. session)
 
 `run-all.py`: **11 měřeno / 0 NEMĚŘENO / 0 VADA**, `exit 0`.
 
 | Brána | Výsledek | Je to vada kódu? |
 |---|---|---|
 | G1–G11 | **OK** | NE |
-| G6 | OK — nově měří `anim_decoder_kod: 0`, `anim_decoder_kontrol: 35` | NE |
-| G10 | OK — `barev: 2148`, `pixelu_mimo_pozadi: 892553` (snímek S postavou) | NE |
+| G6 | OK — měří `anim_decoder_kod: 0`, `anim_decoder_kontrol: 35` | NE |
+| G10 | OK — `barev: 2124`, `pixelu_mimo_pozadi: 892595`, **`kuze_pixelu: 8634`, `kuze_barva: R52 G42 B42`** (shoda s paletou sady 1002) | NE |
 | G13 | PORADNÍ | NE — `vision.mjs` není (poradní je podle `docs/08 §8.2`) |
 
 ## Předletová kontrola (5 minut, než začneš psát)
 
-| Co | Jak | Očekáváno (2026-10-06 noc, 2. session) |
+| Co | Jak | Očekáváno (2026-10-06 noc, 3. session) |
 |---|---|---|
 | Strom je čistý | `git status --porcelain -uall` | **prázdné** po commitu této session |
 | Je před GitHubem | `git rev-list --count origin/main..HEAD` | **`0`** — tato session **pushuje** (uživatel povolil) |
-| **Běží CI?** | `node _analyza/ci-beh-stav.mjs` | poslední běh nad `c3617e5` byl `success` (běh #11); novější commity uvidíš tam |
+| **Běží CI?** | `node _analyza/ci-beh-stav.mjs` | dnes **HTTP 403** (bez tokenu) — stav CI je potřeba ověřit v prohlížeči |
 | Repo je veřejné | API bez tokenu | `visibility: public` |
-| Testy | testy s `APPDATA` ve workspace | `422 kontrol, 0 selhání` |
+| Testy | testy s `APPDATA` ve workspace | `447 kontrol, 0 selhání` |
 | Brány | `python tools/gates/run-all.py` | `11/0/0`, `exit 0` |
 | Self-testy | `python tools/gates/run-all.py --self-test` | `19, 0 chyb`, `exit 0` |
-| Mutační důkaz | `mutace-tests.py` + `mutace-anim.py` + `mutace-skills.py` + `mutace-render-anim.py` | `34/34`, `8/8`, `8/8`, `9/9` |
+| Mutační důkaz | `mutace-tests.py` + `mutace-anim.py` + `mutace-skills.py` + `mutace-render-anim.py` + `mutace-render-hue.py` | `34/34`, `8/8`, `8/8`, `9/9`, `12/12` |
 | Animace | `python tools/uoextract/anim.py --self-test` | `35 kontrol, 0 chyb` |
+| Barvy | `python tools/uoextract/hues.py --self-test` | `5 kontrol, 0 chyb` |
 | Data skillů | `python tools/gates/gen-content.py --only skills --check` | `OK skills.json: shoda` |
 | Fixture sedí na generátor | `python tests/fixtures/world/make_fixture.py --check` | `4× OK`, `exit 0` |
-| **Snímek je z běhu** | `Get-Item .cache/render/snapshot.png \| % LastWriteTime` | **dnešní** (je to frame z chůze) |
+| **Snímek je z běhu** | `Get-Item .cache/render/snapshot.png \| % LastWriteTime` | **dnešní** (frame z `demo-hue.gd`) |
 | Godot běží | `& .cache\godot\...console.exe --headless --version` | `4.7.2.stable.official.ed1daf0bf` |
 | Instalace UO na místě | `Test-Path 'D:\Games\...\tiledata.mul'` | `True` |
 | Kontroly zadání | `check-docs-refs.py`, `check-zadani.py`, `roadmap-gen.py --check` | `exit 0` |
@@ -277,7 +307,7 @@ mount, pathfinding, zvuk. **Hratelná mechanika: chůze a otáčení.** Postava 
     `app/player_controller.gd` (12 vazeb za běhu). **Patří to ale do `ui.hotkeys`**
     — až vznikne, vazby se odsud přesunou.
 19. **Výkonnostní dluh: `AtlasTexture` na objekt** (`UNVERIFIED`) — **PLATÍ DÁL.**
-    Nové číslo: ve snímku s postavou se kreslí **5 771 objektů**.
+    Nové číslo: ve snímku s postavou se kreslí **5 767 objektů**.
 20. ~~Až CI ožije, bude červené kvůli chybějícím assetům~~ — **VYŘEŠENO.**
 21. **`tests/run_tests.gd` tiše přeskočí case soubor s parse errory** — **PLATÍ
     DÁL** (věc 21 z minula; oprava `script.can_instantiate()`).
@@ -338,14 +368,33 @@ mount, pathfinding, zvuk. **Hratelná mechanika: chůze a otáčení.** Postava 
     nebo `.md` by hlásil 0 nálezů (a spadl jako mrtvý). Proto jsou sondy volené
     tak, aby vedly na **kód**, který tu věc používá — a je to i užitečnější.
 39. **NOVÉ (a důležité): ve workspace může běžet PARALELNÍ SESSION.**
-    Naměřeno 2026-10-06 ~22:21: během psaní rejstříku vznikly soubory
+    Naměřeno 2026-10-06 ~22:21: během psaní rejstříku (2. session) vznikly soubory
     `render/hue_cache.gd`, `tests/cases/render_hue.gd`, `tools/gates/mutace-render-hue.py`
     a změny `app/main.gd` + `app/world_view.gd` (zapojení `render.hue`, barva kůže)
-    — **nejsou z této session** a v době commitu byly zelené (testy 444/0,
+    — **nejsou z 2. session** a v době commitu byly zelené (testy 444/0,
     brány 11/0/0). **Pravidlo: než začneš psát, podívej se na `git status`
     a na `LastWriteTime` souborů, které nejsou tvoje** — jinak zapíšeš do cizí
     práce (nebo ji commitneš jako svou). A **necommituj cizí soubory**: `git add`
-    jen na své cesty.
+    jen na své cesty. *(To byla tahle session — 3.; z druhé strany to potvrzuji:
+    `HANDOFF.md` se mi v průběhu práce přepsal pod rukama a musel jsem ho znovu
+    přečíst a mergovat, místo abych ho přepsal celý.)*
+40. **NOVÉ (3. session): `hued_art()` v `render.hue` je hotové, ale NIKDO JE
+    NEVOLÁ.** Statiky v `render.chunk` nesou `hue` ze záznamu mapy a **nikdo ho
+    nepoužívá** — obarvené statiky (dveře, cedule, oblečení na zemi) se kreslí
+    bez barvy. Patří do `render.chunk`.
+41. **NOVÉ (3. session): `render.anim` nevrací `hue` ani neumí vrstvu.** Rozhraní
+    `play()` vrací texturu těla; kdo ji bude skládat s výbavou, musí sáhnout na
+    `world_view.player_hue()` — dnes jediné místo, kde se barva aplikuje.
+    (Rozšiřuje věc 28: `render.hue` na to stroj má, chybí `entity.equipment`.)
+42. **NOVÉ (3. session): G10 měří „klín pixelů kůže" v okolí STŘEDU, ne v boxu
+    postavy.** Je to proto, že kamera drží hráče ve středu a přesná geometrie
+    spritu je v GDScriptu (`world_view`), ne v bráně. **Není to slepé** (sedá
+    postava dá 0 px a self-test to má jako známý chybný případ), ale **není to
+    přesné**: číslo zahrnuje i hnědé dlaždice. Přesnější by bylo měřit barvu
+    z boxu postavy, který umí spočítat jen hra (řidič v `.cache/`, věc 32).
+43. **NOVÉ (3. session): `tools/uoextract/hues.py` nemá `--verify`** (jen
+    `--self-test` s 5 kontrolami a `--install`). Při dalším zásahu do barev by
+    se hodila kontrola proti `hues.mul` (jako `anim.py --verify`).
 
 ## Už není otevřené (přesunuto, nemaže se)
 
@@ -380,17 +429,21 @@ mount, pathfinding, zvuk. **Hratelná mechanika: chůze a otáčení.** Postava 
    + jak ověřit"). Nález, který se nezmění v tvrzení v našem kódu + test, je dojem.
 1. **Pushnout a zkontrolovat CI** na nových commitech (tato session pushuje).
 2. **Opravit slepé místo v `tests/run_tests.gd`** (`script.can_instantiate()`
-   před `script.new()`) — pořád jediná známá slepá brána (věc 21).
-3. **`render.hue`** (`render/hue_cache.gd`, `hues.mul`): bez něj je postava šedá
-   a nejde obléknout. Je to i vstup pro vrstvy výbavy (věc 28).
-4. **Držení klávesy = chůze** (`app.input`, věc 27) — bez toho se demo ovládá
+   před `script.new()`) — pořád jediná známá slepá brána (věc 21) a **dnes mě
+   její tichý skip málem podvedl** (parse error v case souboru → `422/0`).
+3. **`entity.equipment` + `entity.item`** — obléknout postavu (ta je dnes nahá).
+   `render.hue` na to stroj má (věc 41); patří sem i registr, odkud vzít `hue`.
+4. **Statiky s barvou** (věc 40): `render.chunk` + `hued_art()` — dveře a cedule.
+5. **`render.hue` doladit**: `hued_art()` dnes nemá volajícího ani test (věc 40);
+   `hues.py --verify` chybí (věc 43).
+6. **Držení klávesy = chůze** (`app.input`, věc 27) — bez toho se demo ovládá
    „klikatě".
-5. **Dveře a schody v `world.walk`** (věc 31) + `world.doors` napojit.
-6. Pak M2 zbytek: `entity.item`, `entity.container`, `entity.equipment`,
-   `entity.notoriety`, `world.teleport`, `world.regions`; a **zaregistrovat
-   systémy v `SimWorld`** (věci 22 a 30) — tím se replaye rozhýbou.
-7. (nepovinné) `if: always()` u diagnostických kroků CI (věc 26) a doplnit tři
-   mutační harnessy do `ci.yml`.
+7. **Dveře a schody v `world.walk`** (věc 31) + `world.doors` napojit.
+8. Pak M2 zbytek: `entity.container`, `entity.notoriety`, `world.teleport`,
+   `world.regions`; a **zaregistrovat systémy v `SimWorld`** (věci 22 a 30) —
+   tím se replaye rozhýbou.
+9. (nepovinné) `if: always()` u diagnostických kroků CI (věc 26) a doplnit
+   **čtyři** mutační harnessy do `ci.yml`.
 
 ## Jak to dělat (co se osvědčilo)
 
@@ -402,16 +455,27 @@ mount, pathfinding, zvuk. **Hratelná mechanika: chůze a otáčení.** Postava 
   z argumentů** (zkus mu předat neexistující cestu — musí selhat).
 - **Vizuální změna se ověřuje pohledem** (`read_image`), ne jen testy: dnes to
   ukázalo (a) že postava je na mapě, (b) že stojí 40 px nad středem (kamera
-  ignorovala `z`).
+  ignorovala `z`), (c) **že je opravdu barevná** (a ne že „se to počítá").
 - **Druhá implementace téhož formátu je jediná obrana** — dnes to byl
-  **referenční klient** (`_src/classicuo/.../AnimationsLoader.cs`): tři věty
-  z něj rozluštily formát, na kterém rešerše tvrdila, že rozluštit nejde.
+  **referenční klient** dvakrát: `AnimationsLoader.cs` rozluštil animace a
+  `HuesHelper.cs` ukázal, že tabulka 5 → 8 bitů **není vzorec** (liší se
+  na 15 z 32 hodnot). Test to od teď čte **ze souboru reference**.
+- **Vzor mutace musí být v souboru JEDNOU** — dnes to `count == 1` zachránilo
+  u dvou mutací (`roundi(c.r * 255.0)` a `_sets[hue - 1]` jsou v souboru
+  dvakrát); bez té pojistky by se mutovalo něco jiného, než se měří.
+- **Kontrolu hlášení nedělej na podřetězec, který je v souboru víckrát** —
+  `contains("push_warning")` bylo zelené i po smazání jednoho ze dvou hlášení.
+  Počítej **konkrétní** hlášení a před hledáním odstraň komentáře.
+- **Diagnostiku nepiš doprostřed měřené smyčky** — dnes jsem si vlastním
+  `print` rozbil odsazení a pak „měřil" kód, který jsem si sám rozbil.
 - **Data, která v CI nejsou, testuj na fixture v gitu** — a reálná data měř
   navíc, když jsou; když nejsou, řekni to nahlas (NEMĚŘENO), ale neselhávej.
-- **Hotový soubor bez volajícího je mrtvý kód** — ptej se „kdo to volá".
+- **Hotový soubor bez volajícího je mrtvý kód** — ptej se „kdo to volá"
+  (dnes: `hued_art`, věc 40).
 - **Než začneš psát, ověř, že všechny vstupy granule mají PRODUCENTA.**
 - **Když implementace odhalí díru ve smlouvě, napiš ji do hlavičky souboru**
-  (`movement.gd`, `anim_player.gd`, `walk.gd`) a zaznamenej jako otevřenou věc.
+  (`movement.gd`, `anim_player.gd`, `walk.gd`, `hue_cache.gd`) a zaznamenej
+  jako otevřenou věc.
 
 ## Pasti, které už někoho stáhly čas (naměřené)
 
@@ -457,6 +521,27 @@ mount, pathfinding, zvuk. **Hratelná mechanika: chůze a otáčení.** Postava 
     zakazovala `pixels_decoded: true`). Když se měření změní, brána nesmí
     „tvrdit opak" — musí **měřit, že to platí** (dnes: recept v manifestu +
     self-test dekodéru). A nová kontrola musí mít známý správný i chybný případ.
+24. **NOVÉ (3. session): `String.strip()` v GDScriptu NEEXISTUJE** — je
+    `strip_edges()`. Parse error v case souboru ale **sadu nezastaví**, jen tiše
+    ubere kontroly: naměřeno `422 kontrol, 0 selhání` místo chyby (věc 21).
+25. **NOVÉ (3. session): index barvy a POZICE v rampě nejsou totéž.** Kdo v testu
+    předá hodnotu pixelu (0..255) místo úrovně (0..31) do `hue_color()`, dostane
+    u hodnot < 32 správný výsledek a od 33 „vadu", která žádná není. Stálo mě to
+    ~20 minut hledání v produkčním kódu, který byl správný.
+26. **NOVÉ (3. session): `Image.duplicate()` nezachová alfou** (naměřeno:
+    obrázek s alfou 128 měl po duplikaci 255). Kopíruj `Image.create(... RGBA8)`
+    + `fill(transparentní)` + `blit_rect`.
+27. **NOVÉ (3. session): `ImageTexture` vytvořená za běhu má PRÁZDNÝ
+    `resource_path`** — klíč cache se podle něj dělat nesmí, všechny by
+    kolidovaly a cache by vracela **cizí obrázek** (vypadá to jako vada barvy).
+28. **NOVÉ (3. session): `push_warning` může být v souboru dvakrát** — kontrola
+    hlášení na podřetězec je pak slepá; počítej **konkrétní** hlášení a před
+    hledáním odstraň komentáře (jinak najdeš popis vady místo vady).
+29. **NOVÉ (3. session): tabulku 5 → 8 bitů NELZE dopočítat.** `round(v*255/31)`
+    i `v << 3` se od reference liší (15, resp. 31 z 32 hodnot). Ber ji
+    **ze souboru referenčního klienta** a testuj proti ní.
+30. **NOVÉ (3. session): `--write-movie` bez existující složky neskončí chybou.**
+    Vznikne jen `frame.wav` (0 B). Založ složku **před** spuštěním.
 
 ## Vady ZADÁNÍ, které je potřeba opravit (agent je needituje)
 
@@ -505,6 +590,19 @@ mount, pathfinding, zvuk. **Hratelná mechanika: chůze a otáčení.** Postava 
     `anim.mul` nelze dekódovat** — jde to (recept v `tools/uoextract/anim.py`).
 22. **NOVÉ: `docs/04 §4.2` u `render.anim` žádá „skládej vrstvy výbavy podle
     layerů"**, ale `entity.equipment`/`render.hue` v plánu etapy nejsou.
+    *(3. session: `render.hue` už hotové je — chybí `entity.equipment`.)*
+23. **NOVÉ (3. session): `docs/04 §4.2` u `render.hue` uvádí jen
+    `(art_id, hue) → textura` a „index 0 v artu = použij hue"**, ale **neumí to
+    postavu**: těla jsou v `anim*.mul` a jejich framy jsou PNG (nemají `art_id`).
+    Implementace proto bere **texturu** (`hued(textura, hue, partial)`) a
+    `(art_id, hue)` má jen jako `hued_art()`; smlouva to musí popsat.
+24. **NOVÉ (3. session): `docs/03 §3.2b`/`§3.5.2` neuvádí, že barevné sady
+    začínají na 1001.** V `hues.mul` je 0..1000 **převodních šedých tabulek**
+    a sada 1002 se jmenuje „SkinHue #1001" (číslo v názvu je **0-based**). Bez
+    toho se barva kůže hledá v šedých sadách a „nejde to".
+25. **NOVÉ (3. session): `docs/08 §8.2` u G10 neuvádí měření barvy.** G10 dnes
+    měří `kuze_pixelu`/`kuze_barva` a u **výchozího** snímku barvu **vyžaduje**
+    (`KUZE_MIN`); u cizího snímku (`--snapshot`) ji jen změří.
 
 ## Prostředí a konvence
 
@@ -514,8 +612,11 @@ mount, pathfinding, zvuk. **Hratelná mechanika: chůze a otáčení.** Postava 
   nové soubory v `tests/cases/`, `tests/replays/`, `tests/fixtures/`
   a `tools/gates/`; **a integrace podle `ZADANI-DALSI-VYVOJ §3 úkol 5**
   (`app/main.gd`, `app/main.tscn`, `app/world_view.gd`, `app/player_controller.gd`).
-  Gate `check-assets.py` a `mutace-tests.py` jsem dnes upravil proto, že **měření
-  se změnilo** (G6 nesla zestárlé tvrzení) — v předání je to napsané.
+  Gate `check-assets.py` a `mutace-tests.py` jsem upravil proto, že **měření
+  se změnilo** (G6 nesla zestárlé tvrzení); `check-render.py` (3. session) proto,
+  že **měření se rozšířilo** (barva postavy) — v předání je to napsané.
+- **Ve workspace může běžet paralelní session** (věc 39): `git add` jen na své
+  cesty a před zápisem do `HANDOFF.md`/`LESSONS.md` je **znovu přečti**.
 - `python tools/check-docs-refs.py`, `check-zadani.py`, `roadmap-gen.py --check`
   musí procházet.
 - `run-all.py`: 0 = vše měřeno, 1 = vada, **2 = něco NEMĚŘENO** (to není zelená).

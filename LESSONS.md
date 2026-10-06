@@ -1122,6 +1122,92 @@ před commitem).
 **Ponaučení:** `${{ }}` a `$(` patří do **souboru**, ne do argumentu `pwsh`.
 A když příkaz skončí chybou parseru, ověř, **co z plánu se vůbec provedlo**.
 
+### 2026-10-06 — Index barvy a POZICE v rampě nejsou totéž (chyba)
+**Co se stalo:** v testu `render.hue` jsem pro 8 známých šedých hodnot
+(0, 8, 16, 24, 33, 41, 49, 255) očekával `hue_color(hue, i)`, tedy barvu úrovně
+`i` - jenže `i` je **pozice v rampě**, ne úroveň barvy. U hodnot < 32 to vyjde
+(úroveň = hodnota), od 33 ne: 33 je úroveň 4, ne 33. Test proto hlásil vadu
+u posledního pixelu a **20 minut jsem hledal chybu v produkčním kódu, který byl
+správný** (a u toho si ho třikrát rozbil vlastní diagnostikou).
+**Doklad:** `tests/cases/render_hue.gd` kontrola 3 (dnes `uroven = _uroven(seda[i])`);
+sonda `.cache/analysis/probe-hue.gd` s tímtéž výsledkem pro obě cesty.
+**Ponaučení:** než označíš kód za vadný, **vypiš vedle sebe naměřené a očekávané
+číslo pro každý index** (ne jen pro ten vadný). Když se neshoduje jen jeden
+a ostatní sedí posunuté, je to **mapování v testu**, ne logika. A platí to
+oboustranně: „test má pravdu" je taky jen domněnka.
+
+### 2026-10-06 — `push_warning` dvakrát v souboru = slepá kontrola (past-nástroje)
+**Co se stalo:** test hledal v měřeném souboru `contains("push_warning")`, aby
+dokázal, že se chybějící data **hlásí**. Soubor ale obsahuje **dvě** hlášení
+(chybějící sady i neznámé id hue), takže když mutace jedno smazala, druhé drželo
+kontrolu zelenou: mutační harness hlásil `PROSLA - TEST JE SLEPY`. Podobně
+`contains("_sets[hue - 1]")` proslo, protože tentýž řetězec zůstal v **komentáři**.
+**Doklad:** `tools/gates/mutace-render-hue.py` mutace `chybejici_data_mlci`
+a `sada_bez_posunu` (obě dnes CHYCENÉ); sonda `.cache/analysis/sonda-mutant.py`.
+**Ponaučení:** kontrolu **hlasování** nedělej na podřetězec, který může být
+v souboru víckrát - počítej **konkrétní** hlášení (`count("nedal zadnou sadu")`)
+a **před hledáním odstraň komentáře** (jinak najdeš popis vady místo vady).
+
+### 2026-10-06 — Textura vytvořená za běhu má PRÁZDNÝ `resource_path` (past-nástroje)
+**Co se stalo:** cache v `render/hue_cache.gd` klíčovala tonovaný sprite podle
+`texture.resource_path`. `ImageTexture` vytvořená za běhu (`Image` v testu)
+má ale `resource_path == ""`, takže **všechny** takové textury dostaly stejný
+klíč a cache vracela **cizí obrázek** (průhledný dostal neprůhlednou verzi
+předchozího). Vypadalo to jako vada tonování a hledal jsem ji v převodu barev.
+**Doklad:** `.cache/analysis/probe-hue.gd` (před opravou `alfa out (…, 1.0)`
+u obrázku s alfou 128); test `render.hue` kontrola 5b (dvě textury se stejným
+hue mají vlastní výsledek) ji drží.
+**Ponaučení:** klíč cache se **nesmí** opírat o `resource_path` u textur, které
+vznikají za běhu - použij **otisk obsahu** (rozměr + počet + hash pixelů) nebo
+explicitní klíč od volajícího. A když cache vrací „divnou" barvu, ověř
+**klíče**, ne převod barev.
+
+### 2026-10-06 — Test, který měří sám sebe: inverzní kontrola nestačí (past-nástroje)
+**Co se stalo:** test ověřoval tabulku 5 → 8 bitů tak, že z ní zpět převedl
+8 → 5 (`_uroven(EXPAND[v]) == v`). Mutace, která tabulku nahradila posunem
+`v << 3`, tím **prošla** - inverze je konzistentní i pro špatnou tabulku.
+Chycená byla teprve kontrola proti **referenčnímu klientovi**
+(`_src/classicuo/.../HuesHelper.cs`, BSD-2).
+**Doklad:** `tools/gates/mutace-render-hue.py` mutace `posun_misto_zaokrouhleni`
+(před opravou PROSLA, dnes CHYCENÁ).
+**Ponaučení:** „vrací se to zpět" **není** kontrola správnosti, jen konzistence.
+Očekávanou hodnotu ber z **druhého zdroje** (reference, dokument, data), ne
+z téhož souboru.
+
+### 2026-10-06 — Hodnoty z referenčního klienta se OPISUJÍ, nedopočítávají (past-nástroje)
+**Co se stalo:** tabulku 5 → 8 bitů jsem napsal jako `round(v * 255 / 31)`
+(„vždyť je to zaokrouhlení"). Proti `_src/classicuo/.../HuesHelper.cs` nesedí
+na **15 z 32** hodnot (u `v = 3` má reference **24**, vzorec **25**; u 24 má
+reference 197, vzorec 198) - a **není to ani `v << 3`**. Tabulka je ručně
+vytvořený přechod, ne vzorec.
+**Doklad:** `.cache/analysis/hue-ref-tabulka.py` (vypíše referenci, vzorec
+i posun a rozdíly); test `render.hue` kontroluje tabulku proti souboru reference.
+**Ponaučení:** konstantu, která vypadá „spočítatelná", **nejdřív přečti ze
+zdroje a porovnej** - jinak si vyrobíš vlastní verzi, která je blízko a přesto
+jiná (a vizuálně to poznáš jen v pixelech).
+
+### 2026-10-06 — `Image.duplicate()` nezachová formát s alfou (past-nástroje)
+**Co se stalo:** tonování kopírovalo obrázek přes `Image.duplicate()`. Po
+duplikaci zůstala **alfa 255** i tam, kde originál měl 128 (maska spritu se
+ztratila). Kopie přes `Image.create(..., FORMAT_RGBA8)` + `fill(transparentní)`
++ `blit_rect` alfou projde.
+**Doklad:** sonda `probe-hue.gd` (`duplicate` → `a = 1.0`, `blit_rect` → `a = 0.502`);
+test `render.hue` kontrola 5.
+**Ponaučení:** u obrazku s průhledností **nekopíruj** `duplicate()`, ale vytvoř
+cílový obrázek ve **stejném formátu** a přenes obsah `blit_rect`. A vždy měř
+**alfu** zvlášť - barva může sedět a maska být pryč.
+
+### 2026-10-06 — Vlastní diagnostický `print` rozbil kód, který měl měřit (chyba)
+**Co se stalo:** při hledání vady v `_obarvi()` jsem přidal `print` a při
+vkládání se mi **odsadil `out.set_pixel(...)` dovnitř `if` bloku sonda** -
+pixel se pak zapsal jen se zapnutou sondou. Dalších pár běhů jsem „měřil"
+kód, který jsem si sám rozbil, a vypadalo to jako vada převodu barev.
+**Doklad:** `render/hue_cache.gd` (stav před/po), historie běhů v této session.
+**Ponaučení:** diagnostiku **nikdy nevkládej doprostřed měřené smyčky** - dej ji
+do zvláštní metody nebo na konec funkce, a **po každé editaci zkontroluj
+odsazení** (`read` zpět). Když se naměřené číslo nehne ani po opravě, první
+podezření je **vlastní nástroj**, ne měřený kód.
+
 ---
 
 ## Vytvořené nástroje (co, kde a čím ověřené)

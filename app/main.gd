@@ -14,6 +14,7 @@ const TextureCache = preload("res://render/texture_cache.gd")
 const WalkScript = preload("res://sim/world/walk.gd")
 const MovementScript = preload("res://sim/systems/movement.gd")
 const MobileScript = preload("res://sim/entity/mobile.gd")
+const HueScript = preload("res://render/hue_cache.gd")
 
 const DEFAULT_SEED: int = 1234
 const BRITAIN := Vector2i(1495, 1630)   # namesti Britainu (docs/01 §1.4)
@@ -69,6 +70,11 @@ func _setup_player(view) -> void:
 	player = MobileScript.new(serial, PLAYER_BODY, Vector3i(BRITAIN.x, BRITAIN.y, 0))
 	player.pos = Vector3i(BRITAIN.x, BRITAIN.y, walk.surface_z(BRITAIN.x, BRITAIN.y))
 	player.dir = 0
+	# Barva kuze (granule `render.hue`, sada `HUE_SKIN` z `hues.json`). Bez ni je
+	# telo 400 sedive: art z `anim.mul` je jen rampa jasu, barvu dava hue.
+	# V UO znamena `hue == 0` "zadna barva", proto se sada dava jen kdyz je 0.
+	if player.hue == 0:
+		player.hue = HueScript.HUE_SKIN
 	sim.player_serial = serial
 
 	movement = MovementScript.new(walk, sim.clock(), sim.events())
@@ -83,7 +89,8 @@ func _setup_player(view) -> void:
 		return
 	controller.setup(player, sim, loop.input_map, movement, view, loop)
 	print("[main] hrac: serial ", serial, " na ", player.pos, " (", map.land_at(player.pos.x, player.pos.y),
-		" land), systemu v sim: ", sim.systems.keys())
+		" land), hue ", player.hue, " (0 = bez barvy), barvy: ", view.hue_stats(),
+		", systemu v sim: ", sim.systems.keys())
 
 
 func _load_data() -> Dictionary:
