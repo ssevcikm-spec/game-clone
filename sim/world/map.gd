@@ -6,7 +6,16 @@ extends RefCounted
 #   da prazdny blok Britainu (0 statiku misto 60) a pruhovany nahled.
 #   bunka v .land je 3 B `[u16 tile][i8 z]` za 4B hlavickou, 64 bunek na blok,
 #   vevnitr po radku: `inner = (y % 8) * 8 + (x % 8)`.
-#   zaznam statiky je 7 B `[u16 tile][u8 x][u8 y][i8 z][u16 hue]`.
+#   zaznam statiky je 7 B `[u16 tile][u8 x][u8 y][i8 z][u16 hue]` - proto se
+#   `z` cte na offsetu 4 a `x`,`y` na 2 a 3 (do 2026-10-06 se `z` cetl na 3,
+#   tedy lokalni `y`; namEReno: z hodnoty vychazely 0..7 misto 10..60 a statik
+#   se kreslil o desitky pixelu niz - HANDOFF/LESSONS 2026-10-06).
+#
+# TVAR VRACENEHO SLOVNIKU - smlouva (docs/04 §4.2) uvadi `{tile,z,hue}`, ale
+# `render.chunk` POTREBUJE i lokalni `x`,`y` (bez nich se statik neda umistit)
+# a `world.map` je jediny, kdo `.statics.bin` cte. Vracime proto NADMNOZINU
+# `{tile,x,y,z,hue}` - kdo cte jen `tile`/`z`/`hue`, chova se to stejne.
+# Rozsireni smlouvy je vada ZADANI: patri do docs/04 §4.2 (agent docs/ needituje).
 #
 # Data se ctou z assets/uo/world/, nikdy z instalace UO za behu (docs/09 §9.10.2).
 # Chybejici data se HLASI - prazdna mapa neni uspech (docs/08 §8.6).
@@ -111,8 +120,11 @@ func z_at(x: int, y: int) -> int:
 
 
 func statics_at(x: int, y: int) -> Array:
-	# Zaznamy celeho bloku (souřadnice v bloku nejsou vratne - hledaji se podle
-	# `statics_at(x, y)`, ktere znamo, ve kterem bloku se divas).
+	# Zaznamy CELEHO bloku, ve kterem lezi (x, y) - kazdy s lokalnim `x`,`y`
+	# v 0..7, takze svetova dlazdice statiky je `(bx*8 + s.x, by*8 + s.y)`.
+	# Jmenuje se `statics_at`, ale vraci blok: vyber je dany tim, co je
+	# v souboru po blocich (docs/03 §3.4), a filtrovat na jedinou dlazdici by
+	# zahodilo informaci, kterou `render.chunk` potrebuje.
 	var out: Array = []
 	if x < 0 or y < 0:
 		return out
@@ -168,7 +180,8 @@ func _statics(key: int) -> Array:
 	var data := _bin.get_buffer(length)
 	for i in data.size() / STATIC_ENTRY_BYTES:
 		var at := i * STATIC_ENTRY_BYTES
-		out.append({"tile": data.decode_u16(at), "z": data.decode_s8(at + 3),
+		out.append({"tile": data.decode_u16(at), "x": data.decode_u8(at + 2),
+			"y": data.decode_u8(at + 3), "z": data.decode_s8(at + 4),
 			"hue": data.decode_u16(at + 5)})
 	return out
 

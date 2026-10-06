@@ -6,10 +6,20 @@
 ; project.godot, app.main jen app/main.gd), takze ho provedl bootstrap, ktery
 ; scenu zavedl. Scena sama nema herni pravidla: vytvori sim, nacte data
 ; a prida app/loop.gd.
+;
+; 2026-10-06 (integrace renderu, ZADANI-DALSI-VYVOJ §3 úkol 5): pribyl uzel
+; `Camera` (kamera) a `WorldView` (app/world_view.gd). Ani jeden z nich nema
+; v .forge/roadmap.json vlastnika - je to vada ZADANI, ne hotova granule.
 
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://app/main.gd" id="1_main"]
+[ext_resource type="Script" path="res://app/world_view.gd" id="2_world_view"]
 
 [node name="Main" type="Node2D"]
 script = ExtResource("1_main")
+
+[node name="Camera" type="Camera2D" parent="."]
+
+[node name="WorldView" type="Node2D" parent="."]
+script = ExtResource("2_world_view")

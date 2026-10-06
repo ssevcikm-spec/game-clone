@@ -9,6 +9,8 @@ extends Node2D
 const SimScript = preload("res://sim/sim_world.gd")
 const Loop = preload("res://app/loop.gd")
 const InputMapScript = preload("res://app/input_map.gd")
+const MapScript = preload("res://sim/world/map.gd")
+const TextureCache = preload("res://render/texture_cache.gd")
 
 const DEFAULT_SEED: int = 1234
 # Co se nacita na start. Zbytek dat (items, recipes, monsters...) pribude
@@ -28,7 +30,23 @@ func _ready() -> void:
 	loop.sim = sim
 	loop.input_map = InputMapScript.new()
 	add_child(loop)
+	_setup_world()
 	print("[main] sim spusten (seed ", DEFAULT_SEED, ", datovych souboru ", data.size(), ")")
+
+
+func _setup_world() -> void:
+	# Klient (mapa + textury) je ODDELENY od simulace: `main` je jedine misto,
+	# kde se potkavaji (docs/02 §2.2). Kdyz uzel ve scene chybi, rekne se to -
+	# tiche "nic se nekresli" je presne vada, kterou mel projekt 2026-10-06.
+	var view := get_node_or_null("WorldView")
+	if view == null:
+		push_warning("app.main: ve scene chybi uzel WorldView - mapa se nevykresli")
+		return
+	var map = MapScript.new()
+	var textures = TextureCache.new()
+	view.setup(map, textures)
+	print("[main] svet: ", view.visible_count(), " objektu (", view.counts(), "), textury ",
+		textures.stats())
 
 
 func _load_data() -> Dictionary:

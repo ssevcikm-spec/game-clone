@@ -623,6 +623,119 @@ prošla" není totéž jako „kontrola je slepá"**. Než se kontrola „posíl
 se změřit, jestli mutace vůbec **může** změnit výstup. Když nemůže, patří
 k mutaci **důkaz neškodnosti**, ne další test.
 
+### 2026-10-06 — `world.map` čte `z` statiky na offsetu +3, což je lokální `y` (chyba)
+**Co se stalo:** `sim/world/map.gd::_statics()` čte 7B záznam `[u16 tile][u8 x][u8 y][i8 z][u16 hue]`
+jako `tile` na 0, **`z` na +3** a `hue` na +5. Offset +3 je ale `y`. Hlavička téhož
+souboru (ř. 9) přitom správné pořadí **uvádí** — kód si odporoval s vlastním
+komentářem a `x`,`y` se navíc vůbec nevracely, takže statik nebylo jak umístit.
+**Naměřeno:** blok Britainu `(1495,1630)` — 60 statiků, `z` z API **0..7**,
+`z` ze souboru **10..60** (`x` 1..7, `y` 0..3). `world.map` **nemá test
+v `tests/cases/`** (předání to uvádí jako otevřenou věc), takže vada žila od
+2026-10-04 a nikdo ji nechytil.
+**Doklad:** `.cache/analysis/probe-render.gd` porovnává `statics_at()` s **vlastním
+parserem týchž bajtů** → `FAIL … pole 'z': API 0 vs soubor 10` (33 kontrol, 2 selhání);
+mutace „z zpět na +3" je **1 z 12 chycených** (`.cache/analysis/mutace-render.py`).
+**Ponaučení:** když soubor popisuje binární formát **v hlavičce i v kódu**, jsou to
+dvě tvrzení a musí se porovnat **proti bajtům** — komentář byl správný a kód ne.
+A podruhé: **druhá implementace téhož formátu je jediná obrana**; sonda, která čte
+tytéž bajty nezávisle, našla za minutu to, co projektu chybělo dva dny.
+
+### 2026-10-06 — `statics_at` vrací celý blok a zahazoval `x`,`y` (vada-zadani)
+**Co se stalo:** `render.chunk` potřebuje každý statik umístit, jenže smlouva
+(`docs/04 §4.2`) pinuje `statics_at(x,y) -> Array[Dictionary]` jako `{tile,z,hue}` —
+tedy **bez souřadnic** — a `world.map` je jediný, kdo `.statics.bin` čte. Bez
+rozšíření by renderer musel parsovat binární soubor sám.
+**Doklad:** `docs/04-architektura-a-smlouvy.md:50`; nový tvar `{tile,x,y,z,hue}`
+je v hlavičce `sim/world/map.gd` i s vysvětlením, že je to **nadmnožina**.
+**Ponaučení:** chybějící pole ve smlouvě se **doplní v kódu a nahlásí** (docs/
+agent needituje) — ne obejde druhým parserem. A všimnout si, že funkce jménem
+`statics_at(x,y)` vrací **celý blok**: jméno a chování se rozcházely dřív než dnes,
+ale bez souřadnic to nebylo vidět.
+
+### 2026-10-06 — G10 se otočila na zelenou, ale jen na snímku z BĚHU (namereno)
+**Co se stalo:** G10 měřila čtyři dny starý artefakt z bootstrapu (jedna barva).
+Po zapojení `render.textures` → `render.chunk` → `app/world_view.gd` vznikl
+snímek **skutečným během** (`--rendering-driver opengl3 --write-movie`).
+**Naměřeno:** před opravou (2026-10-06 dopoledne) `G10 VADA: barev 1`; po zapojení
+`G10 OK: barev 2117, pixelu_mimo_pozadi 891383, pixelu_v_oblasti 96564`; celý
+`run-all.py` **10 měřeno / 1 NEMĚŘENO (G9) / 0 chyb**, exit 2 (dřív 5/2/4, exit 1).
+**Doklad:** `.cache/analysis/mutace-snimek.py` — **3 ze 3 kroků**: baseline OK,
+vrácená vada „`_draw()` se hned vrátí" → snímek **1 barva** a G10 **exit 1**,
+vada odebrána → **exit 0**; a snímek po opravě má **shodný hash** s baseline
+(`8734c5ca…`), takže se prokazuje i to, že se vada opravdu odectla.
+**Ponaučení:** zelená G10 bez snímku z běhu je jen „soubor existuje". A druhá
+věc: **snímek je deterministický**, takže hash snímku je použitelná regrese —
+refaktor geometrie (`screen_position`) se dal ověřit tím, že obrázek zůstal
+**bajt za bajtem** stejný.
+
+### 2026-10-06 — `==` na `Array` porovnává OBSAHEM: kontrola cache neměřila nic (chyba)
+**Co se stalo:** sonda kontrolovala `chunk.visible(...) == list` („vrací se
+cachovaný seznam") a `novy != list` („po `invalidate()` je nový"). V GDScriptu
+`Array ==` porovnává **obsah**, takže obě kontroly odpovídaly na jinou otázku:
+první prošla i pro nově postavené pole, druhá **spadla na správném kódu**.
+**Doklad:** `.cache/analysis/probe-render.gd` — `FAIL render.chunk: po invalidate()
+se seznam pregeneruje` nad kódem, kde `invalidate()` funguje; po přepisu na
+`is_same()` **35 kontrol, 0 selhání** a obě kontroly mají jak selhat (mutace
+„cache se nikdy nepovažuje za platnou" je chycena).
+**Ponaučení:** u referenčních typů se identita ptá `is_same()`. A hlavně: sonda
+, která **hlásí vadu o správném kódu**, je nastražená brána — nutí „opravovat"
+funkční věc. Rozdíl je vidět jen tak, že se sonda pustí na **ne mutantovi**
+a výsledek se čte.
+
+### 2026-10-06 — Mutační test stropu musí sáhnout na VÍC stránek, než strop dovolí (chyba)
+**Co se stalo:** dvě mutace `render.textures` („`_init` ignoruje předaný strop",
+„LRU nevyhazuje") **prošly** — sonda sice měřila po 10 000 požadavcích, ale všech
+40 art id leželo na **jedné** atlasové stránce, takže se strop neměl jak projevit.
+**Doklad:** `.cache/analysis/mutace-render.py` — před posílením **10 z 12**,
+po přidání kontroly „6 různých stránek při stropu 20 MB (1,25 stránky)" → **12 z 12**;
+naměřeno `po 6 strankach zustala/e 1 v pameti` (bez vyhazování by jich bylo 6 = 96 MB).
+**Ponaučení:** test stropu paměti musí pracovní sadu **překročit**, jinak je to
+test jednoho načtení. A druhá polovina téhož: **12 z 12** má cenu jen s **baseline
+35 kontrol / 0 selhání** — bez něj by „mutace spadla" neznamenalo nic.
+
+### 2026-10-06 — Sonda, která načítá PEVNOU cestu, netestuje mutanta (chyba)
+**Co se stalo:** kontroly stropu v sondě volaly `_load_script("res://render/texture_cache.gd")`
+**natvrdo**, místo cesty z argumentu. Mutant `texture_cache.gd` se tedy do těch
+kontrol vůbec nedostal a dvě mutace „prošly" — vypadalo to jako slepá sonda,
+ale byla to slepá **sonda o sobě**.
+**Doklad:** `.cache/analysis/probe-render.gd` ř. 384 a 397 před opravou; po
+nahrazení `_tex_path` (z `argv[2]`) obě mutace spadly (12/12).
+**Ponaučení:** v mutačním harnessu musí sonda brát **všechny měřené cesty
+z argumentů**; pevná cesta v sondě je totéž co testovat kopii místo zdroje.
+Před spuštěním mutací projdi sondu na výskyty `res://` a každý obhaj.
+
+### 2026-10-06 — „Vada zapojení 1" z předání neobstála měřením (chyba dokumentu)
+**Co se stalo:** `HANDOFF.md` tvrdil, že `input_map` se „nikdy nepřidá jako dítě"
+a proto se `poll()` v produkci nezavolá. Dvě měření to vyvracejí.
+**Doklad:** (a) `app/input_map.gd:1` je `extends RefCounted` — **dítětem být
+nemůže**, takže „nepřidání do stromu" není opomenutí; `app/main.gd:31` ho předává
+`loop` a `app/loop.gd:31-32` ho volá v `_process`. (b) živý běh s vloženým
+markerem (`.cache/analysis/probe-input-map.py`): **`poll()` volán 8× za 20 framů**,
+soubor vrácen (hash `4599a8d02f2b` shodný).
+**Co je vada doopravdy:** `InputMapScript.new()` se volá **bez tabulky vazeb**,
+takže `bindings` je prázdný slovník a `poll()` **proiteruje nula akcí** — vstup se
+nečte proto, že **chybí vlastník výchozích kláves** (`ui.hotkeys`, `docs/04 §4.2`),
+ne proto, že by chyběl `add_child`.
+**Ponaučení:** tvrzení o zapojení se ověřuje **v tom režimu, ve kterém kód běží**
+(`RefCounted` nesmí do stromu, ale volat se dá i tak), a **před „opravou" zapojení
+se hledá, kdo to už volá** — `loop` to volal celou dobu. Nález z auditu, který
+nikdo neměřil, je hypotéza; tenhle stál v předání jako fakt.
+
+### 2026-10-06 — Vrácení souboru přes `write_text` změní konce řádků a nechá „změnu, která neexistuje" (chyba)
+**Co se stalo:** `.cache/analysis/probe-input-map.py` si na chvíli půjčil
+`app/input_map.gd` (vložil do `poll()` marker) a pak ho vrátil přes
+`Path.write_text(...)`. Hash **textu** seděl (`4599a8d02f2b`), ale soubor zůstal
+v `git status` jako změněný — `write_text` přeložil `\n` na `\r\n`, zatímco
+`.gitattributes` má `* text=auto eol=lf`.
+**Doklad:** `git cat-file -s HEAD:app/input_map.gd` → **3536 B** (blob, samé LF),
+na disku **3644 B** (+108 CRLF); `git diff` **prázdný**, `git hash-object`
+(s filtry) se shodoval s `HEAD` — tedy „změna" byla jen v bajtech na disku.
+Po `git checkout -- app/input_map.gd`: 3536 B, `git status` čistý.
+**Ponaučení:** nástroj, který soubor na chvíli mění, ho musí vrátit **bajty**
+(`read_bytes`/`write_bytes`) a ověřovat **bajty**, ne text. A druhé poučení
+obecnější: **hash textu rozpor nevidí** — rozhoduje bajt, ne výpis ani hash
+přečteného řetězce. (Táž třída jako `Measure-Object -Line` a UTF-16 z `git show >`.)
+
 ---
 
 ## Vytvořené nástroje (co, kde a čím ověřené)
@@ -642,3 +755,11 @@ k mutaci **důkaz neškodnosti**, ne další test.
 | `.cache/analysis/mutace-atlas-v2.py` (gitignore) | mutační test self-testu atlasu — **ověřuje i to, že se test vůbec spustil** (kalibrace + traceback + `kontrol` ve výstupu) | **11 z 11 chyceno**; stará verze dávala falešné důkazy (`ModuleNotFoundError` jako „chyceno") |
 | `_analyza/sonda-zapisu.py` (gitignore) | zapíše a smaže soubor v 19 cestách stromu — rozliší „nejde zapsat nic" od „nejde zapsat do podsložek" | před opravou 1/19, po přepnutí na plný přístup 19/19 |
 | `_analyza/acl/` (gitignore) | zálohy ACL + protokol `acl-report-*.jsonl` (14 grantů, všechny ověřené) | `RECAP` v protokolu: `GRANTED=14 REFUSED=0 RESTORED=0` |
+| `render/texture_cache.gd` (granule `render.textures`) | cache textur z `manifest.json` (39 855 land+item spritů), `AtlasTexture` nad stránkou, LRU se stropem **v bajtech** | sonda `probe-render.gd`: `indexovano 39855` = manifest, land 3 = 44×44, land 3 ≠ item 3, chybějící art → `null` + `missing`, **10 000 požadavků** na 1 stránce drží strop, **6 stránek při stropu 20 MB** → 1 v paměti; **mutace 3 z 3** |
+| `render/chunk_renderer.gd` (granule `render.chunk`) | kreslicí seznam pro viditelné bloky: land po dlaždicích, statiky po blocích, řazení přes `render.sort.draw_order`, cache + `invalidate()` | sonda: **6095 prvků** (3072 land + 3023 statik) a **celý seznam shodný s nezávislým přepočtem z bajtů** `.land`/`.statics.bin`; seznam je neklesající podle `sort_key`; `screen_position` = izometrie − `ox`/`oy`; **mutace 5 z 5** |
+| `app/world_view.gd` (**bez granule v roadmapě**) | kreslicí uzel: kamera + `_draw()` v pořadí ze `render.sort`; v `.forge/roadmap.json` pro něj **není vlastník** (vada zadání) | snímek z běhu `1280x720`, **2117 barev**, 891 383 px mimo pozadí; `.cache/analysis/mutace-snimek.py` **3 ze 3** (bez kreslení 1 barva → G10 exit 1) |
+| `.cache/analysis/probe-render.gd` (gitignore) | sonda integrace `world.map` → `render.chunk` → `render.textures`; bere **všechny tři cesty z argumentů**, aby šla mutovat | **35 kontrol, 0 selhání** na reálných datech; `NEMEŘENO` (exit 2), když chybí `assets/uo` |
+| `.cache/analysis/mutace-render.py` (gitignore) | mutační test sondy pro 3 soubory; u každé mutace ověřuje **provedení**, **že sonda vůbec proběhla** (`N kontrol` s N>0) a **že selhala na kontrole** | **12 z 12 chyceno**, baseline 35/0; bez těchhle tří podmínek dřív „prošly" 2 mutace |
+| `.cache/analysis/mutace-snimek.py` (gitignore) | mutační test **G10**: vada „nekreslí se" v `_draw()` → nový snímek z běhu → G10 musí spadnout | **3 ze 3**; snímek po odebrání vady má **shodný hash** s baseline |
+| `.cache/analysis/probe-input-map.py` (gitignore) | živě měří, zda se `input_map.poll()` volá v produkci (vloží marker, spustí hru, vrátí soubor) | **8 volání za 20 framů**; soubor vrácen **bajt za bajtem** (sha256 `4599a8d02f2b`); vyvrací „vadu zapojení 1" z předání |
+| `.cache/analysis/probe-wiring-intrafile.py` (gitignore) | měří **slepé místo brány G4** na dvou fixture, které se liší jen zmínkou jména v jiném produkčním souboru | A (volání jen uvnitř granule) → `volanych_z_produkce 1 / neintegrovano 1` **s hláškou u volané funkce**; B (navíc slovo jinde) → `2 / 0` |
