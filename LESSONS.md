@@ -24,6 +24,81 @@ Typy: `chyba` (moje vada) · `past-nástroje` (prostředí/nástroj, ne logika) 
 
 ---
 
+### 2026-10-06 — „RunUO je lepší než ServUO" je otázka na jádro, ne na celek (postup)
+**Co se stalo:** uživatel se ptal, jestli je lepší zkoumat RunUO než ServUO.
+Místo názoru se změřilo: `servuo/Server` obsahuje **123 ze 123** souborů
+`runuo/Server` (a 20 navíc), `modernuo/Projects/Server` má z těch 123 jen **39**
+(přejmenované/restrukturalizované). Zároveň je RunUO **menší** (jádro ~59k vs
+~73k řádků, celý strom ~3,3k vs ~6,3k `.cs`).
+**Doklad:** `python tools/refs-index.py --srovnej` (měřeno 2026-10-06);
+`research/REJSTRIK-REFERENCI.md`;
+`_src/{runuo,servuo,modernuo}` pinované na `71b2794` / `d76bf44` / `d4531cd`.
+**Ponaučení:** u „který zdroj je lepší" **rozlišuj vrstvu**: na *architekturu*
+je lepší menší a kanonický (RunUO), na *obsah a éry* nadmnožina (ServUO), na
+*modernizaci* přepis (ModernUO). Odpověď „jeden je lepší" je skoro vždy špatná
+a stojí za to ji rozdělit měřením.
+
+### 2026-10-06 — Dvě konstanty téhož jména: 150 vs 400 ms (past-nástroje)
+**Co se stalo:** hledal jsem pravidlo pro prodlevu kroku a v ClassicUO našel
+`Constants.cs:19 WALKING_DELAY = 150`, zatímco `MovementSpeed.cs:13
+STEP_DELAY_WALK = 400`, RunUO/ServUO `Mobile.cs:3050/3063` `m_WalkFoot = 400`
+a ModernUO `Mobiles/Movement.cs:33` default 400. Kdybych vzal 150 jako pravidlo,
+byl by krok **2,7× rychlejší** než v UO.
+**Doklad:** `_src/classicuo/src/ClassicUO.Client/Game/Constants.cs:17-20`
+(vs `Game/Data/MovementSpeed.cs:12-15`), `_src/servuo/Server/Mobile.cs:3063`;
+souhrn je v `research/REJSTRIK-REFERENCI.md` §4.
+**Ponaučení:** **pravidlo ber ze serveru**; klientská konstanta téhož jména může
+znamenat něco jiného (tempo lokální animace vs. jak často se smí poslat krok).
+A když dvě čísla téhož jména existují, patří to do rejstříku jako past, ne do kódu
+jako „ono to nějak vyjde".
+
+### 2026-10-06 — Tiché přeskakování `_src/` závisí na TOM, ČÍ `.gitignore` platí (past-nástroje)
+**Co se stalo:** vestavěný `grep` tool mi nad `_src/` vrátil
+`No files were searched` (0 nálezů), ale tři nezávislí agenti naměřili tentýž
+strom přes `rg -c` **bez** `--no-ignore` a dostali plné počty. Rozpor není chyba:
+`_src/servuo`, `_src/modernuo`, `_src/sphere`, `_src/classicuo` a `_src/runuo`
+jsou **samostatné git repozitáře** (`git rev-parse --show-toplevel` → ten strom),
+takže `rg` na cestu v nich použije **jejich** `.gitignore`, ne náš (`_src/` je
+ignorované v tom našem). Kdežto `grep` tool řeší ignorování pro **náš workspace
+root** — a ten `_src/` přeskočí.
+**Doklad:** `rg -n "namespace" _src/modernuo/Projects/Server` → 282 nálezů
+(s `-uu --no-ignore` stejně); `git ls-files _src` → 0 (vnější git je nevidí);
+`research/REJSTRIK-REFERENCI.md` §0 bod 5.
+**Ponaučení:** u plošných skenů se ptej **čí pravidla se uplatňují**: vnořený
+repo se chová jinak než složka pod naším rootem. Bezpečná varianta zůstává
+`rg -uu --no-ignore` nebo `os.walk` — a „nula nálezů" se nikdy nevykládá jako
+„v datech to není", dokud se nezkusí druhý nástroj.
+
+### 2026-10-06 — Rejstřík, který se nedá ověřit, je jen seznam dojmů (nástroj)
+**Co se stalo:** vznikl `tools/refs-index.py`, který (a) generuje
+`research/REJSTRIK-REFERENCI.md` a (b) má `--check`: u **každého** řádku
+rejstříku spočítá, kolik souborů v tom klonu odpovídá sloupci „jak ověřit" —
+odkaz s **0 nálezy** je mrtvý a kontrola spadne. Tím je oddělené **měřené**
+(commit, počty, životnost odkazů) od **kurátorského** (který soubor k tématu
+patří), a to i v dokumentu.
+**Doklad:** `tools/refs-index.py` (`mereni_nalezu`, `--check`, `--srovnej`);
+`research/REJSTRIK-REFERENCI.md` (generovaný).
+**Ponaučení:** i „rozcestník" má mít bránu. Když seznam odkazů nikdo nekontroluje,
+první refaktoring klonu ho změní na sbírku cest, které nikam nevedou — a nikdo si
+toho nevšimne, protože se to čte jako fakt.
+
+### 2026-10-06 — Tři inventury paralelně: co fungovalo a co je potřeba hlídat (postup)
+**Co se stalo:** tři agenti dostali po jednom stromě (klient / server emulátor /
+ModernUO+Sphere) a **přesně vymezený formát** (tabulka `soubor:řádek` +
+`jak ověřit` + naměřené počty + „kde ten strom není autorita"). Vrátili se
+s ~50 odkazy, z toho několik nálezů, které bych sám nenašel
+(`MovementThrottle` 1139 řádků s prahy 1,05/1,10; `IncomingMovementPackets`,
+který **zahazuje** klientské souřadnice; `StepCacheParityTests` jako vzor pro
+cache; Sphere `PLAYER_HEIGHT 16` jako třetí hlas).
+**Doklad:** tři reporty v `LESSONS`/`HANDOFF` kontextu; konečná data
+v `research/REJSTRIK-REFERENCI.md`; každý řádek ověřen `--check`.
+**Ponaučení:** paralelní inventura se vyplatí, když má **(a)** vlastní strom,
+**(b)** předepsaný formát výstupu, **(c)** povinnost u každého tvrzení uvést
+příkaz a počet, **(d)** výslovný zákaz psát na disk (nic se neslévá).
+A co je potřeba hlídat: agent má sklon **tvrdit víc, než naměřil** — v reportech
+to naštěstí sami označili (`UNVERIFIED`, `NEMĚŘENO`), protože to bylo v zadání.
+
+
 ### 2026-10-06 — „Formát nejde rozluštit" bylo o znaménku, ne o formátu (postup)
 **Co se stalo:** `research/anim-mereni.md` (2026-10-03) uzavřelo, že **pixely těl
 z `anim.mul` se extrahovat nedají**: `x` z hlavičky RLE běhu vycházelo

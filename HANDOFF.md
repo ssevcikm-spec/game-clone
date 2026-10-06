@@ -1,13 +1,15 @@
-# Předání — UO-klon (DEMO: mapa Britainu + postava, která chodí; 2026-10-06 noc, 2. session)
+# Předání — UO-klon (DEMO chodí; rejstřík referencí hotový; 2026-10-06 noc, 2. session)
 
 > **Co je tenhle soubor:** **stav projektu** pro další session agenta. Přepisuje
 > se celý; historie je v `git log`. **Současný stav se bere odtud** — a ověřuje
 > se živě (je tu k tomu sekce „Předletová kontrola").
 > **Zadání pro další vývoj je `ZADANI-DALSI-VYVOJ.md`** (založeno 2026-10-06
 > auditem, který neměnil kód). Tenhle soubor říká, **kde jsme**; tamten, **co dělat**.
+> **Kam pro co v referenčních zdrojích je `research/REJSTRIK-REFERENCI.md`**
+> (rozcestník, generovaný a kontrolovaný — není to stav).
 > **Datum:** 2026-10-06 (noc, 2. session). **Poslední změna kódu:** tato session
-> (pixely animací + M2 pohyb + zapojení do scény). Předchozí commit `c3617e5`
-> = předání po zeleném CI.
+> (pixely animací + M2 pohyb + zapojení do scény + rejstřík referencí).
+> Předchozí commit `c3617e5` = předání po zeleném CI; `8050096` = demo.
 
 ## 🎬 DEMO JE NA SVĚTĚ — mapa Britainu + postava, která po ní chodí
 
@@ -62,6 +64,35 @@ výbava na postavě, jiné postavy (NPC), mount, pathfinding. Postava je navíc
 | **`data.skills` (58 skillů)** | `data/skills.json` (11 755 B, 58 záznamů) + `gen-content.py --only skills --check` (idempotentní, `sha256 5c6716244234`); test 27 kontrol; `tools/gates/mutace-skills.py` **8 z 8** |
 | **`render.anim` (anim player)** | `render/anim_player.gd` (121 řádků): framy z `anim-sheets.json`, časování **80 ms** (`Const.TURN_MS`), mapování 8 → 5 směrů + zrcadlení podle ClassicUO `Animation.cs:76`; `tools/gates/mutace-render-anim.py` |
 
+## 📚 REJSTŘÍK REFERENCÍ (třetí část této session) — „kam pro co"
+
+**Proč:** cíl je **naučit se ze hry a pak ji modernizovat**. V repu jsou klony
+RunUO, ServUO, ModernUO, ClassicUO a Sphere (`_src/`, gitignore) — ale nikde
+nebylo, **který soubor na co**. Vznikl rejstřík, který **není seznam dojmů**:
+
+| Věc | Co to je |
+|---|---|
+| `research/REJSTRIK-REFERENCI.md` | **rozcestník** (generovaný): metoda, které stromy tu jsou (commit + licence + velikost), rozhodovací tabulka „kterou referenci na co", **~50 řádků „otázka → `soubor:řádek`"** s naměřeným počtem nálezů, vzorový příklad, modernizace, odkaz na multiplayer |
+| `tools/refs-index.py` | generátor **a kontrola**: `--write` (default), `--check` (porovná dokument s diskem a spadne na **mrtvém odkazu**, tj. 0 nálezů), `--srovnej` (RunUO vs ServUO vs ModernUO) |
+| `research/08-multiplayer-poucky.md` | **poučky bokem**: 17 principů ze serverů (`soubor:řádek` + „u nás dnes" + „platí už teď / až s multiplayrem"), co z multiplayeru **neplatí**, a startovní bod pro LAN/co-op |
+
+**Naměřená odpověď na otázku „je lepší zkoumat RunUO než ServUO?"** — záleží na
+vrstvě (měřeno `python tools/refs-index.py --srovnej`):
+
+| vrstva | zdroj | měření |
+|---|---|---|
+| architektura jádra | **RunUO** | `servuo/Server` = **123 ze 123** souborů `runuo/Server` (nadmnožina) + 20 navíc; RunUO je menší (jádro ~59k vs ~73k řádků, strom ~3,3k vs ~6,3k `.cs`) → **na učení čistší** |
+| obsah, éry, pravidla | **ServUO** | aktivní (2026-10-06), `Config/`, `Spawns/`, `RevampedSpawns/`; naše `research/` z něj vychází |
+| modernizace | **ModernUO** | z 123 jmen jádra zůstalo **39** (restrukturalizace), 1371 `[Fact]`/`[Theory]` vs **0** v ServUO, 3858 migračních manifestů vs 0 |
+| klient (render, animace, vstup) | **ClassicUO** | jediný klient v repu; animace/art/atlas/klávesy |
+| rozhodčí při rozporu | **Sphere** | jiný rodokmen; `PLAYER_HEIGHT 16` nezávisle potvrzuje 16 |
+
+**Bonus, který z rejstříku vypadl jako past:** v ClassicUO jsou **dvě konstanty
+téhož jména** — `Constants.cs:19 WALKING_DELAY = 150` a
+`MovementSpeed.cs:13 STEP_DELAY_WALK = 400`. Pravidlo je **serverové** (400);
+kdybych vzal 150, byl by krok 2,7× rychlejší. Tohle je přesně ten druh věci,
+kvůli které rejstřík vznikl.
+
 ## ⚠ POVINNÉ: na konci každé session (rozhodnutí uživatele, 2026-10-03)
 
 Uživatel volá **na každý krok novou session** a **po každé implementaci hned
@@ -100,6 +131,9 @@ Dvě věci, které blokátor **nejsou**, ale je dobře je vědět:
 | **Demo (hra)** | `& .cache\godot\Godot_v4.7.2-stable_win64_console.exe --path . --rendering-driver opengl3` (s `$env:APPDATA` ve workspace) |
 | **Zadání pro další vývoj** | **`ZADANI-DALSI-VYVOJ.md`** (naměřená cesta k obrazovce, zapojení bez vlastníka) |
 | **Ponaučení a nástroje** | **`LESSONS.md`** — čti prvních pár záznamů, ať neopakuješ chyby |
+| **Kam pro co v referencích** | **`research/REJSTRIK-REFERENCI.md`** (rozcestník, ~50 odkazů s měřeným počtem nálezů) — generuje a kontroluje `python tools/refs-index.py [--check\|--srovnej]` |
+| **Multiplayer bokem** | **`research/08-multiplayer-poucky.md`** — 17 principů ze serverů, „u nás dnes" + co platí až s multiplayrem |
+| **Referenční klony** | `_src/{runuo,servuo,modernuo,classicuo,sphere}` (**pinované**, gitignore, nejsou submoduly). Pozor: `research/_src/{servuo,modernuo}` jsou **druhé checkouty téhož** — pro čtení používej `_src/` |
 | Projekt | `E:\Workspaces\game-clone` (git, `main`) |
 | Generátor obsahu | `python tools/gates/gen-content.py [--check] [--only items\|recipes\|skills]` |
 | Testy | `$env:APPDATA="E:\Workspaces\game-clone\.cache\godot-appdata"` pak `godot --headless --path . --script res://tests/run_tests.gd` → **422 kontrol / 0 selhání** |
@@ -285,6 +319,33 @@ mount, pathfinding, zvuk. **Hratelná mechanika: chůze a otáčení.** Postava 
     hlásí `WARNING: Loaded resource as image file, this will not work on export`.
     Stejný vzor jako `render/texture_cache.gd`; **pro export build to bude
     potřeba vyřešit** (importovat PNG jako resource). Netýká se běhu ze zdrojů.
+35. **NOVÉ: `tools/refs-index.py --check` není v CI ani v `run-all.py`.**
+    Rejstřík se tím může rozejít s diskem (a nikdo si toho nevšimne). Do
+    `ci.yml` patří jako samostatný krok vedle `mutace-tests.py`. **Pozor: musí
+    běžet na stroji, kde jsou klony `_src/`** — bez nich `--check` u odkazů
+    hlásí CHYBÍ STROM (což je správné chování, ale v CI by to bylo červené).
+    Rozhodnutí: buď klony v CI nemít a `--check` tam nepouštět, nebo ho pouštět
+    jen na „stromy, které existují".
+36. **NOVÉ: `research/_src/{servuo,modernuo}` jsou duplicitní checkouty**
+    (ne junctiony, oba 2× na disku). Nejsou v gitu, ale zabírají místo a pletou
+    rejstřík. **Nic se nemazalo** — rozhodnutí uživatele.
+37. **NOVÉ: repo nemá `LICENSE`.** Reference v `_src/` jsou GPL-2.0 (RunUO,
+    ServUO), GPL-3.0 (ModernUO), BSD-2 (ClassicUO), Apache-2.0 (Sphere). Z GPL
+    zdrojů se smí vzít **fakt nebo formát, ne kód** — ale bez licence našeho
+    repa je i publikování samo o sobě nerozhodnuté.
+38. **NOVÉ: `refs-index.py` měří jen soubory s kódovými příponami**
+    (`.cs`, `.cpp`, `.h`, `.hpp`, `.gd`). Odkaz na `.csproj`, `.json`, `.tbl`
+    nebo `.md` by hlásil 0 nálezů (a spadl jako mrtvý). Proto jsou sondy volené
+    tak, aby vedly na **kód**, který tu věc používá — a je to i užitečnější.
+39. **NOVÉ (a důležité): ve workspace může běžet PARALELNÍ SESSION.**
+    Naměřeno 2026-10-06 ~22:21: během psaní rejstříku vznikly soubory
+    `render/hue_cache.gd`, `tests/cases/render_hue.gd`, `tools/gates/mutace-render-hue.py`
+    a změny `app/main.gd` + `app/world_view.gd` (zapojení `render.hue`, barva kůže)
+    — **nejsou z této session** a v době commitu byly zelené (testy 444/0,
+    brány 11/0/0). **Pravidlo: než začneš psát, podívej se na `git status`
+    a na `LastWriteTime` souborů, které nejsou tvoje** — jinak zapíšeš do cizí
+    práce (nebo ji commitneš jako svou). A **necommituj cizí soubory**: `git add`
+    jen na své cesty.
 
 ## Už není otevřené (přesunuto, nemaže se)
 
@@ -314,6 +375,9 @@ mount, pathfinding, zvuk. **Hratelná mechanika: chůze a otáčení.** Postava 
 
 ## Další kroky (v tomto pořadí)
 
+0. **Než začneš hledat cokoli v referencích:** otevři
+   `research/REJSTRIK-REFERENCI.md` a použij jeho řádek („otázka → `soubor:řádek`
+   + jak ověřit"). Nález, který se nezmění v tvrzení v našem kódu + test, je dojem.
 1. **Pushnout a zkontrolovat CI** na nových commitech (tato session pushuje).
 2. **Opravit slepé místo v `tests/run_tests.gd`** (`script.can_instantiate()`
    před `script.new()`) — pořád jediná známá slepá brána (věc 21).
