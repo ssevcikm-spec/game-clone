@@ -16,6 +16,8 @@ Spousteni:
 from __future__ import annotations
 
 import argparse
+import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -115,6 +117,44 @@ def check_extraction_outputs(root: Path, gate: Gate) -> int:
     return checked
 
 
+def _posledni_radek(vystup: str) -> str:
+    radky = [r for r in vystup.strip().splitlines() if r.strip()]
+    return radky[-1] if radky else "(žádný výstup)"
+
+
+def _pocet_kontrol(vystup: str) -> int:
+    # Self-test píše "[anim] self-test: 35 kontrol, 0 chyb" - bereme PRVNÍ
+    # číslo a jen z řádku se souhrnem (jinak by se dalo splést s "0 chyb").
+    import re
+    m = re.search(r"self-test:\s*(\d+)\s*kontrol", vystup)
+    return int(m.group(1)) if m else 0
+
+
+def anim_selftest(root: Path) -> tuple[int, str]:
+    """Spustí offline self-test dekodéru animací a vrátí (exit kód, výstup).
+
+    Skript se bere z `root` (v reálném běhu je to repo); když tam není (self-test
+    brány pouští check na FALEŠNÉM rootu), bere se z umístění TÉTO brány - jinak
+    by self-test neměřil logiku brány, ale to, co je v atrapě.
+    """
+    skript = root / "tools" / "uoextract" / "anim.py"
+    if not skript.exists():
+        skript = Path(__file__).resolve().parents[2] / "tools" / "uoextract" / "anim.py"
+    if not skript.exists():
+        return 127, f"chybí {skript}"
+    env = dict(os.environ)
+    env["PYTHONIOENCODING"] = "utf-8"
+    try:
+        proc = subprocess.run(
+            [sys.executable, str(skript), "--self-test"],
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
+            timeout=120, env=env,
+        )
+    except subprocess.TimeoutExpired:
+        return 124, "self-test dekodéru překročil timeout 120 s"
+    return proc.returncode, (proc.stdout or "") + (proc.stderr or "")
+
+
 def check_anim_manifest(root: Path, gate: Gate) -> int:
     """Manifest animaci (assets/uo/anim-manifest.json) - granule assets.anim.
 
@@ -152,8 +192,27 @@ def check_anim_manifest(root: Path, gate: Gate) -> int:
         if not zaznam.get("actions"):
             gate.error(f"tělo {telo} nemá v manifestu žádnou akci")
     if data.get("pixels_decoded") is True:
-        gate.error("manifest tvrdí pixels_decoded=true, ale dekodér pixelů "
-                   "v této instalaci ověřený není (research/anim-mereni.md)")
+        # 2026-10-06: do téhle chvíle brána tvrdila "dekodér pixelů ověřený
+        # není" (podle `research/anim-mereni.md` z 2026-10-03) a manifest
+        # s `pixels_decoded: true` rovnou hlásila jako VADU. To tvrzení
+        # zestárlo: pixely JSOU dekódované (signed 10bit x/y, 512B paleta
+        # v bloku, pixel = 1 bajt) a dekodér má vlastní offline self-test.
+        # Brána proto od teď netvrdí "neexistuje" - měří, že to platí:
+        # (1) manifest musí nést recept (`pixels_recipe`) a
+        # (2) self-test dekodéru musí projít (je offline, takže jde i v CI).
+        if not data.get("pixels_recipe"):
+            gate.error("manifest tvrdí pixels_decoded=true, ale nenese `pixels_recipe` "
+                       "(čím je to dekódované, se musí dát ověřit)")
+        kod, vystup = anim_selftest(root)
+        kontrol = _pocet_kontrol(vystup)
+        gate.measure("anim_decoder_kod", kod)
+        gate.measure("anim_decoder_kontrol", kontrol)
+        if kod != 0:
+            gate.error(f"manifest tvrdí pixels_decoded=true, ale self-test dekodéru "
+                       f"(`tools/uoextract/anim.py --self-test`) vyšel {kod}: "
+                       f"{_posledni_radek(vystup)}")
+        elif kontrol <= 0:
+            gate.error("self-test dekodéru proběhl, ale nezměřil nic (`N kontrol`, N<=0)")
     gate.note("anim manifest: zdroj u každého těla je měřený, ne odhadnutý")
     return 1
 
@@ -264,12 +323,24 @@ def selftest() -> int:
     base = Path(__file__).resolve().parents[2] / ".cache" / "gates" / "selftest-assets"
     shutil.rmtree(base, ignore_errors=True)
 
-    def fixture(label: str, manifest: dict | None, pages: list[str]) -> Path:
+    def fixture(label: str, manifest: dict | None, pages: list[str],
+                anim: dict | None = None, rozbity_dekoder: bool = False) -> Path:
         root = base / label
         (root / "assets" / "atlas").mkdir(parents=True, exist_ok=True)
         if manifest is not None:
             (root / "assets" / "atlas" / "manifest.json").write_text(
                 json.dumps(manifest, ensure_ascii=False), encoding="utf-8")
+        if anim is not None:
+            (root / "assets" / "uo").mkdir(parents=True, exist_ok=True)
+            (root / "assets" / "uo" / "anim-manifest.json").write_text(
+                json.dumps(anim, ensure_ascii=False), encoding="utf-8")
+        if rozbity_dekoder:
+            # Známý chybný případ pro druhou část kontroly: manifest tvrdí, že
+            # pixely jsou dekódované, ale dekodér v tomhle rootu selže.
+            (root / "tools" / "uoextract").mkdir(parents=True, exist_ok=True)
+            (root / "tools" / "uoextract" / "anim.py").write_text(
+                "import sys\nprint('[anim] self-test: 3 kontrol, 1 chyb')\n"
+                "sys.exit(1)\n", encoding="utf-8")
         for page in pages:
             target = root / "assets" / "atlas" / page
             # platny PNG: kontrola prázdných spritů potřebuje obrázek, ne hlavičku
@@ -281,11 +352,33 @@ def selftest() -> int:
         return root
 
     good = {"sprites": [{"tile": 1, "page": "atlas0.png", "rect": [0, 0, 44, 44]}]}
+    # Minimální anim manifest, který projde kontrolou těl: 400/401 z MUL,
+    # 334 z UOP (přesně to, co měří check_anim_manifest).
+    anim_ok = {
+        "sha256": {"anim.idx": "0" * 64},
+        "sources": {"anim*.mul": {"bodies": 2, "actions": 2},
+                    "AnimationFrame*.uop": {"bodies": 1, "actions": 1}},
+        "pixels_decoded": True,
+        "pixels_recipe": "test",
+        "bodies": {"400": {"source": "anim.mul", "actions": [0]},
+                   "401": {"source": "anim.mul", "actions": [0]},
+                   "334": {"source": "AnimationFrame.uop", "actions": [1]}},
+    }
+    anim_bez_receptu = dict(anim_ok)
+    anim_bez_receptu.pop("pixels_recipe")
     cases = [
         ("dobry", fixture("dobry", good, ["atlas0.png"]), OK),
         ("vadny_chybi_stranka", fixture("vadny_chybi_stranka", good, []), VADA),
         ("vadny_prazdny_manifest", fixture("vadny_prazdny_manifest", {"sprites": []}, []), VADA),
         ("bez_manifestu", fixture("bez_manifestu", None, []), NEMERENO),
+        # 2026-10-06: kontrola "manifest tvrdí pixels_decoded=true" MUSÍ mít
+        # známý správný i známý chybný případ - jinak je to brána, která
+        # nemůže selhat (docs/08 §8.1).
+        ("anim_s_receptem", fixture("anim_s_receptem", good, ["atlas0.png"], anim_ok), OK),
+        ("anim_bez_receptu", fixture("anim_bez_receptu", good, ["atlas0.png"],
+                                     anim_bez_receptu), VADA),
+        ("anim_vadny_dekoder", fixture("anim_vadny_dekoder", good, ["atlas0.png"],
+                                         anim_ok, rozbity_dekoder=True), VADA),
     ]
     return selftest_cli(NAME, check, [(l, e) for l, _, e in cases],
                         fixtures=[(l, f) for l, f, _ in cases])
