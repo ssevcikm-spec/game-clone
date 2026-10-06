@@ -12,12 +12,23 @@ extends RefCounted
 # `world.walk` je tu FAKE: test meri tento system, ne pruchodnost (tu meri
 # tests/cases/walk.gd). Fake si navic ZAZNAMENA, s jakym `is_player` ho system
 # zavolal - jinak by se asymetricka diagonala dala "splnit" i omylem.
+#
+# Cesta k souboru je VSTUP: `-- --movement-script=<cesta>` (mutacni test).
 
 const Lib = preload("res://tests/lib.gd")
 const Const = preload("res://core/const.gd")
 const ClockScript = preload("res://core/clock.gd")
 const EventsScript = preload("res://core/events.gd")
 const MobileScript = preload("res://sim/entity/mobile.gd")
+
+const MOVEMENT_SCRIPT := "res://sim/systems/movement.gd"
+
+
+func _arg(name: String, fallback: String) -> String:
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--" + name + "="):
+			return arg.substr(name.length() + 3)
+	return fallback
 
 
 class FakeWalk:
@@ -32,9 +43,10 @@ class FakeWalk:
 
 
 func _sestav(t, drain_model: String) -> Array:
-	var script = Lib.script_at("res://sim/systems/movement.gd")
+	var cesta: String = _arg("movement-script", MOVEMENT_SCRIPT)
+	var script = Lib.script_at(cesta)
 	if script == null:
-		t._pending("sim.movement NENI HOTOVA: sim/systems/movement.gd chybi")
+		t._pending("sim.movement NENI HOTOVA: " + cesta + " chybi")
 		return []
 	var walk = FakeWalk.new()
 	var clock = ClockScript.new()

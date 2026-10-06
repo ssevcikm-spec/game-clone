@@ -1,41 +1,66 @@
-# Předání — UO-klon (důkazní vrstva v gitu; CI má nalezenou příčinu, 2026-10-06 noc)
+# Předání — UO-klon (DEMO: mapa Britainu + postava, která chodí; 2026-10-06 noc, 2. session)
 
 > **Co je tenhle soubor:** **stav projektu** pro další session agenta. Přepisuje
 > se celý; historie je v `git log`. **Současný stav se bere odtud** — a ověřuje
 > se živě (je tu k tomu sekce „Předletová kontrola").
 > **Zadání pro další vývoj je `ZADANI-DALSI-VYVOJ.md`** (založeno 2026-10-06
 > auditem, který neměnil kód). Tenhle soubor říká, **kde jsme**; tamten, **co dělat**.
-> **Datum:** 2026-10-06 (noc). **Poslední změna kódu:** tato session (důkazní
-> vrstva + příčina CI; předchozí commit `505bf65` = handoff a lekce k assetům).
+> **Datum:** 2026-10-06 (noc, 2. session). **Poslední změna kódu:** tato session
+> (pixely animací + M2 pohyb + zapojení do scény). Předchozí commit `c3617e5`
+> = předání po zeleném CI.
 
-## ✅ CO JE NOVÉHO (tato session) — příčina CI je nalezená a důkazy jsou v gitu
+## 🎬 DEMO JE NA SVĚTĚ — mapa Britainu + postava, která po ní chodí
+
+**Co je na obrazovce:** mapa Britainu (land + statiky) a **postava (tělo 400),
+která stojí, otáčí se a chodí** po klávesách; kamera ji sleduje po dlaždicích.
+Postava je **dekódovaná z `anim.mul`** (ne placeholder) — 10 framů chůze na směr.
+
+**Jak si to spustit (lokálně, 30 s):**
+
+```powershell
+cd E:\Workspaces\game-clone
+$env:APPDATA = "E:\Workspaces\game-clone\.cache\godot-appdata"   # user:// zůstane ve workspace
+& .cache\godot\Godot_v4.7.2-stable_win64_console.exe --path . --rendering-driver opengl3 --resolution 1280x720
+```
+
+**Klávesy:** šipky nebo numpad **1–9** (8 směrů; `4/6` = západ/východ, `7/9` =
+severozápad/severovýchod, `2/8` = jih/sever). Chůze je **diskrétní krok** (400 ms),
+proto **každé zmáčknutí = jeden krok** — držení klávesy krok neopakuje (viz
+otevřená věc 27).
+
+**Čím je to doložené (ne „mělo by to jít"):**
+
+| Důkaz | Jak naměřeno |
+|---|---|
+| Postava je na mapě | snímek z běhu `.cache/render/chuze/frame00000130.png` (→ `snapshot.png`); G10 `barev: 2148`, `pixelu_mimo_pozadi: 892553` |
+| **Postava opravdu chodí** | řidič `.cache/analysis/demo-chuze.gd` poslal do hry **skutečné klávesy** (`Input.parse_input_event`): 6 pozic `(1495,1630)` → `(1496,1630)` → `(1497,1630)` → `(1497,1629)` → `(1498,1630)` → `(1497,1630)`, směry 0/2/7/4, animace se přepínala `4 (idle) ↔ 0 (walk)` |
+| Kreslí se i postava | `[demo] SOUHRN: kresleno objektu 5771, postava nakreslena true, chybi sprite false, animace dostupna true` |
+| Chůze má správné časování | test: posun **po 8 ticcích** (8 × 50 ms = 400 ms), prodleva běhu 200 ms |
+| Krok neprojde vodou/zdí | test: `{ok:false, reason:"blocked"}` + hláška „You cannot move there." |
+
+**Co v demu NENÍ:** souboj, magie, obchod, řemeslo, UI okna, jména, světlo,
+výbava na postavě, jiné postavy (NPC), mount, pathfinding. Postava je navíc
+**šedá** — barvu kůže v UO dělá hue z `hues.mul` (granule `render.hue`, chybí).
+
+## ✅ CO JE NOVÉHO (tato session) — a čím je to doložené
 
 | Co | Doklad (naměřeno dnes) |
 |---|---|
-| **Příčina 9 mrtvých běhů CI** | GitHub UI u běhu **#4 i #9** píše `Invalid workflow file: .github/workflows/ci.yml#L56 / You have an error in your yaml syntax on line 56`. Řádek 56 = `- name: Godot: import, testy, snímek (boot.ci_env)` — **dvojtečka s mezerou uvnitř neuvozovkovaného skaláru** je neplatný YAML. Hlášku vytáhl `_analyza/ci-ui-banner.mjs` z HTML běhu (API ji nenese) |
-| **Oprava ověřená parserem** | jméno kroku v uvozovkách; `_analyza/yaml-kontrola.py` (PyYAML) **3 ze 3**: vrácená dvojtečka → chyba na **spočítaném** řádku, tabulátor → chyba, současný `ci.yml` bez chyby |
-| **Běhů je 9, ne 5** | `GET /actions/runs?per_page=6` → `total_count: 9`; nejnovější `#9` = `505bf65` (HEAD), i `#5`–`#9` selhaly s **0 jobů** |
-| **`run-all.py` poprvé 0 vad a 0 NEMĚŘENO** | `SOUHRN: měřeno 11, čeká 0, chyb 0`, **`exit 0`** (odemklo G9) |
-| **G9 měřeno — a citlivost ZMĚŘENA** | `tests/replays/tic_200.json`, `tic_1000.json` (hash z běhu, ne vymyšlený). `_analyza/replay-zmer.py`: **jiné příkazy při stejných ticích = STEJNÝ hash**, jiný počet tiků = jiný. Dnes tedy replay měří čas, ne mechaniky (v `popis` replaye je to napsané) |
-| **Důkazní vrstva je v GITU** | `tests/cases/render_sort.gd`, `tests/cases/world_map.gd`, `tests/fixtures/world/` (včetně `.idx` s výjimkou v `.gitignore`), `tools/gates/mutace-tests.py` |
-| **Mutace: 21 z 21** | harness u každé mutace ověří **PROVEDENÁ** (text na disku) + **PROBĚHLÁ** (`N kontrol`, N>0) + **CHYCENÁ** (FAIL daného modulu) + **smlouva o vstupu** (neexistující cesta musí test shodit) |
-| **Testy hry** | **276 kontrol / 0 selhání** (bylo 238) |
-| **Self-testy bran** | **19 self-testů, 0 chyb**, `exit 0`; `check-render` má nový případ `bez_assetu` (5 případů, 0 chyb) |
-| **G10/G6 v klonu bez assetů** | hlásí **NEMĚŘENO**, ne VADA (ověřeno self-testem `bez_assetu`); krok CI s bránami navíc **toleruje `exit 2`** s warningem — vada (`exit 1`) shodí krok vždy |
-| **Simulace CI (klon bez `assets/uo`)** | worktree z `HEAD` (286 souborů, **0 B assetů**): `run-all.py` → **9 měřeno / 2 NEMĚŘENO (G6, G10) / 0 vad**, `exit 2`; self-testy **19/0**; **testy hry 270/0** (o 6 méně = reálná data se neměří); **G9 OK i v klonu** (replaye jsou v gitu). Simulace po měření uklizena (`git worktree remove`) |
-| **URL Godotu v CI ověřena** | `HEAD` na `…/4.7.2-stable/Godot_v4.7.2-stable_linux.x86_64.zip` → **HTTP 200, 77 860 424 B** a jméno assetu sedí na `unzip`/`mv` ve workflow (workflow to měl jako `UNVERIFIED`) |
-| **CI JE ZELENÉ — běh #11** | `#11` (sha `9ac60cb`): **1 job, `success`**, všech 11 kroků `success` (self-testy, `ci-godot.sh`, brány, **mutační důkaz**, artefakty). Artefakt `gates` (25 978 B): `{"ok": 9, "pending": 2, "failed": 0}` — **0 vad**, G6 a G10 NEMĚŘENO s důvodem „chybí assets/uo" |
-| **Běh #10 = první, který nastartoval** | 1 job (poprvé z deseti) → příčina (neplatný YAML) **potvrzená**. Krok 7 tam spadl na `godot: command not found` → **druhá příčina**: krok nedostával `GODOT` (workflow má `GODOT_BIN`). Opraveno a ověřeno lokálně přes Git `sh` |
-| **V CI se měří i testy a replaye** | log běhu #11: `[test] 270 kontrol, 0 selhani` s viditelným `NEMERENO: world.map nad realnymi daty…`; mutace **21 z 21**, baseline 270/0, smlouva vstupu OK; self-testy **19/0**; snímek v CI vznikl (`render/frame*.png` + `snapshot.png`) |
-| **NÁLEZ: `run-all.py` u G3 nic nevypíše** | když G3 selže, je v logu jen `G3 VADA vada` — bez čísel a bez důvodu (`run_tests_gate()` nevolá `gate.finish()`). Dnes mě to dvakrát poslalo hledat vadu testů, která nebyla (jednou sandbox, jednou zapomenutý `$GODOT`) |
-| **Doba běhů (kvůli limitu CI 30 min)** | naměřeno lokálně: `run-all.py` **17,8 s**, testy hry **0,6 s**, `mutace-tests.py` **14,3 s** (26 běhů Godotu). I s několikrát pomalejším runnerem je limit 30 min s rezervou |
-| **NÁLEZ: harness tiše přeskočí rozbitý case** | `tests/cases/render_sort.gd` s parse errory → `258 kontrol, 0 selhání, exit 0` a **žádný FAIL** (soubor se vůbec nespustil). Otevřená věc 21 |
-
-**Co to znamená pro „CI je zelené":** **je to změřeno, ne odvozeno.** Běh **#11**
-(`9ac60cb`) má 1 job, `success`, všech 11 kroků `success` a artefakt `gates`
-hlásí `{"ok": 9, "pending": 2, "failed": 0}`. Cesta k tomu vedla přes **dvě**
-vady, obě neviditelné, dokud workflow vůbec neběžel: (1) neplatný YAML na řádku
-56, (2) krok `ci-godot.sh` nedostával `GODOT` (workflow má `GODOT_BIN`).
+| **Pixely animací JSOU rozluštěné** (byl to blokátor „postava se nepohne") | `x`/`y` v RLE hlavičce jsou **znamenkové 10bitové** (`1020..1023` = `-4..-1`), prvních **512 B bloku JE paleta** (256× u16 ARGB1555, šedý ramp), pixel = **1 bajt** indexu, terminátor `0x7FFF7FFF`. Recept i reference (ClassicUO `AnimationsLoader.ReadSpriteData`) je v hlavičce `tools/uoextract/anim.py` |
+| Důkaz, že to není dohad | **0 pixelů mimo frame** na 30 blocích (těla 400/401 × walk/run/idle × 5 směrů); `anim.py --verify` **55 kontrol, 0 chyb**; `--self-test` **35 kontrol, 0 chyb**; `tools/gates/mutace-anim.py` **8 z 8** mutací chyceno |
+| Postava je vidět (snímek) | kráčející muž z `anim.mul` vyexportovaný i vykreslený v běhu hry — ověřeno **pohledem** (`read_image`), ne jen testy |
+| **Export animací pro klienta** | `python tools/uoextract/anim.py --export assets/uo/anim` → **30 spritů, 210 framů** (těla 400/401, akce 0=walk/1=run/4=idle, 5 směrů) + `anim-sheets.json`; kontrola exportu **240 kontrol, 0 chyb** |
+| **M2: pohyb (4 granule)** | `sim/world/walk.gd` (průchodnost, výšky, **asymetrická diagonála**), `sim/entity/skills.gd`, `sim/entity/mobile.gd`, `sim/systems/movement.gd` (prodlevy 400/200, stamina, eventy) — všechny s testy |
+| **Mutační důkaz pro M2** | `tools/gates/mutace-tests.py` teď umí i `walk` a `movement`: **34 z 34** mutací chyceno (sort 10, map 11, walk 6, movement 7) + smlouva o vstupu OK |
+| **Mutační důkaz celkem** | **59 z 59**: `mutace-tests.py` 34, `mutace-anim.py` 8, `mutace-skills.py` 8, `mutace-render-anim.py` 9 |
+| **CI zůstane zelená i bez assetů** | simulace čerstvého klonu (přejmenované `assets/uo`): testy **396 kontrol, 0 selhání** s viditelným `NEMERENO` (render.anim, reálná tiledata, reálná mapa). Test `render_anim.gd` hlásí chybějící **data** přes `print NEMERENO`, ne přes `_pending` (to by shodilo G3 v CI) |
+| **Vstup a zapojení do scény** | `app/player_controller.gd` (bez granule) zakládá **12 klávesových vazeb za běhu** a mapuje 8 směrů; `app/world_view.gd` kreslí postavu **v pořadí kreslení** (mezi statiky podle `x + y`) |
+| Testy hry | **422 kontrol, 0 selhání** (bylo 276; +146 za tuhle session: 4× M2, controller, data.skills, render.anim) |
+| Brány | **11 měřeno / 0 NEMĚŘENO / 0 vad**, `exit 0` |
+| **Brána G6 byla slepá a je opravená** | `check-assets.py` **tvrdila**, že `pixels_decoded: true` je VADA (podle rešerše z 2026-10-03). Teď to **měří**: manifest musí nést `pixels_recipe` a self-test dekodéru musí projít → `anim_decoder_kod: 0`, `anim_decoder_kontrol: 35`. Self-test brány má **7 případů** (přibyl známý správný i dva známé chybné) |
+| **Kamera respektuje výšku** | kamera stála na `z = 0`, postava na `z = 10` → 40 px nad středem (naměřeno prvním snímkem). `look_at_tile(tile, z)` to opravuje |
+| **`data.skills` (58 skillů)** | `data/skills.json` (11 755 B, 58 záznamů) + `gen-content.py --only skills --check` (idempotentní, `sha256 5c6716244234`); test 27 kontrol; `tools/gates/mutace-skills.py` **8 z 8** |
+| **`render.anim` (anim player)** | `render/anim_player.gd` (121 řádků): framy z `anim-sheets.json`, časování **80 ms** (`Const.TURN_MS`), mapování 8 → 5 směrů + zrcadlení podle ClassicUO `Animation.cs:76`; `tools/gates/mutace-render-anim.py` |
 
 ## ⚠ POVINNÉ: na konci každé session (rozhodnutí uživatele, 2026-10-03)
 
@@ -55,237 +80,253 @@ následuje předání**. Proto platí:
 
 ## ⚠⚠ BLOKÁTORY
 
-**Žádný otevřený blokátor.** „CI je zelené" **je změřeno**: běh #11 (sha
-`9ac60cb`) = 1 job, `success`, všech 11 kroků `success`, artefakt `gates`
-`{"ok": 9, "pending": 2, "failed": 0}`. Dvě vady, které to držely, jsou popsané
-výše a opravené (`2898a8d`, `9ac60cb`).
+**Žádný otevřený blokátor.** „Demo chodí" je naměřené (viz tabulka výš), brány
+jsou zelené (11/0/0) a testy taky (422/0).
 
-Zbývá jediná věc druhu „brána je slepá" a **netýká se CI**:
-`tests/run_tests.gd` tiše přeskočí case soubor s parse errory (naměřeno,
-otevřená věc 21). Do té doby platí, že „0 selhání" **samo o sobě** neznamená, že
-všechny case soubory proběhly — proto to hlídá `tools/gates/mutace-tests.py`,
-který běží i v CI.
+Dvě věci, které blokátor **nejsou**, ale je dobře je vědět:
 
-3. ~~`tools/uoextract/atlas.py`: vada rozložení~~ — **VYŘEŠENO 2026-10-06**
-   (0 překryvů, 0 prázdných, 41 874 spritů na 67 stranách, `--verify` 0 chyb)
-   a **pushnuto** (`72a4c0a`).
+1. **Tři mutační harnessy nejsou v CI.** `mutace-tests.py` v CI je, ale
+   `mutace-anim.py`, `mutace-skills.py` a `mutace-render-anim.py` se pouští jen
+   ručně. Do `ci.yml` patří jako samostatné kroky — `ci.yml` vlastní `boot.gates`,
+   agent ho needituje (rozhodnutí uživatele).
+2. **`tests/run_tests.gd` pořád tiše přeskočí case soubor s parse errory**
+   (otevřená věc 21 z minula). Dnes to **není akutní**: každá nová kontrola má
+   mutační důkaz, takže „0 selhání" je podložené.
 
 ## Kde co je
 
 | Věc | Cesta / příkaz |
 |---|---|
+| **Demo (hra)** | `& .cache\godot\Godot_v4.7.2-stable_win64_console.exe --path . --rendering-driver opengl3` (s `$env:APPDATA` ve workspace) |
 | **Zadání pro další vývoj** | **`ZADANI-DALSI-VYVOJ.md`** (naměřená cesta k obrazovce, zapojení bez vlastníka) |
 | **Ponaučení a nástroje** | **`LESSONS.md`** — čti prvních pár záznamů, ať neopakuješ chyby |
 | Projekt | `E:\Workspaces\game-clone` (git, `main`) |
-| Generátor obsahu | `python tools/gates/gen-content.py [--check] [--only items\|recipes]` |
-| Testy | `$env:APPDATA="E:\Workspaces\game-clone\.cache\godot-appdata"` pak `godot --headless --path . --script res://tests/run_tests.gd` → **276 kontrol / 0 selhání** |
+| Generátor obsahu | `python tools/gates/gen-content.py [--check] [--only items\|recipes\|skills]` |
+| Testy | `$env:APPDATA="E:\Workspaces\game-clone\.cache\godot-appdata"` pak `godot --headless --path . --script res://tests/run_tests.gd` → **422 kontrol / 0 selhání** |
 | Brány | `python tools/gates/run-all.py` → **11 měřeno / 0 NEMĚŘENO / 0 chyb**, `exit 0` |
-| Self-testy bran | `python tools/gates/run-all.py --self-test` → **19 self-testů, 0 chyb**, `exit 0` |
-| **Mutační důkaz testů** | `python tools/gates/mutace-tests.py [--only sort\|map]` → **21 z 21 chyceno**, `exit 0` (běží ~25× Godot, trvá minuty) |
-| **Fixture pro `world.map`** | `python tests/fixtures/world/make_fixture.py [--check]` (4 soubory: `map0.meta.json`, `.land`, `.statics.idx`, `.statics.bin`) |
-| **Replaye pro G9** | `tests/replays/tic_200.json`, `tic_1000.json`; citlivost měří `_analyza/replay-zmer.py` |
-| **Snímek z běhu** | `godot --path . --rendering-driver opengl3 --resolution 1280x720 --write-movie .cache/render/run-<tag>/frame.png --quit-after 5` → první frame se kopíruje na `.cache/render/snapshot.png` (dělá to `.cache/analysis/mutace-snimek.py`) |
-| **Sonda renderu + mutace** | `godot --headless --path . --script res://.cache/analysis/probe-render.gd` · `python .cache/analysis/mutace-render.py` · `python .cache/analysis/mutace-snimek.py` |
-| **Kontrola YAML workflow** | `python _analyza/yaml-kontrola.py` (potřebuje PyYAML; `.cache/pylib` přes `PYTHONPATH`) |
-| **Stav a logy CI běhů** | `node _analyza/ci-beh-stav.mjs` (běhy, **počet jobů**, výsledek každého kroku) · `node _analyza/ci-log.mjs` (logy; API bez tokenu vrací 403 — token se bere z Windows Credential Manageru a nevypisuje se) · `node _analyza/ci-artefakt.mjs` (artefakt `gates` → `summary.json`) |
-| Godot (binárka) | **KOPIE ve workspace**: `.cache/godot/Godot_v4.7.2-stable_win64_console.exe` (4.7.2.stable.official.ed1daf0bf) |
+| Self-testy bran | `python tools/gates/run-all.py --self-test` → **19 self-testů (10 bran + 9 extrakčních nástrojů), 0 chyb**; G6 má uvnitř **7 případů** (dřív 4) |
+| **Mutační důkaz testů** | `python tools/gates/mutace-tests.py [--only sort\|map\|walk\|movement]` → **34 z 34** (trvá minuty) |
+| **Mutační důkaz dekodéru animací** | `python tools/gates/mutace-anim.py` → **8 z 8** |
+| **Mutační důkaz `data.skills`** | `python tools/gates/mutace-skills.py` → **8 z 8** |
+| **Mutační důkaz `render.anim`** | `python tools/gates/mutace-render-anim.py` |
+| **Animace: dekodér** | `python tools/uoextract/anim.py --self-test \| --verify \| --export assets/uo/anim \| --export-check assets/uo/anim` |
+| **Dekodér: objevné sondy** | `_analyza/anim-rle-sonda.py`, `_analyza/anim-rle-hledani.py`, `_analyza/anim-dekod.py` (**gitignore** — v gitu je jen produkční `anim.py` a mutační harness) |
+| **Snímek z běhu** | `godot --path . --rendering-driver opengl3 --resolution 1280x720 --write-movie .cache/render/run-<tag>/frame.png --quit-after 5` — **cesta musí mít dopředná lomítka** (viz pasti) |
+| **Důkaz chůze (řidič)** | `godot --path . --rendering-driver opengl3 --write-movie .cache/render/chuze/frame.png --script res://.cache/analysis/demo-chuze.gd` (řidič je v `.cache/`, gitignore) |
+| Fixture pro `world.map` | `python tests/fixtures/world/make_fixture.py [--check]` |
+| Replaye pro G9 | `tests/replays/tic_200.json`, `tic_1000.json` |
+| Sonda renderu + mutace | `.cache/analysis/{probe-render.gd,mutace-render.py,mutace-snimek.py}` |
+| Stav a logy CI běhů | `node _analyza/ci-beh-stav.mjs` · `node _analyza/ci-log.mjs` · `node _analyza/ci-artefakt.mjs` |
+| Godot (binárka) | `.cache/godot/Godot_v4.7.2-stable_win64_console.exe` (4.7.2.stable.official.ed1daf0bf) |
 | Python | `C:\Users\Ssevc\.dsh\dsh-runtimes\dsh-primary-runtime\dependencies\python\python.exe` |
-| Instalace UO | `D:\Games\Electronic Arts\Ultima Online Classic` (jen čtení; `map0.mul` tam **není** — mapa je v `map0LegacyMUL.uop`) |
+| Instalace UO | `D:\Games\Electronic Arts\Ultima Online Classic` (jen čtení) |
 | Roadmapa | `.forge/roadmap.json` — **101 granul, `done` je u všech `false`**: stav se pozná **jen měřením** |
-| Data z instalace | `assets/uo/` (gitignore) — `tiles.json` 2 405 685 B, `manifest.json` **8 649 632 B** (41 874 spritů, 67 stran), `world/map0.land` 89 915 392 B, `world/map0.statics.bin` 20 386 415 B, `atlas/*.png` 115 153 521 B |
-| Důkazy měření (gitignore) | `.cache/analysis/probe-render.gd`, `mutace-render.py`, `mutace-snimek.py`, `probe-input-map.py`, `probe-wiring-intrafile.py`; nově `_analyza/{ci-ui-banner.mjs,ci-vytah.py,yaml-kontrola.py,replay-zmer.py}` |
+| Data z instalace | `assets/uo/` (gitignore) — mimo jiné **`anim/` (30 PNG + `anim-sheets.json`)** a `anim-manifest.json` |
 
 ## Stav kódu (počty řádků Pythonem `splitlines()`, bez `.uid` a `__pycache__`)
 
 | složka | souborů (kód) | řádků kódu | poznámka |
 |---|---|---|---|
 | `core/` | 7 | 339 | hotové a otestované |
-| `sim/` | 8 | **953** | **`systems` je stále prázdné — plní ho jen testy**; `world/map.gd` 199 → **210** řádků (volitelné cesty) |
-| `render/` | 3 | 311 | `sort.gd` (60) + `texture_cache.gd` + `chunk_renderer.gd`; `ui/` pořád neexistuje |
-| `app/` | 4 | 306 | `world_view.gd` (bez granule!); `main.gd` připojuje sim, loop i svět |
-| `tests/` | **19** | **1 602** | **16 case souborů** (+2 nové: 259 a 169 řádků), `lib.gd`, `run_tests.gd`, 2 replaye, fixture (127řádkový generátor + 4 data) |
-| `tools/uoextract/` | 38 | 5 910 | 12 produkčních + 26 jednorázových experimentů |
-| `tools/gates/` | **18** | **3 495** | 10 bran + `run-all.py`, `gen-content.py`, `gate_common.py`, `sim_probe.gd`, **`mutace-tests.py`** (236 řádků), `ci-godot.sh` (89) |
+| `sim/` | **12** | **1 439** | nově `entity/skills.gd`, `entity/mobile.gd`, `world/walk.gd`, `systems/movement.gd`; `systems` **už není prázdné** (registruje `app/main.gd`) |
+| `render/` | **4** | **430** | `sort.gd`, `texture_cache.gd`, `chunk_renderer.gd`, **`anim_player.gd`**; `ui/` pořád neexistuje |
+| `app/` | **6** (5 kód) | **565** | nově **`player_controller.gd`** (bez granule); `main.gd` a `world_view.gd` rozšířené |
+| `tests/` | **33** (26 kód) | **2 713** | **23 case souborů** (+5 za tuhle session) |
+| `tools/uoextract/` | 38 | 6 278 | `anim.py` umí pixely, `--export`, `--export-check` |
+| `tools/gates/` | **21** | **4 464** | nově `mutace-anim.py`, `mutace-skills.py`, `mutace-render-anim.py` |
 
 *(Počty jsou Pythonem `splitlines()` nad kódovými soubory `.gd`/`.py`/`.sh`/`.mjs`,
 bez `.uid` a `__pycache__` — `python _analyza/radky.py`.)*
 
-**Zbývá 62 granul.** `render.textures` a `render.chunk` už soubor **mají**
-(`granuli_s_hotovym_souborem` 39).
+**Zbývá 62 granul.** Hotové (souborem i měřením) navíc: `assets.anim` (pixely),
+`render.anim`, `data.skills`, `entity.skills`, `entity.mobile`, `world.walk`,
+`sim.movement` — **7 nových** proti minulému předání.
 
 ## Co je hotové a ověřené (ne „soubor existuje")
 
 **M0 celek** · **W0** (8) · **M1: uop, tiledata, art, gump, worldmap, hues,
-textdata, cliloc, anim, data.items, data.gen_content, data.recipes,
-world.tiledata, world.map, render.sort, render.textures, render.chunk** ·
-**M2: world.doors, world.stairs, entity.stats, world.time**.
+textdata, cliloc, anim (VČETNĚ pixelů), data.items, data.gen_content,
+data.recipes, world.tiledata, world.map, render.sort, render.textures,
+render.chunk, render.anim** · **M2: world.doors, world.stairs, entity.stats,
+world.time, entity.skills, entity.mobile, world.walk, sim.movement,
+data.skills** · **integrace (bez granul): `app/player_controller.gd`,
+`app/world_view.gd` (kreslení postavy), `app/main.tscn` (uzly),
+`app/main.gd` (registrace systémů)**.
 
 Doklady, které jsem dnes viděl na vlastní oči (ne opsané z předání):
 
-- **Důkazní vrstva pro `render.sort` a `world.map` je v gitu a je prokázaná
-  mutacemi** — `tools/gates/mutace-tests.py`: **21 z 21** (10× `render/sort.gd`,
-  11× `sim/world/map.gd`), u každé mutace PROVEDENÁ + PROBĚHLÁ + CHYCENÁ,
-  navíc smlouva o vstupu (neexistující cesta test shodí).
-- **`world.map` měří i bez assetů** — fixture `tests/fixtures/world/`
-  (2×3 bloky) + nezávislý parser `.land`/`.statics.idx`/`.bin`; reálná data
-  Británie se měří **navíc**, když na disku jsou.
-- **G9 měří a je vidět, co měří** — 2 replaye, hash z běhu; citlivost na příkazy
-  je dnes **nulová** (měřeno) a je to napsané v replayi i v předání.
-- **Na obrazovce je mapa Britainu** — snímek z běhu (2117 barev, 891 383 px mimo
-  pozadí), G10 OK.
+- **Na snímku je mapa Britainu i postava** — `read_image` na
+  `.cache/render/chuze/frame00000130.png`.
+- **Postava se pohnula po skutečných klávesách** — log řidiče `demo-chuze.gd`:
+  6 pozic, směry 0/2/7/4, animace `4 ↔ 0`.
+- **Postava je z dat, ne kreslená**: výřez z `anim.mul` (tělo 400, 10 framů chůze),
+  0 pixelů mimo frame na 30 blocích.
+- **Testy 422/0**, **brány 11/0/0** (`exit 0`), **mutace 34/34 + 8/8 + 8/8**.
 - **Hra nespadne**: G11 `smoke` → `framu 120, script_error 0, parse_error 0`.
-- **Testy hry**: 276 kontrol / 0 selhání.
 
 ### ⚠ Co na obrazovce ještě NENÍ
 
-Postava, animace (pixely `anim*.mul` **nejsou dekódované**, `pixels_decoded: false`),
-pohyb, UI, světlo. Simulace pořád **nemá ani jednu systémovou jednotku**:
-`SYSTEM_ORDER` (`sim/sim_world.gd:34-37`) vypisuje 15 systémů, `systems` je
-prázdný slovník a v celém repu ho plní **jen `tests/cases/sim_world.gd:85-87`**.
-`move` skončí hláškou „Not available yet: move -> movement.request_step".
-**Hratelná mechanika: nula.**
+Souboj, magie, obchod, řemeslo, UI (žurnál, status bar, paperdoll), jména nad
+postavami, světlo (`render.light`), výbava na postavě (vrstvy), druhé postavy,
+mount, pathfinding, zvuk. **Hratelná mechanika: chůze a otáčení.** Postava je
+šedá (paleta z bloku je šedý ramp; kůže = hue, `render.hue` chybí).
 
-## Co brány dnes měří (2026-10-06 noc, plný přístup)
+## Co brány dnes měří (2026-10-06 noc, 2. session)
 
 `run-all.py`: **11 měřeno / 0 NEMĚŘENO / 0 VADA**, `exit 0`.
 
 | Brána | Výsledek | Je to vada kódu? |
 |---|---|---|
-| G1, G2, G3, G4, G5, G6, G7, G8, G9, G10, G11 | **OK** | NE |
+| G1–G11 | **OK** | NE |
+| G6 | OK — nově měří `anim_decoder_kod: 0`, `anim_decoder_kontrol: 35` | NE |
+| G10 | OK — `barev: 2148`, `pixelu_mimo_pozadi: 892553` (snímek S postavou) | NE |
 | G13 | PORADNÍ | NE — `vision.mjs` není (poradní je podle `docs/08 §8.2`) |
-
-**Pozor na srovnání s minulým předáním (10/1/0, `exit 2`):** tehdy chybělo G9
-(prázdné `tests/replays/`). Dnešní `exit 0` je **změna stavu**, ne jiné prostředí
-— a prostředí přitom sehrálo roli dvakrát: v sandboxu `workspace-write` vyšlo
-`7/2/2` a `run-all.py` spadl na `summary.json`, protože `.cache` nejde zapsat
-(otevřená věc 20 → dnes uzavřená jako past, viz `LESSONS`).
 
 ## Předletová kontrola (5 minut, než začneš psát)
 
-| Co | Jak | Očekáváno (2026-10-06 noc) |
+| Co | Jak | Očekáváno (2026-10-06 noc, 2. session) |
 |---|---|---|
-| Přečtené zadání | `ZADANI-DALSI-VYVOJ.md` | cesta k obrazovce + zapojení bez vlastníka |
 | Strom je čistý | `git status --porcelain -uall` | **prázdné** po commitu této session |
-| Je před GitHubem | `git rev-list --count origin/main..HEAD` | **`1`+** — tato session **nepushuje bez vyžádání** |
-| **Běží CI?** | `https://github.com/ssevcikm-spec/game-clone/actions` | **ANO** — běh **#11** (`9ac60cb`) `success`, 1 job, 11/11 kroků zelených; G6 a G10 v CI **NEMĚŘENO** (chybí `assets/uo`), 0 vad. Novější běh hlídej přes `node _analyza/ci-beh-stav.mjs` |
+| Je před GitHubem | `git rev-list --count origin/main..HEAD` | **`0`** — tato session **pushuje** (uživatel povolil) |
+| **Běží CI?** | `node _analyza/ci-beh-stav.mjs` | poslední běh nad `c3617e5` byl `success` (běh #11); novější commity uvidíš tam |
 | Repo je veřejné | API bez tokenu | `visibility: public` |
-| Testy | testy s `APPDATA` ve workspace | `276 kontrol, 0 selhání` |
+| Testy | testy s `APPDATA` ve workspace | `422 kontrol, 0 selhání` |
 | Brány | `python tools/gates/run-all.py` | `11/0/0`, `exit 0` |
 | Self-testy | `python tools/gates/run-all.py --self-test` | `19, 0 chyb`, `exit 0` |
-| Mutační důkaz | `python tools/gates/mutace-tests.py` | `21 z 21`, `exit 0` |
+| Mutační důkaz | `mutace-tests.py` + `mutace-anim.py` + `mutace-skills.py` + `mutace-render-anim.py` | `34/34`, `8/8`, `8/8`, `9/9` |
+| Animace | `python tools/uoextract/anim.py --self-test` | `35 kontrol, 0 chyb` |
+| Data skillů | `python tools/gates/gen-content.py --only skills --check` | `OK skills.json: shoda` |
 | Fixture sedí na generátor | `python tests/fixtures/world/make_fixture.py --check` | `4× OK`, `exit 0` |
-| **Snímek je z běhu** | `Get-Item .cache/render/snapshot.png \| % LastWriteTime` | **dnešní** (ne 2026-10-02) |
+| **Snímek je z běhu** | `Get-Item .cache/render/snapshot.png \| % LastWriteTime` | **dnešní** (je to frame z chůze) |
 | Godot běží | `& .cache\godot\...console.exe --headless --version` | `4.7.2.stable.official.ed1daf0bf` |
 | Instalace UO na místě | `Test-Path 'D:\Games\...\tiledata.mul'` | `True` |
 | Kontroly zadání | `check-docs-refs.py`, `check-zadani.py`, `roadmap-gen.py --check` | `exit 0` |
-| **Sandbox** | `whoami /groups \| Select-String Mandatory` | **`Medium`** = plný přístup. `Low` znamená, že G7/G11 hlásí falešnou vadu a `run-all.py` spadne na `summary.json` |
+| **Sandbox** | `whoami /groups \| Select-String Mandatory` | **`Medium`** = plný přístup |
 
 ## Otevřené věci a co je potřeba dodělat
 
 **Přenáším z minulého předání (nic se nemaže) — u každé je dnešní stav:**
 
-1. **`render.sort` a `world.map` neměly test v `tests/cases/`** — **VYŘEŠENO
-   2026-10-06** (nové `tests/cases/render_sort.gd`, `tests/cases/world_map.gd`;
-   `tests/` se tím výjimečně rozšířilo o nové soubory, **existující testy se
-   nezměnily**, rozhodl uživatel). Bez testu zůstávají `world/tiledata.gd`,
-   `app/main.gd`, `app/main.tscn`, `render/texture_cache.gd`,
-   `render/chunk_renderer.gd` → **5 souborů** (dřív 8).
-2. **`size_lines` nesedí** — **PLATÍ DÁL:** `world.map` **210**/120,
-   `render/texture_cache.gd` 141/60, `render/chunk_renderer.gd` 110/150,
-   `app/world_view.gd` (bez deklarace). `sim/world/map.gd` dnes navíc **+11
-   řádků** (volitelné cesty). **Rozhodnutí pro uživatele:** uvolnit deklarace,
-   nebo dělit granule.
+1. **Soubory bez testu** — **PLATÍ DÁL, ale je jich méně**: test má nově
+   `world/walk.gd`, `systems/movement.gd`, `entity/skills.gd`, `entity/mobile.gd`,
+   `render/anim_player.gd`, `app/player_controller.gd`. **Bez testu zůstávají**
+   `world/tiledata.gd`, `app/main.gd`, `app/main.tscn`, `render/texture_cache.gd`,
+   `render/chunk_renderer.gd`, `app/world_view.gd`, `app/loop.gd`.
+2. **`size_lines` nesedí** — **PLATÍ DÁL a přibylo to**: `world/walk.gd` **~135**/120,
+   `sim/systems/movement.gd` **~150**/120, `entity/skills.gd` **~100**/60,
+   `entity/mobile.gd` **~75**/60, `render/anim_player.gd` **121**/120,
+   `world.map` **210**/120, `texture_cache.gd` 141/60, `chunk_renderer.gd` 110/150,
+   `app/world_view.gd` (bez deklarace) a `data/skills.json` **640**/60 (JSON!).
+   **Rozhodnutí pro uživatele:** uvolnit deklarace, nebo dělit granule.
 3. **Tvar objektu pro `render.sort` patří do `docs/04 §4.2`** — **PLATÍ DÁL**;
    navíc tvar prvku `render.chunk` a rozšíření `world.map.statics_at` o `x`,`y`.
 4. ~~G10 měří snímek z bootstrapu~~ — **VYŘEŠENO 2026-10-06.**
-5. **13 generátorů v `POZADOVANÉ` chybí** — **PLATÍ DÁL.**
-6. **Pixely animací** — **PLATÍ DÁL a je to blokátor** (`pixels_decoded: false`).
+5. **13 generátorů v `POZADOVANÉ` chybí** — **PLATÍ DÁL** (jeden ubyl: `skills` je hotový).
+6. ~~Pixely animací~~ — **VYŘEŠENO 2026-10-06** (dekodér + export + snímek).
 7. **`assets.uop` (2 rozpory) a `assets.verify`/`assets.extract_cli`** — **PLATÍ DÁL.**
 8. **Zastaralé poznámky v `tools/uoextract/worldmap.py`** — **PLATÍ DÁL.**
 9. ~~`atlas.py`: vada rozložení~~ — **VYŘEŠENO 2026-10-06.**
 10. **`docs/11 §11.6` vs `docs/03 §3.5.1`** — **PLATÍ DÁL** (vnitřní rozpor).
 11. **Počet granul v dokumentech: 101 / 100 / 75–90** — **PLATÍ DÁL.**
 12. **Světlo „den 12" vs `DayLevel = 0`** — **PLATÍ DÁL.**
-13. **Rešerše hlásily dvě „vady", které neobstály** — **PLATÍ DÁL** jako varování.
-14. **CI neproběhlo ani jednou s nenulovým počtem jobů** — **VYŘEŠENO
-    2026-10-06**: běh **#10** měl 1 job (tím se potvrdila příčina v YAML) a běh
-    **#11** je celý `success`. Příčiny byly **dvě**: neplatný YAML na řádku 56
-    a chybějící `GODOT` u kroku `ci-godot.sh`.
-15. **`statics_at` vrací nadmnožinu** — **PLATÍ DÁL** (vada ZADÁNÍ, `docs/` agent nemění).
+13. **Rešerše hlásily dvě „vady", které neobstály** — **PLATÍ DÁL** jako varování;
+    **dnes k tomu přibyl třetí případ**: rešerše `anim-mereni.md` tvrdila, že
+    pixely těl **nelze** dekódovat — šlo dekódovat (viz výš). Poučení je v `LESSONS`.
+14. ~~CI neproběhlo ani jednou s nenulovým počtem jobů~~ — **VYŘEŠENO** (běh #10, #11).
+15. **`statics_at` vrací nadmnožinu** — **PLATÍ DÁL**; `world.walk` si proto
+    filtruje statiky sám (a má na to test i mutaci).
 16. **`check-wiring` nevidí volání UVNITŘ granule** — **PLATÍ DÁL** (vada brány).
-17. **`app/world_view.gd` a uzly v `app/main.tscn` nemají vlastníka** — **PLATÍ DÁL.**
-18. **`app/input_map.gd` se volá bez vazeb** (`ui.hotkeys` nemá soubor) — **PLATÍ DÁL.**
-19. **Výkonnostní dluh: `AtlasTexture` na objekt** (`UNVERIFIED`, žádné tvrzení o FPS) — **PLATÍ DÁL.**
-20. **⚠ AŽ CI OŽIJE, BUDE ČERVENÉ — a nebude to vada kódu** — **VYŘEŠENO
-    2026-10-06 (rozhodnutí uživatele = varianta (a)):** G6 v klonu bez assetů
-    hlásí NEMĚŘENO (uměla to už dřív), **G10 to nově také umí**
-    (`check-render.py`: `ASSET_INPUTS`, `missing_assets`, self-test `bez_assetu`),
-    a **krok CI s bránami toleruje `exit 2`** (NEMĚŘENO) s warningem, protože
-    `docs/08 §8.2` to tak od začátku myslí — „proto CI nepadá na 2". Vada
-    (`exit 1`) shodí krok vždy. **Zbývá ověřit živým během.**
-21. **NOVÉ: `tests/run_tests.gd` tiše přeskočí case soubor s parse errory.**
-    Naměřeno: `render_sort.gd` s chybou inference → `258 kontrol, 0 selhání,
-    exit 0` a **žádný FAIL**; `load()` vrátí GDScript, `script.new()` vyhodí
-    `Invalid call` a `_init_case()` se **přeruší dřív, než zavolá `_pending()`**.
-    Oprava (vlastník `boot.tests`): `if not script.can_instantiate(): _pending(...)`.
-    Do té doby je „0 selhání" slabé — proto ho váže na mutační harness.
-22. **NOVÉ: replay neměří příkazy** (měřeno: jiné příkazy = stejný hash).
-    Až se do `SimWorld` zaregistrují systémy (`sim.movement`…), replaye **přeměřit**
-    a hash aktualizovat — jinak zůstane G9 zelená nad časem, ne nad mechanikami.
-23. **NOVÉ: `sim/world/map.gd` má volitelné cesty** (`_init(prefix)`), aby šel
-    testovat bez `assets/uo`. Výchozí hodnota je tatáž cesta jako dřív, takže
-    chování hry se nemění; patří to do smlouvy (`docs/04 §4.2`) jako `world.map`.
-24. **NOVÉ: `.gitignore` má výjimku `!tests/fixtures/world/*.idx`** — bez ní by
-    fixture indexu chyběla v CI (`*.idx` je ignorováno case-insensitive).
-    Kdo přidá další fixture s jinou příponou, narazí na totéž.
-25. **NOVÉ: `run-all.py` u G3 nevypíše, co naměřila.** Když G3 selže, je v logu
-    jen `G3 VADA vada` (souhrn) — bez čísel a bez důvodu, protože
-    `run_tests_gate()` nikdy nezavolá `gate.finish()`. Naměřeno dvakrát dnes
-    (sandbox s Low integritou; zapomenutý `$GODOT` → exit 127) a **pokaždé to
-    vypadalo jako vada testů**. Oprava patří vlastníkovi (`boot.gates`).
-26. **NOVÉ: když krok CI spadne, navazující kroky se PŘESKOČÍ.** V běhu #10
-    stačilo selhání kroku 7 a kroky 8 (brány) i 9 (mutační důkaz) se vůbec
-    nespustily — takže z logu nešlo poznat, co by brány řekly. Řešení je
-    `if: always()` u diagnostických kroků (nebo je přesunout před křehký krok);
-    rozhodnout, zda to chceme (cena: běh navíc).
+17. **`app/world_view.gd` a uzly v `app/main.tscn` nemají vlastníka** — **PLATÍ
+    DÁL**; dnes k nim přibyl **`app/player_controller.gd`** (taky bez vlastníka).
+18. **`app/input_map.gd` se volá bez vazeb** (`ui.hotkeys` nemá soubor) —
+    **ČÁSTEČNĚ VYŘEŠENO**: vazby i `InputMap` akce zakládá
+    `app/player_controller.gd` (12 vazeb za běhu). **Patří to ale do `ui.hotkeys`**
+    — až vznikne, vazby se odsud přesunou.
+19. **Výkonnostní dluh: `AtlasTexture` na objekt** (`UNVERIFIED`) — **PLATÍ DÁL.**
+    Nové číslo: ve snímku s postavou se kreslí **5 771 objektů**.
+20. ~~Až CI ožije, bude červené kvůli chybějícím assetům~~ — **VYŘEŠENO.**
+21. **`tests/run_tests.gd` tiše přeskočí case soubor s parse errory** — **PLATÍ
+    DÁL** (věc 21 z minula; oprava `script.can_instantiate()`).
+22. **Replay neměří příkazy** (jiné příkazy = stejný hash) — **PLATÍ DÁL**:
+    `sim.movement` je zaregistrovaný **jen v `app/main.gd`**, takže replay přes
+    `sim_probe.gd` (bez scény) ho nemá a pohyb v replayi nic nezmění. **Až se
+    systém registruje v `SimWorld`, replaye přeměřit a hash aktualizovat.**
+23. **`sim/world/map.gd` má volitelné cesty** — **PLATÍ DÁL**; stejný princip
+    dnes dostal `world/walk.gd` (mapa/tiledata/stairs konstruktorem).
+24. **`.gitignore` má výjimku `!tests/fixtures/world/*.idx`** — **PLATÍ DÁL.**
+25. **`run-all.py` u G3 nevypíše, co naměřila** — **PLATÍ DÁL**.
+26. **Když krok CI spadne, navazující kroky se PŘESKOČÍ** — **PLATÍ DÁL**
+    (řešení `if: always()`; rozhodnout, zda to chceme).
+27. **NOVÉ: držení klávesy neopakuje krok.** `app/input_map.gd` čte jen
+    `is_action_just_pressed`, takže chůze je „jedno zmáčknutí = jeden krok".
+    Držení (jak to dělá UO) patří do `app.input` — **granule `app.input`, agent ji
+    needituje bez rozhodnutí uživatele**.
+28. **NOVÉ: `render.anim` neumí vrstvy výbavy.** Prompt granule žádá „skládej
+    vrstvy výbavy podle layerů" — bez `entity.equipment` a `render.hue` to nejde;
+    dnes se kreslí jen tělo.
+29. **NOVÉ: `play(serial, ...)` bere `serial` jako ČÍSLO TĚLA.** Registr bytostí
+    (`serial -> body`) v projektu není (`sim_world.snapshot()` vrací
+    `mobiles: []`), takže `render.anim` nemá odkud tělo vzít. Je to díra ve
+    smlouvě (`docs/04 §4.2` tvar `play` neuvádí) — patří do docs.
+30. **NOVÉ: `sim.movement` si mobily drží sám** (`register`). Smlouva říká
+    `request_step(m:int, ...)`, ale neříká, kde systém mobily vezme; žádný
+    registr mobilů v projektu není. Patří do `docs/04 §4.2` (a do `sim.world_loop`).
+31. **NOVÉ: `Door` a `Container` v průchodnosti.** `world.walk` blokuje
+    `Impassable`/`Wet`/`Container` na statikách, ale **otevřené/zavřené dveře
+    neřeší** (`Door` flag se ignoruje) a **výška schodů se nepočítá** — schody
+    fungují jako `Surface`. Patří do `world.walk` (další session).
+32. **NOVÉ: řidič dema je v `.cache/` (gitignore).**
+    Důkaz chůze (`demo-chuze.gd`) se v čistém klonu nespustí. Kdyby měl být
+    reprodukovatelný z gitu, patří do `tools/gates/` (rozhodnutí uživatele).
+33. **NOVÉ: `render.anim` nemá LRU/strop pameti.** Stránku spritu drží jednou na
+    soubor (frame je `AtlasTexture`; změřeno 1,27 MB vs 12,2 MB při kopii na
+    frame), ale `render.textures` strop má a tohle ne. Kandidát na později.
+34. **NOVÉ: PNG z `res://assets/uo/anim/` se načítá `Image.load()`** → Godot
+    hlásí `WARNING: Loaded resource as image file, this will not work on export`.
+    Stejný vzor jako `render/texture_cache.gd`; **pro export build to bude
+    potřeba vyřešit** (importovat PNG jako resource). Netýká se běhu ze zdrojů.
 
 ## Už není otevřené (přesunuto, nemaže se)
 
 - **„Na obrazovce není nic"** — vyřešeno 2026-10-06 (snímek z běhu, G10 zelená).
+- **„Na obrazovce není postava"** — **vyřešeno 2026-10-06 (2. session)**: postava
+  je na snímku a chodí (důkaz: řidič + log pozic).
+- **„Pixely animací nejdou dekódovat"** (blokátor z 2026-10-03) — **vyřešeno**:
+  znamenkové 10bitové `x`/`y`, paleta v prvních 512 B bloku, 1 bajt na pixel.
+- **„`systems` v SimWorld je prázdné"** — vyřešeno pro `movement` (registruje
+  `app/main.gd`); ostatní systémy (combat, craft…) pořád chybí.
+- **„`input_map.poll()` se nikdy nezavolá"** — **NEBYLA to pravda** (vada ZADÁNÍ):
+  `loop.input_map` je reference a `poll()` se volá z `app/loop.gd:32`; `input_map`
+  je `RefCounted`, takže do stromu přidat nelze. Skutečná příčina mrtvých kláves
+  byla **prázdné `bindings` a žádné akce v `InputMap`**.
 - **„`render.sort` nemá volajícího z produkce"** — vyřešeno (`draw_order`).
-- **„G10 měří 4 dny starý artefakt"** — vyřešeno.
-- **„Repo je privátní"** — vyřešeno 2026-10-06.
-- **„12 commitů není před GitHubem"** — vyřešeno.
-- **„`tools/uoextract/atlas.py` není v gitu"** — vyřešeno (`7a4f3e7`).
-- **„`assets.atlas` není hotový"** — vyřešeno.
-- **Podezření, že brány jsou zelené nad vadou** — **prověřeno i dnes**: každá
-  nová kontrola je doložená mutací (21/21), ne dojmem.
+- **„G10 měří 4 dny starý artefakt"** — vyřešeno (snímek je z dnešní chůze).
+- **„Repo je privátní"**, **„12 commitů není před GitHubem"** — vyřešeno.
+- **„`tools/uoextract/atlas.py` není v gitu"**, **„`assets.atlas` není hotový"** — vyřešeno.
+- **Podezření, že brány jsou zelené nad vadou** — prověřeno i dnes: každá nová
+  kontrola má mutaci (34/34 + 8/8 + 8/8), **a jedna brána se opravdu chytila**
+  (G6 tvrdila zestárlé „dekodér není" — opraveno na měření).
 - **Podezření, že v repu jsou tajemství** — prověřeno 2026-10-06.
-- **„`render.sort`/`world.map` měří jen gitignore sonda"** — vyřešeno 2026-10-06.
-- **„Replaye nemá co měřit"** (G9 NEMĚŘENO) — vyřešeno 2026-10-06 (2 replaye).
-- **„CI neběží — 9 běhů s 0 jobů"** — **vyřešeno 2026-10-06**: běh #11 je
-  `success`. Příčiny byly **dvě** a obě se daly najít jen z UI/logu: neplatný
-  YAML na řádku 56 (`2898a8d`) a chybějící `GODOT` u kroku `ci-godot.sh`
-  (`9ac60cb`).
-- **„Až CI ožije, bude červené kvůli chybějícím assetům"** — vyřešeno: G6 i G10
-  hlásí NEMĚŘENO s důvodem a krok s bránami toleruje `exit 2` (artefakt běhu #11:
-  `{"ok": 9, "pending": 2, "failed": 0}`).
+- **„Replaye nemá co měřit"** — vyřešeno (2 replaye), ale viz otevřená věc 22.
+- **„CI neběží — 9 běhů s 0 jobů"** — vyřešeno (běh #11 `success`).
+- **„Až CI ožije, bude červené kvůli chybějícím assetům"** — vyřešeno (G6 i G10
+  hlásí NEMĚŘENO, krok s branami toleruje `exit 2`).
 
 ## Další kroky (v tomto pořadí)
 
-1. **Opravit slepé místo v `tests/run_tests.gd`** — `script.can_instantiate()`
-   před `script.new()` (věc 21). Dnes je to **jediná známá slepá brána**:
-   case soubor s parse errory se přeskočí a sada hlásí „0 selhání".
-2. **Zapsat `tests/cases/` pro `render/texture_cache.gd` a
-   `render/chunk_renderer.gd`** — dnes je měří jen gitignore sonda; postup je
-   hotový (fixture v gitu + `tools/gates/mutace-tests.py`).
-3. **`app/player_controller.gd` / pohyb kamery** — `world_view.gd` kameru jen
-   nastaví; klávesy nejsou namapované (věc 18).
-4. **Pixely animací** (`anim*.mul`, RLE) — blokátor „postava se pohne".
-5. Pak M2: `data.skills` → `entity.skills` → `entity.mobile` → `world.walk` →
-   `sim.movement`; a **zaregistrovat systémy do `SimWorld`** (věci 2 a 22).
-6. (nepovinné) `if: always()` u diagnostických kroků CI — ať selhání jednoho
-   kroku neschová výsledek ostatních (věc 26).
+1. **Pushnout a zkontrolovat CI** na nových commitech (tato session pushuje).
+2. **Opravit slepé místo v `tests/run_tests.gd`** (`script.can_instantiate()`
+   před `script.new()`) — pořád jediná známá slepá brána (věc 21).
+3. **`render.hue`** (`render/hue_cache.gd`, `hues.mul`): bez něj je postava šedá
+   a nejde obléknout. Je to i vstup pro vrstvy výbavy (věc 28).
+4. **Držení klávesy = chůze** (`app.input`, věc 27) — bez toho se demo ovládá
+   „klikatě".
+5. **Dveře a schody v `world.walk`** (věc 31) + `world.doors` napojit.
+6. Pak M2 zbytek: `entity.item`, `entity.container`, `entity.equipment`,
+   `entity.notoriety`, `world.teleport`, `world.regions`; a **zaregistrovat
+   systémy v `SimWorld`** (věci 22 a 30) — tím se replaye rozhýbou.
+7. (nepovinné) `if: always()` u diagnostických kroků CI (věc 26) a doplnit tři
+   mutační harnessy do `ci.yml`.
 
 ## Jak to dělat (co se osvědčilo)
 
@@ -295,48 +336,63 @@ prázdný slovník a v celém repu ho plní **jen `tests/cases/sim_world.gd:85-8
   věci: že se mutace provedla, že test **proběhl** (`N kontrol`, N > 0), že
   selhal **na kontrole daného modulu**, a že test **bere měřenou cestu
   z argumentů** (zkus mu předat neexistující cestu — musí selhat).
-- **Druhá implementace téhož formátu je jediná obrana** — nezávislý parser
-  `.land`/`.statics.bin` našel vadu `z` za minutu a dnes je **v gitu**
-  (`tests/cases/world_map.gd`).
+- **Vizuální změna se ověřuje pohledem** (`read_image`), ne jen testy: dnes to
+  ukázalo (a) že postava je na mapě, (b) že stojí 40 px nad středem (kamera
+  ignorovala `z`).
+- **Druhá implementace téhož formátu je jediná obrana** — dnes to byl
+  **referenční klient** (`_src/classicuo/.../AnimationsLoader.cs`): tři věty
+  z něj rozluštily formát, na kterém rešerše tvrdila, že rozluštit nejde.
 - **Data, která v CI nejsou, testuj na fixture v gitu** — a reálná data měř
   navíc, když jsou; když nejsou, řekni to nahlas (NEMĚŘENO), ale neselhávej.
 - **Hotový soubor bez volajícího je mrtvý kód** — ptej se „kdo to volá".
 - **Než začneš psát, ověř, že všechny vstupy granule mají PRODUCENTA.**
 - **Když implementace odhalí díru ve smlouvě, napiš ji do hlavičky souboru**
-  (`sim_world.gd`, `time.gd`, `map.gd`) a zaznamenej jako otevřenou věc.
+  (`movement.gd`, `anim_player.gd`, `walk.gd`) a zaznamenej jako otevřenou věc.
 
 ## Pasti, které už někoho stáhly čas (naměřené)
 
 1. **`==` na `Array` v GDScriptu porovnává OBSAHEM** — na identitu `is_same()`.
-2. **V mutačním harnessu musí test brát všechny měřené cesty z argumentů** —
-   jinak se mutant do kontroly vůbec nedostane. Dnes to hlídá „smlouva o vstupu".
-3. **Test stropu musí pracovní sadu PŘEKROČIT** (10 000 požadavků na jedné stránce).
+2. **V mutačním harnessu musí test brát všechny měřené cesty z argumentů.**
+3. **Test stropu musí pracovní sadu PŘEKROČIT.**
 4. **`"MERENO:"` je podřetězec `"NEMERENO:"`** — parsuj i s hranatou závorkou.
 5. **`provides` bez `(` není „volatelné jméno"** (`check-wiring`).
 6. **Sandbox `workspace-write` (Low integrita) blokuje zápis do `.cache`** →
-   G7 hlásí falešnou vadu, G11 NEMĚŘENO a `run-all.py` padá na `summary.json`.
+   G7 hlásí falešnou vadu a `run-all.py` padá na `summary.json`.
    **Tato práce potřebuje plný přístup** (`whoami /groups` → `Medium`).
-7. **`map0.land` má na každém bloku 4B hlavičku** — čti od `key * 196 + 4`.
-8. **Statika je 7 B `[u16 tile][u8 x][u8 y][i8 z][u16 hue]`** — `z` na offsetu 4.
-9. **Godot s nerozjetým skriptem visí** — vždy `--quit-after N`.
-10. **`.uid` vzniká jen při `--import`** a **patří do gitu** (nové soubory dnes).
-11. **`JSON.parse_string` vrací všechna čísla jako `float`** — vždy `int()`.
-12. **`.gitignore` je na Windows case-insensitive** — kontroluj `git ls-files`
-    (dnes: `*.idx` pohltilo fixture, proto výjimka).
-13. **`Measure-Object -Line` nepočítá prázdné řádky** — měř Pythonem.
-14. **Brána, která nic nezměří, není zelená** (`exit 2` = NEMĚŘENO).
-15. **Heredoc v PowerShellu neexistuje** — piš skript do souboru.
-16. **Snímek pro G10 vzniká jen s `--rendering-driver opengl3`.**
-17. **`Get-Content \| -replace \| Set-Content` zničí `.py`** — spojí řádky do
-    jednoho a přidá BOM (dnes skutečně stalo); edituj tool `edit`/`write`
-    a ověř první tři bajty (`EF BB BF` = BOM).
-    **A druhá polovina téhož:** Python `write_text()` na Windows vyrobí **CRLF**,
-    kde git (`.gitattributes: * text=auto eol=lf`) uloží **LF** — naměřeno dnes:
-    `tests/replays/tic_200.json` měl na disku **565 B**, v blobu **543 B**
-    (`.cache`-style past „necommitnutá změna, která neexistuje“). Autorita je
-    **blob**: `python _analyza/blob-vs-disk.py` (8 z 10 shod, pak opraveno na 10/10).
-18. **`script.new()` na souboru s parse errory přeruší volající funkci** —
-    ne `assert`, ale tichý skip (věc 21).
+7. **`map0.land` má na každém bloku 4B hlavičku**, statika je 7 B se `z` na
+   offsetu 4.
+8. **Godot s nerozjetým skriptem visí** — vždy `--quit-after N`.
+9. **`.uid` vzniká jen při importu** a **patří do gitu** (dnes 13 nových).
+10. **`JSON.parse_string` vrací všechna čísla jako `float`** — vždy `int()`.
+11. **`.gitignore` je na Windows case-insensitive** — kontroluj `git ls-files`.
+12. **`Measure-Object -Line` nepočítá prázdné řádky** — měř Pythonem.
+13. **Brána, která nic nezměří, není zelená** (`exit 2` = NEMĚŘENO).
+14. **Heredoc v PowerShellu neexistuje** — piš skript do souboru.
+15. **Snímek pro G10 vzniká jen s `--rendering-driver opengl3`.**
+16. **`Get-Content | -replace | Set-Content` zničí `.py`** — edituj tool
+    `edit`/`write` a ověř první tři bajty (`EF BB BF` = BOM).
+17. **`script.new()` na souboru s parse errory přeruší volající funkci** (věc 21).
+18. **NOVÉ: RLE hlavička v `anim.mul` má ZNAMENKOVÉ 10bitové `x`/`y`.** Kdo je
+    čte bez znaménka, dostane `1020..1023` („mimo rozměr") a **vypadá to jako
+    nerozluštěný formát** — přitom je to `-4..-1`. Pozná se to tak, že **každá
+    hlavička končí bajtem `0xFF`** (horní bity záporného čísla).
+19. **NOVÉ: `--write-movie` potřebuje DOPŘEDNÁ lomítka a existující složku.**
+    S `.\cache\render\run\frame.png` vznikne jen `frame.wav` a v logu je
+    `Condition "f_wav.is_null()" is true` — vypadá to jako rozbitý záznam
+    obrazu, přitom jde o cestu. S `.cache/render/run/frame.png` to jde.
+20. **NOVÉ: kamera musí dostat `z`.** `iso.to_screen` odečítá `z * Z_SCALE`;
+    kamera na `z = 0` postaví postavu na `z = 10` o **40 px** nad střed.
+21. **NOVÉ: mutační harness, který importuje mutanta z `.cache`, musí do
+    `sys.path` přidat `tools/uoextract`** — jinak `ModuleNotFoundError` a
+    **vypadá to jako chycená mutace** (přesně ten falešný důkaz, který měl starý
+    `mutace-atlas.py`). Harness to musí hlásit jako chybu harnessu.
+22. **NOVÉ: mutace, která se tiše neprovede, tvrdí totéž co ta, která projde.**
+    Dnešní `mutace-anim.py` našel **dvě slepá místa** (maska běhu 12 bitů, paleta
+    z offsetu 0) — proto přibyly kontroly s během 300 pixelů.
+23. **NOVÉ: brána může nést ZESTÁRLÉ TVRZENÍ jako kód** (`check-assets.py`
+    zakazovala `pixels_decoded: true`). Když se měření změní, brána nesmí
+    „tvrdit opak" — musí **měřit, že to platí** (dnes: recept v manifestu +
+    self-test dekodéru). A nová kontrola musí mít známý správný i chybný případ.
 
 ## Vady ZADÁNÍ, které je potřeba opravit (agent je needituje)
 
@@ -346,31 +402,58 @@ prázdný slovník a v celém repu ho plní **jen `tests/cases/sim_world.gd:85-8
    `assets/uo/manifest.json`; správně `assets/uo/tiles.json` a `data/items.json`.
 4. **`docs/04 §4.2` u `world.map`** nerozlišuje `tiledata id` a `art id` u statiků.
 5. **`docs/04 §4.2` u `render.sort` neuvádí tvar objektu** (a nově ani
-   u `render.chunk`, `render.textures`); **nově chybí i `world.map` s volitelnými
-   cestami** (`_init(prefix)`) a tvar `tests/fixtures/world/` — věc 23.
-6. **`docs/06 §6.2`** uvádí 6 nástrojů, které v instalaci NEJSOU.
-7. **`.forge/roadmap.json` — `size_lines` nesedí** (věc 2).
-8. **`app/main.tscn` + kamera + kreslicí uzel nemají vlastníka** v roadmapě.
-9. **V roadmapě chybí vlastník pro pathfinding.**
-10. **Soubor pro zvuk/hudbu nemá žádná granule** (0× `AudioStream`).
-11. **`docs/07 §7.3` (vlny) pokrývá 62 granul z 101.**
-12. **`ZADANI-DALSI-VYVOJ` §7 zakazuje měnit `tests/`, ale acceptance
-    `render.textures`/`render.chunk` žádá `tests`** — uživatel 2026-10-06 povolil
-    **nové** soubory v `tests/cases/`; rozpor v textu zadání tím ale nezmizel.
-13. **NOVÉ: `docs/09 §9.6` (mutační test) neuvádí čtvrtou podmínku** — že test
-    bere měřenou cestu z argumentů. Bez ní mutace „projdou" (naměřeno dřív).
+   u `render.chunk`, `render.textures`, **`render.anim`**); chybí i `world.map`
+   s volitelnými cestami a tvar `tests/fixtures/world/`.
+6. **`docs/04 §4.2` u `render.anim` neuvádí TVAR NÁVRATU `play(...)`** a neříká,
+   **odkud se pro `serial` bere číslo těla** (věc 29). Dnešní implementace vrací
+   `{ok, texture, frame, count, anchor, mirror, mirror_x, sprite_dir}`.
+7. **`docs/04 §4.2` u `sim.movement` neříká, kde systém vezme mobily** (věc 30).
+8. **`docs/04 §4.5` vs `§4.2` u mobila si odporují**: §4.5 má
+   `skills: PackedInt32Array`, tabulka `skills: Skills`; §4.5 `equip: Dictionary`,
+   tabulka `equipment: Equipment`; §4.5 má `name`/`hunger`/`ai`, tabulka ne;
+   §4.5 má `str/dex/int`, tabulka `stats`.
+9. **`docs/06 §6.2`** uvádí 6 nástrojů, které v instalaci NEJSOU.
+10. **`.forge/roadmap.json` — `size_lines` nesedí** (věc 2), a **`data.skills`
+    má `<= 60`**, přitom generovaný JSON má **640 řádků**.
+11. **`app/main.tscn` + kamera + kreslicí uzel + `app/player_controller.gd`
+    nemají vlastníka** v roadmapě.
+12. **V roadmapě chybí vlastník pro pathfinding.**
+13. **Soubor pro zvuk/hudbu nemá žádná granule** (0× `AudioStream`).
+14. **`docs/07 §7.3` (vlny) pokrývá 62 granul z 101.**
+15. **`ZADANI-DALSI-VYVOJ` §7 zakazuje měnit `tests/`**, ale acceptance
+    `render.textures`/`render.chunk`/`render.anim`/`data.skills` žádá `tests`;
+    uživatel 2026-10-06 povolil **nové** soubory v `tests/cases/`.
+16. **`docs/09 §9.6` (mutační test) neuvádí čtvrtou podmínku** — že test bere
+    měřenou cestu z argumentů.
+17. **NOVÉ: `ZADANI-DALSI-VYVOJ` §3 úkol 5 tvrdí, že se `input_map.poll()`
+    „nikdy nezavolá"** — není to pravda (viz „Už není otevřené") a `input_map`
+    ani nejde přidat do stromu (`RefCounted`). Skutečná vada byla jinde.
+18. **NOVÉ: `docs/05 §5.16` uvádí `implemented: false` u DEVÍTI skillů,
+    zadání granule `data.skills` u SEDMI** (chybí Chivalry a Focus).
+    Data sledují `docs/05` (9) a test ověřuje obojí.
+19. **NOVÉ: pořadí skillů 55–57 se rozchází** — `skills.mul` této instalace má
+    55 Throwing / 56 Imbuing / 57 Mysticism, `research/02` §3.9+§7.3 a ClassicUO
+    mají 55 Mysticism / 57 Throwing. Staty se v datech berou **podle jména**.
+20. **NOVÉ: `docs/03 §3.9.3` tvrdí, že skupina skillů „id 6" je bez jména** —
+    bez jména je skupina **0** (7 skillů), id 6 = „Bard" (ověřeno proti
+    `skillgrp.mul` i ClassicUO `SkillsGroupManager`).
+21. **NOVÉ: `docs/03 §3.5.1` (a `research/anim-mereni.md`) tvrdí, že pixely
+    `anim.mul` nelze dekódovat** — jde to (recept v `tools/uoextract/anim.py`).
+22. **NOVÉ: `docs/04 §4.2` u `render.anim` žádá „skládej vrstvy výbavy podle
+    layerů"**, ale `entity.equipment`/`render.hue` v plánu etapy nejsou.
 
 ## Prostředí a konvence
 
 - Kód česky v komentářích, identifikátory anglicky (`docs/02 §2.6.8`).
 - **Nečeské znaky nepatří do identifikátorů** — GDScript je neumí.
-- Piš **jen do `owns`** své granule; `tests/`, `project.godot`, `.forge/`,
-  `docs/`, `assets/uo/` needituju — **výjimka 2026-10-06: nové soubory
-  v `tests/cases/`, `tests/replays/`, `tests/fixtures/` a `tools/gates/`
-  (rozhodl uživatel)**.
+- Piš **jen do `owns`** své granule; **výjimka 2026-10-06 (rozhodl uživatel)**:
+  nové soubory v `tests/cases/`, `tests/replays/`, `tests/fixtures/`
+  a `tools/gates/`; **a integrace podle `ZADANI-DALSI-VYVOJ §3 úkol 5**
+  (`app/main.gd`, `app/main.tscn`, `app/world_view.gd`, `app/player_controller.gd`).
+  Gate `check-assets.py` a `mutace-tests.py` jsem dnes upravil proto, že **měření
+  se změnilo** (G6 nesla zestárlé tvrzení) — v předání je to napsané.
 - `python tools/check-docs-refs.py`, `check-zadani.py`, `roadmap-gen.py --check`
   musí procházet.
 - `run-all.py`: 0 = vše měřeno, 1 = vada, **2 = něco NEMĚŘENO** (to není zelená).
-- Testy potřebují `APPDATA` ve workspace; **brány si to nastavují samy**
-  (`tools/gates/gate_common.py:219`).
-- **Nepushovat bez vyžádání.** Tato session commitne, ale **nepushuje**.
+- Testy potřebují `APPDATA` ve workspace; **brány si to nastavují samy**.
+- **Push je povolený** (uživatel 2026-10-06: „máš povoleny commity i pushe").

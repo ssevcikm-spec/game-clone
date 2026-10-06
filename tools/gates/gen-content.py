@@ -17,7 +17,13 @@ Spouštění:
     python tools/gates/gen-content.py            # vygeneruje (přepíše) data/*.json
     python tools/gates/gen-content.py --check    # jen ověří shodu, nic nezapisuje
     python tools/gates/gen-content.py --only items
+    python tools/gates/gen-content.py --only skills --check
 Navazující (a nejdřív) krok: `python tools/uoextract/tiledata.py --extract assets/uo`
+(u `--only skills` staci `data/skill_groups.json` z `tools/uoextract/textdata.py`).
+
+Co je hotové a co ne, se NEPÍŠE RUČNĚ: `POZADAVKY` níž má u každého cíle
+`True`/`False` a cíl s `False` jde do `content-report.json` jako
+"generator jeste neni napsany" - nikdy ticha zelena.
 """
 
 from __future__ import annotations
@@ -50,7 +56,8 @@ POZADAVKY: dict[str, tuple[bool, str]] = {
     "moongates.json": (False, "research/06"),
     "dungeons.json": (False, "research/06"),
     "professions.json": (False, "Prof.txt + research/profese.json"),
-    "skills.json": (False, "skills.mul + research/02"),
+    "skills.json": (True, "data/skill_groups.json (skills.mul + skillgrp.mul, "
+                          "extract textdata.py) + research/02-skills.md §3.9"),
     "balance.json": (False, "rozhodnuti (docs/05)"),
 }
 
@@ -336,9 +343,174 @@ def gen_recipes(root: Path) -> tuple[bytes, list[dict]]:
 
 
 # =============================================================================
+# skills.json - 58 skillu (granule data.skills)
+# =============================================================================
+# ZDROJ 1 (jmena, poradi, skupiny): `data/skill_groups.json` = vystup nastroje
+#   `tools/uoextract/textdata.py` z `skills.mul` (58 jmen v poradi klienta,
+#   docs/11 §11.1) a `skillgrp.mul` (skupina pro kazdy skill). Generator cte
+#   EXTRAKT, ne instalaci UO - stejne jako items.json cte `assets/uo/tiles.json`;
+#   instalace v CI neni a `--check` musi projit i bez ni (docs/03 §3.7).
+# ZDROJ 2 (staty): `research/02-skills.md` §3.9 - tabulka `SkillInfo.Table`
+#   (ServUO pub57, docs/11 §11.3). Je to druhy, nezavisly zdroj.
+#
+# POZOR - PORADI 55-57 SE ROZCHAZI (overeno 2026-10-06 primym ctenim
+# `skills.mul`: 704 B, model spotrebuje cely soubor): klient ma
+# 55 Throwing / 56 Imbuing / 57 Mysticism (docs/11 §11.1), ale research/02 §3.9
+# i §7.3 cisluji 55 Mysticism / 57 Throwing (poradi tridy `SkillInfo` ze
+# serveru). Staty se proto berou podle JMENA, ne podle id - jmeno je jediny
+# spolecny klic; rozchod jde do content-report.json, nikdy do ticha.
+#
+# POZOR (overeno v datech 2026-10-06): `skillgrp.mul` ma 7 ID skupin (0..6), ale
+# jen 6 ma jmeno (hlavicka 7 = 6 jmen + implicitni skupina 0). Mapovani je
+# 1-BAZNOVE: id k (1..6) -> jmena[k-1], id 0 = "Miscellaneous" (nema jmeno;
+# research/02 §7.3). Dukaz z dat: id 6 maji presne 4 bard skilly a sesty nazev
+# je "Bard"; id 4 = Animal Lore/Fishing ("Wilderness"), ne "Thieving" - takze
+# 0-baznove mapovani je vyvracene. (docs/03 §3.9.3 tvrdi, ze "id 6" je bez
+# jmena - to je vada dokumentu, hlasi se; viz poznamka v testu.)
+SKILL_COUNT = 58
+SKILL_GROUP_MISC = "Miscellaneous"
+# Ktere skilly klon mechanicky NEimplementuje: docs/05 §5.16 = "48 klasickych
+# (0-47) + Remove Trap; Necromancy/Bushido/Ninjitsu/Spellweaving/Throwing/
+# Imbuing/Mysticism/Chivalry/Focus = implemented: false" -> DEVET jmen.
+# ZADANI GRANULE uvadi z nich jen SEDM (bez Chivalry a Focus); je to rozpor
+# zadani s dokumentem, ktery se HLASI (SKILL_FALSE_ZE_ZADANI niz), a rozhoduje
+# dokument (docs/05 §5.16 + docs/11 §11.1: "u zbytku ma implemented: false +
+# viditelnou hlasku v UI. Nikdy prazdny skill, ktery tvrdi, ze funguje.").
+# Drzi se JMEN, ne id (viz rozchod poradi 55-57 vyse).
+SKILL_NOT_IMPLEMENTED = ("Necromancy", "Focus", "Chivalry", "Bushido", "Ninjitsu",
+                         "Spellweaving", "Mysticism", "Imbuing", "Throwing")
+SKILL_FALSE_ZE_ZADANI = ("Necromancy", "Bushido", "Ninjitsu", "Spellweaving",
+                         "Throwing", "Imbuing", "Mysticism")
+# `implemented: false` ma byt presne u id 49-57 (§5.16 je vyjmenovava jako
+# pozdni sadu); kdyby se klient rozešel, je to vada, ne ticha zmena.
+SKILL_FALSE_IDS = set(range(49, 58))
+# Era podle research/02 §7.2: Necromancy/Focus/Chivalry = AoS (2003-02-11),
+# Bushido/Ninjitsu = SE (2004-11-02), Spellweaving = ML (2005-08-30),
+# Mysticism/Imbuing/Throwing = SA (2009-09-08); zbytek je pre-AoS (klasicka
+# sada, docs/05 §5.16). Test tuhle tabulku NEprebira - cte vetu z research/02
+# a porovnava s daty, takze rozchod pozna (docs/08 §8.3).
+SKILL_ERA = {"Necromancy": "aos", "Focus": "aos", "Chivalry": "aos",
+             "Bushido": "se", "Ninjitsu": "se", "Spellweaving": "ml",
+             "Mysticism": "sa", "Imbuing": "sa", "Throwing": "sa"}
+SKILL_ERA_CLASSIC = "pre-aos"
+SKILL_RESEARCH = "research/02-skills.md"
+SKILL_TABLE_ANCHOR = "### 3.9"
+SKILL_ROW = re.compile(
+    r"^\|\s*(?P<id>\d+)\s*\|\s*(?P<name>[^|]+?)\s*\|"
+    r"\s*(?P<primary>Str|Dex|Int)\s*\|\s*(?P<secondary>Str|Dex|Int)\s*\|")
+
+
+def staty_skillu(root: Path) -> dict[int, tuple[str, str, str]]:
+    """{id: (jmeno, primarni stat, sekundarni stat)} z tabulky research/02 §3.9.
+
+    Bere se jen tabulka pod nadpisem `### 3.9` (dokud nezačne další `### `),
+    aby se do ni nepletly ostatni tabulky téhož dokumentu (napr. §7.3, ktera ma
+    stejny tvar sloupcu, ale jiný sloupec "Client grp")."""
+    path = root / SKILL_RESEARCH
+    if not path.exists():
+        raise ValueError(f"{SKILL_RESEARCH} chybi - bez nej nelze urcit staty skillu")
+    out: dict[int, tuple[str, str, str]] = {}
+    v_tabulce = False
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if line.startswith("### "):
+            v_tabulce = line.startswith(SKILL_TABLE_ANCHOR)
+            continue
+        if not v_tabulce:
+            continue
+        match = SKILL_ROW.match(line)
+        if match:
+            out[int(match.group("id"))] = (
+                match.group("name"), match.group("primary").lower(),
+                match.group("secondary").lower())
+    if sorted(out) != list(range(SKILL_COUNT)):
+        raise ValueError(
+            f"{SKILL_RESEARCH} §3.9: precteno {len(out)} radku, ocekavano "
+            f"{SKILL_COUNT} s id 0..{SKILL_COUNT - 1}")
+    return out
+
+
+def gen_skills(root: Path) -> tuple[bytes, list[dict]]:
+    """Vraci (bajty `data/skills.json`, seznam nevyresenych polozek)."""
+    cesta = root / "data/skill_groups.json"
+    if not cesta.exists():
+        raise ValueError("data/skill_groups.json chybi - spust "
+                         "`python tools/uoextract/textdata.py --install <UO> --out data`")
+    extrakt = json.loads(cesta.read_text(encoding="utf-8"))
+    jmena = extrakt.get("skills", [])
+    skupiny = extrakt.get("groups", {})
+    gids = skupiny.get("skill_groups", [])
+    gnazvy = skupiny.get("names", [])
+    if len(jmena) != SKILL_COUNT:
+        raise ValueError(f"data/skill_groups.json: {len(jmena)} jmen z skills.mul, "
+                         f"ocekavano {SKILL_COUNT}")
+    if len(gids) != SKILL_COUNT:
+        raise ValueError(f"data/skill_groups.json: {len(gids)} skupinovych id, "
+                         f"ocekavano {SKILL_COUNT}")
+    if skupiny.get("header") != len(gnazvy) + 1:
+        raise ValueError(
+            f"skillgrp.mul: hlavicka {skupiny.get('header')} != {len(gnazvy)} jmen + 1 "
+            "-> mapovani skupin by nebylo 1-baznove (viz komentar vyse)")
+    staty = staty_skillu(root)
+    # Staty se hledaji podle JMENA: id 55/57 ma klientsky `skills.mul` opacne
+    # nez research/02 §3.9 (viz POZOR v hlavicce bloku). Mnozina jmen musi
+    # sedet presne - chybejici nebo prebyvajici jmeno je vada, ne ticha zmena.
+    podle_jmena_tabulky = {v[0]: (v[1], v[2]) for v in staty.values()}
+    chybejici = [j for j in jmena if j not in podle_jmena_tabulky]
+    prebytecna = [j for j in podle_jmena_tabulky if j not in set(jmena)]
+    if chybejici or prebytecna:
+        raise ValueError(
+            f"{SKILL_RESEARCH} §3.9 a skills.mul se neshoduji ve jmenech: "
+            f"chybi {chybejici}, prebyva {prebytecna}")
+
+    zaznamy: list[dict] = []
+    for i, jmeno in enumerate(jmena):
+        prim, sek = podle_jmena_tabulky[jmeno]
+        gid = int(gids[i])
+        if not 0 <= gid <= len(gnazvy):
+            raise ValueError(f"id {i}: skupina {gid} je mimo 0..{len(gnazvy)}")
+        zaznamy.append({
+            "id": i, "name": jmeno, "group_id": gid,
+            "group": gnazvy[gid - 1] if gid else SKILL_GROUP_MISC,
+            "stat_primary": prim, "stat_secondary": sek,
+            "implemented": jmeno not in SKILL_NOT_IMPLEMENTED,
+            "era": SKILL_ERA.get(jmeno, SKILL_ERA_CLASSIC), "source": "skills.mul",
+        })
+
+    # Zadani granule musi platit: vsech 7 jmen z promptu je implemented: false.
+    podle_jmena = {z["name"]: z["id"] for z in zaznamy}
+    for jmeno in SKILL_FALSE_ZE_ZADANI:
+        if jmeno not in podle_jmena:
+            raise ValueError(f"{jmeno} (ze zadani granule) v skills.mul neni")
+        if zaznamy[podle_jmena[jmeno]]["implemented"]:
+            raise ValueError(f"{jmeno} ma byt implemented: false (zadani granule)")
+    # ...a zaroven musi platit mnozina z dokumentu (docs/05 §5.16): presne 49-57.
+    neimpl = {z["id"] for z in zaznamy if not z["implemented"]}
+    if neimpl != SKILL_FALSE_IDS:
+        raise ValueError(f"docs/05 §5.16: implemented: false ma byt u id "
+                         f"{sorted(SKILL_FALSE_IDS)}, vyslo {sorted(neimpl)}")
+
+    # Rozchod poradi mezi skills.mul a research/02 se NESMI zamlcet - jde do
+    # content-report.json (neni to "nevyreseno", ale je to nalezeny rozpor).
+    nenalezene: list[dict] = []
+    nesedici = [i for i in range(SKILL_COUNT) if staty[i][0] != jmena[i]]
+    if nesedici:
+        nenalezene.append({
+            "soubor": "skills.json", "kind": "poradi",
+            "nazev": "; ".join(
+                f"id {i}: skills.mul {jmena[i]} vs research/02 {staty[i][0]}"
+                for i in nesedici),
+            "duvod": "research/02 §3.9 cisluje tyto skilly jinak nez skills.mul teto "
+                     "instalace; staty se berou podle JMENA, poradi z skills.mul "
+                     "(docs/11 §11.1)",
+        })
+    return bajty(zaznamy), nenalezene
+
+
+# =============================================================================
 # rozdeleni prace: generatory, report, zapis
 # =============================================================================
-GENERATORY = {"items.json": gen_items, "recipes.json": gen_recipes}
+GENERATORY = {"items.json": gen_items, "recipes.json": gen_recipes,
+              "skills.json": gen_skills}
 
 
 def bajty(json_obj) -> bytes:
@@ -369,7 +541,12 @@ def main() -> int:
             return VADA
         cil = [only]
 
-    if not (root / "assets/uo/tiles.json").exists():
+    # `assets/uo/tiles.json` potrebuji jen generatory, ktere z nej vychazeji
+    # (items a na nich zavisle recepty). `--only skills` na assets/uo vubec
+    # nesaha - a `assets/uo/` v gitu NENI (docs/03 §3.8), takze bez tehle
+    # podminky by `--only skills --check` nad spravnymi daty vyslo NEMERENO.
+    potrebuji_tiles = [n for n in cil if n in ("items.json", "recipes.json")]
+    if potrebuji_tiles and not (root / "assets/uo/tiles.json").exists():
         print("[gen] CHYBA: assets/uo/tiles.json neexistuje - spust napred "
               "`python tools/uoextract/tiledata.py --extract assets/uo`")
         return NEMERENO
@@ -384,7 +561,15 @@ def main() -> int:
             nemereno += 1
             print(f"[gen] NEMERENO {name}: generator chybi (zdroj by byl {zdroj})")
             continue
-        raw, nenalezene = GENERATORY[name](root)
+        try:
+            raw, nenalezene = GENERATORY[name](root)
+        except ValueError as exc:
+            # Zdroj generatoru je rozbity (chybi extrakt, tabulka se necte, dva
+            # zdroje si odporuji) - to je VADA s vetou, co je spatne, ne
+            # traceback, ze ktereho `--check` nic neprecte (docs/08 §8.6).
+            print(f"[gen] VADA {name}: {exc}")
+            vada += 1
+            continue
         report["unresolved"].extend(nenalezene)
         cesta = root / "data" / name
         sha = hashlib.sha256(raw).hexdigest()

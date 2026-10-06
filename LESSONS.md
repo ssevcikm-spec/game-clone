@@ -24,6 +24,147 @@ Typy: `chyba` (moje vada) · `past-nástroje` (prostředí/nástroj, ne logika) 
 
 ---
 
+### 2026-10-06 — „Formát nejde rozluštit" bylo o znaménku, ne o formátu (postup)
+**Co se stalo:** `research/anim-mereni.md` (2026-10-03) uzavřelo, že **pixely těl
+z `anim.mul` se extrahovat nedají**: `x` z hlavičky RLE běhu vycházelo
+`1020..1023`, tedy mimo rozměr framu (24×64), a hlavička „končí bajtem `0xFF`",
+což dokumentované schéma neumělo vysvětlit. Dnes to spadlo za **~40 minut**:
+`x` a `y` jsou **znamenkové desetibitové** hodnoty (`1020..1023` = `-4..-1`) a to
+`0xFF` je přesně horní bajt záporného čísla. Zbytek (1 bajt na pixel, paleta
+v prvních 512 B bloku) sedl okamžitě.
+**Doklad:** `tools/uoextract/anim.py` (hlavička + `decode_frame`),
+`_analyza/anim-rle-sonda.py`, `_analyza/anim-rle-hledani.py`,
+`_analyza/anim-dekod.py`; invariant **0 pixelů mimo frame** na 30 blocích
+(těla 400/401 × walk/run/idle × 5 směrů), self-test 35/0, mutace 8/8.
+**Ponaučení:** když číslo z binárního pole „vychází mimo rozsah" a **horní bajt
+je konstantní `0xFF`**, první hypotéza je **znaménko**, ne jiné schéma. A když
+někdo (i ty sám v rešerši) napíše „to nejde dekódovat", **ověř to měřením** —
+bylo to 40 minut práce a blokovalo to celý milník.
+
+### 2026-10-06 — Referenční klient je druhá implementace, kterou hledáš (postup)
+**Co se stalo:** tři věty z `_src/classicuo/src/ClassicUO.Assets/AnimationsLoader.cs`
+(`ReadSpriteData`) daly celý formát: `[i16 cx][i16 cy][i16 w][i16 h]`, RLE
+hlavička `[run:12][y:10 signed][x:10 signed]`, paleta = **prvních 512 B bloku**.
+Bez toho bych dál zkoušel bitová pole (a jeden pokus o brute-force prohledávání
+polí jsem už napsal).
+**Doklad:** `_src/classicuo/.../AnimationsLoader.cs` (`ReadMULAnimationFrames`
++ `ReadSpriteData`) vs. `tools/uoextract/anim.py::decode_frame`.
+**Ponaučení:** **než začneš hádat tvar binárního formátu, hledej v `_src/`
+implementaci, která ho čte** (v repu jsou ClassicUO, ServUO, ModernUO, Sphere).
+Rešerše může tvrdit „neověřeno" a přitom mít odpověď o dvě složky vedle.
+
+### 2026-10-06 — Vlastní testy odhalily tři vady v kódu, který jsem právě psal (chyba)
+**Co se stalo:** při prvním běhu nových testů spadlo **5 kontrol** a **tři z nich
+byly skutečné vady kódu**, ne testu: (1) `world.walk.can_step` **nekontroloval
+statiky s `Impassable` na cílové dlaždici** (zdí se dalo projít — měl jsem tu
+kontrolu jen v pomocné funkci pro diagonálu), (2) model staminy „emulator"
+neměl **přenos zbytku** (`(steps + 15) / 16` zaokrouhlilo „1 za 16 kroků" na
+„1 za krok"), (3) v testu jsem měl špatně spočítanou očekávanou hodnotu
+(přehlédl jsem, že jeden skill test mezitím vynuloval).
+**Doklad:** běh `[test] 351 kontrol, 5 selhani` → po opravách `422 kontrol,
+0 selhani`; `tests/cases/walk.gd`, `tests/cases/movement.gd`,
+`sim/world/walk.gd` (`_blokuje_statik`), `sim/systems/movement.gd` (`_carry`).
+**Ponaučení:** testy psát **hned s kódem a spustit je dřív, než je hotová celá
+vrstva** — všechny tři vady by jinak prošly do „hotové" granule a odhalil by je
+až někdo jiný (nebo nikdo).
+
+### 2026-10-06 — Mutační harness našel dvě slepá místa v nových testech (postup)
+**Co se stalo:** `_analyza/mutace-anim.py` (dnes přesunutý do
+`tools/gates/mutace-anim.py`) ohlásil **2 z 8 mutací jako PROSLABÉ**:
+(i) maska běhu `0xFF` místo `0xFFF` — žádný test neměl běh ≥ 256 pixelů, takže
+se zkrácení běhu neprojevilo; (ii) čtení palety z offsetu 512 místo 0 — self-test
+na to **spadl výjimkou**, což harness nejdřív vyhodnotil jako „test neproběhl".
+**Doklad:** `[mutace] 6/8 mutaci chyceno` → po doplnění kontroly s **během 300
+pixelů na framu 400×1** a po rozlišení „spadlo uvnitř testu" vs. „chyba
+harnessu" → `8/8`.
+**Ponaučení:** u každého testu se ptej, **jakou hodnotu by musel vstup mít, aby
+se vada projevila** — když je to hodnota, kterou v datech nikdy nevidíš
+(běh ≥ 256), musíš si ji **vyrobit** v syntetickém vstupu. A „spadlo" musí být
+**pojmenované**: výjimka uvnitř testu je chycení, výjimka při importu mutanta je
+vada harnessu (přesně ten falešný důkaz, který měl starý `mutace-atlas.py`).
+
+### 2026-10-06 — Brána nesla zestárlé tvrzení jako kód (past-nástroje)
+**Co se stalo:** po zapnutí `pixels_decoded: true` v `anim-manifest.json` spadla
+G6 s hláškou „manifest tvrdí pixels_decoded=true, ale dekodér pixelů v této
+instalaci ověřený není". Brána **netvrdila nic o datech** — měla **zapečený
+závěr** z rešerše z 2026-10-03. Opravil jsem ji tak, aby to **měřila**: manifest
+musí nést `pixels_recipe` a `tools/uoextract/anim.py --self-test` musí projít
+(je offline, takže to jde i v CI bez instalace UO). Přidal jsem **tři self-test
+případy** (s receptem → OK, bez receptu → VADA, rozbitý dekodér → VADA), takže
+nová kontrola má známý správný i známý chybný případ.
+**Doklad:** `tools/gates/check-assets.py` (`anim_selftest`, `_pocet_kontrol`);
+G6 self-test `7 případů, 0 chyb`; reálný běh měří
+`anim_decoder_kod: 0, anim_decoder_kontrol: 35`.
+**Ponaučení:** brána, která místo měření **zakazuje tvrzení**, zestárne ve chvíli,
+kdy se tvrzení stane pravdou — a ona pak **brání správnému stavu**. Když se
+měření změní, bránu nepřepínej na opačné tvrzení: **nech ji měřit**.
+
+### 2026-10-06 — Vizuální kontrola odhalila, že kamera ignoruje výšku (postup)
+**Co se stalo:** první snímek s postavou vypadal „skoro dobře" — postava stála
+~40 px nad středem obrazovky. Nebyl to odhad: `iso.to_screen` odečítá
+`z * Z_SCALE` (4 px na jednotku) a kamera se stavěla na `z = 0`, zatímco postava
+stála na `z = 10`. Testy ani brány to nemohly vidět (měří data, ne střed obrazovky).
+**Doklad:** `.cache/render/run-hrac4/frame00000004.png` (před opravou, výřez
+`.cache/render/stred-hrace.png`) vs `frame00000130.png` po opravě;
+`app/world_view.gd::look_at_tile(tile, z)`; `app/player_controller.gd::_follow()`.
+**Ponaučení:** u vizuální změny **měř i to, co testy neměří** (kde na obrazovce
+co je). A když je něco „o pár desítek pixelů vedle", hledej **vzorec, který to
+číslo vysvětlí** (`10 × 4 = 40`), ne „posunu to ručně".
+
+### 2026-10-06 — `--write-movie` mlčí o cestě a vypadá to jako vada záznamu (past-nástroje)
+**Co se stalo:** `godot ... --write-movie .cache\render\run\frame.png` vyrobil jen
+**`frame.wav` (0 B)** a v logu bylo `ERROR: Condition "f_wav.is_null()" is true`.
+Vypadalo to jako rozbitý záznam obrazu nebo chybějící kodek. Příčina byla **cesta**:
+se **zpětnými lomítky** (a/nebo s neexistující složkou) se soubor zvuku nepodaří
+otevřít a PNG framy nevzniknou vůbec.
+**Doklad:** `.cache/render/run-hrac` (jen `frame.wav`) vs `.cache/render/run-hrac4`
+(5× `frame00000000.png` … `frame00000004.png`) — rozdíl je jen `\` vs `/`.
+**Ponaučení:** `--write-movie` dostávej **s dopřednými lomítky** a do **existující**
+složky (tak to dělá `.cache/analysis/mutace-snimek.py`), a po běhu **zkontroluj,
+že framy existují** — nástroj sám nespadne.
+
+### 2026-10-06 — Kamera a `z`, podruhé: `look_at_tile` je vstup, ne konstanta (postup)
+**Co se stalo:** `app/world_view.gd` volal `_camera.position = iso.to_screen(x, y, 0)`
+s nulou napevno. Dokud se svět jen prohlížel, nebylo to vidět; jakmile po něm
+začala chodit postava s `z` z mapy, stala se z nuly chyba. Oprava je parametr
+s výchozí hodnotou (`look_at_tile(tile, z = 0)`) — volající, který výšku zná, ji
+předá (`app/player_controller.gd`).
+**Doklad:** `app/world_view.gd:105-112`, `app/player_controller.gd::_follow()`.
+**Ponaučení:** konstanta napevno je **předpoklad o volajícím**. Když funkci
+začne volat někdo jiný (tady: controller místo `setup`), předpoklad se musí
+přeměnit na parametr — a ten parametr musí být **pojmenovaný důvodem**, ne jen
+„protože to tak vyšlo".
+
+### 2026-10-06 — Klávesy nefungovaly kvůli prázdným vazbám, ne kvůli stromu (vada-zadani)
+**Co se stalo:** `ZADANI-DALSI-VYVOJ §3 úkol 5` tvrdilo, že se `input_map.poll()`
+„nikdy nezavolá", protože `main.gd` přidává do stromu jen `loop`, a žádalo
+„přidat `input_map` do stromu". **Obě poloviny jsou špatně:** `loop.input_map`
+je reference a `poll()` se z `app/loop.gd:32` opravdu volá, a `input_map` je
+`RefCounted`, takže potomek `Node` být **nemůže**. Skutečná příčina mrtvých
+kláves: `bindings` byl **prázdný slovník** a v `InputMap` nebyly **žádné akce**.
+**Doklad:** `app/main.gd`, `app/loop.gd:32`, `app/player_controller.gd`
+(`register_actions`: `[controller] klavesy: 12 novych vazeb, smeru 8`).
+**Ponaučení:** zadání je **tvrzení o stavu** a ověřuje se jako každé jiné.
+Kdybych „přidal `input_map` do stromu" podle zadání, kód by **spadl** (RefCounted
+nejde `add_child`) a klávesy by pořád nefungovaly.
+
+### 2026-10-06 — Tři agenti na jednom repu: co se osvědčilo a co ne (postup)
+**Co se stalo:** sim jádro pohybu jsem psal sám a dva nezávislé kusy
+(`data.skills`, `render.anim`) dostali subagenti s **přesným zadáním** (cesty,
+které vlastní, zakázané cesty, kritéria, jak měřit, jaký harness dodat).
+Oba dodaly soubor + test + mutační harness (8/8 a vlastní). Jeden z nich navíc
+**vyvrátil moje vlastní zadání** (mapování 8 směrů na 5: „sprite 4 = západ je
+zrcadlený sprite 0 = východ" na data nesedí) a doložil správnou tabulku
+geometrií projekce i proti ClassicUO.
+**Doklad:** `data/skills.json` (+ `mutace-skills.py` 8/8),
+`render/anim_player.gd` (+ `mutace-render-anim.py`), `DIR_MAP` v `anim_player.gd`
+vs `core/iso.gd`.
+**Ponaučení:** paralelní agenti se vyplatí, když mají **disjunktní `owns`**
+a dostanou **(a)** co je vstup, **(b)** jak vypadá hotovo, **(c)** čím to má
+doložit. A **zadání od agenta není autorita** — subagent, který ho vyvrátí
+měřením, je přesně to, co má dělat.
+
+
 ### 2026-10-04 — Stabilita na 3 prvcích se neprokáže, na 1000 ano (postup)
 **Co se stalo:** kontrola „tři mobily na jedné dlaždici se stejným `z` si drží
 pořadí vstupu“ **prošla i s mutací**, která porovnává jen `a[0] < b[0]` (bez

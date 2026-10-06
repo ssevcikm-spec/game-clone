@@ -4,9 +4,22 @@ extends RefCounted
 # Test meri ALGORITMUS na FAKE mape a FAKE tiledata: `assets/uo/` je v gitignore,
 # takze v CI zadna realna tiledata nejsou a test nad nimi by tam nemel co merit.
 # Realna data se meri NAVIC, kdyz na disku jsou - a kdyz ne, rekne se to nahlas.
+#
+# Cesta k souboru je VSTUP: `-- --walk-script=<cesta>`, aby mutacni test
+# (tools/gates/mutace-tests.py) mohl predat mutanta a aby se overilo, ze test
+# meri opravdu ten soubor, ktery dostane (HANDOFF 2026-10-06, past 2).
 
 const Lib = preload("res://tests/lib.gd")
 const Const = preload("res://core/const.gd")
+
+const WALK_SCRIPT := "res://sim/world/walk.gd"
+
+
+func _arg(name: String, fallback: String) -> String:
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--" + name + "="):
+			return arg.substr(name.length() + 3)
+	return fallback
 
 const OFF := -1
 const TRAVA := 3            # land, pruchodna
@@ -61,9 +74,9 @@ func _fake() -> Array:
 
 
 func run(t) -> void:
-	var script = Lib.script_at("res://sim/world/walk.gd")
+	var script = Lib.script_at(_arg("walk-script", WALK_SCRIPT))
 	if script == null:
-		t._pending("world.walk NENI HOTOVA: sim/world/walk.gd chybi")
+		t._pending("world.walk NENI HOTOVA: " + _arg("walk-script", WALK_SCRIPT) + " chybi")
 		return
 	var pair := _fake()
 	var map = pair[0]

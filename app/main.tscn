@@ -10,11 +10,16 @@
 ; 2026-10-06 (integrace renderu, ZADANI-DALSI-VYVOJ §3 úkol 5): pribyl uzel
 ; `Camera` (kamera) a `WorldView` (app/world_view.gd). Ani jeden z nich nema
 ; v .forge/roadmap.json vlastnika - je to vada ZADANI, ne hotova granule.
+;
+; 2026-10-06 (pohyb, tyz ukol): pribyl `PlayerController` (app/player_controller.gd)
+; - kamera sleduje hrace, zaklada vazby klaves a ridi `queue_redraw`. Vlastnika
+; v roadmape take nema (ZADANI to pojmenovava jako "bez vlastnika").
 
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://app/main.gd" id="1_main"]
 [ext_resource type="Script" path="res://app/world_view.gd" id="2_world_view"]
+[ext_resource type="Script" path="res://app/player_controller.gd" id="3_controller"]
 
 [node name="Main" type="Node2D"]
 script = ExtResource("1_main")
@@ -23,3 +28,6 @@ script = ExtResource("1_main")
 
 [node name="WorldView" type="Node2D" parent="."]
 script = ExtResource("2_world_view")
+
+[node name="PlayerController" type="Node" parent="."]
+script = ExtResource("3_controller")
