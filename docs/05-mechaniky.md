@@ -416,13 +416,20 @@ souboru (`.sav` a `.sav.bak`), aby pád neznamenal ztrátu hry.
 | Pohyb, `z`, průchodnost, dveře, schody | **pre-AoS** (= všechny éry stejné) | žádný rozpor |
 | Swing delay, hit chance, damage, obrana | **AoS** | konzistence s moderními daty a itemizací |
 | Item properties (AoS) | **AoS** (resisty, DI, HCI/DCI, LMC/LRC, luck) | jsou v datech instalace |
+| **Tooltipy (OPL)** | **ZAPNUTÉ i v klasice** (rozhodnutí uživatele 2026-10-06) | moderní UI; vanilla by je v pre-AoS měla vypnuté (`ObjectPropertyList.Enabled = Core.AOS`), ModernUO to má jako config `opl.enable` (`ExpansionConfiguration.cs:10`) |
+| **Magie zbraní „kov + úroveň"** | **odloženo** (rozhodnutí uživatele 2026-10-06); zatím platí AoS atributy, ale jen když bude vrstva **modulární** | v žádné referenci neexistuje (viz §5.16.1) — je to naše datová vrstva a musí jít přidat bez přepisu souboje |
 | Item insurance | implementováno, **default vypnuto** | v single-playeru trivializuje smrt |
 | Blessed/newbie předměty | **zapnuto** | patří k pocitu hry |
 | Notoriety a flagy | **pre-AoS sémantika** (Felucca), Trammel pravidla implementovaná, ale neaktivní | ve hře není jiný hráč, takže „bezpečná faceta" nemá smysl |
 | Skilly | 58 id, **mechanicky implementováno 48 klasických** (0–47) + `Remove Trap`; Necromancy/Bushido/Ninjitsu/Spellweaving/Throwing/Imbuing/Mysticism/Chivalry/Focus = `implemented: false` | drží id kompatibility, ale neslibuje nefunkční obsah |
+| **Stat gain** | **prodleva 2 s, šance 25 %** (rozhodnutí uživatele 2026-10-06, pásmo 1–3 s / 20–30 %) — hodnoty v `data/balance.json` (`stat_gain.*`), **laditelné** | UO default je 500 ms / 5 % (`SkillCheck.cs:52-53`, `:49`); vypnutá prodleva hru nezrychlí, jen zruší pojistku — viz §5.16.2 |
 | Recepty | **klasické** (z `research/04-craft-data.json`, označené érou) | bez runic/reforging (vypnuto) |
 | Loot | **pre-AoS `LootPack.Old*`** + magic item chance | odpovídá obsahu |
 | BOD, runic, reforging, imbuing | **mimo rozsah** | samostatné systémy |
+
+**Éra je od 2026-10-06 zapsaná PO SLOŽKÁCH** v `data/balance.json` (klíč `era.*`:
+`combat`, `loot`, `content`, `ui`, `movement`, `tooltips`) — tabulka výš je lidské
+čtení téhož. Kdo mění éru, mění **jeden klíč**, ne kód (viz §5.16.3).
 
 ### 5.16.1 Podklad pro rozhodnutí „T2A vs AoS" (DOPLNĚNO 2026-10-06, měřeno)
 
@@ -462,6 +469,59 @@ vybírat (vše `_src/…`, piny v `research/REJSTRIK-REFERENCI.md`):
 nich (pozor na dvojí započtení do `GetDamageBonus()`, `BaseWeapon.cs:3706`);
 (d) zda éru zapsat **po složkách** do `data/balance.json` (`combat_era`, `loot_era`,
 `ui_era`, `movement_era`) — dnes je tam jen `combat_era: "aos"`.
+
+**✅ ROZHODNUTO 2026-10-06 (uživatel):** (a) **zatím zůstává AoS** jako základ
+(combat_era = `aos`), ale s tím, že volba **musí zůstat přepínatelná** (§5.16.3);
+(b) **tooltipy zapnuté** i v klasice; (c) vlastní vrstva „kov + úroveň" se
+**odkládá** — smí se přidat, jen když bude **modulární** (nesmí si vynutit přepis
+souboje ani dvojí započtení); (d) **éra zapsaná po složkách** — je v
+`data/balance.json` v klíči `era.*`; (e) stat gain = **2 s / 25 %**, laditelné.
+
+### 5.16.3 Je volba éry break point? (DOPLNĚNO 2026-10-06 — měřeno)
+
+**Krátká odpověď: dnes ne, a zůstane to levné, pokud dodržíme tři pravidla.
+Drahé to začne být daty a testy, ne kódem.**
+
+**Proč to v emulátorech jde přepnout:** jejich datový model nese **obě složky
+současně** — zbraň má zároveň `DamageLevel`/`AccuracyLevel`/`DurabilityLevel`
+(pojmenované úrovně, `Scripts/Items/Equipment/Weapons/WeaponEnums.cs:17-45`)
+**i** `AosWeaponAttributes` (`Scripts/Misc/AOS.cs:1378`). Éra rozhoduje jen
+o tom, **která se použije**: `AosAttributes.IsValid` vrátí `false`, když
+`!Core.AOS` (`AOS.cs:547-552`), ale **serializovaná data zůstávají**
+(`BaseWeapon.cs:4212-4214`, `:4250-4262`). Přepnutí éry je tedy **změna
+chování, ne migrace dat** — a proto se v ServUO udržuje **633 nálezů
+`Core.AOS` ve 262 souborech**: to je cena za to, že *podporují obojí*.
+
+**Tři pravidla, která drží přepínatelnost (a jejich cena):**
+
+| Pravidlo | Co to znamená | Cena |
+|---|---|---|
+| **1. Data nesou obojí** | předmět uloží `damage_level` **i** `aos_attributes`; ukládání/save nesmí záviset na éře | ~0 (dvě pole místo jednoho) |
+| **2. Jeden klíč na rozhodnutí** | éra se čte z `data/balance.json` (`era.*`), **ne** z konstant rozesetých po kódu; každý systém má **jedno** místo, kde se ptá (`_damage_bonus(item)`, `loot_pack()`, …) | malá; jinak vznikne 20 `if` a přepnutí je přepis |
+| **3. Rozdíl musí být pojmenovaný** | co éra mění, je v `docs/05 §5.16` (tabulka) **a** v `data/balance.json` (`era.*`) — dvě místa, obě ověřitelná | malá |
+
+**Co je i tak drahé (a proč rozhodnout brzy):**
+1. **Vygenerovaná data.** Jakmile se do `data/items.json`/lootu zapíšou AoS
+   atributy jako *jediná* pravda, pre-AoS režim z nich nemá co číst → migrace.
+   (Proto pravidlo 1.)
+2. **Resisty.** AoS dělí poškození na 5 typů a obrana je AR + resisty; pre-AoS má
+   **jedno číslo AR**. Když naše data o tvorech a zbrojích vzniknou v AoS tvaru,
+   pre-AoS režim potřebuje **převodní funkci** (součet → AR). Je to jedno místo,
+   ale musí být napsané **dřív**, než se data vygenerují.
+3. **Testy.** Testy, které tvrdí AoS čísla, jsou při přepnutí k nepotřebě —
+   práce navíc, ale **viditelná** (to je ta lepší varianta).
+4. **Save soubory.** Rozdělaná hra s AoS předměty se po přepnutí nečte správně
+   (řeší se až u `sim.world_loop`, M8).
+
+**Co je naopak levné:** tooltipy (`era.tooltips`), loot packy
+(`LootPack.Old*` vs `Aos*`), `ActionDelay` (500 vs 1000 ms), klikací hlášky,
+damage formule (`ScaleDamageOld` vs `ScaleDamageAOS`), ability (33 vs 0),
+pojištění, stat gain — **všechno to jsou hodnoty nebo jedna funkce**.
+
+**Praktický závěr pro tento klon:** AoS zůstává základem (rozhodnutí výš), ale
+`sim.combat`, `entity.item` a loot se **musí** ptát jednoho místa (pravidla 1–3),
+jinak se z „později to přepneme" stane přepis. Kdo to poruší, porušil smlouvu
+`docs/04 §4.2` (jediná funkce pro rozhodnutí), ne jen styl.
 
 ### 5.16.2 Stat gain — naměřené hodnoty a co od nich čekat (DOPLNĚNO 2026-10-06)
 

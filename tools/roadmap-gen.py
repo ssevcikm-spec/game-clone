@@ -91,9 +91,9 @@ g("core.hash", "Kanonický hash stavu", ["core/hash.gd"],
   prompt="SHA-256 kanonické serializace (seřazené klíče, jen inty) (docs/04 §4.7). Test: dva slovníky s jiným pořadím klíčů dají stejný hash.")
 g("data.balance", "Vyvážení a éry", ["data/balance.json"],
   deps=["boot.project"],
-  provides=["combat_era, stamina_drain_model, ggs_on, insurance_on, anti_macro, skill_cap, stat_cap"],
+  provides=["combat_era, era.{combat,loot,content,ui,movement,tooltips}, stat_gain.{delay_ms,chance_percent}, stamina_drain_model, ggs_on, insurance_on, anti_macro, skill_cap, stat_cap"],
   acceptance=["tests", "schema"], milestone="M0",
-  prompt="Rozhodnutí z docs/05 §5.16: combat_era=aos, stamina_drain_model=run_only, ggs_on=true, insurance_on=false, anti_macro=false. Každá hodnota s poznámkou `source`.")
+  prompt="Rozhodnutí z docs/05 §5.16: combat_era=aos, stamina_drain_model=run_only, ggs_on=true, insurance_on=false, anti_macro=false. Každá hodnota s poznámkou `sources`. DOPLNĚNO 2026-10-06: éra je PO SLOŽKÁCH (`era.*`) - klíč na systém, aby se dala změnit jedním klíčem a ne přepisem dat (docs/05 §5.16.3); `stat_gain.delay_ms` = 2 s a `stat_gain.chance_percent` = 25 % (rozhodnutí uživatele pro singleplayer).")
 g("sim.commands", "Příkazy klient → sim", ["sim/commands.gd"],
   deps=["core.const", "core.events"],
   provides=["parse(d)", "validate(c) -> {ok, reason}", "dispatch(sim, c)"],
