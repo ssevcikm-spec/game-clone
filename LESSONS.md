@@ -490,14 +490,16 @@ ne jen seznam hotových granulí. A **stav CI se měří v API** (`/actions/runs
 v repu je — repo mělo `total_count: 2` běhů, o kterých dokumentace nevěděla.
 
 ### 2026-10-06 — Běh CI s nulou jobů není chyba kódu (past-nástroje)
-**Co se stalo:** oba běhy workflow skončily `failure`, ale **0 jobů, 0 check-runs
-a žádné logy** — ani jeden krok se nespustil, takže se neprojevil žádný kód
-projektu. `Actions` v repu jsou přitom `enabled: true`, `allowed_actions: all`,
-workflow je `active` a token má scope `repo, workflow`. Podpis odpovídá
-**vyčerpané kvóte minut u privátního repa**.
-**Doklad:** `/repos/.../actions/runs` → 2 běhy, oba `failure`;
-`/actions/runs/<id>/jobs` → `total_count: 0` (u obou); `/actions/runs/<id>` →
-`created_at == updated_at`; `/actions/permissions` → `enabled: true`;
+**Co se stalo:** **všechny tři** běhy workflow skončily `failure`, ale pokaždé
+s **0 jobů, 0 check-runs a žádnými logy** — ani jeden krok se nespustil, takže
+se neprojevil žádný kód projektu. `Actions` v repu jsou přitom `enabled: true`,
+`allowed_actions: all`, workflow je `active` a token má na repo `admin: true`
+i scope `repo, workflow`. Podpis odpovídá **vyčerpané kvótě minut u privátního
+repa** (`visibility: private`).
+**Doklad:** `/repos/.../actions/runs` → 3 běhy (`#1` `819c9a3`, `#2` `7a4f3e7`,
+`#3` `036150b`), všechny `failure`; `/actions/runs/<id>/jobs` → `total_count: 0`
+(u všech); `created_at == updated_at` (běh netrval ani sekundu);
+`/actions/permissions` → `enabled: true`; `/repos/...` → `permissions.admin: true`;
 `/users/<login>/settings/billing/actions` → **404** (token billing nevidí).
 **Ponaučení:** u červeného CI se **nejdřív ptej, jestli běželo** — počet jobů
 a existence logu to řeknou dřív než čtení workflow souboru. „Workflow je

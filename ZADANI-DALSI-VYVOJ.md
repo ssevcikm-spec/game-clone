@@ -75,22 +75,27 @@ tady jsou jen ta, která mění plán.
 **Stav:** **HOTOVO** je push — 2026-10-06 dorazil `819c9a3..7a4f3e7`,
 `git rev-list --count origin/main..HEAD` → `0`.
 
-**Nový nález (měřený v API, ne odhad):** CI sice **běželo**, ale **oba běhy
-skončily `failure` s 0 jobů, 0 check-runs a bez logů**:
+**Nový nález (měřený v API, ne odhad):** CI sice **běží**, ale **každý běh
+skončí `failure` okamžitě, s 0 jobů, 0 check-runs a bez logů**:
 
-| běh | kdy | commit | výsledek |
+| běh | kdy (UTC) | commit | výsledek |
 |---|---|---|---|
-| `#1` | 2026-10-03 12:45 | `819c9a3` | `failure`, 0 jobů |
-| `#2` | 2026-10-06 10:59 | `7a4f3e7` | `failure`, 0 jobů, `created_at == updated_at` |
+| `#1` | 2026-10-03 12:45 | `819c9a3` | `failure`, 0 jobů, okamžitě |
+| `#2` | 2026-10-06 10:59 | `7a4f3e7` | `failure`, 0 jobů, okamžitě |
+| `#3` | 2026-10-06 11:07 | `036150b` | `failure`, 0 jobů, okamžitě |
 
 **Žádný krok workflow se nikdy nespustil** — neproběhl ani download Godotu,
-takže `UNVERIFIED` URL a SHA v `ci.yml` zůstávají neověřené. Podpis „běh selhal
-okamžitě bez jobů" odpovídá **vyčerpané kvótě minut u privátního repa**
-(repo je `private: true`; ověřeno tokenem). **Billing API token nevidí (404)**,
-takže příčinu je potřeba **potvrdit v UI**.
+takže `UNVERIFIED` URL a SHA v `ci.yml` zůstávají neověřené.
+
+**Co je vyloučené měřením:** Actions `enabled: true`, `allowed_actions: all`,
+workflow `active`, token má na repo `admin: true` a scope `repo, workflow`.
+**Co zbývá:** podpis odpovídá **vyčerpané kvótě minut u privátního repa**
+(`visibility: private`); billing API token nevidí (404).
 
 **Co udělat:**
-1. Otevřít `Settings → Billing → Actions` a zjistit stav kvóty.
+1. Otevřít `https://github.com/ssevcikm-spec/game-clone/actions`, kliknout na běh
+   `#3` a **přečíst hlášku** — tam je přesná příčina; případně
+   `Settings → Billing → Actions`.
 2. Rozhodnout, jak dál — a to je **rozhodnutí uživatele, ne agenta**:
    platit minuty, nebo **zveřejnit repo** (public repo má minuty zdarma;
    v gitu jsou jen kód a dokumentace — `assets/uo/` je gitignore, autorská díla

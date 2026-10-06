@@ -26,19 +26,29 @@ následuje předání**. Proto platí:
 
 ## ⚠⚠ DVA BLOKÁTORY, KTERÉ JE POTŘEBA VYŘEŠIT PRVNÍ
 
-1. **CI na GitHubu NEBĚŽÍ — a není to chyba kódu.** Push 2026-10-06 dorazil
-   (`819c9a3..7a4f3e7`, `ahead 0`), ale oba běhy workflow skončily **okamžitě
-   s `failure`, 0 jobů a 0 check-runs** (run #1 `2026-10-03T12:45:32Z` nad
-   `819c9a3`, run #2 `2026-10-06T10:59:54Z` nad `7a4f3e7`; u #2 je
-   `created_at == updated_at`). **Žádný krok workflow se nikdy nespustil** —
-   neproběhl ani download Godotu, takže `UNVERIFIED` URL a SHA v `ci.yml`
-   zůstávají neověřené. Podpis „běh selhal bez jobů" je na GitHubu typicky
-   **vyčerpaná kvóta minut u privátního repa** (repo je `private: true`;
-   ověřeno tokenem) — billing API token nevidí, takže **příčinu je potřeba
-   potvrdit v UI** (Settings → Billing → Actions). **Co s tím:** zkontrolovat
-   kvótu, a pokud je vyčerpaná, rozhodnout se mezi placenými minutami
-   a **zveřejněním repa** (public repo má minuty zdarma; v gitu jsou jen kód
-   a dokumentace — `assets/uo/` je gitignore, autorská díla UO tam nejsou).
+1. **CI na GitHubu NEBĚŽÍ — a není to chyba kódu.** Pushy dorazily
+   (`819c9a3..7a4f3e7`, `7a4f3e7..036150b`, `ahead 0`), ale **všechny tři běhy
+   workflow skončily okamžitě s `failure`, 0 jobů a 0 check-runs**:
+
+   | běh | kdy (UTC) | commit | výsledek |
+   |---|---|---|---|
+   | `#1` | 2026-10-03T12:45:32Z | `819c9a3` | `failure`, 0 jobů, okamžitě |
+   | `#2` | 2026-10-06T10:59:54Z | `7a4f3e7` | `failure`, 0 jobů, okamžitě |
+   | `#3` | 2026-10-06T11:07:41Z | `036150b` | `failure`, 0 jobů, okamžitě |
+
+   **Žádný krok workflow se nikdy nespustil** — neproběhl ani download Godotu,
+   takže `UNVERIFIED` URL a SHA v `ci.yml` zůstávají neověřené. **Vyloučeno
+   měřením:** Actions jsou `enabled: true`, `allowed_actions: all`, workflow je
+   `active`, token má na repo `admin: true` a scope `repo, workflow`.
+   **Zbývá:** podpis „běh selhal okamžitě bez jobů" odpovídá **vyčerpané kvótě
+   minut u privátního repa** (`visibility: private`) — billing API token
+   nevidí (404), takže **příčinu potvrdí až UI**: otevřít
+   `https://github.com/ssevcikm-spec/game-clone/actions` a přečíst hlášku
+   u běhu `#3`, případně `Settings → Billing → Actions`.
+   **Co s tím:** rozhodnout se mezi placenými minutami a **zveřejněním repa**
+   (public repo má minuty zdarma; v gitu jsou jen kód a dokumentace —
+   `assets/uo/` je gitignore, autorská díla UO tam nejsou) nebo vlastním
+   runnerem.
 2. **`tools/uoextract/atlas.py` je v gitu, ale má vadu** (commit `7a4f3e7`).
    Vygeneroval `assets/uo/manifest.json` (3 565 629 B, 17 436 spritů, 198 stran),
    ve kterém je **117 překryvů** spritů a **17 jich je plně průhledných**
