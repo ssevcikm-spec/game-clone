@@ -1,5 +1,26 @@
 # Animace těl — měření a rozhodnutí (docs/03 §3.5.1, O3)
 
+> **DOPLNĚNO 2026-10-06 (datum spotřeby): z tohohle dokumentu se stavělo a jedna
+> jeho otevřená otázka je VYŘEŠENÁ.** Oddíl „Co je ověřené o formátu bloku" níž
+> končí tím, že **pixely z `anim.mul` se extrahovat nedají** (neznámá hlavička
+> běhu, `x` vychází 1020–1023). To **už neplatí**:
+>
+> * `x` a `y` v hlavičce běhu jsou **znamenkové desetibitové** hodnoty —
+>   `1020..1023` je `-4..-1`. Proto taky každá hlavička končí bajtem `0xFF`.
+> * Prvních 512 B bloku **JE paleta** (256× u16 ARGB1555). Měření výš je správné
+>   v tom, že je ve vzorcích shodná; nesprávný byl závěr, že tedy žádná není.
+>   Naked tělo je proto šedé — barvu kůže dělá až hue z `hues.mul`.
+> * Pixel = **1 bajt** = index do té palety; terminátor `0x7FFF7FFF` je na konci
+>   framu (naše dřívější „konec" mířil o 4 B dál, do další hlavičky).
+>
+> Reference: `_src/classicuo/src/ClassicUO.Assets/AnimationsLoader.cs`
+> (`ReadMULAnimationFrames`, `ReadSpriteData`). Měření a dekodér:
+> `_analyza/anim-rle-sonda.py`, `_analyza/anim-rle-hledani.py`,
+> `_analyza/anim-dekod.py`; produkčně `tools/uoextract/anim.py`
+> (`decode_frame`, `--export`, `--self-test` 35 kontrol, mutace 8/8).
+> Důkaz: 0 pixelů mimo frame na 30 blocích (těla 400/401 × walk/run/idle × 5 směrů).
+> Zbytek dokumentu je **ve svém čase správný** a needituje se.
+
 Datum: 2026-10-03. Zdroj: `research/probe/anim_pokryti.py` (spustitelné kdykoli
 znovu), surová data v `research/anim-pokryti.json`.
 

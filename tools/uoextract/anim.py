@@ -22,21 +22,41 @@ CO JE OVERENE (a co ne) - docs/10 zada "nemERene = nestavet":
            presne na velikost souboru); tabulka framu v bloku = [u32 pocet] na
            bajtu 512 + pocet x u32 offset od 516; terminátor RLE 0x7FFF7FFF
            lezi 4 B pred koncem framu (overeno na vsech 10 framech bloku).
-  OVERENO  Prvnich 512 B bloku je ve VSECH blocich STEJNYCH (tela 400/200/9,
-           ruzne akce - bit po bitu) -> pixely tela NEMAJI vlastni paletu;
-           barva jde z animdata.mul/hues.mul (research/05-data-formats.md §5.2).
   OVERENO  UOP zaznam se adresuje jmenem
            "build/animationlegacyframe/{telo:06d}/{akce:02d}.bin" a hashem
            create_hash (z uop.py): 4 747 nalezenych na vzorku 700 tela x 80 akci,
            zatimco jenkins_pc_pb 0.
-  NEOVERENO tvar hlavicky framu a kódovani indexu v RLE proudu. `x` z hlavicky
-           behu vychazi 1020..1023, tedy MIMO rozmer framu (24x64). Pixely se
-           proto ZAMERNE neextrahuji - vrací se jen to, co je zmerene.
+  OVERENO  Pixely JSOU dekodovane (2026-10-06). Tvar bloku a RLE je prevzaty
+           z referencni implementace a overeny merenim:
+             * hlavicka framu `[i16 cx][i16 cy][i16 w][i16 h]` na `512 + offset`,
+             * RLE hlavicka `[u32]`: `run = h & 0xFFF`, `x` a `y` jsou
+               ZNAMENKOVE desetibitove hodnoty z `(h >> 22)` a `(h >> 12)`
+               (`x += cx`, `y += cy + h`), pixel = 1 bajt = index do 256barevne
+               palety v PRVNICH 512 B bloku, terminátor `0x7FFF7FFF`,
+             * overeno na telo 400/401, akce walk/run/idle, vsech 5 smeru:
+               **0 pixelu mimo frame** (drivejsi dojem "hlavicka je neznama"
+               vznikl tim, ze 1020..1023 je ve znamenkove desetibite soustave
+               -4..-1; proto take kazda hlavicka konci bajtem 0xFF).
+           Reference: `_src/classicuo/src/ClassicUO.Assets/AnimationsLoader.cs`
+           (`ReadMULAnimationFrames`, `ReadSpriteData`). Dukazy, ktere jsou
+           v gitu: `--self-test` (35 kontrol), `--verify` (0 pixelu mimo frame
+           na 30 blocich) a `tools/gates/mutace-anim.py` (8/8 mutaci chyceno).
+           Mutační harness odhalil dve slepa mista (maska behu 12 bitu,
+           paleta z offsetu 0) - proto pribyly kontroly s behem 300 pixelu.
+           Puvodni objevne sondy jsou v `_analyza/` (gitignore, lokalni):
+           `anim-rle-sonda.py`, `anim-rle-hledani.py`, `anim-dekod.py`.
+           Pomer: `research/anim-mereni.md` (doplneno 2026-10-06).
+  POZOR    Prvnich 512 B bloku JE paleta (driv se usoudilo, ze "je ve vsech
+           blocich stejna, takze paleta neexistuje" - je to vychozi sedy ramp).
+           Naked telo je proto sede; barvu kuze v UO dela az hue z `hues.mul`
+           (granule `render.hue`).
 
 Pouziti:
   python tools/uoextract/anim.py --verify            # zmer vsechna tela
   python tools/uoextract/anim.py --body 400          # detail jednoho tela
   python tools/uoextract/anim.py --self-test         # offline test se znamym vzorkem
+  python tools/uoextract/anim.py --export assets/uo/anim          # PNG + JSON pro klienta
+  python tools/uoextract/anim.py --export-check assets/uo/anim    # kontrola exportu
 """
 
 from __future__ import annotations
@@ -121,25 +141,19 @@ class MulAnim:
 def frames_of(block: bytes) -> list[dict]:
     """Tabulka framu z bloku anim.mul - MERENA cast (rozmery a offsety).
 
-    Tabulka je [u32 pocet] na bajtu 512 a `pocet x u32` offsetu od 516.
-    Hlavicka framu se cte na `516+offset-4` (overeno na vsech framech bloku:
-    rozmer vychazi 24x64, 26x60, ... a terminátor lezi 4 B pred koncem framu).
+    Tabulku (offsety) cte `frame_offsets`, aby existoval JEDEN vyklad tvaru
+    bloku; tady se k offsetum pridavaji rozmery a overuje terminátor.
+    Hlavicka framu je `[i16 cx][i16 cy][i16 w][i16 h]` na `512 + offset`
+    (ClassicUO `ReadSpriteData`), tedy `cx,cy` 4 B pred `516 + offset`.
     """
-    if len(block) < FRAME_TABLE_OFFSET + 8:
-        return []
-    pocet = struct.unpack_from("<I", block, FRAME_TABLE_OFFSET)[0]
-    if not (1 <= pocet <= 200):
+    offsety = frame_offsets(block)
+    if not offsety:
         return []
     tabulka = FRAME_TABLE_OFFSET + 4
-    if tabulka + pocet * 4 > len(block):
-        return []
-    offsety = struct.unpack_from(f"<{pocet}I", block, tabulka)
-    if any(offsety[i] <= offsety[i - 1] for i in range(1, pocet)):
-        return []
     frames = []
     for i, o in enumerate(offsety):
         start = tabulka + o
-        konec = tabulka + offsety[i + 1] if i + 1 < pocet else len(block)
+        konec = tabulka + offsety[i + 1] if i + 1 < len(offsety) else len(block)
         if start - 4 < 0 or start + 4 > konec:
             return []
         cx, cy = struct.unpack_from("<2h", block, start - 4)
@@ -159,6 +173,118 @@ def frames_of(block: bytes) -> list[dict]:
             p += header & 0x0FFF
         frames.append({"cx": cx, "cy": cy, "w": w, "h": h, "terminator": termin})
     return frames
+
+
+PALETA_BAJTU = 512                  # prvnich 512 B bloku = 256 x u16 ARGB1555
+PALETA_BAREV = 256
+
+
+def paleta_z_bloku(block: bytes) -> tuple[int, ...]:
+    """Paleta z prvnich 512 B bloku.
+
+    Dřívější mEReni (`research/anim-mereni.md`) usoudilo, ze prvnich 512 B je
+    "ve vsech blocich stejnych -> pixely nemaji vlastni paletu". Prvni pulka
+    plati (je to vychozi sede ramp), druha je omyl: JE to paleta a pouziva ji
+    i ClassicUO (`ReadMULAnimationFrames` -> `ReadSpriteData`). Naked telo je
+    proto sede - barvu kuze v UO dela az hue z `hues.mul` (granule `render.hue`).
+    """
+    if len(block) < PALETA_BAJTU:
+        return ()
+    return struct.unpack_from(f"<{PALETA_BAREV}H", block, 0)
+
+
+def znamenko10(v: int) -> int:
+    """Desetibitove pole hlavicky je ZNAMENKOVE (ClassicUO `ReadSpriteData`).
+
+    Presne tady vznikl dojem "hlavicka je neznama": `x` vychazelo 1020..1023,
+    tedy mimo rozmer framu - jenze 1020..1023 je ve znamenkove desetibite
+    soustave -4..-1. Proto take kazda hlavicka konci bajtem 0xFF (horni bity
+    zaporneho cisla).
+    """
+    return v - 1024 if v & 0x200 else v
+
+
+def barva16(v: int) -> tuple[int, int, int]:
+    """ARGB1555 -> (r, g, b), rozsireni 5 bitu na 8 (jako ClassicUO)."""
+    r = (v >> 10) & 0x1F
+    g = (v >> 5) & 0x1F
+    b = v & 0x1F
+    return ((r << 3) | (r >> 2), (g << 3) | (g >> 2), (b << 3) | (b >> 2))
+
+
+def decode_frame(block: bytes, offset: int) -> dict | None:
+    """Jeden frame bloku na RGBA pixely.
+
+    Tvar podle `_src/classicuo/src/ClassicUO.Assets/AnimationsLoader.cs`
+    (`ReadSpriteData`): frame zacina na `512 + offset`,
+    `[i16 cx][i16 cy][i16 w][i16 h]`, pak RLE:
+    `[u32 header]` = `run = header & 0xFFF`, `x`/`y` = znamenkove 10 bity
+    z `(header >> 22)` a `(header >> 12)`, `x += cx`, `y += cy + h`,
+    nasleduje `run` bajtu = indexu do palety. Terminátor `0x7FFF7FFF`.
+    Pixel se zapisuje na `y * w + x`; co RLE nepokryje, zustava pruhledne.
+    """
+    paleta = paleta_z_bloku(block)
+    p = FRAME_TABLE_OFFSET + offset          # 512 + offset (ClassicUO)
+    if not paleta or p + 8 > len(block):
+        return None
+    cx, cy, w, h = struct.unpack_from("<4h", block, p)
+    if not (1 <= w <= 512 and 1 <= h <= 512):
+        return None
+    p += 8
+    pixely = bytearray(w * h * 4)
+    behu = 0
+    mimo = 0
+    termin = False
+    while p + 4 <= len(block):
+        (header,) = struct.unpack_from("<I", block, p)
+        p += 4
+        if header == MUL_TERMINATOR:
+            termin = True
+            break
+        run = header & 0x0FFF
+        x = znamenko10((header >> 22) & 0x3FF) + cx
+        y = znamenko10((header >> 12) & 0x3FF) + cy + h
+        behu += 1
+        for k in range(run):
+            if p >= len(block):
+                break
+            index = block[p]
+            p += 1
+            px = x + k
+            if 0 <= px < w and 0 <= y < h:
+                r, g, b = barva16(paleta[index])
+                o = (y * w + px) * 4
+                pixely[o] = r
+                pixely[o + 1] = g
+                pixely[o + 2] = b
+                pixely[o + 3] = 255
+            else:
+                mimo += 1
+    return {"cx": cx, "cy": cy, "w": w, "h": h, "pixels": bytes(pixely),
+            "behu": behu, "pixely_mimo": mimo, "terminator": termin}
+
+
+def decode_block(block: bytes) -> list[dict]:
+    """Vsechny framy bloku (co nejde precist, se preskoci - ne vyjimka)."""
+    out = []
+    for offset in frame_offsets(block):
+        frame = decode_frame(block, offset)
+        if frame is not None:
+            out.append(frame)
+    return out
+
+
+def frame_offsets(block: bytes) -> list[int]:
+    """Offsety framu z tabulky bloku (`[u32 pocet]` na 512, pak `pocet x u32`)."""
+    if len(block) < FRAME_TABLE_OFFSET + 8:
+        return []
+    pocet = struct.unpack_from("<I", block, FRAME_TABLE_OFFSET)[0]
+    if not (1 <= pocet <= 200) or FRAME_TABLE_OFFSET + 4 + pocet * 4 > len(block):
+        return []
+    offsety = list(struct.unpack_from(f"<{pocet}I", block, FRAME_TABLE_OFFSET + 4))
+    if any(offsety[i] <= offsety[i - 1] for i in range(1, pocet)):
+        return []
+    return offsety
 
 
 class UopAnim:
@@ -310,6 +436,36 @@ def verify(install: str | Path) -> tuple[int, list[str]]:
     check(zdroj(334, mul_t, uop_t) == "uop", "telo 334 musi byt zdroj 'uop'")
     check(zdroj(9999, mul_t, uop_t) == "zadny", "neexistujici telo musi byt 'zadny'")
 
+    # Pixely (2026-10-06): hlavni invariant je, ze RLE NIKDY nezapisuje mimo
+    # frame - to je to, co drivejsi vyklad (x bez znamenka) nesplnoval.
+    m = MulAnim(install)
+
+    def blok_pixelu(telo: int, cislo: int, smer: int) -> bytes | None:
+        info = m.block(telo, cislo, smer)
+        return None if info is None else m._blok(info["offset"], info["size"])
+
+    for telo in (400, 401):
+        for cislo in (0, 1, 4):
+            for smer in range(ANIM_SMERY):
+                blok = blok_pixelu(telo, cislo, smer)
+                framy = decode_block(blok) if blok else []
+                mimo = sum(f["pixely_mimo"] for f in framy)
+                bez_terminu = sum(1 for f in framy if not f["terminator"])
+                check(bool(framy) and mimo == 0 and bez_terminu == 0,
+                      f"{telo}/{cislo}/{smer}: framu {len(framy)}, pixelu mimo "
+                      f"{mimo}, framu bez terminatoru {bez_terminu} (ocekavano >0, 0, 0)")
+    blok400 = blok_pixelu(400, 0, 0)
+    paleta = paleta_z_bloku(blok400) if blok400 else ()
+    check(len(paleta) == PALETA_BAREV and any(paleta),
+          f"paleta ma {len(paleta)} barev, nenulovych {sum(1 for v in paleta if v)}")
+    check(znamenko10(1020) == -4 and znamenko10(1022) == -2 and znamenko10(5) == 5,
+          "znamenkove desetibitove pole nefunguje (1020 musi byt -4, 1022 -> -2, 5 -> 5)")
+    idle_blok = blok_pixelu(400, 4, 0)
+    idle = decode_block(idle_blok) if idle_blok else []
+    if idle:
+        check((idle[0]["w"], idle[0]["h"]) == (26, 60),
+              f"idle frame ma {idle[0]['w']}x{idle[0]['h']}, mEReno 26x60")
+
     print(f"[anim] {checks} kontrol, {len(errors)} chyb")
     for e in errors:
         print(f"[anim] CHYBA: {e}")
@@ -413,8 +569,185 @@ def self_test() -> int:
               f"druhy frame ma {fr[1]}")
     check(uop_frames(None) == [], "None vraci prazdny seznam")
 
+    # 6) DEKODER PIXELU na syntetickem bloku. Hlavni vec, ktera se tu merit:
+    # znamenkove x/y a to, ze se zapisuje na `y * w + x`. Kdyby se x cetlo bez
+    # znamenka (drivejsi omyl), pixel by spadl mimo frame a `pixely_mimo` > 0.
+    def _blok_s_behem(cx: int, cy: int, w: int, h: int, x: int, y: int, run: int,
+                      index: int = 1) -> bytes:
+        paleta = bytearray(512)
+        struct.pack_into("<H", paleta, index * 2, 0x7C00)   # cervena (ARGB1555)
+        hlavicka = struct.pack("<4h", cx, cy, w, h)
+        pole = (x & 0x3FF) << 22 | (y & 0x3FF) << 12 | (run & 0xFFF)
+        beh = struct.pack("<I", pole) + bytes([index] * run)
+        frame = hlavicka + beh + struct.pack("<I", MUL_TERMINATOR)
+        # offset je relativne k 512 (ClassicUO `dataStart + frameOffset[i]`):
+        # paleta 512 B + [u32 pocet] + [u32 offset] = 520, tedy offset 8.
+        return bytes(paleta) + struct.pack("<I", 1) + struct.pack("<I", 8) + frame
+
+    # run 4 na relativnim (0,0): x = cx, y = cy + h  -> radek `cy + h`, sloupce 12..15
+    blok = _blok_s_behem(12, -11, 24, 64, 0, 0, 4)
+    fr = decode_frame(blok, 8)
+    check(fr is not None and fr["w"] == 24 and fr["h"] == 64,
+          f"synteticky frame ma {fr['w'] if fr else None}x{fr['h'] if fr else None}, cekano 24x64")
+    if fr:
+        pix = fr["pixels"]
+        radek = fr["cy"] + fr["h"]          # relativni y = 0 je linka zeme
+
+        def _a(px: int, py: int) -> int:
+            return pix[(py * 24 + px) * 4 + 3]
+        check(all(_a(12 + k, radek) == 255 for k in range(4)),
+              f"run 4 na (0,0) musi dat 4 neprusvitne pixely na radku {radek} od sloupce 12")
+        check(_a(11, radek) == 0 and _a(16, radek) == 0 and _a(12, radek - 1) == 0,
+              "kolem runu musi byt pruhledno")
+        check(fr["pixely_mimo"] == 0 and fr["terminator"],
+              f"mimo={fr['pixely_mimo']} terminator={fr['terminator']} (cekano 0, True)")
+        check((pix[(radek * 24 + 12) * 4], pix[(radek * 24 + 12) * 4 + 1]) == (255, 0),
+              "barva z palety musi byt cervena (0x7C00)")
+
+    # zaporny offset: x = -4 (v hlavicce 1020) -> zacatek 4 px vlevo od stredu
+    blok = _blok_s_behem(12, -11, 24, 64, 1020, 0, 3)
+    fr = decode_frame(blok, 8)
+    if fr:
+        pix = fr["pixels"]
+        radek = fr["cy"] + fr["h"]
+        check(all(pix[(radek * 24 + 8 + k) * 4 + 3] == 255 for k in range(3)),
+              "x = 1020 (znamenkove -4) musi zapsat na sloupce 8..10 (12 - 4)")
+
+    # run, ktery pretece vpravo: 2 pixely se zapisou, 2 museji byt hlaseny jako mimo
+    blok = _blok_s_behem(0, 0, 10, 10, 8, 1014, 4)      # 1014 = -10 -> radek 0
+    fr = decode_frame(blok, 8)
+    if fr:
+        check(fr["pixely_mimo"] == 2,
+              f"run pres okraj ma hlasit 2 pixely mimo, hlasil {fr['pixely_mimo']}")
+        check(sum(1 for i in range(0, len(fr["pixels"]), 4) if fr["pixels"][i + 3]) == 2,
+              "pres okraj se smi zapsat jen 2 pixely")
+
+    # DELKA BEHU: `run` je 12 bitu (0..4095). Mutační test nasel, ze se to nijak
+    # nemerilo: beh >= 256 se s maskou 0xFF tise zkrati a kontroly to nepoznaly
+    # (vsechny behy v datech jsou < 100). Frame je proto siroky 400 px, aby se
+    # beh 300 vesel do JEDNOHO radku (beh je vzdy vodorovny).
+    blok = _blok_s_behem(0, 0, 400, 1, 0, 1023, 300)    # 1023 = -1 -> radek 0
+    fr = decode_frame(blok, 8)
+    if fr:
+        zapsano = sum(1 for i in range(0, len(fr["pixels"]), 4) if fr["pixels"][i + 3])
+        check(zapsano == 300,
+              f"beh 300 pixelu musi zapsat 300 pixelu, zapsal {zapsano} "
+              f"(maska behu musi byt 12 bitu, ne 8)")
+
+    # rozbity vstup: prazdny blok a blok bez palety -> None, ne vyjimka
+    check(decode_frame(b"", 0) is None, "prazdny blok vraci None")
+    check(decode_frame(bytes(600), 0) is None,
+          "blok bez platne hlavicky vraci None (nula rozmery)")
+    check(decode_block(_synthetic_block()) != [], "decode_block projde synteticky blok")
+    check(decode_block(b"") == [], "decode_block nad prazdnym blokem vraci []")
+
     print(f"[anim] self-test: {checks} kontrol, {failures} chyb")
     return 1 if failures else 0
+
+
+ANIM_SMERY = 5                      # anim.mul ma 5 smeru (8 smeru hry se z nich sklada)
+
+
+def export_sheets(install: str | Path, out_dir: str | Path, bodies: list[int],
+                  akce: dict[int, str], smery: int = ANIM_SMERY) -> dict:
+    """Zapise animace jako PNG (framy v jedne rade) + JSON s metadaty.
+
+    Kazda (telo, akce, smer) je jeden PNG a jeden zaznam v `anim-sheets.json`.
+    `rect` je ve tvaru PILu `[levy, horni, pravy, dolni]` - stejna konvence jako
+    `assets.atlas` (`tools/uoextract/atlas.py`), aby se to nepletlo.
+    `cx`, `cy` jsou posuny z hlavicky framu: obrazek se kresli na
+    `(tile_x - cx, tile_y - (cy + h))`, tedy `cy + h` je linka zeme.
+
+    Vysledek je REPRODUKOVATELNY z instalace UO (`--export`), do gitu nepatri.
+    """
+    from PIL import Image
+
+    install = Path(install)
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    m = MulAnim(install)
+    zaznamy: dict[str, dict] = {}
+    chyby: list[str] = []
+    for body in bodies:
+        for cislo, nazev in sorted(akce.items()):
+            for smer in range(smery):
+                info = m.block(body, cislo, smer)
+                if info is None:
+                    chyby.append(f"{body}/{cislo}/{smer}: blok v anim.mul neni")
+                    continue
+                blok = m._blok(info["offset"], info["size"])
+                if blok is None:
+                    chyby.append(f"{body}/{cislo}/{smer}: blok se necte")
+                    continue
+                framy = decode_block(blok)
+                if not framy:
+                    chyby.append(f"{body}/{cislo}/{smer}: zadny frame se nedekodoval")
+                    continue
+                sirka = sum(f["w"] for f in framy)
+                vyska = max(f["h"] for f in framy)
+                plocha = Image.new("RGBA", (sirka, vyska), (0, 0, 0, 0))
+                popis = []
+                x = 0
+                for f in framy:
+                    plocha.paste(Image.frombytes("RGBA", (f["w"], f["h"]), f["pixels"]), (x, 0))
+                    popis.append({"rect": [x, 0, x + f["w"], f["h"]],
+                                  "cx": f["cx"], "cy": f["cy"], "w": f["w"], "h": f["h"],
+                                  "pixely_mimo": f["pixely_mimo"]})
+                    x += f["w"]
+                jmeno = f"anim-{body}-{cislo}-{smer}.png"
+                plocha.save(out_dir / jmeno)
+                zaznamy[f"{body}/{cislo}/{smer}"] = {
+                    "file": jmeno, "action": nazev, "frames": popis,
+                    "source": f"{info['source']}+{info['source'].replace('.mul', '.idx')}",
+                }
+    data = {
+        "version": 1,
+        "decoder": ("tools/uoextract/anim.py decode_frame - podle "
+                    "_src/classicuo/src/ClassicUO.Assets/AnimationsLoader.cs "
+                    "(ReadSpriteData): [i16 cx][i16 cy][i16 w][i16 h], RLE hlavicka "
+                    "[run:12][y:10 signed][x:10 signed], pixel = bajt indexu do "
+                    "512B palety v bloku, terminátor 0x7FFF7FFF"),
+        "anchor": "obrazek se kresli na (tile_x - cx, tile_y - (cy + h)); rect je [levy, horni, pravy, dolni]",
+        "actions": {str(k): v for k, v in sorted(akce.items())},
+        "sprites": zaznamy,
+        "chyby": chyby,
+    }
+    (out_dir / "anim-sheets.json").write_text(
+        json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
+    return data
+
+
+def over_export(out_dir: str | Path) -> tuple[int, list[str]]:
+    """Zkontroluje exportovane PNG proti JSON - soubor musi byt a mit velikost.
+
+    Tohle je meritelna brana nad exportem: chybejici nebo ustrizene PNG se
+    pozna bez instalace UO (a tedy i v CI, pokud by assety byly).
+    """
+    from PIL import Image
+
+    out_dir = Path(out_dir)
+    soubor = out_dir / "anim-sheets.json"
+    if not soubor.exists():
+        return 0, [f"chybi {soubor}"]
+    data = json.loads(soubor.read_text(encoding="utf-8"))
+    kontroly = 0
+    chyby: list[str] = []
+    for klic, zaznam in sorted(data.get("sprites", {}).items()):
+        cesta = out_dir / zaznam["file"]
+        kontroly += 1
+        if not cesta.exists():
+            chyby.append(f"{klic}: chybi {zaznam['file']}")
+            continue
+        obrazek = Image.open(cesta)
+        for i, f in enumerate(zaznam["frames"]):
+            kontroly += 1
+            levy, horni, pravy, dolni = f["rect"]
+            if pravy - levy != f["w"] or dolni - horni != f["h"]:
+                chyby.append(f"{klic} frame {i}: rect nesedi na w/h")
+            if pravy > obrazek.width or dolni > obrazek.height:
+                chyby.append(f"{klic} frame {i}: rect je mimo PNG "
+                             f"({obrazek.width}x{obrazek.height})")
+    return kontroly, chyby
 
 
 def zapis_manifest(install: str | Path, out: str | Path) -> dict:
@@ -462,7 +795,11 @@ def zapis_manifest(install: str | Path, out: str | Path) -> dict:
                     "both": p["prunik"]},
         "sha256": vstupy,
         "bodies": tela,
-        "pixels_decoded": False,   # NEOVERENO - viz research/anim-mereni.md
+        "pixels_decoded": True,
+        "pixels_recipe": ("[i16 cx][i16 cy][i16 w][i16 h] na 512+offset; RLE "
+                          "hlavicka [run:12][y:10 signed][x:10 signed]; pixel = bajt "
+                          "indexu do 512B palety v bloku; terminátor 0x7FFF7FFF "
+                          "(ClassicUO AnimationsLoader.ReadSpriteData)"),
     }
     cesta = Path(out)
     cesta.parent.mkdir(parents=True, exist_ok=True)
@@ -477,12 +814,43 @@ def main() -> int:
     ap.add_argument("--verify", action="store_true")
     ap.add_argument("--self-test", action="store_true")
     ap.add_argument("--out", default=None)
+    ap.add_argument("--export", default=None,
+                    help="slozka pro PNG framu + anim-sheets.json (napr. assets/uo/anim)")
+    ap.add_argument("--export-check", default=None,
+                    help="zkontroluje export bez instalace UO (PNG proti JSON)")
+    ap.add_argument("--bodies", default="400,401",
+                    help="tela pro --export (vychozi 400,401 = muz, zena)")
+    ap.add_argument("--actions", default="0:walk,1:run,4:idle",
+                    help="akce pro --export jako cislo:nazev,... (vychozi 0:walk,1:run,4:idle)")
+    ap.add_argument("--dirs", type=int, default=ANIM_SMERY,
+                    help="kolik smeru exportovat (anim.mul ma 5)")
     args = ap.parse_args()
     if args.self_test:
         return self_test()
+    if args.export_check:
+        kontroly, chyby = over_export(args.export_check)
+        for e in chyby:
+            print(f"[anim] CHYBA: {e}")
+        print(f"[anim] export-check: {kontroly} kontrol, {len(chyby)} chyb")
+        if not kontroly:
+            print("[anim] NEMERENO: chybi anim-sheets.json - export se jeste nedelal")
+            return 2
+        return 1 if chyby else 0
     if not (Path(args.install) / "anim.idx").exists():
         print(f"[anim] CHYBA: {args.install} neobsahuje anim.idx")
         return 1
+    if args.export:
+        akce = {}
+        for cast in args.actions.split(","):
+            cislo, _, nazev = cast.partition(":")
+            akce[int(cislo)] = nazev or f"akce{cislo}"
+        tela = [int(x) for x in args.bodies.split(",") if x.strip()]
+        data = export_sheets(args.install, args.export, tela, akce, args.dirs)
+        print(f"[anim] export: {len(data['sprites'])} spritu do {args.export}"
+              f" ({sum(len(z['frames']) for z in data['sprites'].values())} framu)")
+        for e in data["chyby"]:
+            print(f"[anim] CHYBA: {e}")
+        return 1 if data["chyby"] else 0
     if args.body is not None:
         p = pokryti(args.install)
         telo = args.body
