@@ -47,32 +47,33 @@ v `.forge/roadmap.json`.
 | id | soubor | provides | poznámka |
 |---|---|---|---|
 | `world.tiledata` | `sim/world/tiledata.gd` | `flags(tile:int)->int`, `height(tile:int)->int`, `layer(tile:int)->int`, `weight(item:int)->int`, `value(item:int)->int`, `name(tile:int)->String`, `is_land(tile:int)->bool`; data z `assets/uo/manifest.json` + `data/tiles.json` | závisí na vyřešení §3.3.1 |
-| `world.map` | `sim/world/map.gd` | `land_at(x:int,y:int)->int`, `z_at(x:int,y:int)->int`, `statics_at(x:int,y:int)->Array[Dictionary]` (`{tile,z,hue}`), `load_block(bx:int,by:int)->void`, `is_loaded(bx:int,by:int)->bool` | čte `.land`/`.statics` po blocích |
-| `world.walk` | `sim/world/walk.gd` | `can_step(from:Vector3i, dir:int, height:int, is_player:bool)->Dictionary` → `{ok:bool, z:int, reason:String}`; `surface_z(x:int,y:int)->int` | **jádro věrnosti pohybu**, algoritmus v §5.1 |
+| `world.map` | `sim/world/map.gd` | `_init(prefix:String = "res://assets/uo/world/map0")` — **cesty jsou vstup, ne konstanta** (`assets/uo` je v `.gitignore`, takže v CI nejsou); `land_at(x:int,y:int)->int`, `z_at(x:int,y:int)->int`, `statics_at(x:int,y:int)->Array[Dictionary]` — vrací **celý blok 8×8**, každý záznam `{tile,x,y,z,hue}` s **lokálním** `x`,`y` (0..7), světová dlaždice je `(bx*8+x, by*8+y)`; `load_block(bx:int,by:int)->void`, `is_loaded(bx:int,by:int)->bool` | čte `.land`/`.statics` po blocích; **není to „statiky na dlaždici"** — filtr na dlaždici si dělá volající (`world.walk`, `render.chunk`); viz §4.2.1 |
+| `world.walk` | `sim/world/walk.gd` | `_init(map = null, tiledata = null, stairs = null)` — **závislosti konstruktorem, ne konstantou** (jinak by `can_step` nešel změřit bez `assets/uo`); `can_step(from:Vector3i, dir:int, height:int = PERSON_HEIGHT, is_player:bool = true)->Dictionary` → `{ok:bool, z:int, reason:String}`; `surface_z(x:int,y:int)->int` | **jádro věrnosti pohybu**, algoritmus v §5.1; viz §4.2.1 |
 | `world.doors` | `sim/world/doors.gd` | `is_door(tile:int)->bool`, `toggle(tile:int)->int` (vrátí nový tile), `category(tile:int)->int`, `open_tile(cat:int, orient:int)->int` | data z `doors.txt` |
 | `world.teleport` | `sim/world/teleport.gd` | `teleport_target(x:int,y:int,z:int)->Variant` (`{x,y,z}` nebo `null`) | data z `teleprts.txt` + moongates z `data/moongates.json` |
 | `world.stairs` | `sim/world/stairs.gd` | `is_stair(tile:int)->bool`, `stair_group(tile:int)->Dictionary` | data z `stairs.txt` |
 | `world.regions` | `sim/world/regions.gd` | `region_at(x:int,y:int)->Dictionary` (`{name, is_town, is_guard_zone, music, spawn_table}`) | data z `data/regions.json` |
-| `world.time` | `sim/world/time.gd` | `hour()->int`, `minute()->int`, `is_night()->bool`, `light_level()->int` | `SecondsPerUOMinute = 5.0` → **den = 7200 s** (ověřeno v ServUO/ModernUO; viz §10 past P12) |
+| `world.time` | `sim/world/time.gd` | `hour()->int`, `minute()->int`, `is_night()->bool`, `light_level()->int`, **`bind(clock)->void`, `tick(ms)->void`** (DOPLNĚNO 2026-10-06: bez nich modul nikdo nenaplní časem — `world_time_ms` dřív plnily jen testy, takže `hour()` vracelo ve hře vždy 0; viz `tests/cases/time_clock.gd`) | `SecondsPerUOMinute = 5.0` → **den = 7200 s** (ověřeno v ServUO/ModernUO; viz §10 past P12) |
 | `world.spawn` | `sim/world/spawn.gd` | `register(point:Dictionary)->void`, `tick()->void`, `alive_at(point_id:int)->int` | spawnery z `data/spawns.json` |
 
 ### sim/entity
 
 | id | soubor | provides |
 |---|---|---|
-| `entity.mobile` | `sim/entity/mobile.gd` | `serial:int`, `body:int`, `hue:int`, `pos:Vector3i`, `dir:int`, `flags:int`, `hp/max_hp:int`, `stam/max_stam:int`, `mana/max_mana:int`, `stats:Stats`, `skills:Skills`, `equipment:Equipment`, `backpack:int`, `notoriety:int`, `fame:int`, `karma:int`, `ai:AiState` |
+| `entity.mobile` | `sim/entity/mobile.gd` | `serial:int`, `body:int`, `hue:int`, `name:String`, `pos:Vector3i`, `dir:int`, `flags:int`, `hp/max_hp:int`, `stam/max_stam:int`, `mana/max_mana:int`, `stats:Stats`, `skills:Skills` (obě **instance**, ne pole), `equip:Dictionary` (layer → serial; dřív tu stálo `equipment:Equipment`), `backpack:int`, `notoriety:int`, `fame:int`, `karma:int`, `hunger:int`, `ai:AiState` (`{state, target, home, timer_ms}`), `alive()->bool` |
 | `entity.item` | `sim/entity/item.gd` | `serial:int`, `tile:int`, `hue:int`, `amount:int`, `parent:int`, `layer:int`, `pos:Vector3i`, `flags:int`, `durability:int/max_durability:int`, `props:Dictionary` |
 | `entity.container` | `sim/entity/container.gd` | `can_add(c:int, item:Item)->Dictionary` (`{ok, reason}`), `add(c:int,item:Item)->bool`, `remove(c:int,item:int,amount:int)->int`, `weight_of(c:int)->int`, `contents(c:int)->Array[int]` |
 | `entity.equipment` | `sim/entity/equipment.gd` | `equip(m:int, item:int)->Dictionary`, `unequip(m:int, layer:int)->int`, `at_layer(m:int, layer:int)->int`, `total_weight(m:int)->int`, `bonus(m:int, key:String)->int` |
-| `entity.stats` | `sim/entity/stats.gd` | `str/dex/int:int`, `hits_max()->int` (= `50 + STR/2`), `stam_max()->int` (= DEX), `mana_max()->int` (= INT), `stat_total()->int` |
+| `entity.stats` | `sim/entity/stats.gd` | `str_:int`, `dex:int`, `int_:int` (dřív tu stálo `str/dex/int:int`; `int` je klíčové slovo a `str` by přebilo globální funkci `str()`), `hits_max()->int` (= `50 + STR/2`), `stam_max()->int` (= DEX), `mana_max()->int` (= INT), `stat_total()->int`, `at_cap()->bool` |
 | `entity.skills` | `sim/entity/skills.gd` | `value(skill:int)->int` (desetiny), `set_value(skill:int,v:int)->void`, `cap(skill:int)->int`, `total()->int`, `lock(skill:int)->int`, `set_lock(skill:int,l:int)->void` |
 | `entity.notoriety` | `sim/entity/notoriety.gd` | `level(m:int)->int` (1 innocent … 6 murderer, 7 invulnerable), `is_criminal(m:int)->bool`, `flag_criminal(m:int, ms:int)->void`, `murder_counts(m:int)->int`, `award_fame_karma(m:int, fame:int, karma:int)->void` |
+| `sim.entity_registry` | `sim/entity/registry.gd` | **DOPLNĚNO 2026-10-06 — smlouva pro granuli `sim.entity_registry` (kód ještě není):** drží `serial -> mobil`; `register(m)->void`, `get(serial)->Mobile|null`, `all()->Array`, `remove(serial)->void`. Je to **jediné místo, kde se mobil hledá podle serialu** — dnes tuhle díru obchází `sim.movement` (`register`/`mobile`) i `render.anim` (bere `serial` jako číslo těla). Viz §4.2.1 |
 
 ### sim/systems
 
 | id | soubor | provides | acceptance (konkrétní volání) |
 |---|---|---|---|
-| `sim.movement` | `sim/systems/movement.gd` | `request_step(m:int, dir:int, run:bool)->Dictionary` (`{ok, delay_ms, reason}`), `apply_step(m:int, dir:int)->void`, `consume_stamina(m:int, steps:int)->void` | `request_step(m, 0, false).delay_ms == 400`; po `apply_step` se `pos.x += 1` |
+| `sim.movement` | `sim/systems/movement.gd` | **odkud bere mobily (dohodnutý tvar, dokud nebude `sim.entity_registry`):** `register(mobile)->void`, `mobile(serial:int)`, `player_serial:int` (rozhoduje o asymetrické diagonále); `request_step(m:int, dir:int, run:bool)->Dictionary` (`{ok, delay_ms, reason}`), `apply_step(m:int, dir:int)->void`, `consume_stamina(m:int, steps:int)->void`, `pending_count()->int`, `delay_ms_for(run:bool)->int` | `request_step(m, 0, false).delay_ms == 400` **pro zaregistrovaný mobil** (jinak `{ok:false, reason:"no_mobile"}`); po `apply_step` se `pos.x += 1`; viz §4.2.1 |
 | `sim.interaction` | `sim/systems/interaction.gd` | `use(m:int, serial:int)->void`, `use_on(m:int, serial:int, target:Dictionary)->void`, `context_menu(m:int, serial:int)->Array[Dictionary]`, `context_action(m:int, serial:int, entry:int)->void` | `use(m, anvil)` nic neudělá; `use_on(m, ore, {"serial": forge})` spustí tavení |
 | `sim.combat` | `sim/systems/combat.gd` | `set_war(m:int, on:bool)->void`, `attack(m:int, target:int)->void`, `swing_delay_ms(m:int)->int`, `resolve_swing(m:int, t:int)->Dictionary`, `stop_combat(m:int)->void` | `swing_delay_ms` na `dex=100, speed=30` vrátí hodnotu dle vzorce z §5.5 |
 | `sim.magic` | `sim/systems/magic.gd` | `cast(m:int, spell:int)->Dictionary` (`{ok, delay_ms, reagents, reason}`), `interrupt(m:int)->void`, `add_spell(m:int, spell:int)->bool`, `scribe(m:int, scroll:int)->bool` | `cast` bez reagent → `{ok:false, reason:"reagents"}` |
@@ -124,7 +125,7 @@ v `.forge/roadmap.json`.
 | `render.hue` | `render/hue_cache.gd` | `(art_id, hue)` → textura (index 0 = použij hue) |
 | `render.sort` | `render/sort.gd` | **jediná** funkce řazení (land → statics podle z → mobilové podle z) |
 | `render.chunk` | `render/chunk_renderer.gd` | sestavení kreslicího seznamu pro viditelné bloky, cache |
-| `render.anim` | `render/anim_player.gd` | framy těl a worn artu podle `animdata`, časování 80 ms |
+| `render.anim` | `render/anim_player.gd` | `play(serial:int, action:int, dir:int, now_ms:int = -1)->Dictionary` → `{ok, texture, frame, count, anchor, mirror, mirror_x, sprite_dir}` (chybějící sprite = `ok:false` + `texture:null`); framy těl a worn artu podle `animdata`, časování 80 ms; **`serial` se bere jako číslo těla** (registr entit není — viz `sim.entity_registry`); zrcadlení 8 → 5 směrů a `mirror_x` viz §4.2.1 |
 | `render.names` | `render/name_plates.gd` | jména a HP pruhy nad mobily (jen na dosah/po kliku) |
 | `render.light` | `render/light_layer.gd` | úroveň světla z `world.time`, světelné zdroje (louče, okna) |
 | `render.effects` | `render/effects.gd` | kouř, oheň, zásah, smrt, animace kouzel |
@@ -138,6 +139,59 @@ v `.forge/roadmap.json`.
 | `app.input` | `app/input_map.gd` | mapování kláves a myši na `Command` (jediné místo s `Input`) |
 | `app.menu` | `app/menu.gd` | hlavní menu, výběr postavy, uložit/načíst |
 | `app.char_create` | `app/char_create.gd` | tvorba postavy: profese, staty, skilly, jméno, barvy |
+
+### 4.2.1 Co registry dosud nepinovaly (DOPLNĚNO 2026-10-06)
+
+Doplněk smlouvy: co dělá **dnešní kód**, ale tabulky výš to neříkaly. Kde se text
+změnil, je tu i **původní znění** — historie se nepřepisuje, jen doplňuje.
+
+- **`render.anim` — tvar návratu `play(...)`:** kód vrací
+  `{ok, texture, frame, count, anchor, mirror, mirror_x, sprite_dir}`; chybějící
+  sprite vrací `ok:false` a `texture:null` (prázdno nesmí vypadat jako úspěch).
+  Dřív tu stálo jen „framy těl a worn artu podle `animdata`, časování 80 ms" — tedy
+  ani tvar návratu, ani odkud se bere tělo, ani zrcadlení.
+  `mirror_x` = `w - cx` je potřeba proto, že **zrcadlený** sprite se kreslí na
+  `tile_x - (w - cx)` (ClassicUO `MobileView.cs:712`, ověřeno); do `anchor`
+  (`Vector2(cx, cy + h)`) se zrcadlení nevejde.
+- **Odkud se bere tělo pro `play`:** registr bytostí neexistuje, proto
+  `play(serial, action, dir)` bere `serial` jako **číslo těla (art id)**, ne jako
+  serial mobily. Až vznikne `sim.entity_registry`, patří převod `serial -> body` tam.
+- **Zrcadlení 8 směrů na 5:** `anim.mul` má **5 směrů**, hra **8**. Osa zrcadlení je
+  **svislá osa obrazovky** (projekce `screen = ((x-y), (x+y)) * ISO_STEP`), proto jsou
+  zrcadlové dvojice **(E,S), (NE,SW), (N,W)** a **SE/NW leží na ose** (nezrcadlí se).
+  Ověřeno proti ClassicUO `GetAnimDirection`
+  (`_src/classicuo/src/ClassicUO.Renderer/Animations/Animation.cs:76`).
+  **Pozor:** příklad „směr 4 = západ je zrcadlený s 0 = východ" na data **nesedí** —
+  západ je `sprite 3` bez zrcadla, východ `sprite 1` zrcadleně; každý má jiný sprite.
+- **`world.map.statics_at` vrací CELÝ BLOK, ne dlaždici.** Dřív tu stálo
+  `statics_at(x,y)->Array[Dictionary]` (`{tile,z,hue}`). Kód vrací záznamy celého
+  bloku 8×8, každý s **lokálním** `x`,`y` (0..7): `{tile,x,y,z,hue}`. Filtr na dlaždici
+  si dělá **volající** (`world.walk`, `render.chunk`) — blok je to, co je v souboru
+  (docs/03 §3.4), a filtrováním by se zahodila informace, kterou renderer potřebuje.
+- **`world.walk`: závislosti KONSTRUKTOREM.** `_init(map = null, tiledata = null,
+  stairs = null)`. Dřív tu stálo jen `can_step(from, dir, height, is_player)` bez
+  výchozích hodnot a bez konstruktoru. Kdyby závislosti byly konstanty, `can_step`
+  by se nedal změřit bez `assets/uo` — a ta jsou v `.gitignore`, takže v CI nejsou.
+  Stejný vzor jako `world.map._init(prefix)`.
+- **`sim.movement`: kde bere mobily.** Smlouva uváděla jen `request_step(m, ...)`
+  a neříkala, odkud systém `m` vezme. Dnes si je drží **sám** (`register(mobile)`,
+  `mobile(serial)`) a `SimWorld` dostane systém z integračního místa (`app/main.gd`).
+  Přijímací kritérium `request_step(m, 0, false).delay_ms == 400` proto platí **jen
+  pro zaregistrovaný mobil** — jinak vrací `{ok:false, reason:"no_mobile"}`.
+  `SimWorld.snapshot()` vrací `mobiles: []`, takže **klient mobily odsud nevidí**;
+  přesně tuhle díru má zavřít `sim.entity_registry`.
+- **`entity.mobile` sjednoceno s §4.5 (a s kódem).** Tabulka dřív uváděla
+  `equipment:Equipment`, `skills:Skills` a `stats:Stats`, ale neměla `name`, `hunger`
+  ani `ai`; §4.5 měl `str/dex/int`, `skills:PackedInt32Array` + `skill_locks` a `equip`.
+  Platí **kód**: `equip:Dictionary` (layer → serial; `entity.equipment` ještě
+  neexistuje), `skills` a `stats` jako **instance** (`sim/entity/skills.gd`,
+  `sim/entity/stats.gd` — klíč `int_`, protože `int` je klíčové slovo), dále `name`,
+  `hunger`, `ai` a `alive()->bool`.
+- **`sim.entity_registry` je granule i komponenta.** Granule `sim.entity_registry`
+  v `.forge/roadmap.json` **existuje** (ověřeno 2026-10-06: 111 granul, `owns:
+  sim/entity/registry.gd`, `depends_on: core.serial + entity.mobile`), takže řádek
+  výš a roadmapa se shodují; kód (`registry.gd`) ještě není. Kdyby se `provides`
+  v roadmapě změnilo, platí roadmapa (je to klíč plánu) a smlouva se doplní.
 
 ## 4.3 Příkazy klient → simulace
 
@@ -198,17 +252,24 @@ vybere jednou za frame.
 Vector3i  # pozice: x, y = dlaždice (int), z = světová výška (int)
 # serial: int >= 0x40000000 = mobile, < = item (viz core.serial)
 
-# Mobile (sim/entity/mobile.gd)
+# Mobile (sim/entity/mobile.gd) - TVAR JE Z KODU (DOPLNENO 2026-10-06, sjednoceno s §4.2; viz §4.2.1)
 { serial:int, body:int, hue:int, name:String,
   pos:Vector3i, dir:int, flags:int,
   hp:int, max_hp:int, stam:int, max_stam:int, mana:int, max_mana:int,
-  str:int, dex:int, int:int,               # POZOR: 'int' je klíčové slovo → použij stats.int_
-  skills:PackedInt32Array,                  # 58 hodnot v desetinách
-  skill_locks:PackedInt32Array,             # 0=up, 1=down, 2=locked
-  equip:Dictionary,                         # layer:int -> item serial:int
+  stats:Stats,                              # INSTANCE sim/entity/stats.gd; klice `str_`, `dex`, `int_`
+                                            #   (driv tu stalo `str:int, dex:int, int:int`; `int` je
+                                            #   klicove slovo a `str` by prebilo globalni funkci `str()`)
+  skills:Skills,                            # INSTANCE sim/entity/skills.gd - `values` i `locks` jsou
+                                            #   uvnitr (driv tu stalo `skills:PackedInt32Array` +
+                                            #   `skill_locks:PackedInt32Array`)
+  equip:Dictionary,                         # layer:int -> item serial:int; `entity.equipment` jeste
+                                            #   neexistuje, proto `equip` (driv proti sobe §4.2
+                                            #   `equipment:Equipment` a §4.5 `equip:Dictionary`)
   backpack:int,                             # serial batohu
   notoriety:int, fame:int, karma:int, hunger:int,
-  ai:{ state:String, target:int, home:Vector3i, timer_ms:int } }
+  ai:{ state:String, target:int, home:Vector3i, timer_ms:int },
+  # metoda: alive()->bool (v puvodnim tvaru chybela, v kode je)
+}
 
 # Item (sim/entity/item.gd)
 { serial:int, tile:int, hue:int, amount:int,

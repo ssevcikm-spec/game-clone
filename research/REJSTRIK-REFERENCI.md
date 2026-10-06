@@ -159,7 +159,7 @@ zapamatování: **dvě různé konstanty téhož jména.**
 | RunUO | `Server/Mobile.cs:3050` | 400/200/200/100 | pravidlo serveru (pěšky/mount × chůze/běh) |
 | ServUO | `Server/Mobile.cs:3063` | tytéž hodnoty | totéž, beze změny (sem míří `docs/05 §5.1.1`) |
 | ModernUO | `Projects/Server/Mobiles/Movement.cs:33` | 400 (default) | totéž, ale jako **konfigurovatelný klíč** `movement.delay.walkFoot` |
-| ClassicUO (klient) | `src/ClassicUO.Client/Game/Data/MovementSpeed.cs:13` | 400 | jak často klient **smí** poslat krok |
+| ClassicUO (klient) | `src/ClassicUO.Client/Game/Data/MovementSpeed.cs:12` | 400 | jak často klient **smí** poslat krok |
 | ClassicUO (klient) | `src/ClassicUO.Client/Game/Constants.cs:19` | **150** | `WALKING_DELAY` = **jiná věc** (tempo lokální animace), ne pravidlo |
 | my | `core/const.gd:31` | 400/200/200/100 | `WALK_MS`, `RUN_MS`, `MOUNT_*` — a `Const.TURN_MS` = 80 pro frame animace |
 

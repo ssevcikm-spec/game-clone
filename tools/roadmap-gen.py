@@ -124,52 +124,52 @@ g("app.input", "Mapování vstupu", ["app/input_map.gd"],
 g("assets.uop", "Čtení UOP kontejneru", ["tools/uoextract/uop.py"],
   deps=["boot.project"],
   provides=["UopFile: hlavička, hash tabulka, hash funkce, zlib dekomprese, get(hash) -> bytes"],
-  acceptance=["assets"], milestone="M1", size="<= 150", model="strong",
+  acceptance=["assets", "selftest"], milestone="M1", size="<= 150", model="strong",
   prompt="Portuj MYP0 cteni (docs/03 §3.5, research/05 §1.2, research/07). ART SE UZ EXTRAHOVAT PODARILO (soubor je v tools/uoextract/), takze vychazej z nej. Zbyvaji DVA ROZPORY, ktere rozhodni TESTEM, ne podle zdroje: (1) hash jmena zaznamu - Jenkins hashlittle2 (seed len + 0xDEADBEEF) vs CreateHash z ClassicUO (jedna vetev 100 %, druha 1636/2000); implementuj obe, změř na 2 000 indexech, pouzij tu se 100 %. (2) komprese gumpart - BWT vs zlib; dekomprimuj batoh a PODIVEJ SE na nej (read_image). Hlavicka: u64 nextBlock@12, u32 blockSize@20, i32 count@24 (u map ZAPORNE), u32 concurrency@28. Staticky art = tiledata_id + 0x4000.")
 g("assets.tiledata", "Čtení tiledata", ["tools/uoextract/tiledata.py"],
   deps=["assets.uop"],
   provides=["land(tile) -> {flags, texture, name}", "item(tile) -> {flags, weight, layer, count, anim_id, hue, light, height, name}"],
-  acceptance=["assets", "content"], milestone="M1", size="<= 150", model="strong",
+  acceptance=["assets", "content", "selftest"], milestone="M1", size="<= 150", model="strong",
   prompt="LAYOUT JE VYŘEŠENÝ (docs/03 §3.3.1) - nehledej ho znovu: land = offset 4, 512 skupin x (u32 hlavicka + 32 zaznamu x 30 B) = [u64 flags][u16 texId][20B jmeno]; item = offset 493568, 2048 skupin x (u32 + 32 x 41 B) = [u64 flags][u8 weight][u8 layer][i32 count][u16 animID][u16 hue][u16 light][u8 height][20B jmeno, na +21]; soucet = 3 188 736 B, rezerva 0 B. Portuj z ClassicUO (BSD-2). OVER: u vsech predmetu s flagem Wearable (0x00400000) je vrstva nenulova a sedi na jmeno (leather cap -> 6, backpack -> 21, dagger -> 1, anvil -> weight 255 layer 0). POZOR: tato instalace NEMA klasicka jmena (zadne 'leather gloves'/'gold'/'bandage') - obsah se vybira podle vlastnosti, ne podle klasickych seznamu (docs/03 §3.3.1b).")
 g("assets.cliloc", "Čtení kliloků", ["tools/uoextract/cliloc.py"],
   deps=["boot.project"],
   provides=["cliloc(id) -> String", "cliloc_all() -> Dictionary"],
-  acceptance=["assets", "content"], milestone="M1",
+  acceptance=["assets", "content", "selftest"], milestone="M1",
   prompt="Cliloc.enu je BWT-komprimovany (docs/03 §3.3.2): kdyz data[3] == 0x8E, rozbal BWT (port z ClassicUO ClilocLoader.cs, BSD-2), pak preskoc u32+u16 a ctni zaznamy [i32 cislo][u8 flag][i16 delka v BAJTECH][UTF-8 text]. OVER: vypis 5 po sobe jdoucich zaznamu a najdi v souboru anglicky text.")
 g("assets.art", "Dekódování artu", ["tools/uoextract/art.py"],
   deps=["assets.uop"],
   provides=["art(item_id) -> RGBA obrázek", "land_art(tile_id) -> RGBA"],
-  acceptance=["assets"], milestone="M1",
+  acceptance=["assets", "selftest"], milestone="M1",
   prompt="RLE formát 16bit (0x8000 = neprůhledný) podle docs/03 §3.5. Ověř: 6 známých art ID ulož jako PNG, zkontroluj rozměry a podívej se na ně (read_image).")
 g("assets.gump", "Dekódování gumpů", ["tools/uoextract/gump.py"],
   deps=["assets.uop"],
   provides=["gump(id) -> RGBA"],
-  acceptance=["assets"], milestone="M1",
+  acceptance=["assets", "selftest"], milestone="M1",
   prompt="gumpart 16bit s alfou (docs/03 §3.5.1). Ověř na známém gumpu (batoh/paperdoll) a podívej se na výsledek.")
 g("assets.hues", "Barvy z hues.mul", ["tools/uoextract/hues.py"],
   deps=["boot.project"],
   provides=["hues.json: 3000 sad x 32 barev + start + end + jmeno"],
-  acceptance=["assets"], milestone="M1",
+  acceptance=["assets", "selftest"], milestone="M1",
   prompt="LAYOUT JE OVERENY (docs/03 §3.2b): 375 skupin x (4 B hlavicka + 8 x 88 B) = 3000 sad, 265 500 B presne; zaznam = 32 barev (u16) + start (u16) + end (u16) + 20B jmeno. POZOR: plochy model (4 + k*88) je SPATNY - posouva se o 4 B kazdych 8 zaznamu. Over semanticky: text 'Hue (X->Y)' musi sedet s poli start/end u vsech zazanamu (spravny model da ~1000/1000, plochy jen ~47).")
 g("assets.anim", "Animace těl", ["tools/uoextract/anim.py"],
   deps=["assets.uop", "assets.art"],
   provides=["anim(body, action, dir) -> framy + časování"],
-  acceptance=["assets"], milestone="M1", size="<= 150", model="strong",
+  acceptance=["assets", "selftest"], milestone="M1", size="<= 150", model="strong",
   prompt="Rozhodni zdroj (anim*.mul vs AnimationFrame*.uop) podle pokrytí těl (docs/03 §3.5.1, O3) a zapiš rozhodnutí. Extrahuj jen těla, která obsah potřebuje.")
 g("assets.worldmap", "Mapa a statiky", ["tools/uoextract/worldmap.py"],
   deps=["assets.uop", "assets.tiledata"],
   provides=["map0.land", "map0.statics.bin/.idx", "map0.meta.json"],
-  acceptance=["assets", "content"], milestone="M1", size="<= 150", model="strong",
+  acceptance=["assets", "content", "selftest"], milestone="M1", size="<= 150", model="strong",
   prompt="Format a matematika bloku podle docs/03 §3.4: blok je 196 B = u32 hlavicka + 64 x 3 B (u16 tile_id, i8 z) - POZOR, bunka je 3bajtova, ne 4bajtova (overeno dekompresi bloku na presnych 0xC4000 B). Prijimaci kriterium: index statics se precte cely, Britain (1495,1630) ma statiky, voda tvori souvisle plochy.")
 g("assets.textdata", "Textová a pravidlová data", ["tools/uoextract/textdata.py"],
   deps=["boot.project"],
   provides=["data z doors.txt, stairs.txt, teleprts.txt, misc.txt, body.def, Corpse.def, Bodyconv.def, Equipconv.def, animinfo, mobtypes.txt, skills.mul, skillgrp.mul"],
-  acceptance=["assets", "content"], milestone="M1",
+  acceptance=["assets", "content", "selftest"], milestone="M1",
   prompt="Převeď do JSON podle docs/03 §3.6. Ověř počty: doors 37 kategorií, skills 58 jmen, skillgrp 6 skupin.")
 g("assets.atlas", "Atlas a manifest", ["tools/uoextract/atlas.py"],
   deps=["assets.art", "assets.gump", "assets.anim", "assets.hues"],
   provides=["atlas/*.png (2048²)", "manifest.json (art, gumps, anim, source sha256, ox/oy)"],
-  acceptance=["assets"], milestone="M1", size="<= 150", model="strong",
+  acceptance=["assets", "selftest"], milestone="M1", size="<= 150", model="strong",
   prompt="Shelf-pack, deterministické řazení, offsety zarovnání (docs/03 §3.5.2). Dva běhy musí dát shodný SHA-256 manifestu.")
 g("assets.verify", "Ověření extrakce", ["tools/uoextract/verify.py"],
   deps=["assets.atlas", "assets.tiledata"],
@@ -224,7 +224,7 @@ g("render.names", "Jména a pruhy", ["render/name_plates.gd"],
 g("render.light", "Světlo dne a zdroje", ["render/light_layer.gd"],
   deps=["world.time"],
   provides=["úroveň světla", "světelné zdroje (louče, okna)"],
-  acceptance=["render"], milestone="M1",
+  acceptance=["render"], milestone="M7",
   prompt="Úroveň z world.time (den 12, dungeon 26) + bodová světla (docs/05 §5.11).")
 g("data.items", "Katalog předmětů", ["data/items.json"],
   deps=["assets.tiledata"],
@@ -309,10 +309,10 @@ g("world.time", "Herní čas a světlo", ["sim/world/time.gd"],
   acceptance=["tests"], milestone="M2",
   prompt="SecondsPerUOMinute = 5.0 → den 7200 s (docs/05 §5.11, past P12). Test: po 7200 s je stejná hodina jako na začátku.")
 g("sim.interaction", "Interakce (use / use-on)", ["sim/systems/interaction.gd"],
-  deps=["entity.container", "entity.equipment", "world.doors", "sim.craft", "sim.magic"],
+  deps=["entity.container", "entity.equipment", "world.doors"],
   provides=["use(m, serial)", "use_on(m, serial, target)", "context_menu(m, serial)", "context_action(m, serial, entry)"],
   acceptance=["tests", "replay"], milestone="M2", size="<= 150", model="strong",
-  prompt="Routing podle docs/05 §5.2.2 a párová tabulka §5.2.3 (kontrolní seznam z Tilehelp.enu). Neznámý předmět → hláška, nikdy ticho.")
+  prompt="Routing podle docs/05 §5.2.2 a párová tabulka §5.2.3 (kontrolní seznam z Tilehelp.enu). Neznámý předmět → hláška, nikdy ticho. Routing do `sim.craft`/`sim.magic` je DYNAMICKÝ (když systém v `SimWorld.systems` není, `use_on` vrátí `{ok:false, reason:'not_available'}`) - proto to není `depends_on`.")
 g("ui.hud", "Kotvy a okna", ["ui/hud.gd"],
   deps=["app.main"], provides=["okna, jejich pozice a ukládání rozložení"],
   acceptance=["smoke"], milestone="M2",
@@ -379,7 +379,7 @@ g("sim.decay", "Rozpad předmětů", ["sim/systems/decay.gd"],
 # ---------------------------------------------------------------- M4 skilly, sběr, výroba
 g("data.skills", "Data skillů", ["data/skills.json"],
   deps=["assets.textdata"], provides=["58 skillů: id, jméno, skupina, stat primární/sekundární, implemented"],
-  acceptance=["content", "schema"], milestone="M4", kind="data",
+  acceptance=["content", "schema"], milestone="M2", kind="data",
   prompt="Jména a pořadí z skills.mul (ověřeno, docs/11.1), mechaniky z research/02. `implemented: false` pro Necromancy/Bushido/Ninjitsu/Spellweaving/Throwing/Imbuing/Mysticism (docs/05 §5.16).")
 g("sim.skill_gain", "Růst skillů a statů", ["sim/systems/skill_gain.gd"],
   deps=["entity.skills", "entity.stats"], provides=["check(m, skill, difficulty)", "gain_stat(m, stat)"],
@@ -471,7 +471,7 @@ g("data.spawns", "Spawn tabulky", ["data/spawns.json"],
   prompt="Z research/06 §5 (docs/06 §6.7) — regionální tabulky, prodlevy 5-10 min, refill 1/3.")
 g("data.regions", "Regiony, moongates, dungeony", ["data/regions.json", "data/moongates.json", "data/dungeons.json"],
   deps=["data.gen_content"], provides=["19 měst s hranicemi, 9 moongate, 3 dungeony"],
-  acceptance=["content", "schema"], milestone="M7", kind="data",
+  acceptance=["content", "schema"], milestone="M2", kind="data",
   prompt="Z research/06 §1 (docs/06 §6.7) — přesné souřadnice.")
 g("data.professions", "Profese pro tvorbu postavy", ["data/professions.json"],
   deps=["data.skills"], provides=["8 profesí: skilly, staty, výbava"],
@@ -512,6 +512,61 @@ g("docs.credits", "Zdroje a poděkování", ["CREDITS.md"],
   acceptance=["schema"], milestone="M8", kind="doc",
   prompt="Zapiš zdroje: instalace UO (verze, SHA-256), ClassicUO (BSD-2), SphereServer (Apache-2.0), fakta ze ServUO/ModernUO (GPL, jen čísla), volné assety (docs/03 §3.1, docs/11.2).")
 
+# ---------------------------------------------------------------- doplněno 2026-10-06 (revize plánu)
+# Vlastníci pro soubory, které existovaly BEZ granule, a pro nové potřeby,
+# které vyplynuly z implementace (revize plánu, nálezy N6):
+g("app.scene", "Scéna a uzly", ["app/main.tscn"],
+  deps=["app.main"], provides=["uzly Main/Camera/WorldView/PlayerController"],
+  acceptance=["smoke"], milestone="M2",
+  prompt="Scéna je integrační místo: uzly a jejich skripty (docs/02 §2.5). Uzly, které nemá žádná granule, patří sem - dnes je to Camera, WorldView a PlayerController.")
+g("app.player_view", "Kreslení hráče a světa", ["app/world_view.gd"],
+  deps=["app.main", "render.chunk", "render.anim", "render.hue", "render.sort"],
+  provides=["svět na obrazovce", "postava v pořadí kreslení"],
+  acceptance=["render", "tests"], milestone="M2",
+  prompt="Jediné místo, kde se seznam z render.chunk mění na pixely (docs/02 §2.4). Řazení postavy mezi statiky MUSÍ jít přes `render.sort.sort_key` (jediná funkce řazení) - ne přes vlastní porovnání `x + y`.")
+g("app.player_controller", "Kamera a ovládání hráče", ["app/player_controller.gd"],
+  deps=["app.input", "app.loop", "sim.movement"],
+  provides=["kamera sleduje hráče", "vazby kláves (dočasně, než bude ui.hotkeys)", "stav animace (walk/idle)"],
+  acceptance=["tests"], milestone="M2",
+  prompt="Kamera se posouvá po dlaždicích (žádný plynulý lerp, docs/05 §5.1.4) a musí respektovat `z` hráče (`iso.to_screen` odečítá `z * Z_SCALE`). Vazby kláves patří do `ui.hotkeys`; než vznikne, drží je tenhle soubor a je to vidět v hlavičce.")
+g("sim.entity_registry", "Registr bytostí", ["sim/entity/registry.gd"],
+  deps=["core.serial", "entity.mobile"],
+  provides=["register(m) -> void", "get(serial) -> Mobile|null", "all() -> Array", "remove(serial) -> void"],
+  acceptance=["tests"], milestone="M2",
+  prompt="Jedno místo, kde se hledá mobil podle serialu. Dnes to obchází `sim.movement` (drží si mobily sám) a `render.anim` (bere `serial` jako číslo těla) - obojí je díra ve smlouvě docs/04 §4.2. Registr ji zavře: `play(serial, ...)` si tělo vyzvedne tady.")
+g("sim.pathfind", "Hledání cesty", ["sim/world/pathfind.gd"],
+  deps=["world.map", "world.walk"],
+  provides=["find(from, to, limit) -> Array[Vector3i]", "next_step(from, to) -> Vector3i"],
+  acceptance=["tests"], milestone="M2", size="<= 150", model="strong",
+  prompt="A* nad dlaždicemi; průchodnost se ptá `world.walk.can_step` (nikdy vlastní kopie pravidel). Vzory: ClassicUO `src/ClassicUO.Client/Game/Pathfinder.cs:868`, ServUO `Scripts/Services/Pathing/FastAStarAlgorithm.cs:16` (viz research/REJSTRIK-REFERENCI.md). Konzumenti: click-to-move (klient) a `sim.ai`.")
+g("assets.sounds", "Zvuky a hudba (extrakce)", ["tools/uoextract/sounds.py"],
+  deps=["assets.uop"], provides=["zvuky z sound.mul/.uop", "hudba z music/digital"],
+  acceptance=["assets", "content"], milestone="M1",
+  prompt="Extrakce jako u ostatních assetů. POZOR (naměřeno v ClassicUO `SoundsLoader.cs:266`): přehrávač odmítne audio, které není 44,1 kHz stereo - při konverzi to musí sedět, jinak se soubor tiše nepřehraje.")
+g("audio.playback", "Přehrávání zvuku", ["app/sound.gd"],
+  deps=["assets.sounds", "app.loop"],
+  provides=["play(id, volume)", "play_at(id, pos, listener)", "music(id)"],
+  acceptance=["tests"], milestone="M8",
+  prompt="Zvuk nikdy nemění stav simulace (docs/02 §2.2) - jen reaguje na události z `sim.events`. Vzdálenost tlumí podle pozice hráče.")
+g("app.config", "Typovaná konfigurace", ["app/config.gd"],
+  deps=["data.balance"],
+  provides=["get(key, default) -> Variant", "known_keys() -> Array", "check() -> Array chyb"],
+  acceptance=["tests"], milestone="M9",
+  prompt="Modernizace (M9): jedna tabulka klíč + typ + default + rozsah; neznámý klíč se HLÁSÍ (dnes se `data/balance.json` čte ad hoc na více místech). Vzor: ModernUO `Projects/Server/Configuration/ServerConfiguration.cs:43` (`GetSetting`/`GetOrUpdateSetting`). Pravidlo M9: modernizace nesmí ubrat žádné měření.")
+g("app.metrics", "Měření výkonu", ["app/metrics.gd"],
+  deps=["app.loop", "app.player_view"],
+  provides=["fps() -> float", "frame_ms() -> float", "drawn_objects() -> int", "report() -> Dictionary"],
+  acceptance=["tests", "render"], milestone="M9",
+  prompt="Modernizace (M9) potřebuje čísla, ne dojem: kolik objektů se kreslí, kolik ms trvá frame, kolik textur je v cache. `render.textures.stats()` a `app/world_view.drawn` už čísla mají - tohle je sbírá a vypisuje.")
+g("render.chunk_mesh", "Dávkové kreslení bloků", ["render/chunk_mesh.gd"],
+  deps=["render.chunk", "render.textures"],
+  provides=["mesh pro blok (land + statiky)", "rebuild při invalidaci"],
+  acceptance=["render", "tests"], milestone="M9", size="<= 150", model="strong",
+  prompt="Modernizace (M9): místo tisíce draw callů na dlaždici jedna dávka na blok. Vzor: ClassicUO `src/ClassicUO.Client/Game/Map/ChunkMesh.cs:121` (+ `MeshLayer.cs`, `TextureBucketTracker`). Musí zůstat STEJNÝ obraz jako `render.chunk` - dokázat snímkem a paritním testem, ne tvrzením.")
+
+# Pořadí milníků pro kontrolu "závislost nesmí být později" (revize 2026-10-06).
+MILNIKY_PORADI = ["M0", "M1", "M2", "M3", "M4", "M5", "M6", "M7", "M8", "M9"]
+
 
 def main() -> int:
     check = "--check" in sys.argv
@@ -526,6 +581,20 @@ def main() -> int:
             errs.append(f"{x['id']}: prázdné owns")
         if not x["acceptance"]:
             errs.append(f"{x['id']}: prázdné acceptance")
+
+
+    # milník vs závislost: závislost nesmí být v POZDĚJŠÍM milníku (revize 2026-10-06)
+    podle_id = {x["id"]: x for x in G}
+    for x in G:
+        for d in x["depends_on"]:
+            if d not in podle_id:
+                continue
+            a = MILNIKY_PORADI.index(x["milestone"]) if x["milestone"] in MILNIKY_PORADI else 99
+            b = (MILNIKY_PORADI.index(podle_id[d]["milestone"])
+                 if podle_id[d]["milestone"] in MILNIKY_PORADI else 99)
+            if b > a:
+                errs.append(f"{x['id']} ({x['milestone']}) čeká na {d} "
+                            f"({podle_id[d]['milestone']}) - závislost je později")
 
     # kolize owns mezi granulemi
     owner = {}
@@ -559,7 +628,9 @@ def main() -> int:
             "Pravidla: 1 granule = 1 soubor, owns je výlučné, depends_on znamená 'hotové a funkční'.",
             "kind: code | data | gate | bootstrap | doc. Bootstrap granule NEJSOU pro agenty (zakázané soubory).",
             "size_lines/model: výchozí '<= 60' a 'any'; 'strong' jen pro deklarované velké celky.",
-            "acceptance: tests | wiring | content | assets | render | save | determinism | replay | smoke | schema.",
+            "acceptance: tests | wiring | content | assets | render | save | determinism | replay | smoke | schema | selftest (nástroj má vlastní --self-test, běží v run-all --self-test).",
+            "size_lines je ORIENTAČNÍ deklarace; skutečné počty a překročení hlásí `python tools/plan-status.py` (měřeno, ne deklarováno).",
+            "Stav granul (`done`) se tady NEVEDE ručně: měří ho `tools/plan-status.py` (soubor v gitu + test).",
             "Postup a milníky: docs/07-granule-a-milniky.md; smlouvy: docs/04-architektura-a-smlouvy.md.",
         ],
         "milestones": [
@@ -572,6 +643,7 @@ def main() -> int:
             {"id": "M6", "title": "Magie"},
             {"id": "M7", "title": "Ekonomika a svět"},
             {"id": "M8", "title": "Trvanlivost a uzavření"},
+            {"id": "M9", "title": "Modernizace (bez ubrání měření)"},
         ],
         "grains": G,
     }
@@ -592,7 +664,14 @@ def main() -> int:
         return 1
 
     if check:
-        print("\nOK: DAG je konzistentní (žádná chybějící závislost, kolize owns ani cyklus).")
+        if OUT.exists():
+            stary_json = json.loads(OUT.read_text(encoding="utf-8"))
+            if stary_json != doc:
+                print("\nCHYBA: .forge/roadmap.json nesedí s generátorem - "
+                      "spusť `python tools/roadmap-gen.py`")
+                return 1
+        print("\nOK: DAG je konzistentní (žádná chybějící závislost, kolize owns ani cyklus), "
+              "milníky sedí na závislosti a .forge/roadmap.json je aktuální.")
         return 0
 
     OUT.parent.mkdir(parents=True, exist_ok=True)

@@ -21,6 +21,21 @@
 
 Mount = přesně 2× rychlost pěšky. To se v žádné éře neměnilo.
 
+**⚠ DOPLNĚNO 2026-10-06 — pravidlo je SERVEROVÉ a klient má jinou konstantu téhož
+jména.** Prodleva kroku **400 ms je pravidlo serveru** (ServUO `Server/Mobile.cs:3063`,
+ModernUO `Movement.cs:33`); klient ho jen respektuje. ClassicUO má ale **dvě různé
+věci**, které se pletou:
+
+- `src/ClassicUO.Client/Game/Data/MovementSpeed.cs:12` — `STEP_DELAY_WALK = 400`,
+  tj. **jak často klient smí poslat krok** (totéž pravidlo na straně klienta),
+- `src/ClassicUO.Client/Game/Constants.cs:19` — `WALKING_DELAY = 150`,
+  tj. **tempo lokální animace** (v kódu s komentářem `// 750`), **ne** pravidlo pohybu.
+
+**Kdo si vezme 150 jako prodlevu kroku, udělá krok 2,7× rychlejší** (400 / 150 = 2,67).
+Stejná past jako u otočení a animace: `Constants.cs:17 TURN_DELAY = 80` (otočení na
+místě) a `Constants.cs:13 CHARACTER_ANIMATION_DELAY = 80` (frame animace) jsou dvě
+různé věci se stejnou hodnotou — proto je tabulka výš uvádí jako dva řádky.
+
 ### 5.1.2 Algoritmus průchodnosti (jádro věrnosti)
 
 Konstanty: `PERSON_HEIGHT = 16`, `STEP_HEIGHT = 2`.
@@ -328,6 +343,23 @@ dostane hlášku; `state_hash` po 10 000 pokusech je stejný ve dvou bězích.
 | Regiony | města, divočina, dungeony; určují hudbu, spawn tabulku a guard zónu |
 | Teleporty | moongate (9 bran s přesnými souřadnicemi v `research/06`) + teleport dlaždice z `teleprts.txt` |
 | Dveře/schody | z `doors.txt` / `stairs.txt` (§3.6) |
+
+**⚠ OTEVŘENÉ ROZHODNUTÍ — „úroveň dne" a průběh dne (DOPLNĚNO 2026-10-06, nerozhoduji):**
+řádek výš uvádí „úroveň dne **12**" a stejné číslo mají **dva další zdroje**:
+`ZADANI-UO-KLON.md` §10 bod 20 („Světlo: den / dungeon — 12 / 26") a dnešní kód
+(`sim/world/time.gd`: `LIGHT_DAY = 12`, `LIGHT_DUNGEON = 26`).
+**Naměřený zdroj ale říká něco jiného:** `research/01-core-mechanics.md` §4.2 měří
+v ServUO `LightCycle.cs` **`DayLevel = 0`** (0 = nejjasnější) a **`NightLevel = 12`** —
+12 je tedy úroveň **noci**, ne dne (`DungeonLevel = 26` a `JailLevel = 9` sedí ve všech
+zdrojích). Rozpor je i v **průběhu dne**: OSI má **binární** den/noc (noc 00:00–03:59,
+den 04:00–23:59), RunUO/ServUO k tomu přidává dvouhodinový **přechodový ramp** — a to je
+**rozhodnutí éry** (`research/01` §4.2 to označuje jako „era/source conflict");
+`docs/11` §11.6 to vede jako otevřenou otázku **O6** („porovnat snímky klienta
+v 03:55 a 04:05 herního času").
+**Dokud to uživatel nerozhodne:** hodnota v řádku „Světlo" je **nepotvrzená**, nesmí se
+z ní odvozovat jas scény a `render.light` má brát úroveň z jednoho místa
+(`world.time.light_level()`), aby šlo rozhodnutí přepnout konstantou. Kdo ji mění, mění
+**tři** místa: `docs/05` §5.11, `ZADANI-UO-KLON.md` §10 a `sim/world/time.gd`.
 
 ## 5.12 Spawn, NPC a AI
 

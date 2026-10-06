@@ -4,7 +4,9 @@
     "Pravidla: 1 granule = 1 soubor, owns je výlučné, depends_on znamená 'hotové a funkční'.",
     "kind: code | data | gate | bootstrap | doc. Bootstrap granule NEJSOU pro agenty (zakázané soubory).",
     "size_lines/model: výchozí '<= 60' a 'any'; 'strong' jen pro deklarované velké celky.",
-    "acceptance: tests | wiring | content | assets | render | save | determinism | replay | smoke | schema.",
+    "acceptance: tests | wiring | content | assets | render | save | determinism | replay | smoke | schema | selftest (nástroj má vlastní --self-test, běží v run-all --self-test).",
+    "size_lines je ORIENTAČNÍ deklarace; skutečné počty a překročení hlásí `python tools/plan-status.py` (měřeno, ne deklarováno).",
+    "Stav granul (`done`) se tady NEVEDE ručně: měří ho `tools/plan-status.py` (soubor v gitu + test).",
     "Postup a milníky: docs/07-granule-a-milniky.md; smlouvy: docs/04-architektura-a-smlouvy.md."
   ],
   "milestones": [
@@ -43,6 +45,10 @@
     {
       "id": "M8",
       "title": "Trvanlivost a uzavření"
+    },
+    {
+      "id": "M9",
+      "title": "Modernizace (bez ubrání měření)"
     }
   ],
   "grains": [
@@ -476,7 +482,8 @@
       ],
       "consumes": [],
       "acceptance": [
-        "assets"
+        "assets",
+        "selftest"
       ],
       "size_lines": "<= 150",
       "model": "strong",
@@ -500,7 +507,8 @@
       "consumes": [],
       "acceptance": [
         "assets",
-        "content"
+        "content",
+        "selftest"
       ],
       "size_lines": "<= 150",
       "model": "strong",
@@ -524,7 +532,8 @@
       "consumes": [],
       "acceptance": [
         "assets",
-        "content"
+        "content",
+        "selftest"
       ],
       "size_lines": "<= 60",
       "model": "any",
@@ -547,7 +556,8 @@
       ],
       "consumes": [],
       "acceptance": [
-        "assets"
+        "assets",
+        "selftest"
       ],
       "size_lines": "<= 60",
       "model": "any",
@@ -569,7 +579,8 @@
       ],
       "consumes": [],
       "acceptance": [
-        "assets"
+        "assets",
+        "selftest"
       ],
       "size_lines": "<= 60",
       "model": "any",
@@ -591,7 +602,8 @@
       ],
       "consumes": [],
       "acceptance": [
-        "assets"
+        "assets",
+        "selftest"
       ],
       "size_lines": "<= 60",
       "model": "any",
@@ -614,7 +626,8 @@
       ],
       "consumes": [],
       "acceptance": [
-        "assets"
+        "assets",
+        "selftest"
       ],
       "size_lines": "<= 150",
       "model": "strong",
@@ -640,7 +653,8 @@
       "consumes": [],
       "acceptance": [
         "assets",
-        "content"
+        "content",
+        "selftest"
       ],
       "size_lines": "<= 150",
       "model": "strong",
@@ -663,7 +677,8 @@
       "consumes": [],
       "acceptance": [
         "assets",
-        "content"
+        "content",
+        "selftest"
       ],
       "size_lines": "<= 60",
       "model": "any",
@@ -689,7 +704,8 @@
       ],
       "consumes": [],
       "acceptance": [
-        "assets"
+        "assets",
+        "selftest"
       ],
       "size_lines": "<= 150",
       "model": "strong",
@@ -965,7 +981,7 @@
       ],
       "size_lines": "<= 60",
       "model": "any",
-      "milestone": "M1",
+      "milestone": "M7",
       "prompt": "Úroveň z world.time (den 12, dungeon 26) + bodová světla (docs/05 §5.11)."
     },
     {
@@ -1375,9 +1391,7 @@
       "depends_on": [
         "entity.container",
         "entity.equipment",
-        "world.doors",
-        "sim.craft",
-        "sim.magic"
+        "world.doors"
       ],
       "provides": [
         "use(m, serial)",
@@ -1393,7 +1407,7 @@
       "size_lines": "<= 150",
       "model": "strong",
       "milestone": "M2",
-      "prompt": "Routing podle docs/05 §5.2.2 a párová tabulka §5.2.3 (kontrolní seznam z Tilehelp.enu). Neznámý předmět → hláška, nikdy ticho."
+      "prompt": "Routing podle docs/05 §5.2.2 a párová tabulka §5.2.3 (kontrolní seznam z Tilehelp.enu). Neznámý předmět → hláška, nikdy ticho. Routing do `sim.craft`/`sim.magic` je DYNAMICKÝ (když systém v `SimWorld.systems` není, `use_on` vrátí `{ok:false, reason:'not_available'}`) - proto to není `depends_on`."
     },
     {
       "id": "ui.hud",
@@ -1759,7 +1773,7 @@
       ],
       "size_lines": "<= 60",
       "model": "any",
-      "milestone": "M4",
+      "milestone": "M2",
       "prompt": "Jména a pořadí z skills.mul (ověřeno, docs/11.1), mechaniky z research/02. `implemented: false` pro Necromancy/Bushido/Ninjitsu/Spellweaving/Throwing/Imbuing/Mysticism (docs/05 §5.16)."
     },
     {
@@ -2277,7 +2291,7 @@
       ],
       "size_lines": "<= 60",
       "model": "any",
-      "milestone": "M7",
+      "milestone": "M2",
       "prompt": "Z research/06 §1 (docs/06 §6.7) — přesné souřadnice."
     },
     {
@@ -2491,6 +2505,257 @@
       "model": "any",
       "milestone": "M8",
       "prompt": "Zapiš zdroje: instalace UO (verze, SHA-256), ClassicUO (BSD-2), SphereServer (Apache-2.0), fakta ze ServUO/ModernUO (GPL, jen čísla), volné assety (docs/03 §3.1, docs/11.2)."
+    },
+    {
+      "id": "app.scene",
+      "title": "Scéna a uzly",
+      "kind": "code",
+      "owns": [
+        "app/main.tscn"
+      ],
+      "depends_on": [
+        "app.main"
+      ],
+      "provides": [
+        "uzly Main/Camera/WorldView/PlayerController"
+      ],
+      "consumes": [],
+      "acceptance": [
+        "smoke"
+      ],
+      "size_lines": "<= 60",
+      "model": "any",
+      "milestone": "M2",
+      "prompt": "Scéna je integrační místo: uzly a jejich skripty (docs/02 §2.5). Uzly, které nemá žádná granule, patří sem - dnes je to Camera, WorldView a PlayerController."
+    },
+    {
+      "id": "app.player_view",
+      "title": "Kreslení hráče a světa",
+      "kind": "code",
+      "owns": [
+        "app/world_view.gd"
+      ],
+      "depends_on": [
+        "app.main",
+        "render.chunk",
+        "render.anim",
+        "render.hue",
+        "render.sort"
+      ],
+      "provides": [
+        "svět na obrazovce",
+        "postava v pořadí kreslení"
+      ],
+      "consumes": [],
+      "acceptance": [
+        "render",
+        "tests"
+      ],
+      "size_lines": "<= 60",
+      "model": "any",
+      "milestone": "M2",
+      "prompt": "Jediné místo, kde se seznam z render.chunk mění na pixely (docs/02 §2.4). Řazení postavy mezi statiky MUSÍ jít přes `render.sort.sort_key` (jediná funkce řazení) - ne přes vlastní porovnání `x + y`."
+    },
+    {
+      "id": "app.player_controller",
+      "title": "Kamera a ovládání hráče",
+      "kind": "code",
+      "owns": [
+        "app/player_controller.gd"
+      ],
+      "depends_on": [
+        "app.input",
+        "app.loop",
+        "sim.movement"
+      ],
+      "provides": [
+        "kamera sleduje hráče",
+        "vazby kláves (dočasně, než bude ui.hotkeys)",
+        "stav animace (walk/idle)"
+      ],
+      "consumes": [],
+      "acceptance": [
+        "tests"
+      ],
+      "size_lines": "<= 60",
+      "model": "any",
+      "milestone": "M2",
+      "prompt": "Kamera se posouvá po dlaždicích (žádný plynulý lerp, docs/05 §5.1.4) a musí respektovat `z` hráče (`iso.to_screen` odečítá `z * Z_SCALE`). Vazby kláves patří do `ui.hotkeys`; než vznikne, drží je tenhle soubor a je to vidět v hlavičce."
+    },
+    {
+      "id": "sim.entity_registry",
+      "title": "Registr bytostí",
+      "kind": "code",
+      "owns": [
+        "sim/entity/registry.gd"
+      ],
+      "depends_on": [
+        "core.serial",
+        "entity.mobile"
+      ],
+      "provides": [
+        "register(m) -> void",
+        "get(serial) -> Mobile|null",
+        "all() -> Array",
+        "remove(serial) -> void"
+      ],
+      "consumes": [],
+      "acceptance": [
+        "tests"
+      ],
+      "size_lines": "<= 60",
+      "model": "any",
+      "milestone": "M2",
+      "prompt": "Jedno místo, kde se hledá mobil podle serialu. Dnes to obchází `sim.movement` (drží si mobily sám) a `render.anim` (bere `serial` jako číslo těla) - obojí je díra ve smlouvě docs/04 §4.2. Registr ji zavře: `play(serial, ...)` si tělo vyzvedne tady."
+    },
+    {
+      "id": "sim.pathfind",
+      "title": "Hledání cesty",
+      "kind": "code",
+      "owns": [
+        "sim/world/pathfind.gd"
+      ],
+      "depends_on": [
+        "world.map",
+        "world.walk"
+      ],
+      "provides": [
+        "find(from, to, limit) -> Array[Vector3i]",
+        "next_step(from, to) -> Vector3i"
+      ],
+      "consumes": [],
+      "acceptance": [
+        "tests"
+      ],
+      "size_lines": "<= 150",
+      "model": "strong",
+      "milestone": "M2",
+      "prompt": "A* nad dlaždicemi; průchodnost se ptá `world.walk.can_step` (nikdy vlastní kopie pravidel). Vzory: ClassicUO `src/ClassicUO.Client/Game/Pathfinder.cs:868`, ServUO `Scripts/Services/Pathing/FastAStarAlgorithm.cs:16` (viz research/REJSTRIK-REFERENCI.md). Konzumenti: click-to-move (klient) a `sim.ai`."
+    },
+    {
+      "id": "assets.sounds",
+      "title": "Zvuky a hudba (extrakce)",
+      "kind": "code",
+      "owns": [
+        "tools/uoextract/sounds.py"
+      ],
+      "depends_on": [
+        "assets.uop"
+      ],
+      "provides": [
+        "zvuky z sound.mul/.uop",
+        "hudba z music/digital"
+      ],
+      "consumes": [],
+      "acceptance": [
+        "assets",
+        "content"
+      ],
+      "size_lines": "<= 60",
+      "model": "any",
+      "milestone": "M1",
+      "prompt": "Extrakce jako u ostatních assetů. POZOR (naměřeno v ClassicUO `SoundsLoader.cs:266`): přehrávač odmítne audio, které není 44,1 kHz stereo - při konverzi to musí sedět, jinak se soubor tiše nepřehraje."
+    },
+    {
+      "id": "audio.playback",
+      "title": "Přehrávání zvuku",
+      "kind": "code",
+      "owns": [
+        "app/sound.gd"
+      ],
+      "depends_on": [
+        "assets.sounds",
+        "app.loop"
+      ],
+      "provides": [
+        "play(id, volume)",
+        "play_at(id, pos, listener)",
+        "music(id)"
+      ],
+      "consumes": [],
+      "acceptance": [
+        "tests"
+      ],
+      "size_lines": "<= 60",
+      "model": "any",
+      "milestone": "M8",
+      "prompt": "Zvuk nikdy nemění stav simulace (docs/02 §2.2) - jen reaguje na události z `sim.events`. Vzdálenost tlumí podle pozice hráče."
+    },
+    {
+      "id": "app.config",
+      "title": "Typovaná konfigurace",
+      "kind": "code",
+      "owns": [
+        "app/config.gd"
+      ],
+      "depends_on": [
+        "data.balance"
+      ],
+      "provides": [
+        "get(key, default) -> Variant",
+        "known_keys() -> Array",
+        "check() -> Array chyb"
+      ],
+      "consumes": [],
+      "acceptance": [
+        "tests"
+      ],
+      "size_lines": "<= 60",
+      "model": "any",
+      "milestone": "M9",
+      "prompt": "Modernizace (M9): jedna tabulka klíč + typ + default + rozsah; neznámý klíč se HLÁSÍ (dnes se `data/balance.json` čte ad hoc na více místech). Vzor: ModernUO `Projects/Server/Configuration/ServerConfiguration.cs:43` (`GetSetting`/`GetOrUpdateSetting`). Pravidlo M9: modernizace nesmí ubrat žádné měření."
+    },
+    {
+      "id": "app.metrics",
+      "title": "Měření výkonu",
+      "kind": "code",
+      "owns": [
+        "app/metrics.gd"
+      ],
+      "depends_on": [
+        "app.loop",
+        "app.player_view"
+      ],
+      "provides": [
+        "fps() -> float",
+        "frame_ms() -> float",
+        "drawn_objects() -> int",
+        "report() -> Dictionary"
+      ],
+      "consumes": [],
+      "acceptance": [
+        "tests",
+        "render"
+      ],
+      "size_lines": "<= 60",
+      "model": "any",
+      "milestone": "M9",
+      "prompt": "Modernizace (M9) potřebuje čísla, ne dojem: kolik objektů se kreslí, kolik ms trvá frame, kolik textur je v cache. `render.textures.stats()` a `app/world_view.drawn` už čísla mají - tohle je sbírá a vypisuje."
+    },
+    {
+      "id": "render.chunk_mesh",
+      "title": "Dávkové kreslení bloků",
+      "kind": "code",
+      "owns": [
+        "render/chunk_mesh.gd"
+      ],
+      "depends_on": [
+        "render.chunk",
+        "render.textures"
+      ],
+      "provides": [
+        "mesh pro blok (land + statiky)",
+        "rebuild při invalidaci"
+      ],
+      "consumes": [],
+      "acceptance": [
+        "render",
+        "tests"
+      ],
+      "size_lines": "<= 150",
+      "model": "strong",
+      "milestone": "M9",
+      "prompt": "Modernizace (M9): místo tisíce draw callů na dlaždici jedna dávka na blok. Vzor: ClassicUO `src/ClassicUO.Client/Game/Map/ChunkMesh.cs:121` (+ `MeshLayer.cs`, `TextureBucketTracker`). Musí zůstat STEJNÝ obraz jako `render.chunk` - dokázat snímkem a paritním testem, ne tvrzením."
     }
   ]
 }

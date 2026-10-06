@@ -49,13 +49,14 @@ kontrola (snímek + projití scénáře).
 |---|---|---|---|
 | **M0** | **Kostra a pravidla** | `godot --headless --script res://tests/run_tests.gd` projde; simulace tiskne tick; vrstvy a schéma hlídá brána | G1, G2, G3, G11 |
 | **M1** | **Data a svět** | na obrazovce je **mapa Britainu** s dlaždicemi a statiky; postava stojí nohama na dlaždici; manifest artu je ověřený | G5, G6, G10, G13 |
-| **M2** | **Pohyb a interakce** | hráč chodí (400/200 ms), otevírá dveře, projde teleportem, vidí jména, používá předměty kurzorem | G3, G4, G9 |
+| **M2** | **Pohyb a interakce** | hráč chodí (400/200 ms), **najde cestu (click-to-move)**, otevírá dveře, projde teleportem, používá předměty kurzorem; postava je vidět **v pořadí kreslení** (mezi statiky) | G3, G4, G9 |
 | **M3** | **Předměty a manipulace** | zvedne, položí, nasadí, dá do batohu a truhly; váha a stacky sedí; equippované věci jsou vidět na postavě | G3, G7, G10 |
 | **M4** | **Skilly, sběr, výroba** | vytěží rudu, vytaví ingot, vyková dagger; skill roste; gump výroby funguje | G3, G5, G9 |
 | **M5** | **Souboj a smrt** | zabije kostlivce, dostane loot, umře, stane se duchem, nechá se vzkřísit | G3, G8, G9 |
 | **M6** | **Magie** | sesílá kouzla 1.–8. kruhu s many a reagenty; spellbook a svitky | G3, G5 |
-| **M7** | **Ekonomika a svět** | koupí a prodá u vendora, uloží zlato do banky, potká spawny ve 3 dungeonech, funguje den/noc | G3, G5, G9, G12 |
-| **M8** | **Trvanlivost a uzavření** | uložení/načtení, determinismus, replaye, výkon, makra, credits, vydání | G7, G8, G9, G12, G13 |
+| **M7** | **Ekonomika a svět** | koupí a prodá u vendora, uloží zlato do banky, potká spawny ve 3 dungeonech, **funguje den/noc a světlo (`render.light`)** | G3, G5, G9, G12 |
+| **M8** | **Trvanlivost a uzavření** | uložení/načtení, determinismus, replaye, výkon, makra, **zvuk a hudba**, credits, vydání | G7, G8, G9, G12, G13 |
+| **M9** | **Modernizace** | typovaná konfigurace, dávkové kreslení bloků (mesh), měření výkonu a parity cache; **pravidlo: modernizace nesmí ubrat žádné měření** (každá změna má stejnou nebo silnější bránu) | G1–G13 (nesmí jich ubýt) |
 
 **Pravidlo pro milníky:** milník není hotový, dokud **člověk** neprojde jeho
 scénář a neuvidí ho. Zelené brány k tomu **nestačí** (naměřeno: hráč nebyl
@@ -74,7 +75,16 @@ na obrazovce, a všechny brány byly zelené).
 | **W6** | `sim.skill_gain`, `sim.harvest`, `sim.craft`, `ui.craft_gump`, `ui.skill_list` |
 | **W7** | `sim.combat`, `sim.poison`, `sim.ai`, `sim.loot`, `sim.death`, `ui.backpack`, `ui.container_window` |
 | **W8** | `sim.magic`, `ui.spellbook`, `sim.vendor`, `ui.vendor_gump` |
-| **W9** | `world.spawn`, `app.char_create`, `ui.options`, `ui.hotkeys`, `ui.macros`, `render.effects` |
+| **W9** | `world.spawn`, `app.char_create`, `ui.options`, `ui.hotkeys`, `ui.macros`, `render.effects`, `audio.playback` |
+| **W10** | `sim.entity_registry`, `sim.pathfind` (po `world.walk`), `app.scene`, `app.player_view`, `app.player_controller` (integrace scény) |
+| **W11** | `app.config`, `app.metrics`, `render.chunk_mesh` (M9 — až po M8) |
+
+**Granule bez vlny (a proč):** `boot.*` (bootstrap — zakládá je člověk),
+`assets.*` (extrakce dat — sekvenční, jedna po druhé, viz W1) a `app.*` integrační
+uzly, které se dotýkají scény. Naměřeno 2026-10-06 (`python tools/plan-status.py`):
+vlny pokrývají **62 z 111** granul; zbytek jsou právě tyhle tři druhy.
+**Pravidlo: granule, která není ani ve vlně, ani v tomhle seznamu, se nesmí vydat** —
+nejdřív se zařadí (jinak se nedá poznat, co může běžet paralelně).
 
 **Pozor na sdílené místo:** `sim/sim_world.gd` a `app/loop.gd` registrují
 systémy — do těch smí sahat **jen integrační granule**. Ostatní systémy se
@@ -91,7 +101,29 @@ tick mezi sebou).
 
 ## 7.5 Odhad rozsahu
 
-| Milník | Granulí (code) | Poznámka |
+**Pozor: tabulka níž je ODHAD ze vzniku plánu (2026-10-02) a je zastaralá.**
+Skutečné počty granul hlásí generátor — naměřeno 2026-10-06 po revizi plánu:
+
+| Milník | Granulí (měřeno) |
+|---|---|
+| M0 | 17 |
+| M1 | 23 |
+| M2 | 32 |
+| M3 | 5 |
+| M4 | 6 |
+| M5 | 9 |
+| M6 | 3 |
+| M7 | 9 |
+| M8 | 4 |
+| M9 | 3 |
+| **celkem** | **111** |
+
+*(M2 je velký, protože do něj patří integrace scény a cesta hráče; M3–M8 jsou
+zatím jen deklarované — jejich obsah vzniká, až na ně dojde. Původní odhad
+„~75–90“ s dnešními 111 nesedí; rozdíl je v tom, že se doplnily granule pro
+soubory, které dřív neměly vlastníka, a trať M9.)*
+
+| Milník | Granulí (odhad 2026-10-02) | Poznámka |
 |---|---|---|
 | M0 | 8–10 | kostra, všechny malé |
 | M1 | 16–20 | **nejtěžší část** (extrakce dat) — tady je riziko, že se něco nepodaří přečíst (O1, O2) |

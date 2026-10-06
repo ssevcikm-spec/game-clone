@@ -9,6 +9,62 @@
 > `.forge/roadmap.json`, nové zadání etapy 2). **Stav: NEPROVEDENO** — `docs/`
 > a `.forge/` agent needituje bez výslovného rozhodnutí uživatele.
 >
+> ---
+> ## ⚠ DOPLNĚNO 2026-10-06 (po rozhodnutí uživatele: „b" + „a")
+>
+> Uživatel povolil **(b)** editovat i `docs/` a `.forge/roadmap.json` a zvolil
+> **(a)** u `size_lines`: měřit a nechat deklarace jako orientační. Podle toho
+> se část revize **provedla** a **dvě tvrzení v ní byla chybná**:
+>
+> | # | Chyba / změna stavu | Naměřeno |
+> |---|---|---|
+> | **C1** | N6 tvrdilo, že `ui.hotkeys` nemá granuli. **Není pravda** — `ui.hotkeys` v roadmapě je (`owns: ui/hotkeys.gd`, W9). Souborů bez vlastníka jsou **přesně 3**: `app/main.tscn`, `app/player_controller.gd`, `app/world_view.gd` | `python tools/plan-status.py` (0 souborů bez vlastníka po opravě) |
+> | **C2** | Z10 tvrdilo „doplnit 3 mutační harnessy do CI". V CI může běžet **jen `mutace-skills.py`** (vstup `data/skills.json` je v gitu). `mutace-anim.py` chce instalaci UO (`D:\Games\…`) a `mutace-render-anim.py` chce `assets/uo/anim/*.png` — obojí je gitignore, takže **lokálně** (dokud nedostanou fixture) | `ci.yml` (komentář u kroku) |
+>
+> **Provedeno:** Z1 (stav plánu se měří + `--check` + krok v CI) · Z2 (kontrola
+> „milník vs závislost" v `roadmap-gen.py`; **6 rozporů opraveno**) · Z3
+> (`size_lines` zůstává orientační, překročení hlásí `plan-status.py`) · Z4
+> (acceptance `selftest` u 10 extraktorů) · Z5 (**10 nových granul**: `app.scene`,
+> `app.player_view`, `app.player_controller`, `sim.entity_registry`, `sim.pathfind`,
+> `assets.sounds`, `audio.playback`, `app.config`, `app.metrics`, `render.chunk_mesh`)
+> · Z6 (`world_view` řadí přes `render.sort.sort_key` — **`check-wiring` už
+> `render.sort` nehlásí jako neintegrovaný**; `world.time` napojen na clock, vada F6
+> zavřená, nový test `tests/cases/time_clock.gd`) · Z7 (vlny W10/W11 + pravidlo
+> „granule bez vlny se nesmí vydat") · Z9 (**M9 Modernizace** v milnících a v `docs/07`)
+> · Z11 (pravidlo pro paralelní session v `docs/09 §9.7`) · Z12 (`ZADANI-DALSI-VYVOJ-2.md`).
+> **Zbývá:** Z8 (smlouvy v `docs/04`+`docs/05` — řeší se zvlášť) a rozhodnutí
+> uživatele 1–6 (hlavně **éra** a **světlo**).
+>
+> ---
+> ## ⚠ DOPLNĚNO 2026-10-06 (podruhé) — co přinesly dvě rešerše a co se ještě našlo
+>
+> **Z8 je hotové** (smlouvy v `docs/04 §4.2`, nový §4.2.1 a `docs/05 §5.1.1`/§5.11;
+> `check-docs-refs.py` 139 odkazů, `exit 0`). Nová měření přinesla další nálezy —
+> a **dvě z nich byly chyby v mojí práci**:
+>
+> | # | Nález | Naměřeno / kde |
+> |---|---|---|
+> | **N14** | **Moje citace byla off-by-one**: rejstřík uváděl `MovementSpeed.cs:13`, hodnota `STEP_DELAY_WALK = 400` je na **ř. 12** (ř. 13 je prázdný) | `_src/classicuo/.../Data/MovementSpeed.cs:12`; opraveno v `tools/refs-index.py` (a rejstřík se přegeneroval) |
+> | **N15** | **Světlo je v referencích OVĚŘENÉ, ne „UNVERIFIED"**: ServUO i ModernUO `LightCycle.cs:13-16` mají `DayLevel = 0`, `NightLevel = 12`, `DungeonLevel = 26`, `JailLevel = 9`, rozsah 0–30 a **0 = nejjasnější** (ClassicUO `IsometricLight.cs:69` to říká slovem). `data/balance.json:25` přesto tvrdí, že světelný cyklus ověřený není — neověřené je jen chování **originálního OSI klienta** (to je `docs/11 §11.6` O6) | `_src/servuo/Scripts/Misc/LightCycle.cs:13-16,70-82`, `_src/modernuo/.../LightCycle.cs:13-16` |
+> | **N16** | **Náš kód nesl špatné číslo i test, který ho „ověřoval"**: `sim/world/time.gd` měl `LIGHT_DAY = 12` (12 je `NightLevel`!) a `tests/cases/time.gd:49` tvrdil `light_level() == 12` — zelená brána nad nesprávným číslem. **Můj nový test** `time_clock.gd` se navíc ptal konstanty proti sobě. Obojí je teď označené jako otevřené rozhodnutí (`NEMĚŘENO` v logu), chování jsem **neměnil** | `sim/world/time.gd`, `tests/cases/time_clock.gd`, `tests/cases/time.gd` |
+> | **N17** | **`render/light_layer.gd` neexistuje**, ale `docs/04 §4.2` ho vede jako komponentu `render.light` (a `CanvasModulate`/`PointLight2D` v `render/`+`app/` = 0 nálezů) | `docs/04` ř. 130 vs `Test-Path` |
+> | **N18** | **Stat gain: dokument si odporuje sám se sebou** — `docs/05 §5.10` uvádí interval 15 min jako ověřený, `§5.10.1` bod 2 říká, že se má teprve zvolit a zapsat do `data/balance.json`; klíč tam **není** | `docs/05 §5.10` vs §5.10.1 |
+> | **N19** | **`docs/05 §5.16` míchá čtyři éry a zamlčuje dvě odchylky**: (a) deklaruje AoS vzorce i AoS item properties, ale vyřazuje **AoS spell schools** (Necromancy/Chivalry/Focus jsou AoS — `BaseCreature.cs:4255`, `Initializer.cs:89`) bez věty, že jde o vědomý řez; (b) kombinuje AoS properties s **pre-AoS lootem** — v emulátorech jsou to dvě větve téhož přepínače (`LootPack.cs:496-502`), takže ten stav tam **nikdy nenastane**; (c) `data/balance.json` to zplošťuje na jediné `combat_era: "aos"`. Chybí zmínka o **Siege** (GGS/insurance off), `ActionDelay` a že **tooltipy jsou AoS+** (`ObjectPropertyList.Enabled = Core.AOS`) | `docs/05 §5.16` ř. 399–408 vs `_src/servuo/Scripts/Misc/CurrentExpansion.cs:27-46`, `LootPack.cs:496-502` |
+>
+> **Nový návrh Z13 (M9 se musí měřit):** M9 slibuje „modernizace nesmí ubrat
+> měření" — a to je tvrzení, které musí mít bránu: `plan-status.py` ať umí
+> vypsat **počty měření** (testy, self-testy, mutace, brány) a `ci.yml` ať je
+> u artefaktu; při modernizaci se pak porovná „před/po", ne dojmem.
+>
+> **Rozhodnutí uživatele se tím rozšiřuje** (viz §6): k éře a světlu přibývá
+> **stat gain** (N18) a **éra po složkách** (N19c).
+
+>
+> **Naměřený stav po provedení:** 111 granul (bylo 101), **39 měřitelně hotových**,
+> 10 soubor-je-bez-testu, 62 chybí; **0 rozporů** milník vs závislost;
+> `roadmap-gen.py --check` hlídá i to, že `.forge/roadmap.json` není zestaralá.
+
+>
 > **Čím je každé číslo měřeno:** `python tools/plan-status.py` (stav granul,
 > rozpory závislostí, `size_lines`, pokrytí vlnami), `python tools/refs-index.py
 > --srovnej` (reference), `python tools/gates/run-all.py` a testy. Nic v tomhle

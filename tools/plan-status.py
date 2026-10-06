@@ -66,6 +66,8 @@ def texty_testu() -> str:
 def main() -> int:
     ap = argparse.ArgumentParser(description="Stav vyvojoveho planu")
     ap.add_argument("--json", action="store_true", help="zapis i .cache/plan-stav.json")
+    ap.add_argument("--check", action="store_true",
+                    help="spadni, kdyz je granule 'done: true' a pritom NEMERENE hotova")
     args = ap.parse_args()
 
     data = json.loads(ROADMAPA.read_text(encoding="utf-8"))
@@ -164,6 +166,19 @@ def main() -> int:
         cil.write_text(json.dumps({"hotove": hotove, "bez_testu": bez_testu, "chybi": chybi},
                                   ensure_ascii=False, indent=1), encoding="utf-8")
         print(f"\n[plan] JSON: {cil}")
+
+    if args.check:
+        # Jedina vec, ktera je tady VADA (ne jen stav): roadmapa tvrdi "hotovo",
+        # ale mereni to nepotvrzuje. Opacny smer ("hotovo a neni to v roadmape")
+        # je jen stav - roadmapa se `done` nevede, proto se meri.
+        hotove_ids = {h["id"] for h in hotove}
+        rozpor = [g["id"] for g in grains if g.get("done") and g["id"] not in hotove_ids]
+        if rozpor:
+            print(f"[plan] CHYBA: {len(rozpor)} granul je `done: true`, ale nemERene "
+                  f"hotovych: {rozpor}")
+            return 1
+        print(f"[plan] OK: 0 rozporu 'done vs nemEReno' "
+              f"({len(hotove)} hotovych, {len(bez_testu)} bez testu, {len(chybi)} chybi)")
     return 0
 
 

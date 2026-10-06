@@ -14,6 +14,7 @@ const TextureCache = preload("res://render/texture_cache.gd")
 const WalkScript = preload("res://sim/world/walk.gd")
 const MovementScript = preload("res://sim/systems/movement.gd")
 const MobileScript = preload("res://sim/entity/mobile.gd")
+const TimeScript = preload("res://sim/world/time.gd")
 const HueScript = preload("res://render/hue_cache.gd")
 
 const DEFAULT_SEED: int = 1234
@@ -29,6 +30,7 @@ var sim = null
 var loop = null
 var player = null
 var movement = null
+var time = null
 var map = null
 var controller = null
 
@@ -81,6 +83,13 @@ func _setup_player(view) -> void:
 	movement.player_serial = serial
 	movement.register(player)
 	sim.systems["movement"] = movement
+
+	# `world.time` se musi napojit na clock simulace (vada F6 z etapy 1: do
+	# 2026-10-06 `world_time_ms` plnily jen testy, takze `hour()` vratilo ve hre
+	# vzdy 0). Modul si cas nedrzi sam - dostava ho z `sim.clock()`.
+	time = TimeScript.new()
+	time.bind(sim.clock())
+	sim.systems["time"] = time
 
 	view.set_player(player)
 	controller = get_node_or_null("PlayerController")

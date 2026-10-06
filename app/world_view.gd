@@ -23,6 +23,7 @@ const Chunk = preload("res://render/chunk_renderer.gd")
 const Const = preload("res://core/const.gd")
 const Anim = preload("res://render/anim_player.gd")
 const Hue = preload("res://render/hue_cache.gd")
+const Sort = preload("res://render/sort.gd")
 
 const VIEW_TILES_X: int = 64
 const VIEW_TILES_Y: int = 48
@@ -40,6 +41,7 @@ var _camera: Camera2D = null
 var _player = null
 var _action: int = 4               # 4 = idle (viz app/player_controller.gd)
 var _anim = null
+var _sort = null                   # render.sort (jedina funkce razeni)
 var _hues = null                   # render.hue (barva kuze; bez nej je postava seda)
 var _hue_cache_hit: bool = false   # tonovany sprite se pocita jen pri zmene
 var _hue_last: Texture2D = null    # posledni prebarveny zaklad
@@ -49,6 +51,7 @@ var _hue_last_hued: Texture2D = null
 func _ready() -> void:
 	_iso = Iso.new()
 	_anim = Anim.new()
+	_sort = Sort.new()
 	_hues = Hue.new()
 	_camera = get_parent().get_node_or_null("Camera") as Camera2D
 	if _camera == null:
@@ -139,12 +142,21 @@ func _draw() -> void:
 		return
 	drawn = 0
 	player_drawn = false
+	# Postava se vklada do JIZ SETRIDENEHO seznamu. Poradi rozhoduje
+	# `render.sort.sort_key` (jedina funkce razeni, docs/04 §4.2) - ne vlastni
+	# porovnavani. Aby se `sort_key` nevolal 5 000x za frame, pouzije se jen
+	# tam, kde opravdu rozhoduje: na stejne diagonale (`x + y`), protoze
+	# pres diagonalu rozhoduje uz ten soucet.
+	var klic_hrace: int = 0
 	var diagonal: int = 999999
 	if _player != null:
 		diagonal = int(_player.pos.x) + int(_player.pos.y)
+		klic_hrace = _sort_key_of_player()
 	for obj in _list():
-		if _player != null and not player_drawn and int(obj["x"]) + int(obj["y"]) > diagonal:
-			_draw_player()
+		if _player != null and not player_drawn:
+			var d: int = int(obj["x"]) + int(obj["y"])
+			if d > diagonal or (d == diagonal and _sort.sort_key(obj) > klic_hrace):
+				_draw_player()
 		var art: Texture2D = _textures.texture(obj["art_id"])
 		if art == null:
 			continue
@@ -152,6 +164,12 @@ func _draw() -> void:
 		drawn += 1
 	if _player != null and not player_drawn:
 		_draw_player()
+
+
+func _sort_key_of_player() -> int:
+	# Klid pro `render.sort`: mobil ma vlastni vrstvu (za statiky na teze dlazdici).
+	return _sort.sort_key({"kind": "mobile", "x": int(_player.pos.x),
+		"y": int(_player.pos.y), "z": int(_player.pos.z)})
 
 
 func _draw_player() -> void:

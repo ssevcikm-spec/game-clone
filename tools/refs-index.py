@@ -534,7 +534,7 @@ def dokument(infos: dict, nalezy: dict) -> str:
     d.append("| RunUO | `Server/Mobile.cs:3050` | 400/200/200/100 | pravidlo serveru (pěšky/mount × chůze/běh) |")
     d.append("| ServUO | `Server/Mobile.cs:3063` | tytéž hodnoty | totéž, beze změny (sem míří `docs/05 §5.1.1`) |")
     d.append("| ModernUO | `Projects/Server/Mobiles/Movement.cs:33` | 400 (default) | totéž, ale jako **konfigurovatelný klíč** `movement.delay.walkFoot` |")
-    d.append("| ClassicUO (klient) | `src/ClassicUO.Client/Game/Data/MovementSpeed.cs:13` | 400 | jak často klient **smí** poslat krok |")
+    d.append("| ClassicUO (klient) | `src/ClassicUO.Client/Game/Data/MovementSpeed.cs:12` | 400 | jak často klient **smí** poslat krok |")
     d.append("| ClassicUO (klient) | `src/ClassicUO.Client/Game/Constants.cs:19` | **150** | `WALKING_DELAY` = **jiná věc** (tempo lokální animace), ne pravidlo |")
     d.append("| my | `core/const.gd:31` | 400/200/200/100 | `WALK_MS`, `RUN_MS`, `MOUNT_*` — a `Const.TURN_MS` = 80 pro frame animace |")
     d.append("")

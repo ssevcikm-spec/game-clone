@@ -101,6 +101,17 @@ granuli, jejíž soubor v `main` je a jejíž API jde zavolat.**
   do samostatné granule a ostatní ať jen deklarují `provides`.
 - **Závislost nikdy do prózy** — vždy `depends_on`. (Kaskáda chyb vzniká tím,
   že závislost je schovaná ve větě.)
+- **Dvě SESSION v jednom workspace (doplněno 2026-10-06, naměřeno):** když
+  v jednom klonu běží dvě agentní session současně, platí:
+  1. **Před psaním si projdi `git status` a `LastWriteTime`** souborů, které
+     nejsou tvoje — jinak zapíšeš do cizí rozdělané práce.
+  2. **Commituj jen své cesty** (`git add <svoje soubory>`), nikdy `git add -A`,
+     dokud je v stromě cizí necommitnutá práce.
+  3. **Stavové dokumenty (`HANDOFF.md`, `LESSONS.md`) přebírá ten, kdo končí
+     později** — a při přepisu nesmí zmizet body, které tam dal ten první
+     (zkontroluj hledáním, ne pamětí).
+  4. Když se práce sejde ve stejném souboru, **vyhrává ten, kdo má změnu
+     doloženou měřením**; druhý ji převezme nebo zapíše konflikt jako nález.
 
 ## 9.8 Protokol dokončení granule (co napsat do PR)
 

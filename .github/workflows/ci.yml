@@ -92,6 +92,19 @@ jobs:
           GODOT: ${{ env.GODOT_BIN }}
         run: python tools/gates/mutace-tests.py
 
+      # Mutační důkaz DATA (skills.json) - běží kdekoli, protože vstup je v gitu.
+      # POZOR: `mutace-anim.py` a `mutace-render-anim.py` v CI běžet NEMOHOU -
+      # první chce instalaci UO (`D:\Games\...`), druhý `assets/uo/anim/*.png`
+      # (obojí je gitignore). Pouští se lokálně; kdo je bude chtít v CI, musí
+      # jim dát fixture.
+      - name: Mutační důkaz dat (data/skills.json)
+        run: python tools/gates/mutace-skills.py
+
+      # Stav plánu je MĚŘENÝ (soubor v gitu + test), ne deklarovaný v roadmapě.
+      # `--check` spadne jen na rozporu "done: true, ale neměřeno" (dnes 0).
+      - name: Stav plánu (měřený, ne deklarovaný)
+        run: python tools/plan-status.py --check
+
       - name: Souhrn bran do přehledu běhu
         if: always()
         run: |
