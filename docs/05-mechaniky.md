@@ -336,7 +336,7 @@ dostane hlášku; `state_hash` po 10 000 pokusech je stejný ve dvou bězích.
 | Věc | Hodnota (ověřeno) |
 |---|---|
 | Délka dne | `SecondsPerUOMinute = 5.0` → herní den = 1440 × 5 s = **7200 s (2 h)** |
-| Světlo | úroveň dne **12**, dungeon **26** (NightLevel/DungeonLevel); OSI vs RunUO průběh `UNVERIFIED` (O6) |
+| Světlo | **den 0**, **noc 12**, dungeon **26** (0 = nejjasnější; `LightCycle.cs:13-16`); průběh dne **V1** = dvouhodinové rampy 4–6 a 22–24 (`LightCycle.cs:70-82`) |
 | Roční období | 4 období (vliv na vegetaci) — mimo základ, ale data jsou |
 | Počasí | déšť/sníh/bouře — mimo základ (jen efekt, ne mechanika) |
 | Faceta | **0 (Felucca)**, 7168 × 4096; start Britain |
@@ -344,22 +344,34 @@ dostane hlášku; `state_hash` po 10 000 pokusech je stejný ve dvou bězích.
 | Teleporty | moongate (9 bran s přesnými souřadnicemi v `research/06`) + teleport dlaždice z `teleprts.txt` |
 | Dveře/schody | z `doors.txt` / `stairs.txt` (§3.6) |
 
-**⚠ OTEVŘENÉ ROZHODNUTÍ — „úroveň dne" a průběh dne (DOPLNĚNO 2026-10-06, nerozhoduji):**
-řádek výš uvádí „úroveň dne **12**" a stejné číslo mají **dva další zdroje**:
-`ZADANI-UO-KLON.md` §10 bod 20 („Světlo: den / dungeon — 12 / 26") a dnešní kód
-(`sim/world/time.gd`: `LIGHT_DAY = 12`, `LIGHT_DUNGEON = 26`).
-**Naměřený zdroj ale říká něco jiného:** `research/01-core-mechanics.md` §4.2 měří
-v ServUO `LightCycle.cs` **`DayLevel = 0`** (0 = nejjasnější) a **`NightLevel = 12`** —
-12 je tedy úroveň **noci**, ne dne (`DungeonLevel = 26` a `JailLevel = 9` sedí ve všech
-zdrojích). Rozpor je i v **průběhu dne**: OSI má **binární** den/noc (noc 00:00–03:59,
-den 04:00–23:59), RunUO/ServUO k tomu přidává dvouhodinový **přechodový ramp** — a to je
-**rozhodnutí éry** (`research/01` §4.2 to označuje jako „era/source conflict");
-`docs/11` §11.6 to vede jako otevřenou otázku **O6** („porovnat snímky klienta
-v 03:55 a 04:05 herního času").
-**Dokud to uživatel nerozhodne:** hodnota v řádku „Světlo" je **nepotvrzená**, nesmí se
-z ní odvozovat jas scény a `render.light` má brát úroveň z jednoho místa
-(`world.time.light_level()`), aby šlo rozhodnutí přepnout konstantou. Kdo ji mění, mění
-**tři** místa: `docs/05` §5.11, `ZADANI-UO-KLON.md` §10 a `sim/world/time.gd`.
+**✅ ROZHODNUTO 2026-10-06 — světlo je varianta V1 (a je v kódu):**
+řádek výš uváděl „úroveň dne **12**" a stejné číslo měly **dva další zdroje**:
+`ZADANI-UO-KLON.md` §10 bod 20 („Světlo: den / dungeon — 12 / 26") a kód
+(`sim/world/time.gd`: `LIGHT_DAY = 12`). **Naměřený zdroj říká něco jiného:**
+`research/01-core-mechanics.md` §4.2 i přímé měření `_src/servuo/Scripts/Misc/LightCycle.cs:13-16`
+(a shodně `_src/modernuo/.../Misc/LightCycle.cs:13-16`) dávají **`DayLevel = 0`**
+(0 = nejjasnější) a **`NightLevel = 12`** — 12 je tedy úroveň **noci**, ne dne.
+`DungeonLevel = 26` sedí ve všech zdrojích, `JailLevel = 9` existuje jen tam
+(u nás ho záměrně nemáme jako konstantu — věznice nejsou).
+
+**Uživatel 2026-10-06 zvolil variantu V1** („přesně to, co dělají emulátory"):
+`den = 0`, `noc = 12`, `dungeon = 26` a **dvouhodinové přechodové rampy**
+(22:00 → 0:00 se stmívá na 12, 4:00 → 6:00 se rozednívá na 0), tedy
+`h < 4 → 12`; `4 ≤ h < 6 → 12 + ((h−4)·60+m)·(0−12)/120`; `6 ≤ h < 22 → 0`;
+`22 ≤ h ≤ 23:59 → 0 + ((h−22)·60+m)·(12−0)/120`. Přesný přepis je
+v `sim/world/time.gd::_day_night_level` a měří ho `tests/cases/time.gd`
+a `tests/cases/time_clock.gd`.
+
+**Co z toho zůstává otevřené (a mění se jen v datech):**
+- **`light.mul`** (per-dlaždicové osvětlení terénu) — doplňuje globální úroveň, nenahrazuje ji;
+  obsah souboru je `NEMĚŘENO` (ověřil by ho extraktor + 5 dlaždic). `docs/11 §11.6` (O6)
+  se tím **neuzavírá**: O6 se ptá na chování **originálního OSI klienta**, ne na server.
+- **Osobní světlo** (louče, Night Sight): `personal = 21` při `AosAttributes.NightSight > 0`
+  nebo `Core.ML && Race == Elf` (`Scripts/Mobiles/PlayerMobile.cs:1111-1125`), Night Sight
+  dává `13` (`Scripts/Items/Consumables/NightSight.cs:37`); klient bere `max(personal, 32 − global)`.
+  Patří do `render.light` (granule v M7) až s osobním světlem.
+- **Kdo světlo aplikuje:** hodnotu počítá **simulace** (`world.time.light_level()`), klient ji
+  jen zobrazuje — do té doby, než vznikne `render.light`, se v naší hře **nevykresluje**.
 
 ## 5.12 Spawn, NPC a AI
 

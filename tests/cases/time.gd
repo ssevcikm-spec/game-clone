@@ -42,14 +42,26 @@ func run(t) -> void:
 	clock.world_time_ms = 300000 * 6
 	t._check(not clock.is_night(), "world.time: 06:00 uz neni noc")
 
-	# svetlo: dve overena cisla ze zadani (den 12, dungeon 26).
-	# POZOR: noc ma zatim stejnou hodnotu jako den - je to ZNÁMÁ MEZERA
-	# (docs/11 §11.6, svetelny cyklus se ma merit z light.mul), ne tvrzeni
-	# o svete. Test to drzi, aby se na to nezapomnelo.
+	# svetlo: V1 (rozhodnuti uzivatele 2026-10-06) = den 0, noc 12, dungeon 26
+	# a dvouhodinove rampy. Hodnoty jsou MERENE v obou emulatorech
+	# (`_src/servuo/Scripts/Misc/LightCycle.cs:13-16,70-82`), ne opsane ze
+	# zadani - to melo "den 12" (12 je NightLevel). 0 = nejjasnejsi.
 	clock.in_dungeon = false
-	t._check(clock.light_level() == 12, "world.time: svetlo ve meste je 12 (namEReno %d)" % clock.light_level())
+	clock.world_time_ms = 300000 * 12
+	t._check(clock.light_level() == 0,
+		"world.time: svetlo v poledne je 0 (namEReno %d)" % clock.light_level())
+	clock.world_time_ms = 300000 * 2
+	t._check(clock.light_level() == 12,
+		"world.time: svetlo ve 02:00 je 12 (namEReno %d)" % clock.light_level())
+	clock.world_time_ms = 300000 * 5
+	t._check(clock.light_level() == 6,
+		"world.time: svetlo v 05:00 je 6 (ramp 12->0, namEReno %d)" % clock.light_level())
+	clock.world_time_ms = 300000 * 23
+	t._check(clock.light_level() == 6,
+		"world.time: svetlo ve 23:00 je 6 (ramp 0->12, namEReno %d)" % clock.light_level())
 	clock.in_dungeon = true
-	t._check(clock.light_level() == 26, "world.time: svetlo v dungeonu je 26 (namEReno %d)" % clock.light_level())
+	t._check(clock.light_level() == 26,
+		"world.time: svetlo v dungeonu je 26 (namEReno %d)" % clock.light_level())
 
 	# posun casu zpet (zaporne ms) nesmi rozbit hodiny
 	clock.world_time_ms = -5000

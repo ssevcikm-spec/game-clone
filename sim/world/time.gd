@@ -16,22 +16,21 @@ extends RefCounted
 
 const Const = preload("res://core/const.gd")
 
-# SVETLO - NAMERENO 2026-10-06 v referencich (podklad: research/REJSTRIK-REFERENCI.md):
+# SVETLO - ROZHODNUTO UZIVATELEM 2026-10-06: varianta **V1** (presne to, co delaji
+# oba emulatory). NamEReno v referencich (podklad: research/REJSTRIK-REFERENCI.md):
 #   ServUO i ModernUO `Scripts/Misc/LightCycle.cs:13-16` maji DayLevel = 0,
 #   NightLevel = 12, DungeonLevel = 26, JailLevel = 9; rozsah 0..30, kde
 #   **0 = NEJJASNEJSI** (ClassicUO `IsometricLight.cs:69` to rika slovem:
 #   "if overall is 0, we have MAXIMUM light").
-#   ZADANI §10 bod 20 ("den 12, dungeon 26") je tedy v PRVNI casti nespravne:
-#   12 je NightLevel, ne den - dungeon 26 naopak sedi. Puvodni komentar tady
-#   tvrdil "obojí overene cislo", coz byla nepravda (nalez 2026-10-06).
-#
-# ROZHODNUTI UZIVATELE (otevrene, docs/05 §5.11): (1) den 0 / noc 12 s rampy
-#   (presne to delaji oba emulatory) vs (2) binarni OSI den/noc. Do rozhodnuti
-#   vraci `light_level()` hodnotu nize a NESMI se z ni odvozovat jas sceny.
-const LIGHT_DAY: int = 12        # POZOR: 12 je ve referencich NIGHT, ne day
-const LIGHT_DUNGEON: int = 26    # tohle referencim sedi (DungeonLevel = 26)
+#   ZADANI §10 bod 20 ("den 12, dungeon 26") mel prvni cast nespravnou: 12 je
+#   NightLevel. V ZADANI je k tomu datumova poznamka (historie se neprepisuje).
+#   `JailLevel = 9` zamerne NENI konstanta - veznice nemame a mrtva konstanta
+#   je jen sum (docs/09: nefunkcni metriku smazat, ne nechat lezet).
+const LIGHT_DAY: int = 0         # 0 = nejjasnejsi (neni to "nic")
+const LIGHT_NIGHT: int = 12
+const LIGHT_DUNGEON: int = 26
 
-# Noc je ROZHODNUTI (22:00-06:00), ne overene cislo - viz hlavicka.
+# Noc je 22:00-06:00 vcetne dvouhodinovych rampu (viz `_day_night_level`).
 const NIGHT_FROM_HOUR: int = 22
 const NIGHT_TO_HOUR: int = 6
 
@@ -69,11 +68,34 @@ func time_of_day() -> String:
 
 
 func is_night() -> bool:
+	# 22:00-06:00 = nocetne rampu; `_day_night_level()` dava v techto hodinach
+	# hodnoty mezi dnem a noci (12 -> 0 a 0 -> 12).
 	var h: int = hour()
 	return h >= NIGHT_FROM_HOUR or h < NIGHT_TO_HOUR
 
 
 func light_level() -> int:
+	# Svetlo je cislo 0..30, kde 0 = nejjasnejsi (viz hlavicka). V dungeonu ho
+	# region PREPISE tvrde (ServUO `Scripts/Regions/DungeonRegion.cs:63-66`
+	# dela `global = LightCycle.DungeonLevel`, ne `min`).
 	if in_dungeon:
 		return LIGHT_DUNGEON
-	return LIGHT_DAY
+	return _day_night_level(hour(), minute())
+
+
+func _day_night_level(h: int, m: int) -> int:
+	# Doslovny prepis ze `_src/servuo/Scripts/Misc/LightCycle.cs:70-82`
+	# (ModernUO ma tytez hodnoty na `.../Misc/LightCycle.cs:86-93`):
+	#   h < 4        -> 12 (plna noc)
+	#   4 <= h < 6   -> 12 + ((h-4)*60 + m) * (0 - 12) / 120    (ramp 12 -> 0)
+	#   6 <= h < 22  -> 0  (den)
+	#   22 <= h < 24 -> 0 + ((h-22)*60 + m) * (12 - 0) / 120    (ramp 0 -> 12)
+	# Celociselne deleni se zaokrouhluje k nule (jako v C#), proto je i v
+	# zapornem rampu chovani stejne jako v predloze - proto ta citace.
+	if h < 4:
+		return LIGHT_NIGHT
+	if h < 6:
+		return LIGHT_NIGHT + ((h - 4) * 60 + m) * (LIGHT_DAY - LIGHT_NIGHT) / 120
+	if h < 22:
+		return LIGHT_DAY
+	return LIGHT_DAY + ((h - 22) * 60 + m) * (LIGHT_NIGHT - LIGHT_DAY) / 120

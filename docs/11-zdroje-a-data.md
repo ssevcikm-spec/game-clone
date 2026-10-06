@@ -126,7 +126,7 @@ pro veřejné vydání použij CC0/CC-BY alternativy (§3.1).
 | O3 | Který formát animací použít (anim*.mul vs AnimationFrame*.uop) | nerozhodnuto | změřit pokrytí těl v obou; rozhodnout podle obsahu |
 | O4 | Spotřeba staminy při běhu v originále | UNVERIFIED | měřit v originálním klientu (v emulatech se to liší) |
 | O5 | Ztráta skillů při smrti vraha (stat loss) | UNVERIFIED (20 % vs 33 %) | zdroj mimo tyto repa; do té doby config flag, default vypnuto |
-| O6 | OSI vs RunUO světelný cyklus | UNVERIFIED | porovnat snímky klienta v 03:55 a 04:05 herního času |
+| O6 | OSI vs RunUO světelný cyklus | **ROZHODNUTO 2026-10-06 (uživatel): V1 = RunUO/ServUO rampy**; zbytková část (chování originálního OSI klienta) zůstává NEMĚŘENO | serverová část je vyřešená a v kódu (`sim/world/time.gd`, `docs/05 §5.11`); kdo chce OSI binární variantu, mění jen `_day_night_level` |
 | O7 | Význam 9 čísel kontextového menu | UNVERIFIED | dohledat v `Cliloc.enu` (až bude O2) |
 | O8 | Klasické profesní šablony (8+) | částečně | v instalaci jsou 3 klasické (Warrior/Mage/Blacksmith); zbytek **rozhodnout a zapsat** do `data/professions.json` |
 | O9 | Ceny domů (tabulky se rozcházejí o ~19 %) | UNVERIFIED | mimo rozsah (housing je non-goal) |

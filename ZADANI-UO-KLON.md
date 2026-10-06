@@ -287,6 +287,15 @@ Celý registr (23 položek, každá naměřená): `docs/10-rizika-a-pasti.md`.
 
 (Plná tabulka 40 čísel s citacemi `soubor:řádek`: `research/01` §6.)
 
+> **⚠ OPRAVA 2026-10-06 (doplněno, řádek výš se nepřepisuje):** bod 20 uváděl
+> „Světlo: den / dungeon = **12** / 26". Měření v referencích
+> (`_src/servuo/Scripts/Misc/LightCycle.cs:13-16`, shodně ModernUO) dává
+> **`DayLevel = 0`**, **`NightLevel = 12`**, `DungeonLevel = 26`, `JailLevel = 9`
+> a rozsah 0–30, kde **0 = nejjasnější**. **12 je tedy úroveň NOCI, ne dne**;
+> dungeon 26 sedí. Uživatel 2026-10-06 rozhodl variantu **V1** (den 0 / noc 12
+> s dvouhodinovými rampy 4–6 a 22–24) — je v `sim/world/time.gd` a měří ji
+> `tests/cases/time.gd` + `tests/cases/time_clock.gd`. Detail: `docs/05 §5.11`.
+
 ---
 
 ## 11. První tři kroky, kterými začneš

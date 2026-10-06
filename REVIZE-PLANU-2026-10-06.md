@@ -58,6 +58,18 @@
 >
 > **Rozhodnutí uživatele se tím rozšiřuje** (viz §6): k éře a světlu přibývá
 > **stat gain** (N18) a **éra po složkách** (N19c).
+>
+> ---
+> ## ⚠ DOPLNĚNO 2026-10-06 (potřetí) — rozhodnutí, která už padla
+>
+> | Rozhodnutí | Volba | Co se provedlo |
+> |---|---|---|
+> | **Světlo** (N15/N16, otázka 2) | **V1** = den **0**, noc **12**, dungeon 26, dvouhodinové rampy 4–6 a 22–24 (přesně to, co dělají ServUO i ModernUO) | `sim/world/time.gd` (`LIGHT_DAY = 0`, `LIGHT_NIGHT = 12`, `_day_night_level()` = doslovný přepis `LightCycle.cs:70-82`); `tests/cases/time.gd` + `tests/cases/time_clock.gd` měří poledne 0, noc 12, rampy 6, dungeon 26; `docs/05 §5.11` má rozhodnutí místo „otevřené"; `ZADANI-UO-KLON.md` §10 dostalo **datumovou opravu** (řádek se nepřepisuje); `docs/11` **O6** je „rozhodnuto (server), NEMĚŘENO (OSI klient)". Testy po změně: **460 kontrol, 0 selhání** |
+> | **`size_lines`** (otázka 1) | „a" — měřit, deklarace nechat orientační | hotovo (Z3) |
+>
+> **Zbývá:** **éra** (T2A vs AoS vs jiná — otázka 3/N19), **stat gain** (N18),
+> a zda zapsat éru **po složkách** do `data/balance.json` (B5).
+
 
 >
 > **Naměřený stav po provedení:** 111 granul (bylo 101), **39 měřitelně hotových**,

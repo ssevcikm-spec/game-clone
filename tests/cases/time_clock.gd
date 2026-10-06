@@ -50,17 +50,27 @@ func run(t) -> void:
 	time.tick(Const.TICK_MS)
 	t._check(time.is_night(), "world.time: 23:00 je noc (namEReno %s)" % time.time_of_day())
 
-	# 5) light_level: DUNGEON je namERene cislo (ServUO/ModernUO
-	#    `LightCycle.cs:16` DungeonLevel = 26), takze se da tvrdit. Hodnota pro
-	#    den/noc je ROZHODNUTI UZIVATELE (den 0 vs 12) - test ji proto netvrdi
-	#    a jen ji vypise jako NEMERENO (driv tu byl test, ktery se ptal
-	#    konstanty proti sobe a tvrdil 12 - nalez 2026-10-06).
+	# 5) light_level podle varianty V1 (rozhodnuti uzivatele 2026-10-06):
+	#    den 0, noc 12, dungeon 26, rampy 4-6 a 22-24. Hodnoty jsou merene
+	#    (`_src/servuo/Scripts/Misc/LightCycle.cs:13-16,70-82`), proto se daji
+	#    tvrdit - driv tu byl test, ktery se ptal konstanty proti sobe a tvrdil
+	#    12 i pro den (nalez 2026-10-06). Cas se nastavuje MODULU (`time`),
+	#    ne `core.clock` - ten drzi jen cas simulace.
+	time.world_time_ms = 300000 * 12
+	t._check(time.light_level() == 0,
+		"world.time: v poledne je svetlo 0 (namEReno %d)" % time.light_level())
+	time.world_time_ms = 300000 * 2
+	t._check(time.light_level() == 12,
+		"world.time: ve 02:00 je svetlo 12 - noc (namEReno %d)" % time.light_level())
+	time.world_time_ms = 300000 * 5
+	t._check(time.light_level() == 6,
+		"world.time: v 05:00 je svetlo 6 - ramp (namEReno %d)" % time.light_level())
+	time.world_time_ms = 300000 * 23
+	t._check(time.light_level() == 6,
+		"world.time: ve 23:00 je svetlo 6 - ramp (namEReno %d)" % time.light_level())
 	time.in_dungeon = true
 	t._check(time.light_level() == 26,
 		"world.time: v dungeonu je 26 (namEReno %d)" % time.light_level())
-	t._check(script.LIGHT_DUNGEON == 26,
-		"world.time: konstanta LIGHT_DUNGEON sedi na referenci (26)")
 	time.in_dungeon = false
-	print("[test]      NEMERENO: world.time.light_level() mimo dungeon vraci %d - "
-		% time.light_level()
-		+ "hodnota je otevrene rozhodnuti (den 0 vs 12), viz hlavicka time.gd")
+	t._check(script.LIGHT_DUNGEON == 26 and script.LIGHT_DAY == 0,
+		"world.time: konstanty sedi na referenci (den 0, dungeon 26)")
