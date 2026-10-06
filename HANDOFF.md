@@ -134,28 +134,28 @@ následuje předání**. Proto platí:
 (viz tabulky výš), brány jsou zelené (11/0/0) a testy taky (453/0 s assety,
 400/0 v čistém klonu).
 
-**⚠ CI JE ČERVENÉ (stav 2026-10-06 21:05 UTC, běh #17 nad `e26c12a`):** kroky
-1–9 **prošly** (včetně testů, bran i `mutace-tests.py`), **spadl krok 10
-„Mutační důkaz dat (data/skills.json)"**. Lokálně (s `assets/uo`) ten krok
-prochází (baseline 453/0, 8 z 8 mutací), takže jde o **rozdíl prostředí** —
-v CI nejsou `assets/uo/` ani `_src/`. **Patří to k paralelní session, která
-v `e26c12a` měnila `data/skills.json`/`tests/cases/skills_data.gd`** (a další
-soubory); v době psaní tohohle předání v repu už nebyl její strom. **Co udělat:**
-spustit `mutace-skills.py` v **čistém klonu** (`git worktree add --detach
-<cesta> HEAD`) a přečíst, jestli spadl baseline, nebo kontrola kopie.
+**⚠ CI BYLO ČERVENÉ a je opravené (stav 2026-10-06 21:10 UTC):** běh **#19 nad
+`28e3a68` = `success`, všech 11 kroků**. Dva předchozí běhy spadly a oba mají
+poučení:
 
-*(Předchozí běh #16 nad `878f391` spadl v kroku 7 s **10 selhanimi v
-`tests/cases/render_hue.gd`** — to byla vada TOHOTO testu: vynucoval data
-(`hues.json`, `_src/`), která v CI nejsou. Opraveno v `c010a20` a v běhu #17
-krok 7 prošel. Poučení je v `LESSONS.md`.)*
+| běh | commit | spadl v | příčina | oprava |
+|---|---|---|---|---|
+| #16 | `878f391` | **7** (testy) | můj `tests/cases/render_hue.gd` **vynucoval data** (`hues.json`, `_src/`), která v CI nejsou → **10 selhání** | `c010a20`: test rozdělený na „bez dat" / „s daty" |
+| #17 | `e26c12a` | **10** (`mutace-skills`) | paralelní session měla v době běhu **rozpracovaný strom** (`data/skills.json` vs `skills_data.gd`) — zelené to bylo až po jejím dalším commitu (`cee3bec`) | její commit, ne můj |
+
+**Obecné pravidlo z toho:** v CI **nejsou `assets/uo/` ani `_src/`** (gitignore).
+Test granule, který potřebuje data z instalace, se **musí** ptát
+`FileAccess.file_exists()` a při chybějících datech hlásit `NEMERENO`
+(`print`, ne `_pending` — to by shodilo G3), **nikdy nesmí selhat**.
 
 Dvě věci, které blokátor **nejsou**, ale je dobře je vědět:
 
-1. **Čtyři mutační harnessy nejsou v CI.** `mutace-tests.py` a `mutace-skills.py`
+1. **Tři mutační harnessy nejsou v CI.** `mutace-tests.py` a `mutace-skills.py`
    v CI jsou, ale `mutace-anim.py`, `mutace-render-anim.py` a
-   **`mutace-render-hue.py`** se pouští jen ručně. Do `ci.yml` patří jako
-   samostatné kroky — `ci.yml` vlastní `boot.gates`, agent ho needituje
-   (rozhodnutí uživatele).
+   **`mutace-render-hue.py`** se pouští jen ručně — **a v CI běžet nemohou**:
+   první chce instalaci UO, druhý `assets/uo/anim/*.png`, třetí `hues.json`
+   (a bez nich měří hůř). Chtějí **fixture**; do `ci.yml` je smí přidat jen
+   `boot.gates`.
 2. **`tests/run_tests.gd` pořád tiše přeskočí case soubor s parse errory**
    (otevřená věc 21 z minula). Dnes to **není akutní**: každá nová kontrola má
    mutační důkaz, takže „0 selhání" je podložené. **Ale dnes mě to málem
@@ -267,7 +267,7 @@ a barva kůže.** Statiky nesou barvu ze záznamu mapy, ale **nikdo ji nepouží
 |---|---|---|
 | Strom je čistý | `git status --porcelain -uall` | **prázdné** po commitu této session |
 | Je před GitHubem | `git rev-list --count origin/main..HEAD` | **`0`** — tato session **pushuje** (uživatel povolil) |
-| **Běží CI?** | `node _analyza/ci-beh-stav.mjs` (funguje i bez tokenu) · anotace: `node _analyza/ci-anotace.mjs` | **běh #17 nad `e26c12a` = `failure`, spadl krok 10** (`mutace-skills`) — viz BLOKÁTORY; kroky 1–9 prošly |
+| **Běží CI?** | `node _analyza/ci-beh-stav.mjs` (funguje i bez tokenu) · anotace: `node _analyza/ci-anotace.mjs` | **běh #19 nad `28e3a68` = `success`, 11/11 kroků** (předchozí #16 a #17 spadly — viz BLOKÁTORY) |
 | Repo je veřejné | API bez tokenu | `visibility: public` |
 | Testy | testy s `APPDATA` ve workspace | `453 kontrol, 0 selhání` (v čistém klonu 400/0 — 53 kontrol je nad daty) |
 | Brány | `python tools/gates/run-all.py` | `11/0/0`, `exit 0` |
@@ -411,13 +411,14 @@ a barva kůže.** Statiky nesou barvu ze záznamu mapy, ale **nikdo ji nepouží
 43. **NOVÉ (3. session): `tools/uoextract/hues.py` nemá `--verify`** (jen
     `--self-test` s 5 kontrolami a `--install`). Při dalším zásahu do barev by
     se hodila kontrola proti `hues.mul` (jako `anim.py --verify`).
-44. **NOVÉ (3. session): CI spadá v kroku 10 (`mutace-skills`) na commitu
-    `e26c12a`.** Lokálně (s `assets/uo`) prochází; v CI **není `assets/uo/` ani
-    `_src/`**. Postup: `git worktree add --detach ../x HEAD` a tam
-    `GODOT=… python tools/gates/mutace-skills.py` — uvidí se, jestli padá
-    baseline, nebo kontrola kopie. **Pozor: `mutace-anim.py`,
-    `mutace-render-anim.py` a `mutace-render-hue.py` v CI běžet NEMOHOU** (chtějí
-    instalaci UO, `assets/uo/anim/*.png`, resp. `hues.json`) — chtějí fixture.
+44. ~~CI spadá v kroku 10 (`mutace-skills`) na commitu `e26c12a`~~ — **VYŘEŠENO**
+    commitem paralelní session (`cee3bec`); běh **#19 je zelený (11/11)**.
+    **Poučení zůstává:** kdo mění `data/*.json` nebo case soubor, musí
+    `mutace-*` spustit **v čistém klonu** (`git worktree add --detach ../x HEAD`),
+    protože CI nemá `assets/uo/` ani `_src/`. A **`mutace-anim.py`,
+    `mutace-render-anim.py` ani `mutace-render-hue.py` v CI běžet NEMOHOU**
+    (chtějí instalaci UO, `assets/uo/anim/*.png`, resp. `hues.json`) — chtějí
+    fixture.
 45. **NOVÉ (3. session): `--write-movie` bez existující složky neskončí chybou**
     (vznikne jen `frame.wav` 0 B) — v `ci-godot.sh` to řeší `mkdir -p`, ale kdo
     ten příkaz opisuje ručně, narazí (past 30).
