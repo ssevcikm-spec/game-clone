@@ -30,6 +30,15 @@ from gate_common import NEMERENO, OK, VADA, Gate, selftest_cli  # noqa: E402
 NAME = "check-render"
 DEFAULT_SNAPSHOT = ".cache/render/snapshot.png"
 RENDER_GRAINS = ("render.chunk", "render.sort")
+# Data, bez kterych se nema co vykreslit (assets/uo/ je v .gitignore, takze
+# v cerstvem klonu nejsou). Chybejici DATA nejsou vada kódu - viz check().
+ASSET_INPUTS = ("manifest.json", "world/map0.meta.json", "world/map0.land",
+                "world/map0.statics.bin")
+
+
+def missing_assets(root: Path) -> list[str]:
+    base = root / "assets" / "uo"
+    return [name for name in ASSET_INPUTS if not (base / name).exists()]
 
 
 def render_sources(root: Path) -> list[Path]:
@@ -89,6 +98,18 @@ def check(root: Path, gate: Gate, snapshot: Path | None = None,
             + ", ".join(RENDER_GRAINS) + " (W1/W3)"
         )
         return
+    chybi = missing_assets(root)
+    if chybi:
+        # NamEReno 2026-10-06 v simulaci cerstveho klonu: bez assets/uo se
+        # vykresli JEDINA barva (77,77,77) a brana na tom hlasila VADA. To je
+        # vada prostredi (chybeji DATA), ne kódu - v CI assety nikdy nejsou
+        # (docs/08 §8.4). NEMERENO neni zelena a je videt v souhrnu.
+        gate.pending(
+            "chybí data pro vykreslení (assets/uo: " + ", ".join(chybi) + ") - "
+            "v tomto klonu nejsou extrahovaná data UO, snímek by měřil jen barvu "
+            "pozadí; NEMĚŘENO (spusť tools/uoextract/worldmap.py --extract)"
+        )
+        return
     path = snapshot or (root / DEFAULT_SNAPSHOT)
     if not path.exists():
         gate.pending(f"snímek {path} není - G10 měří pixely, bez snímku NEMĚŘENO")
@@ -108,11 +129,19 @@ def selftest() -> int:
     base = Path(__file__).resolve().parents[2] / ".cache" / "gates" / "selftest-render"
     shutil.rmtree(base, ignore_errors=True)
 
-    def fixture(label: str, kind: str, with_render: bool = True) -> Path:
+    def fixture(label: str, kind: str, with_render: bool = True,
+                with_assets: bool = True) -> Path:
         root = base / label
         if with_render:
             (root / "render").mkdir(parents=True, exist_ok=True)
             (root / "render" / "chunk_renderer.gd").write_text("extends Node2D\n", encoding="utf-8")
+        if with_assets:
+            # Klon s extrahovanymi daty: jen existence, obsah tu nikdo nemeri
+            # (v CI assety nejsou a brana to musi umet rict nahlas).
+            for name in ASSET_INPUTS:
+                cil = root / "assets" / "uo" / name
+                cil.parent.mkdir(parents=True, exist_ok=True)
+                cil.write_bytes(b"stub")
         target = root / DEFAULT_SNAPSHOT
         target.parent.mkdir(parents=True, exist_ok=True)
         if kind == "blank":
@@ -136,6 +165,9 @@ def selftest() -> int:
         ("vadny_jednolity", fixture("vadny_jednolity", "blank"), VADA),
         ("vadny_postava_mimo", fixture("vadny_postava_mimo", "blob_corner"), VADA),
         ("bez_render_kodu", fixture("bez_render_kodu", "blob_center", with_render=False), NEMERENO),
+        # klon bez extrahovanych dat: snimek muze byt klidne "pekny", ale merit
+        # se nema co - a NEMERENO se nesmi tvarit jako VADA kódu (docs/08 §8.4)
+        ("bez_assetu", fixture("bez_assetu", "blank", with_assets=False), NEMERENO),
     ]
     return selftest_cli(NAME, check, [(l, e) for l, _, e in cases],
                         fixtures=[(l, f) for l, f, _ in cases])

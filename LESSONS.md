@@ -755,6 +755,107 @@ v den, kdy CI ožije, vadu v kódu, která není. A druhá polovina: simulaci je
 nutné po měření **uklidit** — zkopírovaný zdrojový strom v `.cache/` je mrtvá
 větev, kterou příští session může číst místo skutečné.
 
+### 2026-10-06 — CI selhávalo kvůli dvojtečce ve skaláru, ne kvůli kvótě (past-nástroje)
+**Co se stalo:** devět běhů CI (`#1`–`#9`) selhalo **okamžitě, s 0 jobů, 0 check-runs
+a bez logů**. Předchozí session vylučovala kvótu minut, oprávnění i YAML — a to
+poslední **vlastním parserem**, kalibrovaným na dvou vratných vadách. Hláška
+z GitHub UI (běh #4 i #9) ale zní: `Invalid workflow file:
+.github/workflows/ci.yml#L56 / You have an error in your yaml syntax on line 56`.
+Řádek 56 je `- name: Godot: import, testy, snímek (boot.ci_env)` — **dvojtečka
+s mezerou uvnitř neuvozovkovaného skaláru** je v YAML neplatná.
+**Doklad:** `_analyza/ci-ui-banner.mjs` (stáhne HTML běhu a vypíše anotaci),
+`_analyza/ci-vytah.py` (text anotace z HTML); `_analyza/yaml-kontrola.py` s PyYAML
+— vrácená vada se zahlásí na **spočítaném** řádku (60, protože jsem přidal
+komentář), tabulátor na 23, současný `ci.yml` bez chyby: **3 ze 3 případů**.
+**Ponaučení:** platnost YAML se neověřuje vlastním parserem — i „kalibrovaný na
+dvou vadách“ je slepý na třetí druh vady. Vezmi **skutečný parser** (PyYAML)
+a kalibruj ho tak, že **očekávaný řádek spočítáš z textu, neopíšeš**. A druhá
+polovina: co API neumí, bývá v HTML stránky — `fetch` + extrakce textu anotace
+je levnější než čekat na člověka s prohlížečem.
+
+### 2026-10-06 — Low-integrity sandbox vyrobil čtyři falešné výsledky bran (past-nástroje)
+**Co se stalo:** v režimu `workspace-write` běžel proces s tokenem **Low Mandatory
+Level**. Kořen workspace je označený Low, ale `.cache` (vzniklý dřív, bez
+příznaku) je Medium → zápis „nahoru“ je zakázaný. Následky: `G7` hlásila
+**VADA** (`save=false`, protože `user://` se nešlo zapsat), `G11` **NEMĚŘENO**,
+každá brána si stěžovala `JSON neulozen (Permission denied)` a `run-all.py`
+**spadl na `summary.json`** (traceback, exit 1). Vypadalo to jako vada ukládání.
+**Doklad:** `icacls` kořene obsahuje `Mandatory Label\Low Mandatory Level:(OI)(CI)(NW)`,
+`.cache` žádný; `whoami /groups` → `Low`; po přepnutí na plný přístup (`Medium`)
+totéž měření dá **10 měřeno / 1 NEMĚŘENO / 0 chyb** a G7/G11 jsou OK.
+**Ponaučení:** než začneš „opravovat“ bránu, ověř **integritu tokenu** a to, zda
+jde zapsat do `.cache`. Odmítnutí zápisu do podsložky označené Medium **není
+vada ACL** — je to hranice sandboxu a oprava oprávnění by byla zbytečná (a
+škodlivá). Skript na opravu ACL se přitom vůbec nepodařilo spustit: execution
+policy zakazuje `.ps1` (`running scripts is disabled`).
+
+### 2026-10-06 — Harness tiše přeskočí case soubor s parse errory (chyba nástroje)
+**Co se stalo:** nový `tests/cases/render_sort.gd` měl chybu typové inference
+(`var max8 := sort.sort_key(...)` — z netypovaného volání). Godot soubor
+nezparsoval, `load()` vrátil GDScript, `script.new()` vyhodil
+`Invalid call. Nonexistent function 'new'` — a tím se `_init_case()` **přerušil
+DŘÍV, než stačil zavolat `_pending()`**. Smyčka pak případ přeskočila a sada
+ohlásila **258 kontrol, 0 selhání, exit 0** — bez jediného `FAIL`, s testem,
+který se vůbec nespustil. Přesně ten druh zelené, který nic netvrdí.
+**Doklad:** `.cache/testy-out.txt` (258/0) + `.cache/testy-err.txt`
+(`Failed to load script "res://tests/cases/render_sort.gd" with error "Parse
+error"`); po opravě typu `276 kontrol, 0 selhání` a `[test] -- render_sort.gd`.
+**Ponaučení:** do mutačního důkazu patří **tři** podmínky (provedena · proběhla ·
+chycena na kontrole daného modulu) — a ještě čtvrtá: **že test bere měřenou cestu
+z argumentů** (ověřeno předáním neexistující cesty: test musí selhat). Otevřený
+bod: `tests/run_tests.gd` má před `script.new()` volat `script.can_instantiate()`.
+
+### 2026-10-06 — „Změna se neprovedla“ bývá vada měřidla, ne mutace (chyba nástroje)
+**Co se stalo:** dvě mutace harness ohlásil jako `ZMENA SE NA DISKU NEPROVEDLA`,
+i když provedené byly. Důvod: podmínka `stare not in mutant` je špatná ve dvou
+případech — (a) nový text obsahuje původní jako předponu (`out = entry["statics"]`
+→ `…statics"].slice(0, 1)`), (b) původní text je v souboru **dvakrát** (stejná
+kontrola `if x < 0 or y < 0:` v `land_at` i `z_at`) a mění se jen první výskyt.
+**Doklad:** `tools/gates/mutace-tests.py`; po opravě na
+`mutant != zdroj and nove in mutant and na_disku == mutant` je výsledek
+**21 z 21 chyceno** (předtím 19 z 21 se dvěma falešnými „neprovedena“).
+**Ponaučení:** provedení mutace se dokazuje **přítomností nového textu a shodou
+s kopií na disku**, ne nepřítomností starého.
+
+### 2026-10-06 — Mutace, která se neprojeví, se z evidence VYŘADÍ (postup)
+**Co se stalo:** mutace `_lower`: `return a[0] < b[0]` → `return a[0] <= b[0]`
+**prošla** (sada 276 kontrol, 0 selhání, exit 0). Naměřeno: Godotův `sort_custom`
+dá se `<=` stejné pořadí jako s `<` — 1000 objektů se stejným klíčem i 200
+smíšených. Není to tedy slepé místo testu, ale **nepozorovatelná změna**.
+**Doklad:** `tools/gates/mutace-tests.py` — mutace v seznamu není a v hlavičce je
+i s měřením; po jejím vyřazení harness končí `21 z 21`, `exit 0`.
+**Ponaučení:** seznam mutací je **tvrzení o tom, co testy chytí**. Nechytatelnou
+mutaci neškrtej tiše ani nenechávej v seznamu (buď lže, nebo shodí CI) — zapiš
+k ní měření a vyřaď ji.
+
+### 2026-10-06 — Replay dnes měří čas, ne příkazy — a musí to říkat (vada-zadani)
+**Co se stalo:** G9 byla jediné NEMĚŘENO (prázdné `tests/replays/`). Než jsem do
+replaye zapsal očekávaný hash, změřil jsem, **na co hash reaguje**: stejné tiky
+s jinými příkazy → **stejný** hash; jiný počet tiků → jiný hash. Důvod je
+strukturální: `SimWorld` nemá zaregistrovaný ani jeden systém, takže každý
+příkaz skončí jen hláškou v žurnálu a žurnál se do `state_hash()` nepočítá.
+**Doklad:** `_analyza/replay-zmer.py` (čtyři varianty vedle sebe);
+`tests/replays/tic_200.json`, `tic_1000.json` (hash změřený, v `popis` je
+napsáno, co hash pokrývá); `check-replay` → `OK (exit 0)`.
+**Ponaučení:** u replaye se **nejdřív měří citlivost** a teprve pak zapisuje hash.
+Replay, který je necitlivý na to, co tvrdí, že měří, je stejná lež jako zelená
+brána nad prázdným seznamem.
+
+### 2026-10-06 — Brána, která měří data, musí umět říct „nejsou data“ (postup)
+**Co se stalo:** v klonu bez `assets/uo` (a tak vypadá CI) nakreslí hra jedinou
+barvu a `check-render` na tom hlásil **VADA** — tedy vadu kódu, kterou to není.
+Brána teď chybějící vstupy hlásí jako **NEMĚŘENO** (`gate.pending`) a má na to
+vlastní self-test případ `bez_assetu` (blank snímek **s** daty = VADA, **bez**
+dat = NEMĚŘENO). Zároveň `run-all.py` vrací 2 (NEMĚŘENO) — a to **nesmí shodit
+krok CI**: návrh to tak od začátku myslel (`docs/08 §8.2`, „proto CI nepadá na 2“),
+ale workflow to neměl ošetřené, takže by po oživení CI spadl na prostředí.
+**Doklad:** `tools/gates/check-render.py` (`ASSET_INPUTS`, `missing_assets`,
+self-test `5 případů, 0 chyb`); `.github/workflows/ci.yml` — krok bran toleruje
+`exit 2` s warningem, `exit 1` shodí krok vždy.
+**Ponaučení:** u brány, která čte data z gitignore, rozlišuj **tři** stavy:
+vada kódu (1), chybějící data (2) a změřeno (0). A exit kód brány není totéž co
+výsledek CI kroku — kdo to spojí, dostane červenou za prostředí.
+
 ---
 
 ## Vytvořené nástroje (co, kde a čím ověřené)
@@ -782,3 +883,10 @@ větev, kterou příští session může číst místo skutečné.
 | `.cache/analysis/mutace-snimek.py` (gitignore) | mutační test **G10**: vada „nekreslí se" v `_draw()` → nový snímek z běhu → G10 musí spadnout | **3 ze 3**; snímek po odebrání vady má **shodný hash** s baseline |
 | `.cache/analysis/probe-input-map.py` (gitignore) | živě měří, zda se `input_map.poll()` volá v produkci (vloží marker, spustí hru, vrátí soubor) | **8 volání za 20 framů**; soubor vrácen **bajt za bajtem** (sha256 `4599a8d02f2b`); vyvrací „vadu zapojení 1" z předání |
 | `.cache/analysis/probe-wiring-intrafile.py` (gitignore) | měří **slepé místo brány G4** na dvou fixture, které se liší jen zmínkou jména v jiném produkčním souboru | A (volání jen uvnitř granule) → `volanych_z_produkce 1 / neintegrovano 1` **s hláškou u volané funkce**; B (navíc slovo jinde) → `2 / 0` |
+| `tests/cases/render_sort.gd` (**nově v gitu**, boot.tests) | test granule `render.sort`: pořadí na dlaždici, `x+y` jako hlavní klíč, sverování `z`, **stabilita na 1000 prvcích**, radix vrstev | `tools/gates/mutace-tests.py --only sort`: **10 z 10** mutací `render/sort.gd` chyceno; `render.sort` je tím poprvé měřený **z gitu**, ne z gitignore sondy |
+| `tests/cases/world_map.gd` + `tests/fixtures/world/` (**nově v gitu**) | test granule `world.map`: nezávislý parser `.land`/`.statics.idx`/`.bin` proti API, na fixture (2×3 bloky); reálná data Británie **navíc**, když na disku jsou | **11 z 11** mutací `sim/world/map.gd` chyceno (i vrácená vada `z` na offsetu +3); v klonu bez `assets/uo` hlásí NEMĚŘENO a **neselže** |
+| `tests/fixtures/world/make_fixture.py` (nové) | generátor fixture; `--check` porovná soubory na disku s generátorem (sha256) | 4 soubory (1 176 B / 72 B / 105 B / 138 B), `--check` shoduje |
+| `tools/gates/mutace-tests.py` (**nově v gitu**) | mutační důkaz testů: u každé mutace **PROVEDENÁ** (text na disku), **PROBĚHLÁ** (`N kontrol` s N>0), **CHYCENÁ** (FAIL modulu) + **smlouva o vstupu** (neexistující cesta musí test shodit) | **21 z 21** chyceno, `exit 0`; baseline **276 kontrol / 0 selhání**; bez smlouvy o vstupu by mutace „procházely“ (past 2 z HANDOFF) |
+| `tests/replays/tic_200.json`, `tic_1000.json` (nové) | replaye pro G9 s **změřeným** hashem; `popis` říká, co hash pokrývá (dnes čas, ne příkazy) | `check-replay` **OK** (2 replaye, hash = očekávaný); citlivost měřena `_analyza/replay-zmer.py` |
+| `_analyza/ci-ui-banner.mjs`, `_analyza/ci-vytah.py` (gitignore) | vytáhnou hlášku z **GitHub UI** (HTML běhu) — to, co API neumí | našlo `Invalid workflow file: .github/workflows/ci.yml#L56 / You have an error in your yaml syntax on line 56` (běh #4 i #9) |
+| `_analyza/yaml-kontrola.py` (gitignore) | kontrola YAML **skutečným** parserem (PyYAML) + kalibrace na dvou vratných vadách | **3 ze 3**: dvojtečka ve skaláru na spočítaném řádku, tabulátor v odsazení, současný `ci.yml` bez chyby |

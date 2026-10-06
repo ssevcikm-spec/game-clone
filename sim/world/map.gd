@@ -19,13 +19,17 @@ extends RefCounted
 #
 # Data se ctou z assets/uo/world/, nikdy z instalace UO za behu (docs/09 §9.10.2).
 # Chybejici data se HLASI - prazdna mapa neni uspech (docs/08 §8.6).
+#
+# CESTY JSOU VSTUP, NE KONSTANTA (2026-10-06): `assets/uo/` je v .gitignore,
+# takze v CI zadna mapa NENI a test nad realnymi daty by tam nemel co merit.
+# Konstruktor proto bere PREDPONU cest (`map0` bez pripony); vychozi hodnota
+# je tatáž cesta jako driv, takze hra se chova stejne. Testy tak meri format
+# na malem fixture v gitu (tests/fixtures/world/) a realna data jen tehdy,
+# kdyz na disku opravdu jsou.
 
 const Const = preload("res://core/const.gd")
 
-const META_PATH := "res://assets/uo/world/map0.meta.json"
-const LAND_PATH := "res://assets/uo/world/map0.land"
-const STATICS_INDEX_PATH := "res://assets/uo/world/map0.statics.idx"
-const STATICS_PATH := "res://assets/uo/world/map0.statics.bin"
+const DEFAULT_PREFIX := "res://assets/uo/world/map0"
 
 const CELL_BYTES := 3             # [u16 tile][i8 z]
 const LAND_HEADER_BYTES := 4      # hlavicka bloku v .land
@@ -35,6 +39,7 @@ const EMPTY_BLOCK := 0xFFFFFFFF   # nepouzity blok v .idx
 const MAX_CACHED_BLOCKS := 2048   # LRU: 2048 * (192 B + statiky)
 const OFF_MAP := -1               # land_at/z_at mimo mapu
 
+var _prefix: String = DEFAULT_PREFIX
 var _blocks_x := 0
 var _blocks_y := 0
 var _land_tile_max := 0
@@ -45,21 +50,27 @@ var _cache: Dictionary = {}       # index bloku -> {cells, statics, used}
 var _clock := 0                   # poradi pristupu pro LRU
 
 
-func _init() -> void:
+func _init(prefix: String = DEFAULT_PREFIX) -> void:
+	_prefix = prefix
 	if _load_meta():
-		_land = _open(LAND_PATH)
-		_index = _open(STATICS_INDEX_PATH)
-		_bin = _open(STATICS_PATH)
+		_land = _open(_prefix + ".land")
+		_index = _open(_prefix + ".statics.idx")
+		_bin = _open(_prefix + ".statics.bin")
+
+
+func meta_path() -> String:
+	return _prefix + ".meta.json"
 
 
 func _load_meta() -> bool:
-	if not FileAccess.file_exists(META_PATH):
-		push_warning("world.map: chybi " + META_PATH + " - spust "
+	var meta_path := meta_path()
+	if not FileAccess.file_exists(meta_path):
+		push_warning("world.map: chybi " + meta_path + " - spust "
 			+ "python tools/uoextract/worldmap.py --extract assets/uo/world")
 		return false
-	var meta = JSON.parse_string(FileAccess.get_file_as_string(META_PATH))
+	var meta = JSON.parse_string(FileAccess.get_file_as_string(meta_path))
 	if not (meta is Dictionary):
-		push_warning("world.map: " + META_PATH + " neni objekt")
+		push_warning("world.map: " + meta_path + " neni objekt")
 		return false
 	_blocks_x = int(meta.get("blocks_x", 0))
 	_blocks_y = int(meta.get("blocks_y", 0))

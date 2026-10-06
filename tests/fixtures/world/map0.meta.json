@@ -1,0 +1,6 @@
+{
+ "format": "fixture (tests/fixtures/world/make_fixture.py) - NENI to UO data",
+ "blocks_x": 2,
+ "blocks_y": 3,
+ "land_tile_max": 16383
+}

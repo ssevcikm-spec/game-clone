@@ -53,13 +53,38 @@ jobs:
           GODOT: ${{ env.GODOT_BIN }}
         run: python tools/gates/run-all.py --self-test
 
-      - name: Godot: import, testy, snímek (boot.ci_env)
+      # POZOR: dvojtečka s mezerou uvnitř NEUVOZOVKOVANÉHO jména kroku je
+      # neplatný YAML ("mapping values are not allowed here"). GitHub kvůli ní
+      # odmítl běhy #1-#9 hláškou "Invalid workflow file: ci.yml#L56 / You have
+      # an error in your yaml syntax on line 56" (ověřeno 2026-10-06 z UI).
+      - name: "Godot: import, testy, snímek (boot.ci_env)"
         run: bash tools/gates/ci-godot.sh .
 
+      # `run-all.py` vraci 2, kdyz neco zustalo NEMERENO (docs/08 §8.2). V CI bez
+      # `assets/uo` (jsou v .gitignore) to plati pro G6 a G10 - a NENI to vada
+      # kódu, takze krok NESMI spadnout (jinak by cervena prehlusila skutecnou
+      # vadu). Vada (exit 1) ale shodi krok VZDY a NEMERENO zustava videt jako
+      # warning i v artefaktu summary.json.
       - name: Brány v závazném pořadí (G1 → G3 → G5 → … → G10)
         env:
           GODOT: ${{ env.GODOT_BIN }}
-        run: python tools/gates/run-all.py
+        run: |
+          set +e
+          python tools/gates/run-all.py
+          rc=$?
+          if [ "$rc" -eq 2 ]; then
+            echo "::warning::Brány: část zůstala NEMĚŘENO (exit 2) - v CI bez assets/uo jde o G6 a G10; NENÍ to zelená"
+            exit 0
+          fi
+          exit "$rc"
+
+      # Mutacni dukaz: vraci do kódu vadu a test ji musi chytit. Bez tohoto
+      # kroku je "0 selhani" jen tvrzeni - namEReno 2026-10-06: case soubor
+      # s parse errory se v harnessu TISE preskoci a sada hlasi 0 selhani.
+      - name: Mutační důkaz testů (tests/cases opravdu měří)
+        env:
+          GODOT: ${{ env.GODOT_BIN }}
+        run: python tools/gates/mutace-tests.py
 
       - name: Souhrn bran do přehledu běhu
         if: always()

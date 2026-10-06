@@ -6,6 +6,9 @@ assets/atlas/
 *.mul
 *.uop
 *.idx
+# Vyjimka (stejna past jako u Cliloc.* nize): fixture pro test world.map je
+# zamerne `.idx` a MUSI byt v gitu, jinak by v CI chybel index statiku.
+!tests/fixtures/world/*.idx
 Cliloc.*
 # POZOR (namEReno 2026-10-02): git na Windows porovnava vzory BEZ OHLEDU NA
 # VELIKOST PISMEN, takze `Cliloc.*` pohlcuje i nastroj tools/uoextract/cliloc.py.

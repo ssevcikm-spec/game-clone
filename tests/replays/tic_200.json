@@ -1,0 +1,22 @@
+{
+ "name": "tic_200",
+ "popis": "determinismus simulace pres N tiku (svetovy cas); prikazy v teto fazi stav nemeni - SimWorld nema zaregistrovany zadny system, takze 'move' konci jen hlaskou v zurnalu (mereno 2026-10-06: jine prikazy pri stejnych ticich daly stejny hash)",
+ "ticks": 200,
+ "hash": "281e78023cd72642803e1948ff7c216c0b6a961a454b76188c8cb7c14a3f7b66",
+ "commands": [
+  {
+   "at": 0,
+   "t": "move",
+   "dir": 0,
+   "run": false,
+   "seq": 1
+  },
+  {
+   "at": 40,
+   "t": "move",
+   "dir": 1,
+   "run": true,
+   "seq": 2
+  }
+ ]
+}
