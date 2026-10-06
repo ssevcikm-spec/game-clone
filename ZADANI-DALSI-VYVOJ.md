@@ -60,11 +60,12 @@ tady jsou jen ta, která mění plán.
 | F6 | `time.world_time_ms` **nikdo nezapíše** → `hour()` je vždy 0 | `time.gd:23`; zapisuje ho jen `tests/cases/time.gd` |
 | F7 | `move` skončí „Not available yet" | `sim/commands.gd` routing na neexistující systém |
 | F8 | Data i mapa **jsou hotové a ověřené** | sonda mapy 18/0 (60 statik v britském bloku, 9 329 v okolí ±6 bloků); `manifest.json` 17 436 spritů |
-| F9 | `atlas.py` **není v gitu** a má vadu | `git status` → `??`; **117 překryvů**, **17 prázdných spritů** |
+| F9 | Atlas **má vadu v rozložení** a jeho self-test je slepý | **117 překryvů**, **17 prázdných spritů**; `--self-test` hlásí 30 kontrol / 0 chyb, ale kontrolu překryvů pouští na **6 spritech** místo 17 436 |
 | F10 | Atlas **není jen „nehotový"** — jeho self-test je slepý | `--self-test` hlásí 30 kontrol / 0 chyb, ale kontrolu překryvů pouští na **6 spritech** místo 17 436 |
 | F11 | *(ve svém čase správné)* **12 commitů nebylo před GitHubem** a CI nikdy neproběhlo | `git rev-list --count origin/main..HEAD` → 12; `ci.yml` sám sebe značí `UNVERIFIED`. **Dnes už neplatí — viz F12 a F13** |
-| F12 | **Během auditu se to vyřešilo a CI ukázalo svou vadu** | push `819c9a3..7a4f3e7` dorazil (`ahead 0`); **oba běhy CI `failure` s 0 jobů a 0 check-runs** (#1 2026-10-03 nad `819c9a3`, #2 2026-10-06 nad `7a4f3e7`) — **žádný krok se nikdy nespustil**, podpis odpovídá vyčerpané kvóte minut u privátního repa |
+| F12 | **Během auditu se to vyřešilo a CI ukázalo svou vadu** | push `819c9a3..7a4f3e7` dorazil (`ahead 0`); **běhy CI `failure` s 0 jobů a 0 check-runs** (#1 2026-10-03 nad `819c9a3`, #2–#4 2026-10-06) — **žádný krok se nikdy nespustil** |
 | F13 | `atlas.py` **je v gitu** (commit `7a4f3e7`) | `git status` → prázdný strom |
+| F14 | **Repo je veřejné, a CI přesto neběží** | `visibility: public` (ověřeno dotazem **bez tokenu**); běh `#4` po zveřejnění **také `failure` s 0 jobů** → **kvóta minut to není**; `/actions/runs/<id>/timing` → `billable: {}`; **YAML je v pořádku** (parser kalibrovaný na dvou vratných vadách); v repu **0 tajemství** ve 255 textových souborech |
 
 ---
 
@@ -72,8 +73,10 @@ tady jsou jen ta, která mění plán.
 
 ### Úkol 1 — Zprovoznit CI na GitHubu (rozhoduje uživatel, ne agent)
 
-**Stav:** **HOTOVO** je push — 2026-10-06 dorazil `819c9a3..7a4f3e7`,
-`git rev-list --count origin/main..HEAD` → `0`.
+**Stav:** **HOTOVO** je push — commity `819c9a3..7a4f3e7`, `7a4f3e7..036150b`,
+`036150b..8172b75`, `git rev-list --count origin/main..HEAD` → `0`.
+**HOTOVO** je i zveřejnění repa — `visibility: public` (ověřeno dotazem bez
+tokenu). Tím **padla teorie o kvótě minut**.
 
 **Nový nález (měřený v API, ne odhad):** CI sice **běží**, ale **každý běh
 skončí `failure` okamžitě, s 0 jobů, 0 check-runs a bez logů**:
@@ -83,25 +86,24 @@ skončí `failure` okamžitě, s 0 jobů, 0 check-runs a bez logů**:
 | `#1` | 2026-10-03 12:45 | `819c9a3` | `failure`, 0 jobů, okamžitě |
 | `#2` | 2026-10-06 10:59 | `7a4f3e7` | `failure`, 0 jobů, okamžitě |
 | `#3` | 2026-10-06 11:07 | `036150b` | `failure`, 0 jobů, okamžitě |
+| `#4` | 2026-10-06 11:10 | `8172b75` | `failure`, 0 jobů, okamžitě (**už po zveřejnění**) |
 
 **Žádný krok workflow se nikdy nespustil** — neproběhl ani download Godotu,
 takže `UNVERIFIED` URL a SHA v `ci.yml` zůstávají neověřené.
 
-**Co je vyloučené měřením:** Actions `enabled: true`, `allowed_actions: all`,
-workflow `active`, token má na repo `admin: true` a scope `repo, workflow`.
-**Co zbývá:** podpis odpovídá **vyčerpané kvótě minut u privátního repa**
-(`visibility: private`); billing API token nevidí (404).
+**Co je vyloučené měřením** (a co tedy nemá smysl zkoumat znovu):
 
-**Co udělat:**
-1. Otevřít `https://github.com/ssevcikm-spec/game-clone/actions`, kliknout na běh
-   `#3` a **přečíst hlášku** — tam je přesná příčina; případně
-   `Settings → Billing → Actions`.
-2. Rozhodnout, jak dál — a to je **rozhodnutí uživatele, ne agenta**:
-   platit minuty, nebo **zveřejnit repo** (public repo má minuty zdarma;
-   v gitu jsou jen kód a dokumentace — `assets/uo/` je gitignore, autorská díla
-   UO tam nejsou), případně přesunout běhy na vlastní runner.
-3. Po odblokování nechat CI proběhnout a **podívat se, co řeklo** — první
-   skutečný běh je sám měření a odhalí, co je v `ci.yml` neověřené.
+| Vyloučeno | Jak |
+|---|---|
+| oprávnění / nastavení Actions | `enabled: true`, `allowed_actions: all`, `state: active`, token `admin: true`, scope `repo, workflow` |
+| **syntaxe YAML** | vlastní parser **kalibrovaný** na dvou vratných vadách (chybějící dvojtečka u `on:`, tabulátor v odsazení) — obě odhalil, soubor je čistý |
+| **kvóta minut** | repo je **veřejné** (public = minuty zdarma) **a** `/actions/runs/<id>/timing` → **`billable: {}`**, tedy nespotřebovala se ani minuta |
+| tajemství / velké binárky v repu | 0 nálezů ve 255 textových souborech; `assets/uo/`, `_src/`, `_analyza/`, `.cache/` nebyly v historii ani jednou |
+
+**Co zbývá — jediné měření, které API neumí:** přesná hláška u běhu. Otevřít
+**[běh #4](https://github.com/ssevcikm-spec/game-clone/actions/runs/37454659740)**
+nebo `Settings → Billing` a přečíst text. Tam je příčina (typicky účetní
+omezení nebo pozastavené platby — API to tokenu vrací jako 404).
 
 **Přijímací kritérium:** existuje běh CI s **nenulovým počtem jobů** a je
 u něj vidět, které kroky prošly a které ne (i kdyby výsledek byl `failure`).
@@ -214,10 +216,12 @@ v `.cache/analysis/` je gitignore — v čerstvém klonu ji nikdo nespustí.
 Tyhle věci **nejsou technické** — rozhoduje je uživatel. Agent je smí jen
 předložit s naměřenými důsledky.
 
-1. **CI na GitHubu** — push je hotový, ale **CI selhává s 0 jobů** (běhy #1 a #2).
-   Zkontrolovat kvótu minut (Settings → Billing → Actions) a rozhodnout:
-   platit minuty, nebo **zveřejnit repo** (public má minuty zdarma; v gitu jsou
-   jen kód a dokumentace, assety UO jsou gitignore)?
+1. **CI na GitHubu** — push i zveřejnění repa jsou hotové, ale **všechny čtyři
+   běhy selhaly s 0 jobů**. Vyloučeno měřením: oprávnění, **kvóta minut**
+   (`billable: {}`, repo veřejné), **syntaxe YAML**. **Zbývá jediné:** otevřít
+   [běh #4](https://github.com/ssevcikm-spec/game-clone/actions/runs/37454659740)
+   nebo `Settings → Billing` a **přečíst hlášku** — API ji nevydá (404).
+   Sem patří i rozhodnutí, co s tím (účetní nastavení, vlastní runner…).
 2. **`size_lines` u 21 z 31 souborů přetéká deklaraci** (až 8×: `anim.py`
    516/150, `sim_world.gd` 232/60). Uvolnit deklarace, nebo dělit granule?
 3. **Světelný cyklus:** `ZADANI §10` a `docs/05 §5.11` uvádějí „den 12",

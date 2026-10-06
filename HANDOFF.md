@@ -26,29 +26,34 @@ následuje předání**. Proto platí:
 
 ## ⚠⚠ DVA BLOKÁTORY, KTERÉ JE POTŘEBA VYŘEŠIT PRVNÍ
 
-1. **CI na GitHubu NEBĚŽÍ — a není to chyba kódu.** Pushy dorazily
-   (`819c9a3..7a4f3e7`, `7a4f3e7..036150b`, `ahead 0`), ale **všechny tři běhy
-   workflow skončily okamžitě s `failure`, 0 jobů a 0 check-runs**:
+1. **CI na GitHubu NEBĚŽÍ — a není to chyba kódu ani kvóta minut.** Repo je od
+   2026-10-06 **veřejné** (`visibility: public`) a pushy dorazily
+   (`819c9a3..7a4f3e7`, `7a4f3e7..036150b`, `036150b..8172b75`, `ahead 0`), ale
+   **všechny čtyři běhy workflow skončily okamžitě s `failure`, 0 jobů
+   a 0 check-runs**:
 
    | běh | kdy (UTC) | commit | výsledek |
    |---|---|---|---|
    | `#1` | 2026-10-03T12:45:32Z | `819c9a3` | `failure`, 0 jobů, okamžitě |
    | `#2` | 2026-10-06T10:59:54Z | `7a4f3e7` | `failure`, 0 jobů, okamžitě |
    | `#3` | 2026-10-06T11:07:41Z | `036150b` | `failure`, 0 jobů, okamžitě |
+   | `#4` | 2026-10-06T11:10:36Z | `8172b75` | `failure`, 0 jobů, okamžitě (už po zveřejnění) |
 
    **Žádný krok workflow se nikdy nespustil** — neproběhl ani download Godotu,
-   takže `UNVERIFIED` URL a SHA v `ci.yml` zůstávají neověřené. **Vyloučeno
-   měřením:** Actions jsou `enabled: true`, `allowed_actions: all`, workflow je
-   `active`, token má na repo `admin: true` a scope `repo, workflow`.
-   **Zbývá:** podpis „běh selhal okamžitě bez jobů" odpovídá **vyčerpané kvótě
-   minut u privátního repa** (`visibility: private`) — billing API token
-   nevidí (404), takže **příčinu potvrdí až UI**: otevřít
-   `https://github.com/ssevcikm-spec/game-clone/actions` a přečíst hlášku
-   u běhu `#3`, případně `Settings → Billing → Actions`.
-   **Co s tím:** rozhodnout se mezi placenými minutami a **zveřejněním repa**
-   (public repo má minuty zdarma; v gitu jsou jen kód a dokumentace —
-   `assets/uo/` je gitignore, autorská díla UO tam nejsou) nebo vlastním
-   runnerem.
+   takže `UNVERIFIED` URL a SHA v `ci.yml` zůstávají neověřené.
+
+   **Co je vyloučené měřením:** Actions `enabled: true`, `allowed_actions: all`,
+   workflow `state: active`, token má na repo `admin: true` a scope
+   `repo, workflow`; **YAML je syntakticky v pořádku** (vlastní parser
+   kalibrovaný na dvou vratných vadách: chybějící dvojtečka u `on:` a tabulátor
+   v odsazení — obě odhalil); `/actions/runs/<id>/timing` → **`billable: {}`**,
+   tedy **nespotřebovala se ani minuta** (kvóta minut to být nemůže, a public
+   repo je má navíc zdarma).
+
+   **Zbývá jediné měření, které API neumí:** přesná hláška u běhu. Otevřít
+   **[běh #4](https://github.com/ssevcikm-spec/game-clone/actions/runs/37454659740)**
+   (nebo `Settings → Billing`) a přečíst, co GitHub píše — tam je příčina
+   (typicky účetní omezení nebo pozastavené platby, což API tokenu vrací 404).
 2. **`tools/uoextract/atlas.py` je v gitu, ale má vadu** (commit `7a4f3e7`).
    Vygeneroval `assets/uo/manifest.json` (3 565 629 B, 17 436 spritů, 198 stran),
    ve kterém je **117 překryvů** spritů a **17 jich je plně průhledných**
@@ -167,7 +172,8 @@ Doklad téhož podpisu: sonda mapy hlásí „NELZE ZAPSAT vystup (err 12)".
 | Přečtené zadání | `ZADANI-DALSI-VYVOJ.md` | cesta k obrazovce + zapojení bez vlastníka |
 | Strom je čistý | `git status --porcelain -uall` | **prázdné** (od commitu `7a4f3e7`) |
 | Je před GitHubem | `git rev-list --count origin/main..HEAD` | `0` |
-| **Běží CI?** | `https://github.com/ssevcikm-spec/game-clone/actions` | zatím **NE** — oba běhy `failure` s **0 jobů** (viz blokátor 1) |
+| **Běží CI?** | `https://github.com/ssevcikm-spec/game-clone/actions` | zatím **NE** — všechny čtyři běhy `failure` s **0 jobů** (viz blokátor 1) |
+| Repo je veřejné | `git ls-remote` bez přihlášení, nebo API bez tokenu | `visibility: public` (od 2026-10-06) |
 | Testy | testy s `APPDATA` ve workspace | `238 kontrol, 1 selhání` (prostředí) |
 | Godot běží | `& .cache\godot\...exe --headless --version` | `4.7.2.stable.official.ed1daf0bf` |
 | Instalace UO na místě | `Test-Path 'D:\Games\...\tiledata.mul'` | `True` |
@@ -216,18 +222,22 @@ Doklad téhož podpisu: sonda mapy hlásí „NELZE ZAPSAT vystup (err 12)".
     neopakovaly:** (a) „`manifest.json` neexistuje" — existuje, 3 565 629 B;
     (b) „`world.time` vrací noc = den, je to vada" — je to **dokumentované
     rozhodnutí** v `time.gd:12-21`. **Vada byla v dokumentaci / v rešerši, ne v kódu.**
-14. **CI neproběhlo ani jednou — a příčina není v kódu** — **NOVÉ (2026-10-06).**
-    Dva běhy (`#1` 2026-10-03 nad `819c9a3`, `#2` 2026-10-06 nad `7a4f3e7`),
-    oba `failure` s **0 jobů, 0 check-runs a bez logů**; u `#2` je
-    `created_at == updated_at`. **Ani jeden krok se nespustil**, takže
-    `ci.yml` zůstává `UNVERIFIED` (URL i SHA Godotu). Podpis odpovídá
-    **vyčerpané kvótě minut u privátního repa** — potvrdit v UI
-    (Settings → Billing → Actions); billing API token nevidí (404).
+14. **CI neproběhlo ani jednou — a příčina není v kódu ani v kvótě** — **NOVÉ (2026-10-06).**
+    Čtyři běhy (`#1` 2026-10-03 nad `819c9a3`, `#2`–`#4` 2026-10-06 nad
+    `7a4f3e7`, `036150b`, `8172b75`), všechny `failure` s **0 jobů, 0 check-runs
+    a bez logů**; `created_at == updated_at`. **Ani jeden krok se nespustil.**
+    Vyloučeno: oprávnění i nastavení Actions, **syntaxe YAML** (vlastní parser
+    kalibrovaný na dvou vratných vadách) a **kvóta minut**
+    (`/actions/runs/<id>/timing` → `billable: {}`; repo je navíc **veřejné**).
+    **Zbývá přečíst hlášku v UI** — viz blokátor 1.
 
 ## Už není otevřené (přesunuto, nemaže se)
 
-- **„12 commitů není před GitHubem"** — **vyřešeno 2026-10-06**: push
-  `819c9a3..7a4f3e7` dorazil, `ahead 0`.
+- **„Repo je privátní, a proto nemá minuty Actions"** — **vyřešeno 2026-10-06**:
+  repo je **veřejné** (`visibility: public`, ověřeno i dotazem **bez tokenu**).
+  Kvóta minut tím padla jako vysvětlení — a stejně padla i měřením (`billable: {}`).
+- **„12 commitů není před GitHubem"** — **vyřešeno 2026-10-06**: pushy
+  `819c9a3..7a4f3e7`, `7a4f3e7..036150b`, `036150b..8172b75`; `ahead 0`.
 - **„`tools/uoextract/atlas.py` není v gitu"** — **vyřešeno**: commit `7a4f3e7`
   (s poctivě popsanou vadou v commit message i tady v bodu 9).
 - **„`assets.atlas` není hotový"** (minulé předání, otevřená věc č. 7) — soubor
@@ -235,6 +245,11 @@ Doklad téhož podpisu: sonda mapy hlásí „NELZE ZAPSAT vystup (err 12)".
 - **„Další krok = `assets.atlas`"** — krok 1 minulých „dalších kroků" je hotový.
 - **Podezření, že brány jsou zelené nad vadou** — v tomto režimu **nejsou**:
   4 červené, z toho 2 pravé vady (G6, G10).
+- **Podezření, že v repu jsou tajemství** (před zveřejněním) — **prověřeno
+  2026-10-06**: 0 nálezů ve 255 textových souborech a `assets/uo/`, `_src/`,
+  `_analyza/`, `.cache/` **nebyly v historii ani jednou** (269 souborů celkem).
+  V gitu je 13 PNG z artu UO (`research/extract-out/art/`, 15 kB) — uživatel
+  rozhodl je **nechat**.
 
 ## Další kroky (v tomto pořadí)
 

@@ -507,6 +507,26 @@ v repu a má `on: push`" nedokazuje, že někdy proběhlo. A **privátní repo m
 minuty omezené, veřejné ne** — u hry, jejíž assety jsou gitignore, je
 zveřejnění repa levná varianta, ale je to **rozhodnutí uživatele**.
 
+### 2026-10-06 — Zveřejnění repa kvótu vyloučilo, YAML taky: zbývá hláška v UI (postup)
+**Co se stalo:** repo jsem zveřejnil (`visibility: public`, ověřeno dotazem
+**bez tokenu**) a **běh `#4` selhal úplně stejně** — okamžitě, 0 jobů. Tím padla
+hypotéza o vyčerpané kvótě minut, kterou jsem předtím vyslovil. Další měření ji
+potvrdilo nezávisle: `/actions/runs/<id>/timing` → **`billable: {}`**, tedy
+**nespotřebovala se ani minuta** (což je i logické — běh netrval ani sekundu).
+Pak jsem ověřil **syntaxi YAML** vlastním parserem, **kalibrovaným** na dvou
+vratných vadách (chybějící dvojtečka u `on:`, tabulátor v odsazení) — soubor je
+čistý. Třetí „mutace" (odebraný krok) **kalibraci neprošla a byla to moje chyba
+v očekávání**: odebraný krok není syntaktická vada.
+**Doklad:** `PATCH /repos/...` → `visibility: public`; `/actions/runs` → `#4`
+`8172b75` `failure`, `/jobs` → `total_count: 0`; `timing` → `billable: {}`;
+vlastní parser na `.github/workflows/ci.yml` → 0 chyb (a 2/2 vratné vady odhalil).
+**Ponaučení:** když hypotéza padne, **řekni to nahlas a zapiš** — jinak zůstane
+v předání jako fakt (přesně to se stalo s „kvótou minut" i předtím s „CI nikdy
+neběželo"). A **kalibrace parseru je součást měření**: bez vratných vad se
+„0 chyb" nedá odlišit od parseru, který nic neměří. Co API neumí, se musí
+**přečíst v UI** — a to patří do zadání jako konkrétní krok pro člověka,
+ne jako „vyřešit CI".
+
 ### 2026-10-06 — Auditem zmizelo 5 granul z fronty: stav se nesmí opisovat (postup)
 **Co se stalo:** předání tvrdilo „M0 5" hotových granul a `run-all` fronta stavěla
 na tom, že `app.main`, `app.loop`, `app.input`, `sim.commands` a `sim.world_loop`
