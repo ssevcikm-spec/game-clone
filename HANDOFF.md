@@ -38,6 +38,7 @@ následuje předání**. Proto platí:
    | `#2` | 2026-10-06T10:59:54Z | `7a4f3e7` | `failure`, 0 jobů, okamžitě |
    | `#3` | 2026-10-06T11:07:41Z | `036150b` | `failure`, 0 jobů, okamžitě |
    | `#4` | 2026-10-06T11:10:36Z | `8172b75` | `failure`, 0 jobů, okamžitě (už po zveřejnění) |
+   | `#5` | 2026-10-06T11:46:23Z | `bd1f25a` | `failure`, 0 jobů, okamžitě (repo už veřejné) |
 
    **Žádný krok workflow se nikdy nespustil** — neproběhl ani download Godotu,
    takže `UNVERIFIED` URL a SHA v `ci.yml` zůstávají neověřené.

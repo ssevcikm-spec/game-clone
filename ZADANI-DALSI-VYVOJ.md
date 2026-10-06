@@ -87,6 +87,7 @@ skončí `failure` okamžitě, s 0 jobů, 0 check-runs a bez logů**:
 | `#2` | 2026-10-06 10:59 | `7a4f3e7` | `failure`, 0 jobů, okamžitě |
 | `#3` | 2026-10-06 11:07 | `036150b` | `failure`, 0 jobů, okamžitě |
 | `#4` | 2026-10-06 11:10 | `8172b75` | `failure`, 0 jobů, okamžitě (**už po zveřejnění**) |
+| `#5` | 2026-10-06 11:46 | `bd1f25a` | `failure`, 0 jobů, okamžitě |
 
 **Žádný krok workflow se nikdy nespustil** — neproběhl ani download Godotu,
 takže `UNVERIFIED` URL a SHA v `ci.yml` zůstávají neověřené.
