@@ -24,14 +24,18 @@
 | **G10/G6 v klonu bez assetů** | hlásí **NEMĚŘENO**, ne VADA (ověřeno self-testem `bez_assetu`); krok CI s bránami navíc **toleruje `exit 2`** s warningem — vada (`exit 1`) shodí krok vždy |
 | **Simulace CI (klon bez `assets/uo`)** | worktree z `HEAD` (286 souborů, **0 B assetů**): `run-all.py` → **9 měřeno / 2 NEMĚŘENO (G6, G10) / 0 vad**, `exit 2`; self-testy **19/0**; **testy hry 270/0** (o 6 méně = reálná data se neměří); **G9 OK i v klonu** (replaye jsou v gitu). Simulace po měření uklizena (`git worktree remove`) |
 | **URL Godotu v CI ověřena** | `HEAD` na `…/4.7.2-stable/Godot_v4.7.2-stable_linux.x86_64.zip` → **HTTP 200, 77 860 424 B** a jméno assetu sedí na `unzip`/`mv` ve workflow (workflow to měl jako `UNVERIFIED`) |
+| **CI JE ZELENÉ — běh #11** | `#11` (sha `9ac60cb`): **1 job, `success`**, všech 11 kroků `success` (self-testy, `ci-godot.sh`, brány, **mutační důkaz**, artefakty). Artefakt `gates` (25 978 B): `{"ok": 9, "pending": 2, "failed": 0}` — **0 vad**, G6 a G10 NEMĚŘENO s důvodem „chybí assets/uo" |
+| **Běh #10 = první, který nastartoval** | 1 job (poprvé z deseti) → příčina (neplatný YAML) **potvrzená**. Krok 7 tam spadl na `godot: command not found` → **druhá příčina**: krok nedostával `GODOT` (workflow má `GODOT_BIN`). Opraveno a ověřeno lokálně přes Git `sh` |
+| **V CI se měří i testy a replaye** | log běhu #11: `[test] 270 kontrol, 0 selhani` s viditelným `NEMERENO: world.map nad realnymi daty…`; mutace **21 z 21**, baseline 270/0, smlouva vstupu OK; self-testy **19/0**; snímek v CI vznikl (`render/frame*.png` + `snapshot.png`) |
 | **NÁLEZ: `run-all.py` u G3 nic nevypíše** | když G3 selže, je v logu jen `G3 VADA vada` — bez čísel a bez důvodu (`run_tests_gate()` nevolá `gate.finish()`). Dnes mě to dvakrát poslalo hledat vadu testů, která nebyla (jednou sandbox, jednou zapomenutý `$GODOT`) |
 | **Doba běhů (kvůli limitu CI 30 min)** | naměřeno lokálně: `run-all.py` **17,8 s**, testy hry **0,6 s**, `mutace-tests.py` **14,3 s** (26 běhů Godotu). I s několikrát pomalejším runnerem je limit 30 min s rezervou |
 | **NÁLEZ: harness tiše přeskočí rozbitý case** | `tests/cases/render_sort.gd` s parse errory → `258 kontrol, 0 selhání, exit 0` a **žádný FAIL** (soubor se vůbec nespustil). Otevřená věc 21 |
 
-**Co to znamená pro „CI je zelené":** příčina, kvůli které **neběžel ani jeden
-job**, je nalezená a opravená; brány jsou lokálně 0/0; a prostředí CI (klon bez
-`assets/uo`) je ošetřené (G6/G10 NEMĚŘENO, testy hry projdou nad fixture).
-**Že je CI zelené, se ale ještě NEMEŘILO** — ověří to až běh po pushi.
+**Co to znamená pro „CI je zelené":** **je to změřeno, ne odvozeno.** Běh **#11**
+(`9ac60cb`) má 1 job, `success`, všech 11 kroků `success` a artefakt `gates`
+hlásí `{"ok": 9, "pending": 2, "failed": 0}`. Cesta k tomu vedla přes **dvě**
+vady, obě neviditelné, dokud workflow vůbec neběžel: (1) neplatný YAML na řádku
+56, (2) krok `ci-godot.sh` nedostával `GODOT` (workflow má `GODOT_BIN`).
 
 ## ⚠ POVINNÉ: na konci každé session (rozhodnutí uživatele, 2026-10-03)
 
@@ -51,17 +55,17 @@ následuje předání**. Proto platí:
 
 ## ⚠⚠ BLOKÁTORY
 
-1. **„CI je zelené" NENÍ ZMĚŘENÉ — chybí jen push.** Příčina (neplatný YAML na
-   řádku 56) je nalezená, opravená a ověřená parserem; běhy `#1`–`#9` přitom
-   selhaly **všechny**, takže oprava nebyla nikdy vyzkoušena na GitHubu.
-   **Uživatel rozhoduje o pushi** (pravidlo „nepushovat bez vyžádání" platí).
-   Až se pushne: ověřit, že běh má **nenulový počet jobů**, a číst
-   `summary.json` z artefaktu.
-2. **`tests/run_tests.gd` tiše přeskočí case soubor s parse errory** (naměřeno,
-   viz „Co je nového" a otevřená věc 21). Oprava patří vlastníkovi (`boot.tests`):
-   před `script.new()` volat `script.can_instantiate()`. Do té doby platí, že
-   „0 selhání" **samo o sobě** neznamená, že všechny case soubory proběhly —
-   proto to hlídá `tools/gates/mutace-tests.py`.
+**Žádný otevřený blokátor.** „CI je zelené" **je změřeno**: běh #11 (sha
+`9ac60cb`) = 1 job, `success`, všech 11 kroků `success`, artefakt `gates`
+`{"ok": 9, "pending": 2, "failed": 0}`. Dvě vady, které to držely, jsou popsané
+výše a opravené (`2898a8d`, `9ac60cb`).
+
+Zbývá jediná věc druhu „brána je slepá" a **netýká se CI**:
+`tests/run_tests.gd` tiše přeskočí case soubor s parse errory (naměřeno,
+otevřená věc 21). Do té doby platí, že „0 selhání" **samo o sobě** neznamená, že
+všechny case soubory proběhly — proto to hlídá `tools/gates/mutace-tests.py`,
+který běží i v CI.
+
 3. ~~`tools/uoextract/atlas.py`: vada rozložení~~ — **VYŘEŠENO 2026-10-06**
    (0 překryvů, 0 prázdných, 41 874 spritů na 67 stranách, `--verify` 0 chyb)
    a **pushnuto** (`72a4c0a`).
@@ -83,6 +87,7 @@ následuje předání**. Proto platí:
 | **Snímek z běhu** | `godot --path . --rendering-driver opengl3 --resolution 1280x720 --write-movie .cache/render/run-<tag>/frame.png --quit-after 5` → první frame se kopíruje na `.cache/render/snapshot.png` (dělá to `.cache/analysis/mutace-snimek.py`) |
 | **Sonda renderu + mutace** | `godot --headless --path . --script res://.cache/analysis/probe-render.gd` · `python .cache/analysis/mutace-render.py` · `python .cache/analysis/mutace-snimek.py` |
 | **Kontrola YAML workflow** | `python _analyza/yaml-kontrola.py` (potřebuje PyYAML; `.cache/pylib` přes `PYTHONPATH`) |
+| **Stav a logy CI běhů** | `node _analyza/ci-beh-stav.mjs` (běhy, **počet jobů**, výsledek každého kroku) · `node _analyza/ci-log.mjs` (logy; API bez tokenu vrací 403 — token se bere z Windows Credential Manageru a nevypisuje se) · `node _analyza/ci-artefakt.mjs` (artefakt `gates` → `summary.json`) |
 | Godot (binárka) | **KOPIE ve workspace**: `.cache/godot/Godot_v4.7.2-stable_win64_console.exe` (4.7.2.stable.official.ed1daf0bf) |
 | Python | `C:\Users\Ssevc\.dsh\dsh-runtimes\dsh-primary-runtime\dependencies\python\python.exe` |
 | Instalace UO | `D:\Games\Electronic Arts\Ultima Online Classic` (jen čtení; `map0.mul` tam **není** — mapa je v `map0LegacyMUL.uop`) |
@@ -100,7 +105,7 @@ následuje předání**. Proto platí:
 | `app/` | 4 | 306 | `world_view.gd` (bez granule!); `main.gd` připojuje sim, loop i svět |
 | `tests/` | **19** | **1 602** | **16 case souborů** (+2 nové: 259 a 169 řádků), `lib.gd`, `run_tests.gd`, 2 replaye, fixture (127řádkový generátor + 4 data) |
 | `tools/uoextract/` | 38 | 5 910 | 12 produkčních + 26 jednorázových experimentů |
-| `tools/gates/` | **18** | **3 486** | 10 bran + `run-all.py`, `gen-content.py`, `gate_common.py`, `sim_probe.gd`, **`mutace-tests.py`** (236 řádků) |
+| `tools/gates/` | **18** | **3 495** | 10 bran + `run-all.py`, `gen-content.py`, `gate_common.py`, `sim_probe.gd`, **`mutace-tests.py`** (236 řádků), `ci-godot.sh` (89) |
 
 *(Počty jsou Pythonem `splitlines()` nad kódovými soubory `.gd`/`.py`/`.sh`/`.mjs`,
 bez `.uid` a `__pycache__` — `python _analyza/radky.py`.)*
@@ -162,7 +167,7 @@ prázdný slovník a v celém repu ho plní **jen `tests/cases/sim_world.gd:85-8
 | Přečtené zadání | `ZADANI-DALSI-VYVOJ.md` | cesta k obrazovce + zapojení bez vlastníka |
 | Strom je čistý | `git status --porcelain -uall` | **prázdné** po commitu této session |
 | Je před GitHubem | `git rev-list --count origin/main..HEAD` | **`1`+** — tato session **nepushuje bez vyžádání** |
-| **Běží CI?** | `https://github.com/ssevcikm-spec/game-clone/actions` | **běhy #1–#9 `failure`, 0 jobů**; příčina (neplatný YAML) je opravená v commitu, ale **pushnutá ještě není**. V simulaci klonu bez assetů dnes `9/2/0`, `exit 2` — přesně to krok CI toleruje |
+| **Běží CI?** | `https://github.com/ssevcikm-spec/game-clone/actions` | **ANO** — běh **#11** (`9ac60cb`) `success`, 1 job, 11/11 kroků zelených; G6 a G10 v CI **NEMĚŘENO** (chybí `assets/uo`), 0 vad. Novější běh hlídej přes `node _analyza/ci-beh-stav.mjs` |
 | Repo je veřejné | API bez tokenu | `visibility: public` |
 | Testy | testy s `APPDATA` ve workspace | `276 kontrol, 0 selhání` |
 | Brány | `python tools/gates/run-all.py` | `11/0/0`, `exit 0` |
@@ -202,9 +207,10 @@ prázdný slovník a v celém repu ho plní **jen `tests/cases/sim_world.gd:85-8
 11. **Počet granul v dokumentech: 101 / 100 / 75–90** — **PLATÍ DÁL.**
 12. **Světlo „den 12" vs `DayLevel = 0`** — **PLATÍ DÁL.**
 13. **Rešerše hlásily dvě „vady", které neobstály** — **PLATÍ DÁL** jako varování.
-14. **CI neproběhlo ani jednou s nenulovým počtem jobů** — **PLATÍ DÁL**, ale
-    **už je známá příčina**: neplatný YAML na řádku 56 (`ci.yml`), opraveno.
-    Ověří až běh po pushi (blokátor 1).
+14. **CI neproběhlo ani jednou s nenulovým počtem jobů** — **VYŘEŠENO
+    2026-10-06**: běh **#10** měl 1 job (tím se potvrdila příčina v YAML) a běh
+    **#11** je celý `success`. Příčiny byly **dvě**: neplatný YAML na řádku 56
+    a chybějící `GODOT` u kroku `ci-godot.sh`.
 15. **`statics_at` vrací nadmnožinu** — **PLATÍ DÁL** (vada ZADÁNÍ, `docs/` agent nemění).
 16. **`check-wiring` nevidí volání UVNITŘ granule** — **PLATÍ DÁL** (vada brány).
 17. **`app/world_view.gd` a uzly v `app/main.tscn` nemají vlastníka** — **PLATÍ DÁL.**
@@ -237,6 +243,11 @@ prázdný slovník a v celém repu ho plní **jen `tests/cases/sim_world.gd:85-8
     `run_tests_gate()` nikdy nezavolá `gate.finish()`. Naměřeno dvakrát dnes
     (sandbox s Low integritou; zapomenutý `$GODOT` → exit 127) a **pokaždé to
     vypadalo jako vada testů**. Oprava patří vlastníkovi (`boot.gates`).
+26. **NOVÉ: když krok CI spadne, navazující kroky se PŘESKOČÍ.** V běhu #10
+    stačilo selhání kroku 7 a kroky 8 (brány) i 9 (mutační důkaz) se vůbec
+    nespustily — takže z logu nešlo poznat, co by brány řekly. Řešení je
+    `if: always()` u diagnostických kroků (nebo je přesunout před křehký krok);
+    rozhodnout, zda to chceme (cena: běh navíc).
 
 ## Už není otevřené (přesunuto, nemaže se)
 
@@ -252,22 +263,29 @@ prázdný slovník a v celém repu ho plní **jen `tests/cases/sim_world.gd:85-8
 - **Podezření, že v repu jsou tajemství** — prověřeno 2026-10-06.
 - **„`render.sort`/`world.map` měří jen gitignore sonda"** — vyřešeno 2026-10-06.
 - **„Replaye nemá co měřit"** (G9 NEMĚŘENO) — vyřešeno 2026-10-06 (2 replaye).
+- **„CI neběží — 9 běhů s 0 jobů"** — **vyřešeno 2026-10-06**: běh #11 je
+  `success`. Příčiny byly **dvě** a obě se daly najít jen z UI/logu: neplatný
+  YAML na řádku 56 (`2898a8d`) a chybějící `GODOT` u kroku `ci-godot.sh`
+  (`9ac60cb`).
+- **„Až CI ožije, bude červené kvůli chybějícím assetům"** — vyřešeno: G6 i G10
+  hlásí NEMĚŘENO s důvodem a krok s bránami toleruje `exit 2` (artefakt běhu #11:
+  `{"ok": 9, "pending": 2, "failed": 0}`).
 
 ## Další kroky (v tomto pořadí)
 
-1. **Pushnout a podívat se, jestli CI opravdu běží** (rozhodnutí uživatele;
-   bez pushnutí zůstává „CI je zelené" nezměřené). Čekat **nenulový počet jobů**;
-   když běh projde, přečíst artefakt `summary.json` a porovnat s lokálními čísly.
-2. **Opravit slepé místo v `tests/run_tests.gd`** (`script.can_instantiate()`)
-   a přidat na to self-test harnessu — jinak zůstává „0 selhání" slabé.
-3. **Zapsat `tests/cases/` i pro `render/texture_cache.gd` a
-   `render/chunk_renderer.gd`** (dnes je měří jen gitignore sonda; postup je
-   hotový: fixture + mutační harness).
-4. **`app/player_controller.gd` / pohyb kamery** — `world_view.gd` kameru jen
+1. **Opravit slepé místo v `tests/run_tests.gd`** — `script.can_instantiate()`
+   před `script.new()` (věc 21). Dnes je to **jediná známá slepá brána**:
+   case soubor s parse errory se přeskočí a sada hlásí „0 selhání".
+2. **Zapsat `tests/cases/` pro `render/texture_cache.gd` a
+   `render/chunk_renderer.gd`** — dnes je měří jen gitignore sonda; postup je
+   hotový (fixture v gitu + `tools/gates/mutace-tests.py`).
+3. **`app/player_controller.gd` / pohyb kamery** — `world_view.gd` kameru jen
    nastaví; klávesy nejsou namapované (věc 18).
-5. **Pixely animací** (`anim*.mul`, RLE) — blokátor „postava se pohne".
-6. Pak M2: `data.skills` → `entity.skills` → `entity.mobile` → `world.walk` →
-   `sim.movement`; a **zaregistrovat systémy do `SimWorld`** (věc 2 a 22).
+4. **Pixely animací** (`anim*.mul`, RLE) — blokátor „postava se pohne".
+5. Pak M2: `data.skills` → `entity.skills` → `entity.mobile` → `world.walk` →
+   `sim.movement`; a **zaregistrovat systémy do `SimWorld`** (věci 2 a 22).
+6. (nepovinné) `if: always()` u diagnostických kroků CI — ať selhání jednoho
+   kroku neschová výsledek ostatních (věc 26).
 
 ## Jak to dělat (co se osvědčilo)
 

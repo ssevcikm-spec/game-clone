@@ -856,6 +856,56 @@ self-test `5 případů, 0 chyb`); `.github/workflows/ci.yml` — krok bran tole
 vada kódu (1), chybějící data (2) a změřeno (0). A exit kód brány není totéž co
 výsledek CI kroku — kdo to spojí, dostane červenou za prostředí.
 
+### 2026-10-06 — Příčina CI potvrzena: běh #10 měl poprvé JOB (past-nástroje)
+**Co se stalo:** po opravě YAML (dvojtečka s mezerou v názvu kroku) nastartoval
+běh **#10 poprvé z deseti** skutečný job. Tím je hypotéza **potvrzená**, ne
+odvozená: příčinou byl neplatný YAML, ne kvóta minut ani oprávnění. Job ale
+**spadl v kroku `ci-godot.sh`** a navazující kroky 8 a 9 se přeskočily.
+**Doklad:** `_analyza/ci-beh-stav.mjs` — běh #10: `jobu 1`, kroky 1–6 `success`,
+7 `failure`, 8–9 `skipped`; log přes `_analyza/ci-log.mjs` (API logy bez tokenu
+vrací **403**; token jsem vzal z Windows Credential Manageru a nikdy ho
+nevypisoval — jen jeho délku).
+**Ponaučení:** „CI je opravené" znamená **běh s nenulovým počtem jobů**, ne
+zelený YAML v editoru. A druhá vada se pozná **jen z logu**, který bez
+přihlášení nevydá — kdo log nemá, hádá.
+
+### 2026-10-06 — Skript čte `GODOT`, workflow posílá `GODOT_BIN` (vada zapojení)
+**Co se stalo:** krok `Godot: import, testy, snímek (boot.ci_env)` byl jediný
+**bez `env:` bloku**, kdežto všechny ostatní kroky posílají `GODOT`. `ci-godot.sh`
+má `GODOT="${GODOT:-godot}"`, takže sáhl po holém `godot` →
+`line 28: godot: command not found`, testy `exit 127` a tři hlášky, které
+vypadaly jako vada testů („CHYBA: ve výstupu chybí 'N kontrol, M selhání' -
+testy NEPROBĚHLY").
+**Doklad:** log běhu #10; oprava `9ac60cb`; ověřeno **lokálně přes Git `sh`**:
+bez `GODOT` → `CHYBA: Godot 'godot' neni v PATH…`, `exit 1`; s `GODOT` → import,
+**testy 276/0**, snímek, `exit 0`; snímek má po běhu skriptu **stejné měření**
+(2117 barev, 891 383 px mimo pozadí) a G10 je OK.
+**Ponaučení:** proměnná, kterou si skript bere z prostředí, je **součást
+smlouvy** — jiné jméno u volajícího není „chyba skriptu", ale **nepředaný
+vstup**. Skript má chybějící vstup hlásit **jednou a nahlas** (nová pojistka),
+ne se rozpadnout do hlášek, které ukazují na testy.
+
+### 2026-10-06 — Kalibrace měřidla musí být vada TÉHOŽ druhu (past-nástroje)
+**Co se stalo:** `sh -n` (kontrola syntaxe) na záměrně „rozbité" kopii
+`ci-godot.sh` vrátil **exit 0**, kalibrace vyšla jako `NESHODA` a vypadalo to,
+že měřidlo nic neměří. Vada byla v **kalibračním vstupu**: přidal jsem
+`if [ 1 -eq ; then` — to je **běhová** chyba (chybějící `]` ohlásí až příkaz
+`[`), ne syntaktická. Po výměně za neukončené `if true; then` měřidlo funguje:
+rozbitá kopie `exit 2` (`syntax error: unexpected end of file`, řádek 93),
+současný skript `exit 0`.
+**Doklad:** `_analyza/over-ci-godot.py` — po opravě kalibrace **2 ze 2**.
+**Ponaučení:** „nástroj nic nezachytil" je nejdřív **podezření na kalibraci**,
+teprve potom na nástroj. Kalibruj vadou téhož druhu, jakou má měřidlo hledat.
+
+### 2026-10-06 — `${{ }}` v textu commitu rozbije PowerShell (past-nástroje)
+**Co se stalo:** `git commit -m "… ${{ env.GODOT_BIN }} …"` skončil
+`ParserError: Use '{ instead of { in variable names` — a protože jde o chybu
+**parseru**, nespustilo se z toho příkazu **nic** (ani YAML kontrola, která byla
+před commitem).
+**Doklad:** chybová hláška; po přeformulování commitu (`9ac60cb`) prošlo vše.
+**Ponaučení:** `${{ }}` a `$(` patří do **souboru**, ne do argumentu `pwsh`.
+A když příkaz skončí chybou parseru, ověř, **co z plánu se vůbec provedlo**.
+
 ---
 
 ## Vytvořené nástroje (co, kde a čím ověřené)
@@ -890,3 +940,9 @@ výsledek CI kroku — kdo to spojí, dostane červenou za prostředí.
 | `tests/replays/tic_200.json`, `tic_1000.json` (nové) | replaye pro G9 s **změřeným** hashem; `popis` říká, co hash pokrývá (dnes čas, ne příkazy) | `check-replay` **OK** (2 replaye, hash = očekávaný); citlivost měřena `_analyza/replay-zmer.py` |
 | `_analyza/ci-ui-banner.mjs`, `_analyza/ci-vytah.py` (gitignore) | vytáhnou hlášku z **GitHub UI** (HTML běhu) — to, co API neumí | našlo `Invalid workflow file: .github/workflows/ci.yml#L56 / You have an error in your yaml syntax on line 56` (běh #4 i #9) |
 | `_analyza/yaml-kontrola.py` (gitignore) | kontrola YAML **skutečným** parserem (PyYAML) + kalibrace na dvou vratných vadách | **3 ze 3**: dvojtečka ve skaláru na spočítaném řádku, tabulátor v odsazení, současný `ci.yml` bez chyby |
+| `_analyza/ci-beh-stav.mjs` (gitignore) | stav běhů CI z API: čísla běhů, **počet jobů** a výsledek každého kroku (co v UI přehlédneš) | běh #10: `jobu 1`, krok 7 `failure`, 8–9 `skipped`; běh #11: **11/11 `success`** |
+| `_analyza/ci-log.mjs` (gitignore) | stáhne log jobu (bez tokenu **403**; bere se z Windows Credential Manageru a nevypisuje se) | našel `line 28: godot: command not found` a `testy skončily s kódem 127` (běh #10) |
+| `_analyza/ci-artefakt.mjs` (gitignore) | stáhne artefakt `gates` z běhu a vypíše, co brány naměřily | běh #11: `{"ok": 9, "pending": 2, "failed": 0}` |
+| `_analyza/over-ci-godot.py` (gitignore) | kontrola syntaxe `ci-godot.sh` přes `sh -n` **kalibrovaná na syntaktickou vadu** (neukončené `if`) | **2 ze 2**; s běhovou vadou (`[ 1 -eq ;`) by kalibrace lhala |
+| `_analyza/blob-vs-disk.py` (gitignore) | porovná blob v `HEAD` s bajty na disku (autorita je blob) | po opravě CRLF→LF **10 z 10** shod |
+| `_analyza/radky.py`, `normalizuj-lf.py` (gitignore) | počty řádků pro tabulku stavu; normalizace konců řádků na LF | `tools/gates 18/3 495`, `tests 19/1 602`; replaye 543/545 B = velikost blobu |
