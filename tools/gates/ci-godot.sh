@@ -17,6 +17,15 @@ ROOT="${1:-.}"
 USERDATA="${ROOT}/.cache/godot-appdata"
 SNAPSHOT_DIR="${ROOT}/.cache/render"
 
+# Chybejici Godot se hlasi JEDNOU a jasne. NamEReno 2026-10-06 (beh #10):
+# krok dostal jen `GODOT_BIN`, skript cetl `GODOT`, a spadl na
+# "godot: command not found" (127) s hláškou o testech - ta ukazovala na testy,
+# ne na chybějící vstup. Vstup, který nikdy nedorazí, musí být vidět hned.
+if ! command -v "${GODOT}" >/dev/null 2>&1; then
+  echo "CHYBA: Godot '${GODOT}' neni v PATH a \$GODOT neni nastaveny - krok nema cim merit"
+  exit 1
+fi
+
 mkdir -p "${USERDATA}/Godot/app_userdata" "${SNAPSHOT_DIR}"
 export APPDATA="${USERDATA}"          # Windows
 export XDG_DATA_HOME="${USERDATA}"    # Linux (godot/app_userdata/<projekt>)

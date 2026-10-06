@@ -57,7 +57,13 @@ jobs:
       # neplatný YAML ("mapping values are not allowed here"). GitHub kvůli ní
       # odmítl běhy #1-#9 hláškou "Invalid workflow file: ci.yml#L56 / You have
       # an error in your yaml syntax on line 56" (ověřeno 2026-10-06 z UI).
+      # POZOR: tomuhle kroku chybel `env: GODOT` - skript `ci-godot.sh` cte
+      # `GODOT`, ale workflow ma promennou `GODOT_BIN`, takze se pouzilo holé
+      # `godot` a krok spadl na "command not found" (127). NamEReno 2026-10-06
+      # v behu #10 - poprve, kdy se workflow vubec spustil.
       - name: "Godot: import, testy, snímek (boot.ci_env)"
+        env:
+          GODOT: ${{ env.GODOT_BIN }}
         run: bash tools/gates/ci-godot.sh .
 
       # `run-all.py` vraci 2, kdyz neco zustalo NEMERENO (docs/08 §8.2). V CI bez
