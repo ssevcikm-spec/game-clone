@@ -423,3 +423,70 @@ souboru (`.sav` a `.sav.bak`), aby pád neznamenal ztrátu hry.
 | Recepty | **klasické** (z `research/04-craft-data.json`, označené érou) | bez runic/reforging (vypnuto) |
 | Loot | **pre-AoS `LootPack.Old*`** + magic item chance | odpovídá obsahu |
 | BOD, runic, reforging, imbuing | **mimo rozsah** | samostatné systémy |
+
+### 5.16.1 Podklad pro rozhodnutí „T2A vs AoS" (DOPLNĚNO 2026-10-06, měřeno)
+
+Tabulka výš **není rozhodnutí o éře jako celku** — je to směs (pohyb a notoriety
+pre-AoS, souboj a itemizace AoS, loot pre-AoS). Naměřená fakta, ze kterých se dá
+vybírat (vše `_src/…`, piny v `research/REJSTRIK-REFERENCI.md`):
+
+| Co | T2A (klasika) | AoS („The Big Divide") |
+|---|---|---|
+| **Přepínač** | `Core.T2A` = `Expansion >= T2A`: **2 nálezy v 1 souboru** (ServUO; jen `StrangeContraption.cs`) | `Core.AOS`: **633 nálezů ve 262 souborech** (ServUO), 581/242 (ModernUO) |
+| **Tooltipy / item properties** | **vypnuté** (`ObjectPropertyList.Enabled = Core.AOS`, `Scripts/Misc/CurrentExpansion.cs:27`); AoS atributy mají `IsValid == false` bez `Core.AOS` | zapnuté: 27 `AosAttribute`, 31 `AosWeaponAttribute`, 6 `AosArmorAttribute` (`Scripts/Misc/AOS.cs:514,1342,2130`) + resisty (`AosElementAttribute`) |
+| **Magie zbraní** | **pojmenované úrovně** (`WeaponEnums.cs:17-45`, `ArmorEnums.cs:5-23`): poškození `Ruin/Might/Force/Power/Vanq`, přesnost `Accurate…Supremely`, odolnost `Defense…Invulnerability`; bonus `+15/+20/+25/+30/+35` **jen když `!Core.AOS`** (`BaseWeapon.cs:3715-3744`) | pojmenované **atributy s číslem v tooltipu** (DI/HCI/DCI/LMC…), runic reforging, imbuing |
+| **Základní staty zbraní** | staré hodnoty (`OldX`) | **přepočítané** (`Core.AOS ? AosX : OldX`, `BaseWeapon.cs:575-676`) — pro hráče nejcitelnější rozdíl |
+| **Speciální útoky** | ne (starý `SpecialMove` chce `Core.SE`; `WeaponAbility` chce `Core.AOS`, `Scripts/Abilities/WeaponAbility.cs:412`) | ano, 33 ability (13 základních + ML/SA) |
+| **Svět** | Felucca (Trammel je v datech vždy, ale bez rozdělení) | Trammel/Felucca rozdělení, Malas, Ilshenar |
+| **Ostatní** | `ActionDelay = 500 ms`, klikací hlášky guild/ascii zapnuté | `ActionDelay = 1000 ms`, pojištění (`Core.AOS && !Siege`), BOD s jiným artem i odměnami, `VisibleDamageType = Related` |
+
+**Co z toho plyne pro náš klon (a pro „+1 +3 +5 +7 +9" z Dark Paradise):**
+
+1. **Číselný „+N" zápis v žádné referenci NENÍ** (měřeno: `"+1"` → 0 nálezů
+   v ServUO/ModernUO/RunUO; ve Sphere jen v SQLite). Je to **vlastní datová
+   vrstva** — nad kteroukoli érou.
+2. **Kov mění vlastnosti jen za `Core.AOS`** (`BaseWeapon.cs:909-932`,
+   `GetLowerStatReq():939`); v pre-AoS mění kov jen **hue a jméno** (a jméno je
+   v tooltipu, který je pre-AoS vypnutý). Chceme-li „zbraně z různých kovů, které
+   na něčem záleží", je to **naše vrstva**, ne přepínač éry.
+3. `RunicReforging.cs` a `Imbuing` **neobsahují ani jeden `Core.*`** (0 nálezů) —
+   v pre-AoS světě by zůstaly dostupné; kdo je nechce, musí je vypnout **sám**.
+4. **Rozhodnout teď je levné, později drahé:** `sim.combat` ještě není napsaný,
+   takže volba „pre-AoS damage/obrana" dnes znamená jen jinou tabulku v `docs/05`
+   a `data/balance.json`; po M5 by to byl přepis hotového systému.
+
+**K rozhodnutí uživateli (otevřené):** (a) éra **obsahu předmětů a souboje**
+(T2A klasika vs AoS itemizace), (b) zda zapnout **tooltipy** i v klasice
+(ModernUO to má jako config `opl.enable`, `ExpansionConfiguration.cs:10`),
+(c) zda vlastní vrstva „kov + úroveň" bude **místo** AoS atributů, nebo **vedle**
+nich (pozor na dvojí započtení do `GetDamageBonus()`, `BaseWeapon.cs:3706`);
+(d) zda éru zapsat **po složkách** do `data/balance.json` (`combat_era`, `loot_era`,
+`ui_era`, `movement_era`) — dnes je tam jen `combat_era: "aos"`.
+
+### 5.16.2 Stat gain — naměřené hodnoty a co od nich čekat (DOPLNĚNO 2026-10-06)
+
+Stat gain = **zvyšování STR/DEX/INT** ze skillů (není to totéž co skill gain).
+Naměřeno v `_src/servuo/Scripts/Misc/SkillCheck.cs`:
+
+| Veličina | ServUO default | Kde |
+|---|---|---|
+| Prodleva mezi zisky statu | **15 min** *jen když je zapnutá* | `:46` `PlayerStatTimeDelay` z `PlayerCaps.cfg:50` |
+| Přepínač prodlevy | **`false`** → prodleva se přepíše na **0,5 s** | `:52-53`; `PlayerCaps.cfg:45` (OSI to vypnulo v Publishe 45) |
+| Šance na zisk statu | **5 %** | `:49` `PlayerChanceToGainStats` |
+| Stat se zvedá | jen uvnitř **úspěšného** skill gainu | `:460-481` |
+| Capy | total **225**, jednotlivý **125** (max 150) | `Mobile.cs:11128-11129`; `PlayerCaps.cfg:16-34` |
+| Na total capu | staty se **přesouvají** (atrofie), nepřidávají | `IncreaseStat` `:629-647` |
+
+**Co od toho čekat (výpočet ze konstant, ne stopky):** varianta **A** (0,5 s, 5 %)
+≈ **180 stat pointů/hod** při jednom vyhodnocení skillu za sekundu (strop 7200/h
+je teoretický); varianta **B** (15 min) = max **4/h na stat** ≈ 12/h celkem;
+varianta **C** (3 s, 30 %) ≈ **360/h na stat** ≈ 1080/h.
+**ModernUO** má default **3 s** (ML) / **10 min** (před ML), 5 %, primary:secondary
+**75:25** — a `_statGainDelay` pro hráče **vůbec nepoužívá** (používá jen
+`_petStatGainDelay`) a **GGS nemá** (`GGSTable` = 0 nálezů).
+
+**Doporučení pro singleplayer (a proč):** zapnout prodlevu na **1–3 s** a šanci
+**20–30 %**. Vypnutá prodleva hru nezrychlí — jen zruší pojistku proti exploitu;
+skutečným limitem zůstává 5% hod. Krátká prodleva dělá růst **předvídatelným**
+(≈1000/h), což je v jednohráčovi čitelnější než náhodné skoky. **Rozhodnutí
+uživatele je otevřené** — hodnota patří do `data/balance.json`.
