@@ -130,14 +130,30 @@ následuje předání**. Proto platí:
 
 ## ⚠⚠ BLOKÁTORY
 
-**Žádný otevřený blokátor.** „Demo chodí a postava je barevná" je naměřené
-(viz tabulky výš), brány jsou zelené (11/0/0) a testy taky (447/0).
+**Žádný otevřený blokátor v kódu.** „Demo chodí a postava je barevná" je naměřené
+(viz tabulky výš), brány jsou zelené (11/0/0) a testy taky (453/0 s assety,
+400/0 v čistém klonu).
+
+**⚠ CI JE ČERVENÉ (stav 2026-10-06 21:05 UTC, běh #17 nad `e26c12a`):** kroky
+1–9 **prošly** (včetně testů, bran i `mutace-tests.py`), **spadl krok 10
+„Mutační důkaz dat (data/skills.json)"**. Lokálně (s `assets/uo`) ten krok
+prochází (baseline 453/0, 8 z 8 mutací), takže jde o **rozdíl prostředí** —
+v CI nejsou `assets/uo/` ani `_src/`. **Patří to k paralelní session, která
+v `e26c12a` měnila `data/skills.json`/`tests/cases/skills_data.gd`** (a další
+soubory); v době psaní tohohle předání v repu už nebyl její strom. **Co udělat:**
+spustit `mutace-skills.py` v **čistém klonu** (`git worktree add --detach
+<cesta> HEAD`) a přečíst, jestli spadl baseline, nebo kontrola kopie.
+
+*(Předchozí běh #16 nad `878f391` spadl v kroku 7 s **10 selhanimi v
+`tests/cases/render_hue.gd`** — to byla vada TOHOTO testu: vynucoval data
+(`hues.json`, `_src/`), která v CI nejsou. Opraveno v `c010a20` a v běhu #17
+krok 7 prošel. Poučení je v `LESSONS.md`.)*
 
 Dvě věci, které blokátor **nejsou**, ale je dobře je vědět:
 
-1. **Čtyři mutační harnessy nejsou v CI.** `mutace-tests.py` v CI je, ale
-   `mutace-anim.py`, `mutace-skills.py`, `mutace-render-anim.py`
-   a **`mutace-render-hue.py`** se pouští jen ručně. Do `ci.yml` patří jako
+1. **Čtyři mutační harnessy nejsou v CI.** `mutace-tests.py` a `mutace-skills.py`
+   v CI jsou, ale `mutace-anim.py`, `mutace-render-anim.py` a
+   **`mutace-render-hue.py`** se pouští jen ručně. Do `ci.yml` patří jako
    samostatné kroky — `ci.yml` vlastní `boot.gates`, agent ho needituje
    (rozhodnutí uživatele).
 2. **`tests/run_tests.gd` pořád tiše přeskočí case soubor s parse errory**
@@ -251,9 +267,9 @@ a barva kůže.** Statiky nesou barvu ze záznamu mapy, ale **nikdo ji nepouží
 |---|---|---|
 | Strom je čistý | `git status --porcelain -uall` | **prázdné** po commitu této session |
 | Je před GitHubem | `git rev-list --count origin/main..HEAD` | **`0`** — tato session **pushuje** (uživatel povolil) |
-| **Běží CI?** | `node _analyza/ci-beh-stav.mjs` | dnes **HTTP 403** (bez tokenu) — stav CI je potřeba ověřit v prohlížeči |
+| **Běží CI?** | `node _analyza/ci-beh-stav.mjs` (funguje i bez tokenu) · anotace: `node _analyza/ci-anotace.mjs` | **běh #17 nad `e26c12a` = `failure`, spadl krok 10** (`mutace-skills`) — viz BLOKÁTORY; kroky 1–9 prošly |
 | Repo je veřejné | API bez tokenu | `visibility: public` |
-| Testy | testy s `APPDATA` ve workspace | `447 kontrol, 0 selhání` |
+| Testy | testy s `APPDATA` ve workspace | `453 kontrol, 0 selhání` (v čistém klonu 400/0 — 53 kontrol je nad daty) |
 | Brány | `python tools/gates/run-all.py` | `11/0/0`, `exit 0` |
 | Self-testy | `python tools/gates/run-all.py --self-test` | `19, 0 chyb`, `exit 0` |
 | Mutační důkaz | `mutace-tests.py` + `mutace-anim.py` + `mutace-skills.py` + `mutace-render-anim.py` + `mutace-render-hue.py` | `34/34`, `8/8`, `8/8`, `9/9`, `12/12` |
@@ -395,6 +411,20 @@ a barva kůže.** Statiky nesou barvu ze záznamu mapy, ale **nikdo ji nepouží
 43. **NOVÉ (3. session): `tools/uoextract/hues.py` nemá `--verify`** (jen
     `--self-test` s 5 kontrolami a `--install`). Při dalším zásahu do barev by
     se hodila kontrola proti `hues.mul` (jako `anim.py --verify`).
+44. **NOVÉ (3. session): CI spadá v kroku 10 (`mutace-skills`) na commitu
+    `e26c12a`.** Lokálně (s `assets/uo`) prochází; v CI **není `assets/uo/` ani
+    `_src/`**. Postup: `git worktree add --detach ../x HEAD` a tam
+    `GODOT=… python tools/gates/mutace-skills.py` — uvidí se, jestli padá
+    baseline, nebo kontrola kopie. **Pozor: `mutace-anim.py`,
+    `mutace-render-anim.py` a `mutace-render-hue.py` v CI běžet NEMOHOU** (chtějí
+    instalaci UO, `assets/uo/anim/*.png`, resp. `hues.json`) — chtějí fixture.
+45. **NOVÉ (3. session): `--write-movie` bez existující složky neskončí chybou**
+    (vznikne jen `frame.wav` 0 B) — v `ci-godot.sh` to řeší `mkdir -p`, ale kdo
+    ten příkaz opisuje ručně, narazí (past 30).
+46. **NOVÉ (3. session): test granule musí být ROZDĚLENÝ na „bez dat" a „s daty"**
+    (vzor `tests/cases/render_hue.gd` po opravě `c010a20`): kontroly, které
+    potřebují `assets/uo`, se v CI **nesmí vynucovat** — jinak spadne krok
+    s testy (stalo se v běhu #16: 10 selhání). Patří to i do `docs/09`.
 
 ## Už není otevřené (přesunuto, nemaže se)
 
