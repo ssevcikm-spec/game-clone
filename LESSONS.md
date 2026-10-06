@@ -571,6 +571,58 @@ důvěrou — a to i když je měřil nástroj, který jsem si sám zadal. Když
 vypadá jako vada, ale v souboru je **napsaný důvod**, je to nález o dokumentaci
 (chybějící zmínka, rozpor sekcí), ne o kódu. Zapsat se má **obojí**.
 
+### 2026-10-06 — Mutační skript hlásil „spadla" u 9 z 10 mutací. Byl to ModuleNotFoundError (chyba)
+**Co se stalo:** `.cache/analysis/mutace-atlas.py` pouštěl mutanta zapsaného do
+`.cache/analysis/`, ale `atlas.py` si na začátku dělá
+`sys.path.insert(0, Path(__file__).parent)` — takže hledal `art.py`
+v `.cache/analysis/`, kde není. **Každý mutant spadl na `ModuleNotFoundError`**
+a skript to vyhodnotil jako „self-test vadu chytil" (exit 1 + text `CHYBA`
+z tracebacku). Všech **9 „SPADLA" tedy byly falešné důkazy** a „SLEPA" jen
+znamenalo „mutant se vůbec nespustil" (proto ta jedna mutace, jejíž hledaný kus
+ve zdroji nebyl, „prošla").
+**Doklad:** týž mutant spuštěný z `.cache/analysis/` → `ModuleNotFoundError`
+(výstup neobsahuje ani řádek `kontrol`); tentýž mutant s `PYTHONPATH` na
+`tools/uoextract` → `[atlas] self-test: 42 kontrol, 0 chyb`, exit 0.
+Opravená verze: `.cache/analysis/mutace-atlas-v2.py` → **11 z 11 chyceno**.
+**Ponaučení:** u mutačního testu se neověřuje jen „mutace se provedla", ale
+i **„test se vůbec spustil"**. Kontrola musí být dvě věci současně: výstup
+obsahuje souhrn (`kontrol`) **a** neobsahuje traceback. Skript, který počítá
+exit kód, nerozliší „vada chycena" od „program spadl při startu" — a vypadá to
+přesně jako úspěch. Tohle je tatáž past jako „test vypsal CHYBA a skončil
+exit 0", jen obráceně.
+
+### 2026-10-06 — Příčina 117 překryvů: hlavička item artu čtená o 4 bajty vedle (chyba)
+**Co se stalo:** `rozmiar()` v `atlas.py` četl rozměry item spritu jako
+`struct.unpack_from("<Hxxh", payload, 0)` — jenže formát statického artu je
+`[u32 flags][i16 width][i16 height]`, takže se **`flags` četl jako šířka**.
+Sázení pak používalo jiný rozměr, než jaký se uložil do manifestu a použil při
+dekódování → pozdější sprite přepsal dřívější (`paste`) a vzniklo
+**117 překryvů** (až 27 px ze 44) a **17 plně průhledných spritů**.
+**Doklad:** měření `.cache/analysis/diag-rozmery.py`: u **11 681 z 11 685** item
+spritů se šířka z hlavičky lišila od uložené (item 4410: měřeno `(32, 87)`,
+skutečnost `(87, 62)`); se **správným** offsetem se hlavička shoduje
+s dekódováním u **39 516 z 39 516** itemů (`.cache/analysis/diag-item-rozmery.py`).
+**Ponaučení:** když dva kusy kódu čtou **týž binární formát**, musí se to
+ověřovat **vzájemně**, ne každý sám proti sobě — `rozmiar()` i `art()` měly
+vlastní testy a oba „procházely". A podruhé: **dvě implementace téhož formátu
+jsou jediná obrana** (tenhle projekt to má zapsané jako pravidlo) — tady se
+porovnávaly jen tehdy, když se to někdo rozhodl změřit.
+
+### 2026-10-06 — Mutace, která nemění výstup, se nemá honit testem (postup)
+**Co se stalo:** mutace `if y + h + pad > page:` → `if y + h > page:` („konec
+stranky bez padu") neprošla self-testem ani po posílení kontrol. Měřeno
+`.cache/analysis/diag-mutace-stranka2.py` na **40 001 spritech**: **0 rozdílů
+v umístění**, 128 stran, stejná dna stránek.
+**Proč je neškodná (doklad, ne dojem):** podmínka se může lišit jen když
+`y + h == page`. To nenastane, protože každá police začíná spritem, pro který
+platí `y + h + pad <= page` (to je podmínka předchozího `if` na konci police),
+a sprity na policce jsou jen nižší nebo stejně vysoké (řadí se podle výšky
+sestupně). Pad na přechodu stránky je tedy **redundantní**.
+**Ponaučení:** stejná situace jako `z + Z_MIN` v `render/sort` — **„mutace
+prošla" není totéž jako „kontrola je slepá"**. Než se kontrola „posílí", musí
+se změřit, jestli mutace vůbec **může** změnit výstup. Když nemůže, patří
+k mutaci **důkaz neškodnosti**, ne další test.
+
 ---
 
 ## Vytvořené nástroje (co, kde a čím ověřené)
@@ -586,6 +638,7 @@ vypadá jako vada, ale v souboru je **napsaný důvod**, je to nález o dokument
 | `research/probe/anim_pokryti.py` | reprodukovatelné měření pokrytí těl | dává 270 / 318 těl, prunik 2 — zapsáno v `research/anim-mereni.md` |
 | `tools/gates/check-assets.py` (G6) | nově měří i manifest animací | `--self-test` 4 případy; běh nad repem `OK` |
 | `tools/gates/run-all.py --self-test` | nově pouští i `anim.py` | 19 self-testů (10 bran + 9 extrakčních nástrojů), 0 chyb |
-| `tools/uoextract/atlas.py` (granule `assets.atlas`) | shelf-pack do 2048² + `manifest.json` (17 436 spritů, 198 stran) s `ox`/`oy` z ClassicUO | `--self-test` **30 kontrol** — ale na 6 spritech, tedy **slepý na překryvy** (záznam 2026-10-06); živý běh `assets/uo/manifest.json` 3 565 629 B; `--verify` hlásí **17 prázdných spritů** = **neopravená vada**; **NENÍ v gitu** |
+| `tools/uoextract/atlas.py` (granule `assets.atlas`) | shelf-pack do 2048² + `manifest.json` (41 874 spritů, 67 stran) s `ox`/`oy` z ClassicUO | `--self-test` **42 kontrol** na **40 000 spritech** (dřív 30 na 6 → slepý na překryvy); `--verify` **0 chyb**; **mutace 11 z 11** (`.cache/analysis/mutace-atlas-v2.py`); nezávislé ověření z pixelů **0 prázdných / 0 překryvů** (`.cache/analysis/over-atlas.py`); dva běhy → **shodný SHA-256** manifestu `442b163f…` |
+| `.cache/analysis/mutace-atlas-v2.py` (gitignore) | mutační test self-testu atlasu — **ověřuje i to, že se test vůbec spustil** (kalibrace + traceback + `kontrol` ve výstupu) | **11 z 11 chyceno**; stará verze dávala falešné důkazy (`ModuleNotFoundError` jako „chyceno") |
 | `_analyza/sonda-zapisu.py` (gitignore) | zapíše a smaže soubor v 19 cestách stromu — rozliší „nejde zapsat nic" od „nejde zapsat do podsložek" | před opravou 1/19, po přepnutí na plný přístup 19/19 |
 | `_analyza/acl/` (gitignore) | zálohy ACL + protokol `acl-report-*.jsonl` (14 grantů, všechny ověřené) | `RECAP` v protokolu: `GRANTED=14 REFUSED=0 RESTORED=0` |

@@ -70,6 +70,17 @@ KNOWN = ((3921, "item"), (3936, "item"), (5118, "item"),
 def rozmiar(kind: str, payload: bytes | None) -> tuple[int, int] | None:
     """(sirka, vyska) z hlavicky payloadu - bez dekodovani pixelu (dvoupruchod).
 
+    TVARY HLAVICE (kazdy format jinak - a tady se to uz jednou spletlo):
+      item: [u32 flags][i16 width][i16 height]  -> "<Ihh" od offsetu 0
+            (docs/03 §3.3.4; cte to stejne `art.py:176` pri dekodovani)
+      gump: [u32 width][u32 height]             -> "<II" od offsetu 0
+            (`gump.py:111`)
+      land: vzdy LAND_SIZE x LAND_SIZE, hlavicka zadna (`art.py:162`)
+    Namerено 2026-10-06: se SPRAVNYM offsetem se hlavicka == dekodovane
+    rozmery u 39 516 z 39 516 item spritu, takze je pro sazeni verohodna.
+    Pred opravou se u itemu cetlo "<Hxxh" (tedy `flags` jako sirka): 11 681
+    z 11 685 spritu melo jinou sirku, nez se pak ulozilo -> prekryvy v atlase.
+
     Rozmery vetsi nez stranka se odmita: `rozloz` by je musel umistit mimo
     stranku a sprite by vysel z obrazku.
     """
@@ -77,8 +88,10 @@ def rozmiar(kind: str, payload: bytes | None) -> tuple[int, int] | None:
         return None
     if kind == "land":
         return (LAND_SIZE, LAND_SIZE) if len(payload) >= LAND_BYTES else None
-    w, h = (struct.unpack_from("<Hxxh", payload, 0) if kind == "item"
-            else struct.unpack_from("<II", payload, 0))
+    if kind == "item":
+        _flags, w, h = struct.unpack_from("<Ihh", payload, 0)   # [u32][i16][i16]
+    else:
+        w, h = struct.unpack_from("<II", payload, 0)            # [u32][u32]
     return (w, h) if 0 < w <= PAGE and 0 < h <= PAGE else None
 
 
@@ -210,6 +223,22 @@ def sestav(install: str, out: Path, tiles_path: Path, only: set[str]) -> dict:
     (out / "manifest.json").write_text(
         json.dumps(manifest, ensure_ascii=False, sort_keys=True, indent=1) + "\n",
         encoding="utf-8", newline="\n")
+    # UKLID OSIRELYCH STRANEK: novy beh muze potrebovat min stran nez predchozi
+    # a stare PNG by v `atlas/` zustaly. Namerено 2026-10-06: po oprave
+    # rozlozeni zustalo v adresari 198 souboru, ale manifest znal jen 67 -
+    # 131 osirelych stranek (10,1 MB). Uklidi se jen to, co NENI v manifestu
+    # a lezi v `atlas/`; nic jineho se nedotyka.
+    # POZOR: u castecneho behu (`--only item`) by uklid smazal stranky ostatnich
+    # druhu, ktere tento manifest nezna - proto se uklizi jen pri plnem behu.
+    if set(only) >= {"land", "item", "gump"}:
+        platne = {Path(p["file"]).name for p in manifest["pages"]}
+        uklizeno = 0
+        for stara in (out / "atlas").glob("*.png"):
+            if stara.name not in platne:
+                stara.unlink()
+                uklizeno += 1
+        if uklizeno:
+            print(f"[atlas] uklizeno osirelych stranek: {uklizeno}")
     return manifest
 
 
@@ -266,6 +295,74 @@ def over(out: Path, sada: str) -> int:
     return 1 if chyby else 0
 
 
+def _prekryvy(umisteni: list[tuple], rozmery: dict) -> list[tuple]:
+    """Kontrola SAZENI v meritku: vraci seznam dvojic, ktere se prekryvaji.
+
+    Prochazi stranky a police, ne vsechny dvojice - aby sla pouzit i na
+    tisicich spritu (dvoupruchodova kontrola O(n^2) je na tom slepa, protoze
+    se neda spustit).
+    """
+    from collections import defaultdict
+
+    police: dict = defaultdict(list)
+    for kind, ident, cislo, x, y in umisteni:
+        police[(cislo, y)].append((x, kind, ident))
+    kolize = []
+    for klic, v in police.items():
+        v.sort()
+        for (x1, k1, i1), (x2, k2, i2) in zip(v, v[1:]):
+            w1 = rozmery[(k1, i1)][0]
+            if x1 + w1 > x2:
+                kolize.append(((k1, i1), (k2, i2)))
+    return kolize
+
+
+def _mezery(umisteni: list[tuple], rozmery: dict) -> list[tuple]:
+    """Mezery mezi sousedy na policce - kazda ma byt presne PAD.
+
+    Proč zvlast: bez teto kontroly prosly mutace "konec police bez padu"
+    a "konec stranky bez padu" (namerено 2026-10-06). Self-test tehdy overoval
+    jen to, ze se sprity NEprekryvaji - ale ne to, ze maji mezi sebou
+    predepsanou mezeru, ktera brani filtraci souseda v GPU.
+    """
+    from collections import defaultdict
+
+    police: dict = defaultdict(list)
+    for kind, ident, cislo, x, y in umisteni:
+        police[(cislo, y)].append((x, kind, ident))
+    spatne = []
+    for klic, v in police.items():
+        v.sort()
+        for (x1, k1, i1), (x2, k2, i2) in zip(v, v[1:]):
+            mezera = x2 - (x1 + rozmery[(k1, i1)][0])
+            if mezera != PAD:
+                spatne.append(((k1, i1), (k2, i2), mezera))
+    return spatne
+
+
+def _sada_v_meritku(nic: int = 0) -> list[tuple]:
+    """Synteticka sada v meritku REALNEHO behu: 40 000 spritu, stranka 2048.
+
+    Proč: puvodni self-test poustel kontrolu prekryvu na 6 spritech na strance
+    256 px. Police se v takovem vstupu nikdy nezaplni a stranka se ani jednou
+    neprekroci, takze kontrola nemela jak selhat - a 117 prekryvu proslo.
+    Namerено 2026-10-06: 6 000 spritu da jen 19 stranek (algoritmus je efektivni),
+    proto je vstup vetsi, aby test skutecne prosel prechodem na dalsi stranku.
+    """
+    import random
+
+    rng = random.Random(20261006)
+    vysky = [24, 44, 46, 60, 80, 108, 130, 177, 204, 256]
+    sada = []
+    for i in range(40000):
+        kind = ("item", "gump", "land")[i % 3]
+        h = rng.choice(vysky)
+        w = rng.randint(10, 200)
+        sada.append((kind, i, w, h))
+    sada.append(("land", 99999, LAND_SIZE, LAND_SIZE))
+    return sada
+
+
 def self_test() -> int:
     """Offline: pomer, razeni, ofsahy a opakovatelnost - bez instalace UO."""
     chyby: list[str] = []
@@ -305,11 +402,71 @@ def self_test() -> int:
     mala = rozloz(rady, page=40, pad=0)
     kontrola(mala != [] and len({c for _, _, c, _, _ in mala}) > 1,
              "u male stranky se sprite rozbiji na vice stran")
-    kontrola(rozmiar("item", struct.pack("<Hxxh", 5000, 10).ljust(8, b"\x00")) is None and
-             rozmiar("item", struct.pack("<Hxxh", 44, 44).ljust(8, b"\x00")) == (44, 44),
+    kontrola(rozmiar("item", struct.pack("<Ihh", 0, 5000, 10).ljust(8, b"\x00")) is None and
+             rozmiar("item", struct.pack("<Ihh", 0, 44, 44).ljust(8, b"\x00")) == (44, 44),
              "sprite vetsi nez stranka se odmita, bežny projde")
     kontrola(ofsahy("land", 44, 44) == (0, 0), "land ma ox = oy = 0")
     kontrola(ofsahy("item", 45, 114) == (0, 70), "item ox = (w>>1)-22, oy = h-44")
+
+    # --- TVAR HLAVICE: presne offsety poli (tady byla vada, ktera udelala 117 prekryvu) ---
+    # item: [u32 flags][i16 width][i16 height]. Kdo cte "<Hxxh", precte `flags`
+    # jako sirku - a sazi podle jineho rozmeru, nez pak dekoduje.
+    item_hlavicka = struct.pack("<Ihh", 0x00002000, 87, 62)
+    kontrola(rozmiar("item", item_hlavicka) == (87, 62),
+             "item: rozmiar neprecetl [u32 flags][i16 w][i16 h] (cte se spatnym offsetem?)")
+    kontrola(rozmiar("item", struct.pack("<Ihh", 1464, 44, 44)) == (44, 44),
+             "item: hodnota z pole flags se dostala do sirky (offsety hlavicky nesedi)")
+    gump_hlavicka = struct.pack("<II", 640, 480)
+    kontrola(rozmiar("gump", gump_hlavicka) == (640, 480),
+             "gump: rozmiar neprecetl [u32 w][u32 h]")
+
+    # --- SAZENI V MERITKU REALNEHO BEHU (6 000 spritu, stranka 2048) ---
+    sada = _sada_v_meritku()
+    rozmery_s = {(k, i): (w, h) for k, i, w, h in sada}
+    velke = rozloz(sada)
+    zpet = rozloz(list(reversed(sada)))
+    kontrola(velke == zpet, "v meritku: rozloz zavisi na poradi vstupu")
+    kolize = _prekryvy(velke, rozmery_s)
+    kontrola(not kolize,
+             f"v meritku: sprity se prekryvaji ({len(kolize)} kolizi, prvni {kolize[:3]})")
+    mimo = [r for r in velke
+            if r[3] + rozmery_s[r[:2]][0] > PAGE or r[4] + rozmery_s[r[:2]][1] > PAGE]
+    kontrola(not mimo, f"v meritku: {len(mimo)} spritu lezi za hranici stranky")
+    # mezera mezi sousedy MUSI byt PAD - bez teto kontroly prosly mutace,
+    # ktere pad na konci police/stranky vynechaly (namerено 2026-10-06)
+    mezery = _mezery(velke, rozmery_s)
+    kontrola(not mezery,
+             f"v meritku: {len(mezery)} sousedu nema mezeru {PAD} px (prvni {mezery[:3]})")
+    # Mezera musi byt dodrzena i VE SMERU DOLU: sprite + PAD se jeste musi vejit
+    # na stranku. Bez tohoto je pad jen na konci police, ne na konci stranky.
+    za_okraj = [r for r in velke
+                if r[3] + rozmery_s[r[:2]][0] + PAD > PAGE
+                or r[4] + rozmery_s[r[:2]][1] + PAD > PAGE]
+    kontrola(not za_okraj,
+             f"v meritku: {len(za_okraj)} spritu nema za sebou PAD "
+             "(lepi se na okraj stranky - filtr v GPU by nasal souseda)")
+    kontrola(len(velke) == len(sada), "v meritku: ne vsechny sprity se umistily")
+    policek = len({(r[2], r[4]) for r in velke})
+    stran = len({r[2] for r in velke})
+    # Kriterium ma byt o TOM, co test prokazuje: ze se opravdu prosel
+    # prechodem na dalsi stranku (jinak by test obstal i s jednou strankou
+    # a o chovani na hranici by netvrdil nic).
+    kontrola(stran >= 20, f"v meritku: stran jen {stran} - test neprosel prechodem stranky")
+    kontrola(policek >= 200, f"v meritku: policek jen {policek} - vstup nema meritko realneho behu")
+    # Vsechny stranky krome POSLEDNI (ta muze byt castecna) musi byt zaplnene
+    # do vetsiny vysky - jinak by na nich prekryvy nemely kde vzniknout.
+    # Pozor na past: kdyz se "posledni" urci z dat, mutace, ktera prida dalsi
+    # stranku, si ji sama oznaci za posledni a kontrole unikne.
+    podle_stran = {}
+    for kind, ident, cislo, x, y in velke:
+        w, h = rozmery_s[(kind, ident)]
+        podle_stran[cislo] = max(podle_stran.get(cislo, 0), y + h)
+    nejvyssi = max(podle_stran)
+    plne = [c for c, dno in podle_stran.items() if c != nejvyssi and dno < PAGE * 0.8]
+    kontrola(not plne,
+             f"v meritku: {len(plne)} stranek je zaplneno pod 80 % vysky "
+             f"(nejnizsi dno {min((podle_stran[c] for c in plne), default=0)} px)")
+
     # invariant z ChunkMesh.cs: spodni hrana statiku lezi na spodni hrane dlazdice
     ox, oy = ofsahy("item", 45, 114)
     kontrola((-oy + 114) == (0 + 44), "spodni hrana statiku nesedi na spodni hranu dlazdice")

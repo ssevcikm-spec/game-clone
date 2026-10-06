@@ -55,10 +55,26 @@ následuje předání**. Proto platí:
    **[běh #4](https://github.com/ssevcikm-spec/game-clone/actions/runs/37454659740)**
    (nebo `Settings → Billing`) a přečíst, co GitHub píše — tam je příčina
    (typicky účetní omezení nebo pozastavené platby, což API tokenu vrací 404).
-2. **`tools/uoextract/atlas.py` je v gitu, ale má vadu** (commit `7a4f3e7`).
-   Vygeneroval `assets/uo/manifest.json` (3 565 629 B, 17 436 spritů, 198 stran),
-   ve kterém je **117 překryvů** spritů a **17 jich je plně průhledných**
-   (item 4410 a další). Podrobně „Otevřené věci" č. 9.
+2. **`tools/uoextract/atlas.py`: vada OPRAVENA, atlas přegenerován** (2026-10-06).
+   Příčina: `rozmiar()` četl hlavičku item artu jako `"<Hxxh"`, jenže formát je
+   `[u32 flags][i16 width][i16 height]` → **`flags` se četl jako šířka**, sázení
+   používalo jiný rozměr, než se uložilo, a pozdější sprite přepsal dřívější.
+   Naměřeno před/po:
+
+   | | před | po |
+   |---|---|---|
+   | Překryvy spritů | **117** (až 27 px ze 44) | **0** |
+   | Plně průhledné sprity | **17** | **0** |
+   | Stran atlasu | 198 | **67** |
+   | Spritů v manifestu | 17 436 | **41 874** |
+   | Itemů „chybí v archivu" | 24 481 | **43** |
+   | `--verify` | 17 chyb | **0 chyb** |
+   | Manifest | 3,5 MB | 8,6 MB |
+
+   Self-test: **42 kontrol** (dřív 30) a běží na **40 000 spritech** místo 6.
+   Mutační test `mutace-atlas-v2.py`: **11 z 11 chyceno** + jedna mutace
+   prokázaná jako neškodná. Nezávislé ověření z pixelů
+   (`.cache/analysis/over-atlas.py`): 0 prázdných, 0 překryvů, 0 mimo stránku.
 
 ## Kde co je
 
@@ -75,7 +91,7 @@ následuje předání**. Proto platí:
 | Python | `C:\Users\Ssevc\.dsh\dsh-runtimes\dsh-primary-runtime\dependencies\python\python.exe` |
 | Instalace UO | `D:\Games\Electronic Arts\Ultima Online Classic` (jen čtení; `tiledata.mul` je tam, `map0.mul` **ne** — mapa je v `map0LegacyMUL.uop`) |
 | Roadmapa | `.forge/roadmap.json` — **101 granul, `done` je u všech `false`** a klíč `done_note` neexistuje: stav se pozná **jen měřením** |
-| Data z instalace | `assets/uo/` (gitignore) — `tiles.json` 2 405 685 B, `manifest.json` 3 565 629 B, `world/map0.land` 89 915 392 B, `world/map0.statics.bin` 20 386 415 B |
+| Data z instalace | `assets/uo/` (gitignore) — `tiles.json` 2 405 685 B, **`manifest.json` 8 649 632 B (41 874 spritů, 67 stran)**, `world/map0.land` 89 915 392 B, `world/map0.statics.bin` 20 386 415 B |
 | Snímek pro G10 | `.cache/render/snapshot.png` — **artefakt z 2026-10-02 19:24**, jedna barva (77,77,77) |
 
 ## Stav kódu (počty řádků Pythonem `splitlines()`, bez `.uid` a `__pycache__`)
@@ -110,7 +126,7 @@ Doklady, které jsem 2026-10-06 viděl na vlastní oči (ne opsané z předání
   kožené věci, trávu. Řetěz UOP → MUL → pixely funguje.
 - **Sonda mapy** `probe-map.gd`: britský blok **60 statik**, okolí ±6 bloků
   **9 329 statik**, 168 různých land id, LRW cache eviction funguje.
-- **Data**: `items.json` 8 748 záznamů, `recipes.json` 1 053, atlas 17 436 spritů.
+- **Data**: `items.json` 8 748 záznamů, `recipes.json` 1 053, atlas **41 874 spritů na 67 stranách** (po opravě rozložení 2026-10-06).
 - **Hra nespadne**: `--headless --quit-after 300` → exit 0, tiká
   (`[loop] tick 20`, `tick 40`).
 
@@ -205,12 +221,12 @@ Doklad téhož podpisu: sonda mapy hlásí „NELZE ZAPSAT vystup (err 12)".
 8. **Zastaralé poznámky v `tools/uoextract/worldmap.py`** (ř. 10–11, 60–63,
    87–90) tvrdí, že `docs/03 §3.4` uvádí špatné pořadí bloku — **PLATÍ DÁL**;
    `docs/03` je opravený (§3.9.1), kód `struct.unpack_from("<HBBbH")` je správný.
-9. **`atlas.py`: v gitu (`7a4f3e7`), ale s vadou v rozložení** — **NOVÉ (2026-10-06).**
-   `manifest.json` má 17 436 spritů, ale **117 překryvů** na stejné poličce
-   (až **27 px ze 44**) → **17 spritů je plně průhledných** (např. item 4410).
-   `--self-test` přitom hlásí **„30 kontrol, 0 chyb"**, protože kontrolu překryvů
-   pouští na **6 syntetických spritech** na stránce 256 px. Past „zelená, která
-   nic nezměřila" — viz `LESSONS.md`. **Oprava je úkol 2 v zadání.**
+9. **`atlas.py`: vada rozložení OPRAVENA** — **VYŘEŠENO 2026-10-06.** Bylo:
+   `manifest.json` měl 17 436 spritů s **117 překryvy** (až 27 px ze 44) a
+   **17 plně průhledných** (item 4410). Příčina byla **hlavička item artu čtená
+   o 4 bajty vedle** (`"<Hxxh"` místo `"<Ihh"` → `flags` jako šířka); naměřeno
+   u **11 681 z 11 685** item spritů. Po opravě: 0 překryvů, 0 prázdných,
+   41 874 spritů na 67 stranách. **Detaily a čísla: blokátor 2.**
 10. **`docs/11 §11.6` vede O3 jako neuzavřené, `docs/03 §3.5.1` tvrdí
     „rozhodnuto měřením"** — **NOVÉ.** Vnitřní rozpor dokumentace.
 11. **Počet granul se v dokumentech rozchází: 101 / 100 / 75–90** — **NOVÉ.**
@@ -220,7 +236,7 @@ Doklad téhož podpisu: sonda mapy hlásí „NELZE ZAPSAT vystup (err 12)".
     denní hodnotu a **přiznává to v hlavičce** jako nehotovost; vadná je
     dokumentace, ne kód. Rozhodnout lidsky.
 13. **Rešerše hlásily dvě „vady", které neobstály** — **NOVÉ, jen aby se
-    neopakovaly:** (a) „`manifest.json` neexistuje" — existuje, 3 565 629 B;
+    neopakovaly:** (a) „`manifest.json` neexistuje" — existuje (dnes 8 649 632 B);
     (b) „`world.time` vrací noc = den, je to vada" — je to **dokumentované
     rozhodnutí** v `time.gd:12-21`. **Vada byla v dokumentaci / v rešerši, ne v kódu.**
 14. **CI neproběhlo ani jednou — a příčina není v kódu ani v kvótě** — **NOVÉ (2026-10-06).**
@@ -254,9 +270,8 @@ Doklad téhož podpisu: sonda mapy hlásí „NELZE ZAPSAT vystup (err 12)".
 
 ## Další kroky (v tomto pořadí)
 
-1. **Opravit rozložení v `atlas.py`** (překryvy) **a předělat self-test na
-   reálný počet stránek**, ne na 6 spritů. Pak `--verify` musí dát 0 chyb.
-   (Uživatel 2026-10-06 rozhodl: **atlas dřív než renderer.**)
+1. ~~Opravit rozložení v `atlas.py`~~ — **HOTOVO 2026-10-06** (viz blokátor 2):
+   0 překryvů, 0 prázdných spritů, `--verify` 0 chyb, nezávislé ověření OK.
 2. **Zprovoznit CI** (nutné před orchestrou) — zkontrolovat kvótu minut
    v Settings → Billing → Actions; dokud běh neproběhne, je `ci.yml` neověřený.
 3. **`render.textures`** (`render/texture_cache.gd`, ≤ 60) — cache z manifestu.

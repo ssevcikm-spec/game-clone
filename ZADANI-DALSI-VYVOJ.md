@@ -109,25 +109,25 @@ omezení nebo pozastavené platby — API to tokenu vrací jako 404).
 **Přijímací kritérium:** existuje běh CI s **nenulovým počtem jobů** a je
 u něj vidět, které kroky prošly a které ne (i kdyby výsledek byl `failure`).
 
-### Úkol 2 — Opravit rozložení v `atlas.py` (granule `assets.atlas`)
+### Úkol 2 — Opravit rozložení v `atlas.py` (granule `assets.atlas`) — **HOTOVO 2026-10-06**
 
-**Co je špatně:** `rozloz()` umisťuje sprity bez kontroly překryvů. Naměřeno
-**117 překryvů** na stejné poličce (až **27 px ze 44**) a **17 spritů je proto
-plně průhledných** (např. item 4410). `atlas.py --verify` to sám hlásí.
+Příčina: `rozmiar()` četl hlavičku item artu jako `"<Hxxh"`, ale formát je
+`[u32 flags][i16 width][i16 height]` → `flags` se četl jako šířka. Sázení
+používalo jiný rozměr, než se uložilo do manifestu, a `paste` pak pozdějším
+spritem přepsal dřívější.
 
-**Co udělat:**
-1. Opravit umisťování tak, aby se sprity **nepřekrývaly** (včetně zbytku police).
-2. **Předělat `--self-test` tak, aby kontrolu překryvů pouštěl na datech
-   v měřítku reálné stránky** (tisíce spritů na 2 048 px), ne na 6 spritech.
-   **Bez toho je oprava neprokázaná.**
-3. **Vrátit do kódu vadu a podívat se, že test spadne** (mutační test) —
-   a ověřit, že se mutace **skutečně provedla** (sha souboru).
+| | před | po |
+|---|---|---|
+| Překryvy | 117 (až 27 px ze 44) | **0** |
+| Plně průhledné sprity | 17 | **0** |
+| Stran / spritů | 198 / 17 436 | **67 / 41 874** |
+| `--verify` | 17 chyb | **0 chyb** |
 
-**Přijímací kritérium:** `atlas.py --verify` → **0 chyb**; počet prázdných
-spritů v manifestu **0**; mutace (vrácený překryv) self-test **shodí**.
-
-**Pozor:** `assets/uo/` je gitignore — manifest se negeneruje do gitu, ale
-`atlas.py` **musí být v gitu** (jinak si ho každý klon musí napsat znovu).
+Self-test: 30 → **42 kontrol**, vstup 6 → **40 000 spritů**.
+Mutační test `.cache/analysis/mutace-atlas-v2.py`: **11 z 11 chyceno**.
+Nezávislé ověření z pixelů `.cache/analysis/over-atlas.py`: 0 / 0 / 0.
+**Pozor pro příště:** starý `mutace-atlas.py` dával falešné důkazy
+(`ModuleNotFoundError` vypadal jako chycená vada) — viz `LESSONS.md`.
 
 ### Úkol 3 — `render.textures` (granule, `render/texture_cache.gd`, ≤ 60 řádků)
 
