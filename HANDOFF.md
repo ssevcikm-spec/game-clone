@@ -110,7 +110,7 @@ v `docs/04` sedí na kód a brány/testy/self-testy jsou zelené.
 | **Co se NEMĚNILO** | `sim.interaction` (Úkol 4) se nedělal, `entity.equipment`/`entity.notoriety` taky ne, vady ze snímků (věci 59–61) a M9 taky ne; `data/items.json`, `data/recipes.json` ani `core/const.gd` se nedotkly; **nikdo `item`/`container` nevolá z produkce** (věc 64) |
 | **Brány a self-testy** | `run-all.py`: **11 měřeno / 0 NEMĚŘENO / 0 vad**, `exit 0`; self-testy **19 / 0 chyb**, `exit 0`; `check-docs-refs.py`, `check-zadani.py`, `roadmap-gen.py --check` `exit 0`; G4 po změně: `granuli_s_hotovym_souborem 53` (bylo 51), `volanych_z_produkce 63` (bylo 59), `jen_z_testu 37` |
 | **Plán** | `plan-status.py`: **45 měřeně hotových** po commitu (bylo 43), **0 rozporů**, mrtvé deklarace v M2 se zmenšily o `entity.item` a `entity.container`; `size_lines` u obou nových granul **překročeno** (66/60 a 192/60) a je to **věc 2** (rozhodnutí uživatele: měřit, ne přepisovat) |
-| **CI** | běh nad commitem této session — viz „BLOKÁTORY“ (vyplněno po pushi) |
+| **CI** | **`#40` nad `17ebc04` = `success`**, 17 kroků, job 2:03 min; prošel krok 7 (testy **bez `assets/uo`**, lokálně **582/0**) i krok 9 s **81 mutacemi** — viz „BLOKÁTORY“ |
 
 ## ✅ CO JE NOVÉHO (8. session) — konvence dveří je ZMĚŘENÁ a OPRAVENÁ
 
@@ -442,12 +442,15 @@ schody svou výškou; 8. session: `world.doors` páruje `art` ↔ `art + 1`;
 9. session: `entity.item` + `entity.container` hotové, **20/20 mutací**).
 **Hra jede 40–45 FPS** (bylo 1–2 FPS) — viz sekce VÝKON.
 
-**⚠ CI NAD COMMITEM 9. SESSION: `#NN` nad `<sha>` = `<stav>`** — *řádek doplněn
-po pushi; dokud tu stojí `#NN`, není ověřený.* **Předtím** běh nad commitem
-8. session byl zelený: **`#38` nad `98542a3` = `success`,
-17 kroků, job 1:33 min** (ověřeno živě přes API; krok 9 „Mutační důkaz testů"
-prošel i s **61 mutacemi** — lokálně celý `mutace-tests.py` trvá 3 min 27 s, takže
-`timeout-minutes: 30` je s rezervou). **Předtím** #37 nad `ce0c38e` = `success`
+**⚠ CI NAD COMMITEM 9. SESSION JE ZELENÝ — `#40` nad `17ebc04` = `success`**,
+**17 kroků** (+ 3 post kroky), job **2:03 min** (13:05:08 → 13:07:14; ověřeno
+živě přes API). Prošel i **krok 7** (import + testy, tj. sada **bez `assets/uo`**,
+kde lokálně vychází **582/0**) a **krok 9 „Mutační důkaz testů" s 81 mutacemi**;
+krok 15 „Stav plánu" taky. **Předtím** `#39` nad `bcd9128` = `success`
+(8. session push), **`#38` nad `98542a3` = `success`,
+17 kroků, job 1:33 min** (krok 9 tehdy s **61 mutacemi** — lokálně celý
+`mutace-tests.py` trvá 3 min 27 s, takže `timeout-minutes: 30` je s rezervou).
+**Předtím** #37 nad `ce0c38e` = `success`
 (7. session push), #36 nad `073583b` = `success`; #34 nad `4259091` = `success`
 (17 kroků, včetně nových 11–14 z 7. session); #30 nad `f243ba2` = `success`
 (13 kroků; krok 9 = 53 mutací se vešlo do `timeout-minutes: 30`), #31 nad
@@ -637,7 +640,7 @@ a barva kůže.** Statiky nesou barvu ze záznamu mapy, ale **nikdo ji nepouží
 |---|---|---|
 | Strom je čistý | `git status --porcelain -uall` | **prázdné** po commitu této session (nové `.uid` u `item`/`container` jsou v commitu — vznikly `--import` pod plným přístupem) |
 | Je před GitHubem | `git rev-list --count origin/main..HEAD` | **`0`** — **9. session pushla** (trvalé povolení uživatele z 2026-10-07) |
-| **Běží CI?** | `node _analyza/ci-beh-stav.mjs` (bez tokenu je limitovaný — viz past v `LESSONS`) · anotace: `node _analyza/ci-anotace.mjs` | **běh nad commitem 9. session** — viz „BLOKÁTORY"; předtím **#38 nad `98542a3` (8. session) = `success`, 17 kroků** (i krok 9 s **61 mutacemi**). **sha rozhoduje**, ne „poslední běh" |
+| **Běží CI?** | `node _analyza/ci-beh-stav.mjs` (bez tokenu je limitovaný — viz past v `LESSONS`) · anotace: `node _analyza/ci-anotace.mjs` | **`#40` nad `17ebc04` (9. session) = `success`, 17 kroků, job 2:03 min** (i krok 9 s **81 mutacemi** a krok 15 „Stav plánu"); předtím `#39` nad `bcd9128` a `#38` nad `98542a3` (8. session) = `success`. **sha rozhoduje**, ne „poslední běh" |
 | **Co v CI NEJDE ověřit bez tokenu** | `node _analyza/ci-log.mjs` → **HTTP 403**; `ci-artefakt.mjs` → **HTTP 401** | Kdo nemá token, **vidí jen stav kroků**, ne jejich obsah — takže „krok s mutacemi prošel" je naměřené, ale **počet chycených mutací v CI je neověřený** (naměřeno je **lokálně**). Nezapisuj do předání „CI má 81/81", když to nevidíš |
 | Repo je veřejné | API bez tokenu | `visibility: public` |
 | **Oprávnění** | `whoami /groups \| Select-String Mandatory` | **`Medium`** = plný přístup. `Low` = sandbox → **falešná selhání testů i bran** (9. session naměřila v `Low` **583/9** místo **584/0**: 8× `render.textures` + 1× `sim.world_loop` save — viz `LESSONS`) a `.uid` nevzniknou |
