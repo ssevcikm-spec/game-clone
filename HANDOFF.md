@@ -296,6 +296,39 @@ ho celý." Každá session tedy **není „krok"**, ale **jeden celek s cílem**
 zavřenými i otevřenými dveřmi, test kroku na schod nahoru/dolů, obojí s mutací
 (`--only walk` **12/12**), `run_tests.gd` **537/0**, `run-all.py` **0 vad**.
 
+## Co čeká na tebe
+
+**Dvě věci čekají na tvé rozhodnutí — obojí je o souborech, které agent nesmí
+měnit sám (`boot.*` v roadmapě, tedy „co se smí přidat do CI"). Všechno ostatní
+si 7. session udělá sama** (cíl je výše) a nic od tebe nepotřebuje.
+
+### 1. Zavřít slepé místo v `tests/run_tests.gd`?  ⏳ ČEKÁ NA TEBE
+**Co to je:** sada testů **tiše přeskočí** case soubor, který se nedá
+zinstancovat (parse error) — vypíše menší počet kontrol a `0 selhání`, takže
+vypadá zeleně. Naměřeno 2×: 4. session `438 kontrol` místo `480`, 5. session
+`480` místo `507`. Oprava je jednořádková (`script.can_instantiate()` před
+`script.new()`), ale soubor je `boot.tests` → **patří tobě**.
+
+**Co to přinese:** když se příště rozbije case soubor, sada to **řekne** místo
+aby ztišila 20 kontrol. Dnes je to jediná známá slepá brána.
+**Co to stojí:** jedno rozhodnutí; práce je na 10 minut i s testem.
+**Doporučuji:** ano — je to nejlevnější zvýšení důvěry v celou sadu.
+**Jak se to vrátí:** `git revert <commit>` (změna je v jednom souboru).
+
+### 2. Přidat zbývající tři mutační harnessy do `ci.yml`?  ⏳ ČEKÁ NA TEBE
+**Co to je:** v CI dnes běží `mutace-tests.py` a `mutace-skills.py`;
+`mutace-anim.py`, `mutace-render-anim.py` a `mutace-render-hue.py` se pouští
+**jen ručně** (dnes naměřeno 8/8, 11/11, 12/12). Do `ci.yml` je smí přidat jen
+`boot.gates`.
+**Co to přinese:** i ty tři granule by měly v CI důkaz, že jejich testy měří.
+**Co to stojí:** delší běh CI (naměřeno dnes: **53 mutací se vešlo do
+`timeout-minutes: 30`**, takže místo je — ale tři harnessy přidají další běhy
+celé sady) a riziko, že dva z nich v CI **nepoběží** (chtějí instalaci UO
+a `assets/uo/anim`, což v CI není) → chtěly by fixture.
+**Doporučuji:** nejdřív **jen `mutace-render-hue.py`** (má data v gitu) a pro
+zbylé dva nejdřív udělat fixture; jinak by v CI tiše neměřily.
+**Jak se to vrátí:** `git revert <commit>` (změna je v `ci.yml`).
+
 ## ⚠⚠ BLOKÁTORY
 
 **Žádný otevřený blokátor v kódu.** „Demo chodí a postava je barevná" je naměřené

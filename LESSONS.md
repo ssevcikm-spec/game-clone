@@ -89,6 +89,23 @@ soubory přeskakuje**. Není to tedy jen o skrytých složkách (`.forge`, `.git
 tool** — použij Python walk (plošné skeny) nebo `Select-String` na konkrétní
 soubor. Do `dsh-prostredi` patří formulace: grep tool **respektuje `.gitignore`**.
 
+### 2026-10-07 — Nový oddíl v předání: kontrola hledala klíč v CELÉM oddílu, ne v bodu (chyba)
+**Co se stalo:** pravidlo uživatele (2026-10-07) žádá v předání oddíl
+`## Co čeká na tebe` a `_analyza/handoff-kontrola.py` ho má hlídat. První verze
+kontroly hledala `Doporučuji` / `Jak se to vrátí` / `ČEKÁ NA TEBE` **kdekoliv
+v oddílu** — a když jsem u **jednoho ze dvou** bodů klíčovou větu smazal, kontrola
+**prošla** (`exit 0`), protože ji měl ještě druhý bod.
+**Doklad:** mutace „bod 1 bez `Doporučuji`" → stará verze `klicove vety OK`,
+`exit 0`; po opravě (kontrola **po bodech**, `re.split(r"^### ", …)`) tatáž
+mutace hlásí `bod 1: 'Doporučuji'` a `exit 1`; po návratu souboru
+(sha256 `25C849600B4F…`) je zelená.
+**Ponaučení:** **kontrola musí mít stejně jemné okno, jako je jednotka tvrzení** —
+u seznamu „každý bod musí mít X" se nesmí hledat X v celém seznamu. A druhá
+polovina: **první mutace byla špatně zvolená** (`Doporučuji:` → `Doporučuji
+(MUTACE):` klíčové slovo neodstranilo), takže „prošla" — což vypadá jako slepá
+kontrola, ale byl to **neplatný test**. Než začneš opravovat kontrolu, ověř, že
+mutace měnila to, co kontrola měří.
+
 ### 2026-10-07 — CI stav bez tokenu narazí na limit a `git credential fill` se zasekne (past-nástroje)
 **Co se stalo:** po pushi jsem chtěl ověřit běh nad **svým** commitem a polloval
 jsem `node _analyza/ci-beh-stav.mjs` ve smyčce. Po ~35 dotazech začalo API vracet
