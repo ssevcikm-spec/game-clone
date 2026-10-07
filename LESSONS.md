@@ -24,6 +24,88 @@ Typy: `chyba` (moje vada) · `past-nástroje` (prostředí/nástroj, ne logika) 
 
 ---
 
+### 2026-10-07 — `plan-status.py` posune na „měřeně hotové“ i granuli, kterou cizí test jen ZMÍNÍ (past-nástroje)
+**Co se stalo:** přidal jsem `tests/cases/interaction.gd`, který čte `data/items.json`
+(routing z `category`/`role`) a `data/skills.json` (id skillu pro gump). Metrika
+„hotovo = soubor v gitu + zmínka v `tests/`“ (`v_testu` hledá **kmen názvu
+souboru** kdekoliv v textu testů) tím přeskočila **dvě nesouvisející granule**
+mezi měřeně hotové: `assets.gump` (můj test používá slovo `gump` v
+`gump_open`) a `data.recipes` (používá `recipes_for`). Obě mají acceptance
+`content`/`schema`, což ten test **neměří**.
+**Doklad:** `python tools/plan-status.py` → s testem `47` hotových, s testem
+dočasně přesunutým do `.cache` `45`; diff ids z `--json`:
+`přibylo do hotových: ['assets.gump', 'data.recipes']`. Skutečná práce
+(`sim.interaction` po commitu) je z toho **jedna**.
+**Ponaučení:** číslo z `plan-status` je **horní odhad** — než ho použiješ jako
+„stav se zvedl“, rozděl přírůstek na *skutečně hotové* a *artefakty metriky*
+(stačí se zeptat: které nové slovo/cesta v testu mohly trefit cizí kmen?).
+Metrika měří zmínku, ne měření; kdo hlásí „+N hotových“, musí říct, čím to bylo.
+
+### 2026-10-07 — `callv` se špatným počtem argumentů vrátí `null`, ne výjimku (past-nástroje)
+**Co se stalo:** dynamický routing posílal do stubu `recipes_for(m, serial, skill)`
+(3 argumenty) místo `recipes_for(m, skill)`. Godot vypsal
+`ERROR: Error calling method from 'callv': Method expected 2 argument(s)...`, ale
+**`callv` vrátil `null`** — a kód na tom postavil `{"ok": true}`. Test to chytil
+jen proto, že kontroloval **i počet volání stubu** (`volani == 1`); kdyby
+kontroloval jen `ok`, byla by to zelená nad ničím.
+**Doklad:** běh sady před opravou: `806 kontrol, 8 selhání`, všechna na parové
+tabulce (`zavola system ... volani 0`); po opravě `args = [m, skill]` a `res == null`
+se hlásí jako `reason:"bad_system"` (viditelný důvod, ne úspěch).
+**Ponaučení:** `callv` je tichý — `null` z něj je **vada volání** a patří hlásit
+(`bad_system`), ne brát jako úspěch. Test dynamického routingu musí kontrolovat
+**argumenty a počet volání**, ne jen `ok`.
+
+### 2026-10-07 — „Dva id prostory v `items.json`“ byla domněnka; rozhodlo porovnání jmen (postup)
+**Co se stalo:** `data/items.json` má 4 004 hodnot `tile < 0x4000` a 4 744 hodnot
+`>= 0x4000`, takže to vypadalo, že data míchají **tiledata id** a **art id**
+(a 269 hodnot by se „překrývalo“). Měření proti `assets/uo/tiles.json` (název
+záznamu na indexu `tile`) ukázalo, že **všechny** záznamy jsou tiledata id:
+shoda `400/400` při indexu `tile`, `0/400` při `tile - 0x4000`. Teprve pak je
+bezpečné překládat `entity.item.tile` (art id) na `tile - 0x4000`.
+**Doklad:** `data/items.json` vs `assets/uo/tiles.json` (`item[8]` = jméno):
+velké záznamy `400/400` shoda při `tile`, `0/400` při art konvenci.
+**Ponaučení:** „vypadá to jako dva prostory“ se neřeší podle velikosti čísla ani
+podle dojmu, ale **porovnáním proti zdroji jmen**; jinak si člověk vymyslí
+kolizi, která neexistuje, a „opraví“ správný kód.
+
+### 2026-10-07 — `String.split_lines()` v Godotu 4.7.2 NENÍ; parse error shodí celý case soubor (past-nástroje)
+**Co se stalo:** v testu jsem chtěl projít řádky `docs/05` a napsal
+`text.split_lines()` (pythonovský zvyk). Godot 4.7.2 hlásí
+`Parse Error: Cannot find member "split_lines" in base "String"`, case soubor se
+**tiše přeskočí** a sada spadne z `806` na `641` kontrol (`0 selhání` by přitom
+svádělo k „je to OK“) — přesně past věci 21.
+**Doklad:** `SCRIPT ERROR: Parse Error: Cannot find member "split_lines"` +
+`[test] FAIL case soubor res://tests/cases/interaction.gd nelze nacist (parse error?)`.
+**Ponaučení:** `text.split("\n")` + `strip_edges()` (kvůli `\r`) je jistota;
+`split_lines()` je jen v novějších/některých verzích — a každý nový case soubor
+se po zápisu **jednou spustí**, protože parse error se projeví jako „méně kontrol“,
+ne jako červená.
+
+### 2026-10-07 — Opravoval jsem domnělou vadu (`\` na konci řádku), která vadou NEBYLA (chyba)
+**Co se stalo:** po parse erroru jsem měl dva podezřelé: `split_lines()` a
+**pokračování řádku zpětným lomítkem**. Obě jsem „opravil“ — a teprve pak ověřil,
+že GDScript `\` na konci řádku **podporuje** (`var x: int = 1 + \` → `soucet=3`,
+`exit 0`). Skutečná vada byla jen `split_lines()`.
+**Doklad:** dočasný skript `.cache/tmp/bs.gd` (po testu smazán) → `soucet=3`,
+`exit 0`.
+**Ponaučení:** když je podezřelých víc, **izoluj je jednou po druhém** (minimální
+skript), ne „oprav všechny naráz“ — jinak se do historie zapíše vada, která
+neexistovala, a příště se podle ní bude hledat zas.
+
+### 2026-10-07 — Krátký číselník session 10 (`sim.interaction`) (postup)
+**Co se stalo:** cíl `sim.interaction` (Úkol 4) hotový: `use`/`use_on`/
+`context_menu`/`context_action`, routing z **dat** (`data/items.json`:
+`category`/`role`), parová tabulka §5.2.3 (36 řádků dokumentu, pokryto 10 =
+11 párů) a dynamický routing do `sim.craft`/`sim.magic`/`sim.harvest`/…
+**Doklad:** `tests/run_tests.gd` **806 kontrol / 0 selhání** (31 case souborů);
+`mutace-tests.py --only interaction` **13 z 13 chyceno** + smlouva vstupu OK;
+`run-all.py` **11/0/0**; self-testy **19/0**; `plan-status.py` 0 rozporů.
+**Ponaučení:** velikost se nevyplácí podceňovat — `sim/interaction.gd` má
+**461 řádků** proti deklaraci `<= 150` (**3,1×**, třetí největší překročení
+v projektu). Drželo to zadání „radši datovou tabulku než rozvětvený kód“, ale
+kdo plánuje `strong <= 150`, má počítat s tím, že 4 metody + datové tabulky +
+hlavička s měřenými důkazy se do 150 nevejdou.
+
 ### 2026-10-07 — Jak lokálně změřit „stav jako v CI“ (bez `assets/uo`) (postup)
 **Co se stalo:** CI `assets/uo/` nevidí (gitignore), takže čísla sady se liší od
 lokálních a z lokálního běhu se nepozná, jestli krok v CI projde. Změřil jsem to

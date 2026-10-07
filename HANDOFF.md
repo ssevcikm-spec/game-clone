@@ -1,23 +1,51 @@
-# Předání — UO-klon (předměty a kontejnery hotové; 2026-10-07, 9. session)
+# Předání — UO-klon (interakce hotová; 2026-10-07, 10. session)
 
 > **Co je tenhle soubor:** **stav projektu** pro další session agenta. Přepisuje
 > se celý; historie je v `git log`. **Současný stav se bere odtud** — a ověřuje
 > se živě (je tu k tomu sekce „Předletová kontrola").
 > **Zadání pro další vývoj je `ZADANI-DALSI-VYVOJ-2.md`** (etapa 2, Úkoly 1–9);
-> **Úkoly 1, 2 a 3 jsou hotové, konvence dveří (věc 62) je rozhodnutá a opravená
-> a `entity.item` + `entity.container` (první dvě granule Úkolu 6) jsou hotové
-> a měřené** — takže **další je Úkol 4 (`sim.interaction`)**, na který už obojí
-> sedí (`use_on` na kontejner se teď dá měřit; `depends_on` v roadmapě je tím
-> splněné). Předchozí etapa je v `ZADANI-DALSI-VYVOJ.md`.
+> **Úkoly 1–4 jsou HOTOVÉ** (poslední = `sim.interaction`, tato session) a z Úkolu 6
+> jsou hotové `entity.item` + `entity.container` — **další je `entity.equipment`**
+> (poslední granule Úkolu 6): sedí na obě, zavře invariant „právě jeden rodič"
+> i pro nasazený předmět (věc 66b) a je to systém, který dnes `sim.interaction`
+> hledá pro větev `equip` (věc 68). Předchozí etapa je v `ZADANI-DALSI-VYVOJ.md`.
 > **Naměřený stav plánu je v `REVIZE-PLANU-2026-10-06.md`** a **stav granul
 > měří** `python tools/plan-status.py`.
 > **Kam pro co v referenčních zdrojích je `research/REJSTRIK-REFERENCI.md`**.
-> **Datum:** 2026-10-07 (9. session). **Poslední změna kódu:** tato session
-> (**`sim/entity/item.gd` + `sim/entity/container.gd`** — tvar dat podle
-> `docs/04 §4.5`, invariant „právě jeden rodič", limity 125 / 400 stones /
-> 60 000 a slučování hromad; dále `tests/cases/{item,container}.gd`, dva nové
-> moduly v `tools/gates/mutace-tests.py`, `docs/04 §4.2` + `§4.2.1` + `§4.5`).
-> Předchozí commit `bcd9128` = konvence dveří a cíl 9. session (8. session).
+> **Datum:** 2026-10-07 (10. session). **Poslední změna kódu:** tato session
+> (**`sim/systems/interaction.gd`** — `use`/`use_on`/`context_menu`/
+> `context_action`, routing z dat `data/items.json`, parová tabulka §5.2.3,
+> dynamický routing do `SimWorld.systems`; dále `tests/cases/interaction.gd`,
+> modul `interaction` v `tools/gates/mutace-tests.py`, smlouvy
+> `docs/04 §4.2`/`§4.2.1`).
+> Předchozí commit `2ede2c9` = CI #41 nad `adbd2cb` zelený (9. session).
+
+## ✅ CO JE NOVÉHO (10. session) — `sim.interaction` je HOTOVÝ a měřený
+
+**Cíl session (zadaný 9. session):** „Dokončit `sim.interaction` (Úkol 4 ze
+`ZADANI-DALSI-VYVOJ-2.md`)" — `use`, `use_on`, `context_menu`, `context_action`
+podle `docs/05 §5.2.2` a párové tabulky §5.2.3, s **dynamickým routingem**
+a s tím, že **neznámý předmět → hláška, nikdy ticho**. **Splněno** — včetně všech
+čtyř bodů přijímacího kritéria (kovadlina, chybějící systém, neznámý předmět,
+dveře přes `world.doors.toggle`).
+
+| Co | Doklad (naměřeno dnes) |
+|---|---|
+| **`sim/systems/interaction.gd`** (461 řádků; deklarace `<= 150` → **3,1×**, věc 2, **3. největší překročení v projektu**) | `use`/`use_on`/`context_menu`/`context_action`. První tři vracejí **`Dictionary`** `{ok, reason, action}` — **odchylka od `->void`** ve smlouvě (zapsaná v `docs/04 §4.2.1` i v hlavičce souboru, i s důvodem: `void` nerozliší „nic se nestalo" od „není to hotové"). `context_menu` vrací `Array[Dictionary]` `{entry, text, custom}` |
+| **Routing se rozhoduje z DAT, ne z prozy** | `data/items.json` (8 748 záznamů): `category` (container/weapon/armor/shield/clothing/tool/light/misc/material) + `role` (36 hodnot: pickaxe, smith hammer, anvil, forge, iron ore, …). **`anvil` a `forge` mají `category == "tool"`, ale jsou to CÍLE** (naměřeno: 18 záznamů `tool` = 16 nástrojů + tyto 2) → konstanta `TARGET_ROLES`; proto `use` na kovadlinu nic neudělá **a řekne to** |
+| **Dva id prostory (měřeno, ne odhad)** | `entity.item.tile` je **ART ID**, data mají **TILEDATA ID**: názvy v `assets/uo/tiles.json` sedí na indexu `tile` i u **4 744** záznamů s `tile >= 0x4000` (`400/400` shoda), při art konvenci `0/400` shoda. Modul proto hledá **nejdřív** `tile - 0x4000` |
+| **`use` — 9 větví §5.2.2** | dveře (`world.doors.toggle`, konvence z 8. session: `art ± 1`), kontejner (`container_contents` + `gump_open`), vendor (AI stav `vendor`, `docs/05 §5.3`), nástroj (`target_request` s kursorem), svitek (→ `sim.magic`), výbava (→ `entity.equipment`), světlo, mobil (→ `sim.combat`), **`unknown` → hláška `You see nothing special.`** |
+| **Dynamický routing** | `_call` hledá systém v `SimWorld.systems`; když tam není (nebo nemá metodu) → `{ok:false, reason:"not_available"}` **a hláška** — nikdy ticho. **`callv` se špatným počtem argumentů vrací `null`** → hlásí se `reason:"bad_system"`, ne falešný úspěch (past je v `LESSONS`) |
+| **§5.2.3 (párová tabulka z `Tilehelp.enu`)** | Dokument má **36 řádků, pokryto je 10 = 11 párů** (řádek 26 má dvě podoby materiálu: `logs` i `boards`) + 4 páry z §5.2.2 (`pickaxe`/`hatchet`/`axe`/`fishing pole` → dlaždice). Zbytek potřebuje data, která v `data/items.json` **nejsou** (ryba, vlna, nit, obvaz, klíč, lockpick, pochodeň, svitek do knihy, reagent, runa, moongate, srp, vědro, měch, sextant, hodiny) — chybějící řádek odpoví hláškou. **Test to měří proti dokumentu** (počet řádků `docs/05` + přesná množina párů), takže **nový řádek v dokumentu test shodí**, dokud se pokrytí nedoplní |
+| **Kontextové menu** | `0x0078` (Open Backpack) a `0x0193` (Paperdoll) = čísla, která **klient zná** (ServUO `Server/ContextMenus/ContextMenu.cs:178-256` přes `research/01 §2.4`); ostatní `>= 0x64` = vlastní (`custom: true`), protože clilocy jsou UNVERIFIED (`docs/11` O7). `0x0078` otevře batoh hráče (jinak `not_available`), `0x0193` pošle `gump_open{paperdoll}`, vlastní číslo je dnes `not_available`, neznámé `unknown_entry` — **vždy s hláškou** |
+| **Test granul** | `tests/cases/interaction.gd` (518 řádků, **166 nových kontrol**): všech 9 větví, **každý pár tabulky** (bez systému → `not_available`; se stubem → **zavolaná metoda i argumenty**), pokrytí §5.2.3 proti dokumentu, kontextové menu a akce, sloučení hromad. Sada: **806 kontrol / 0 selhání, `exit 0`**, **31 case souborů** (bylo 640/0 a 30) |
+| **Mutační důkaz** | Nový modul `interaction` = **13 vzorů**, každý v souboru **1×** (ověřeno před během) → `python tools/gates/mutace-tests.py --only interaction` = **13 z 13 chyceno**, smlouva vstupu OK. Celkem `mutace-tests` **94 vzorů** (bylo 81); lokálně `120/120` → **133/133** |
+| **Brány a self-testy** | `run-all.py`: **11 měřeno / 0 NEMĚŘENO / 0 vad**, `exit 0`; self-testy **19 / 0 chyb**, `exit 0`; `check-docs-refs.py`, `check-zadani.py`, `roadmap-gen.py --check` `exit 0`. **G9 replay zelený beze změny hashů** (`tic_200` = `281e7802…`, `tic_1000` = `9e6218ab…`) — modul v replayi zaregistrovaný není, takže se stav nezměnil (acceptance `replay` je tím splněná měřením, ne tvrzením) |
+| **G4 po změně** | `granuli_s_hotovym_souborem 54` (bylo 53), `provides_jmen 112`, `volanych_z_produkce 67`, `jen_z_testu 38`, `neintegrovano 7`; **všechna čtyři jména `sim.interaction` jsou „volá ho jen tests/ — čeká na integraci"** (acceptance `wiring` nežádá; věc 68) |
+| **Plán** | `plan-status.py`: **47 měřeně hotových** se započteným testem (po commitu **48**), **0 rozporů**. **⚠ +2 z toho jsou artefakty metriky, ne práce:** `assets.gump` a `data.recipes` přeskočily na „hotové" jen proto, že test používá slova `gump`/`recipes_for` (naměřeno diffem `--json`; věc 70) |
+| **Smlouvy (`docs/04`)** | `§4.2` má u `sim.interaction` **změřené signatury** (Dictionary místo `->void`); `§4.2.1` má nový blok „`sim.interaction` je HOTOVÝ" (konstruktor, routing z dat, oba id prostory, `TARGET_ROLES`, pokrytí §5.2.3, kontextová čísla a **dvě díry ve smlouvě**: §4.4 nemá událost „art existujícího předmětu se změnil" ani gump `paperdoll`). **Nic se nepřepsalo** — jen doplnilo |
+| **Co se NEMĚNILO** | `entity.equipment`/`entity.notoriety`, voják pro `sim.pathfind`, vady ze snímků (věci 59–61), M9, **`app/main.gd` (systém se NEregistruje — integrační session, věc 68)**, `data/items.json`, `data/skills.json`, `docs/05`, `.forge/roadmap.json` (`done` se nepřepisuje, stav se měří) |
+| **⚠ Co je potřeba vědět** | **V demu není vidět nic nového** — do hry se `sim.interaction` nezapojil (nikdo ho neregistruje a předměty nemají registr), takže je to hotová a měřená mechanika, ne hratelná (stejná situace jako `entity.item`/`container`, věc 64) |
 
 ## 🎬 DEMO JE NA SVĚTĚ — mapa Britainu + BAREVNÁ postava, která po ní chodí
 
@@ -55,11 +83,13 @@ otevřená věc 27).
 **výbava na postavě** (postava je nahá), jiné postavy (NPC), mount, pathfinding,
 zvuk. Barva kůže od této session **je** (věc 1 → vyřešeno, viz nová tabulka).
 
-**⚠ Předměty a kontejnery (9. session) jsou hotové v SIMULACI, ale na obrazovce
-nejsou** — `entity.item` i `entity.container` nikdo nekreslí ani nevolá z UI
-(drag & drop, batoh ani drop neexistují), takže **dopad na obraz je dnes nulový**
-a nic se nesnímkovalo. Je to hotová dvojice bez vojáka (věc 64) a jejím prvním
-volajícím má být `sim.interaction` (Úkol 4).
+**⚠ Předměty, kontejnery ANI interakce na obrazovce nejsou** — `entity.item`
+i `entity.container` nikdo nekreslí ani nevolá z UI (drag & drop, batoh ani drop
+neexistují) a `sim.interaction` (10. session) **není zaregistrovaný v žádné hře**
+(`app/main.gd` ho nepřidává, `SimWorld.systems` ho nezná), takže **dopad na obraz
+je dnes nulový** a nic se nesnímkovalo. Je to hotová trojice bez vojáka (věc 64 +
+věc 68); prvním volajícím `item`/`container` je od 10. session **`sim.interaction`**,
+ale zatím **jen z testů** (G4 to hlásí výslovně).
 
 ## ⚡ VÝKON: hra jela na 1–2 FPS a bylo to v KÓDU, ne v assetech (5. session)
 
@@ -350,27 +380,39 @@ ho celý." Každá session tedy **není „krok"**, ale **jeden celek s cílem**
    v pořádku.
 4. **Nedělat v jedné session víc cílů**, aniž by první byl uzavřený a ověřený.
 
-**⚠ CÍL TÉTO (10.) SESSION — až ho dokončíš, přepiš tuhle větu na další cíl:**
+**⚠ CÍL TÉTO (11.) SESSION — až ho dokončíš, přepiš tuhle větu na další cíl:**
 
-> **Dokončit `sim.interaction` (Úkol 4 ze `ZADANI-DALSI-VYVOJ-2.md`)** — `use`,
-> `use_on`, `context_menu`, `context_action` podle `docs/05 §5.2.2` a párové
-> tabulky §5.2.3, s **dynamickým routingem** do `sim.craft`/`sim.magic` (když
-> systém v `SimWorld.systems` není, `use_on` vrátí `{ok:false,
-> reason:"not_available"}`) a s tím, že **neznámý předmět → hláška, nikdy ticho**.
-> **Proč právě tohle:** `entity.item` i `entity.container` jsou hotové (9. session)
-> a jsou to jeho `depends_on` — `use_on` na kontejner se tím dá konečně měřit;
-> a je to poslední velký kus M2 před `entity.equipment`.
-> **Přijímací kritérium:** test `tests/cases/interaction.gd` (cesta z argumentu)
-> měří: `use` na anvil nic neudělá **a řekne to**, `use_on` s neexistujícím
-> systémem vrátí `not_available` (ne ticho), neznámý předmět → hláška, otevření
-> dveří jde přes `world.doors.toggle` (na správnou konvenci z 8. session);
-> modul v `mutace-tests.py` to chytí; `run-all.py`, testy hry i self-testy zelené.
-> **Pozor na velikost:** granule je `strong` s `size_lines <= 150` — `docs/05
-> §5.2.3` je dlouhá tabulka, takže **radši tabulku datovou** (a měřenou) než
-> rozvětvený kód. **Acceptance je `tests` + `replay`** — replay se musí přeměřit
-> (`G9` má pevné hashe; když se stav nezmění, hash zůstane).
-> **Co do cíle NEPATŘÍ:** `entity.equipment`/`entity.notoriety`, vady ze snímků
-> (věci 59–61), M9, držení klávesy (`app.input`, věc 27) a `ui.*`.
+> **Dokončit `entity.equipment` (poslední granule Úkolu 6 ze
+> `ZADANI-DALSI-VYVOJ-2.md`)** — `equip(m, item)`, `unequip(m, layer)`,
+> `at_layer(m, layer)`, `total_weight(m)`, `bonus(m, key)` podle `docs/04 §4.2`,
+> vrstvy `0x00–0x1F` (`docs/11` §11.7, `research/01` §2.6), **dvouruční zbraň
+> uvolní vrstvu štítu**, a hlavně **invariant „právě jeden rodič" i pro nasazený
+> předmět** (věc 66b: `entity.container` o předchozím rodiči „mobil" **neví**,
+> takže `equip` ho musí z kontejneru vyjmout a `unequip` zase vrátit).
+> **Proč právě tohle:** je to poslední granule Úkolu 6 (M2), sedí na hotové
+> `entity.item` + `entity.container`, a je to systém, který `sim.interaction`
+> (10. session) hledá pro větev `equip` — **rozhodni a zapiš, kudy ho najde**
+> (`SimWorld.systems["equipment"]` jako u `craft`/`magic`, nebo dependency
+> konstruktorem). Bez toho zůstane `use` na zbraň navždy `not_available`.
+> **Přijímací kritérium:** test `tests/cases/equipment.gd` (cesta z argumentu)
+> měří: `equip` štítu při dvouručné zbrani → `{ok:false}` s důvodem (roadmapa),
+> `at_layer` po `equip`/`unequip`, `total_weight` = součet nasazených předmětů,
+> **nasazený předmět není v kontejneru a naopak** (a `equip` ho z kontejneru
+> vyjme), `bonus` čte `props`; modul v `mutace-tests.py` to chytí; `run-all.py`,
+> testy hry i self-testy zelené.
+> **Pozor na velikost:** deklarace je `<= 60` a model `any`, ale **naměřeno
+> 9. session: `entity.container` má 192 řádků proti `<= 60`** — reálný odhad je
+> 100–200 řádků; napiš do hlavičky, co smlouva nepinuje, a `size_lines` nech být
+> (věc 2).
+> **Co do cíle NEPATŘÍ:** `entity.notoriety`, vady ze snímků (věci 59–61), M9,
+> držení klávesy (`app.input`, věc 27), `ui.*`, **registrace systémů v
+> `app/main.gd`** (to je věc 68 — integrační session) a `sim.pathfind` (voják).
+
+**Předchozí cíl (10. session), splněný:** **`sim.interaction`** (Úkol 4) — hotový
+a měřený: **806 kontrol / 0 selhání**, **13/13 mutací** (`--only interaction`),
+brány **11/0/0**, self-testy **19/0**, pokrytí §5.2.3 **měřené proti dokumentu**
+(36 řádků, 10 pokrytých) a `docs/04 §4.2`/`§4.2.1` sedí na kód. Doklady v „CO JE
+NOVÉHO (10. session)"; **v demu není vidět nic** (věc 68).
 
 **Předchozí cíl (9. session), splněný:** **`entity.item` + `entity.container`**
 (první dvě granule Úkolu 6) — hotové a měřené: **640 kontrol / 0 selhání**,
@@ -401,10 +443,10 @@ zavřenými i otevřenými dveřmi, test kroku na schod nahoru/dolů, obojí s m
 
 ## Co čeká na tebe
 
-**Na dnešní cíl nečeká nic** — 9. session se rozhodla měřením (dvě pasti jsou
-v `LESSONS`) a cíl je hotový. **Ale čtyři rozhodnutí z `ZADANI-DALSI-VYVOJ-2.md`
-§5 (`Otázky k rozhodnutí`) pořád čekají** — každé z nich blokuje jinou trať,
-ne tu dnešní:
+**Na dnešní cíl nečeká nic** — 10. session se rozhodla měřením (`TARGET_ROLES`
+z dat, oba id prostory) a cíl je hotový. **Ale čtyři rozhodnutí z
+`ZADANI-DALSI-VYVOJ-2.md` §5 (`Otázky k rozhodnutí`) pořád čekají** — každé
+z nich blokuje jinou trať, ne tu dnešní:
 
 | # | Na co se čeká | Co to blokuje | Cena / cesta zpět |
 |---|---|---|---|
@@ -421,8 +463,8 @@ a `CONTAINER_MAX_WEIGHT` v setinách; cena je zásah do `core/const.gd` a
 `world.tiledata` (obojí jiná granule), cesta zpět je triviální (konstanta).
 Do rozhodnutí je to **zdokumentované jako omezení**, ne zamčené v kódu.
 
-**Co bude následovat (bez tebe):** cíl 10. session = **`sim.interaction`
-(Úkol 4)** — viz „CÍL SESSION“ níže.
+**Co bude následovat (bez tebe):** cíl 11. session = **`entity.equipment`**
+(poslední granule Úkolu 6) — viz „CÍL SESSION“ níže.
 
 **Konvence dveří (věc 62) je od 8. session rozhodnutá MĚŘENÍM a opravená** —
 nic na tebe nečeká. Montáž pro kontrolu pohledem
@@ -431,15 +473,18 @@ disku pořád je, ale **rozhodnutí na ní nestojí**: je podložené třemi
 asymetrickými signály (jména „closed"/„opened", `Impassable` 230 vs 71, `art+1`
 nikdy v `doors.txt`) a referencí `openedID = closedID + 1`. Kdybys na ni koukl
 a viděl něco jiného, je to **nový nález**, ne oprava — ozvi se s ním.
+**10. session na konvenci navázala:** `sim.interaction` přepíná dveře přes
+`world.doors.toggle` a test to měří na artu `1721 → 1722` (`is_open`).
 
 ## ⚠⚠ BLOKÁTORY
 
 **Žádný otevřený blokátor v kódu.** „Demo chodí a postava je barevná" je naměřené
-(viz tabulky výš), brány jsou zelené (11/0/0), testy **640/0** (s assety; bez
+(viz tabulky výš), brány jsou zelené (11/0/0), testy **806/0** (s assety; bez
 `assets/uo` část kontrol hlásí NEMĚŘENO — viz „Předletová kontrola") a **průchodnost
 i konvence dveří jsou opravené** (6. session: statiky se čtou správnou tabulkou,
 schody svou výškou; 8. session: `world.doors` páruje `art` ↔ `art + 1`;
-9. session: `entity.item` + `entity.container` hotové, **20/20 mutací**).
+9. session: `entity.item` + `entity.container` hotové, **20/20 mutací**;
+10. session: `sim.interaction` hotový, **13/13 mutací** a routing z dat).
 **Hra jede 40–45 FPS** (bylo 1–2 FPS) — viz sekce VÝKON.
 
 **⚠ CI NAD COMMITTY 9. SESSION JE ZELENÝ — `#40` nad `17ebc04` = `success`
@@ -503,23 +548,24 @@ Dvě věci, které blokátor **nejsou**, ale je dobře je vědět:
 | Věc | Cesta / příkaz |
 |---|---|
 | **Demo (hra)** | **`HRA.cmd`** v kořeni (dvojklik) — spouštěč řeší Godot, `APPDATA` i chybějící data. Ručně: `& .cache\godot\Godot_v4.7.2-stable_win64_console.exe --path . --rendering-driver opengl3` (s `$env:APPDATA` ve workspace) |
-| **Zadání pro další vývoj** | **`ZADANI-DALSI-VYVOJ-2.md`** (etapa 2, Úkoly 1–9; **hotové: Úkol 1, 2, 3 a z Úkolu 6 první dvě granule** — `entity.item`, `entity.container`). Etapa 1 je v `ZADANI-DALSI-VYVOJ.md` |
+| **Zadání pro další vývoj** | **`ZADANI-DALSI-VYVOJ-2.md`** (etapa 2, Úkoly 1–9; **hotové: Úkoly 1, 2, 3, 4 a z Úkolu 6 první dvě granule** — `entity.item`, `entity.container`). Etapa 1 je v `ZADANI-DALSI-VYVOJ.md` |
 | **Ponaučení a nástroje** | **`LESSONS.md`** — čti prvních pár záznamů, ať neopakuješ chyby |
 | **Kam pro co v referencích** | **`research/REJSTRIK-REFERENCI.md`** (rozcestník, ~50 odkazů s měřeným počtem nálezů) — generuje a kontroluje `python tools/refs-index.py [--check\|--srovnej]` |
 | **Multiplayer bokem** | **`research/08-multiplayer-poucky.md`** — 17 principů ze serverů, „u nás dnes" + co platí až s multiplayrem |
 | **Referenční klony** | `_src/{runuo,servuo,modernuo,classicuo,sphere}` (**pinované**, gitignore, nejsou submoduly). Pozor: `research/_src/{servuo,modernuo}` jsou **druhé checkouty téhož** — pro čtení používej `_src/` |
 | Projekt | `E:\Workspaces\game-clone` (git, `main`) |
 | Generátor obsahu | `python tools/gates/gen-content.py [--check] [--only items\|recipes\|skills]` |
-| Testy | `$env:APPDATA="E:\Workspaces\game-clone\.cache\godot-appdata"` pak `godot --headless --path . --script res://tests/run_tests.gd` → **640 kontrol / 0 selhání** (s assety), **30 case souborů**; **bez `assets/uo` (stav jako v CI) `582/0`** — měřeno 9. session dočasným přesunem `assets/uo` do `.cache` a zpět (viz „Předletová kontrola“). **Bez plného přístupu dej `APPDATA` do `.tmp`** (viz pasti) |
+| Testy | `$env:APPDATA="E:\Workspaces\game-clone\.cache\godot-appdata"` pak `godot --headless --path . --script res://tests/run_tests.gd` → **806 kontrol / 0 selhání** (s assety), **31 case souborů**; **bez `assets/uo` (stav jako v CI) `748/0`** — měřeno 10. session dočasným přesunem `assets/uo` do `.cache` a zpět (viz „Předletová kontrola“). **Bez plného přístupu dej `APPDATA` do `.tmp`** (viz pasti) |
 | Brány | `python tools/gates/run-all.py` → **11 měřeno / 0 NEMĚŘENO / 0 chyb**, `exit 0` |
 | Self-testy bran | `python tools/gates/run-all.py --self-test` → **19 self-testů (10 bran + 9 extrakčních nástrojů), 0 chyb**; **G10 má uvnitř 8 případů** |
-| **Mutační důkaz testů** | `python tools/gates/mutace-tests.py [--only sort\|map\|walk\|doors\|movement\|registry\|pathfind\|textures\|item\|container]` → **81 z 81** (bylo 61; **+5 `item`, +15 `container`**; trvá desítky minut — `walk` má 12 mutací) |
+| **Mutační důkaz testů** | `python tools/gates/mutace-tests.py [--only sort\|map\|walk\|doors\|movement\|registry\|pathfind\|textures\|item\|container\|interaction]` → **94 z 94** (bylo 81; **+13 `interaction`**; trvá desítky minut — `walk` má 12 mutací) |
 | **Mutační důkaz dekodéru animací** | `python tools/gates/mutace-anim.py [--install <UO>]` → **8 z 8** (bez instalace UO měří jen self-test a **řekne to**: `realna sonda: NEMERENA`; proměnná `UO_INSTALL`) |
 | **Mutační důkaz `data.skills`** | `python tools/gates/mutace-skills.py` → **8 z 8** |
 | **Mutační důkaz `render.anim`** | `python tools/gates/mutace-render-anim.py` → **11 z 11** (fixture v gitu, běží i v CI) |
 | **Mutační důkaz `render.hue`** | `python tools/gates/mutace-render-hue.py` → **12 z 12** (fixture v gitu, běží i v CI) |
-| **Sonda: unikátnost mutačních vzorů** | `python _analyza/mutace-vzory.py` (**gitignore**) → `mutace-tests: 81 vzorů` (9. session: +5 `item`, +15 `container`) + `mutace-render-anim: 11` = **92**, `OK`; ověřená mutací sebe sama. **Pozor:** u `mutace-tests` sonda unikátnost jen **vypisuje** (`movement/druhy krok v letu se neodmitne` je **2×**) — tvrdit u ní „vada“ by bylo tvrzení o něčem jiném; nové moduly `item`/`container` mají všech 20 vzorů **1×** (ověřeno 9. session) |
-| **Předmět a kontejner (nové, 9. session)** | `sim/entity/item.gd` + `sim/entity/container.gd` + `tests/cases/{item,container}.gd`; `tile` = **art id**, invariant „právě jeden rodič“ (jedna instance = všechny kontejnery světa), limity 125/400/60 000, slučování hromad podle flagu `Generic` |
+| **Sonda: unikátnost mutačních vzorů** | `python _analyza/mutace-vzory.py` (**gitignore**) → `mutace-tests: 94 vzorů` (10. session: +13 `interaction`) + `mutace-render-anim: 11` = **105**, `OK`; ověřená mutací sebe sama. **Pozor:** u `mutace-tests` sonda unikátnost jen **vypisuje** (`movement/druhy krok v letu se neodmitne` je **2×**) — tvrdit u ní „vada“ by bylo tvrzení o něčem jiném; nové moduly `item`/`container` (9. session) i `interaction` (10. session) mají všechny vzory **1×** (ověřeno skriptem před během) |
+| **Předmět a kontejner (9. session)** | `sim/entity/item.gd` + `sim/entity/container.gd` + `tests/cases/{item,container}.gd`; `tile` = **art id**, invariant „právě jeden rodič“ (jedna instance = všechny kontejnery světa), limity 125/400/60 000, slučování hromad podle flagu `Generic` |
+| **Interakce (nové, 10. session)** | `sim/systems/interaction.gd` + `tests/cases/interaction.gd`; `use`/`use_on`/`context_menu`/`context_action`, routing z `data/items.json` (`category`/`role`, `TARGET_ROLES`), parová tabulka §5.2.3 měřená proti `docs/05`, dynamický routing do `SimWorld.systems` (`not_available` místo ticha) |
 | **Registr bytostí (nové)** | `sim/entity/registry.gd` + `tests/cases/registry.gd`; `register`, `get_mobile`, `all`, `remove`, `size` |
 | **Animace: dekodér** | `python tools/uoextract/anim.py --self-test \| --verify \| --export assets/uo/anim \| --export-check assets/uo/anim` |
 | **Dekodér: objevné sondy** | `_analyza/anim-rle-sonda.py`, `_analyza/anim-rle-hledani.py`, `_analyza/anim-dekod.py` (**gitignore** — v gitu je jen produkční `anim.py` a mutační harness) |
@@ -543,22 +589,24 @@ Dvě věci, které blokátor **nejsou**, ale je dobře je vědět:
 | složka | souborů (kód) | řádků kódu | poznámka |
 |---|---|---|---|
 | `core/` | 7 | 339 | hotové a otestované |
-| `sim/` | **16** | **2 106** | 9. session: **`entity/item.gd` 66** a **`entity/container.gd` 192** (obě nad deklarací — věc 2); dřív `world/doors.gd` 142 (8. session: konvence `art` ↔ `art + 1` a důkazy v hlavičce), `world/walk.gd` 222 (6. session: id prostor statiků, dveře, pásmo, výška schodů), `world/pathfind.gd` (5. session, 176), `entity/registry.gd`, `entity/skills.gd`, `entity/mobile.gd`, `systems/movement.gd` |
+| `sim/` | **17** | **2 567** | 10. session: **`systems/interaction.gd` 461** (nad deklarací `<= 150` — věc 2, **3. největší překročení v projektu**); 9. session: **`entity/item.gd` 66** a **`entity/container.gd` 192** (obě nad deklarací — věc 2); dřív `world/doors.gd` 142 (8. session: konvence `art` ↔ `art + 1` a důkazy v hlavičce), `world/walk.gd` 222 (6. session: id prostor statiků, dveře, pásmo, výška schodů), `world/pathfind.gd` (5. session, 176), `entity/registry.gd`, `entity/skills.gd`, `entity/mobile.gd`, `systems/movement.gd` |
 | `render/` | 5 | **770** | `sort.gd`, **`texture_cache.gd`** (+48: cache oken a počítadlo načtení), `chunk_renderer.gd`, `anim_player.gd`, `hue_cache.gd`; `ui/` pořád neexistuje |
 | `app/` | 6 (5 kód) | 651 | `main.gd`, `world_view.gd`, `player_controller.gd` (bez granule) |
-| `tests/` | **44** (35 kód) | **5 087** | 9. session: **`cases/item.gd` 84** a **`cases/container.gd` 272** (+56 kontrol, 30 case souborů); dřív `cases/doors.gd` přepsaný (8. session: 102 řádků, 25 kontrol, měří oba členy dvojice na všech 230 artech), `cases/walk.gd` 391; 3 soubory fixture (`tests/fixtures/{hues,anim}/`) |
+| `tests/` | **45** (36 kód) | **5 605** | 10. session: **`cases/interaction.gd` 518** (+166 kontrol, 31 case souborů; v CI stavu **748/0**); 9. session: **`cases/item.gd` 84** a **`cases/container.gd` 272**; dřív `cases/doors.gd` přepsaný (8. session: 102 řádků, 25 kontrol, měří oba členy dvojice na všech 230 artech), `cases/walk.gd` 391; 3 soubory fixture (`tests/fixtures/{hues,anim}/`) |
 | `tools/uoextract/` | 38 | 6 278 | `anim.py` umí pixely, `--export`, `--export-check` |
-| `tools/gates/` | 22 | **5 090** | 9. session: **`mutace-tests.py` +62** (dva moduly: `item` 5 mutací, `container` 15 — celkem 81); dřív +32 (8. session: modul `doors`, 8 mutací); `mutace-anim.py` má baseline reálné sondy + `--install` |
+| `tools/gates/` | 22 | **5 147** | 10. session: **`mutace-tests.py` +57** (modul `interaction`, 13 mutací — celkem **94**); 9. session: **`mutace-tests.py` +62** (dva moduly: `item` 5 mutací, `container` 15 — celkem 81); dřív +32 (8. session: modul `doors`, 8 mutací); `mutace-anim.py` má baseline reálné sondy + `--install` |
 
 *(Počty jsou Pythonem `splitlines()` nad kódovými soubory `.gd`/`.py`/`.sh`/`.mjs`,
 bez `.uid` a `__pycache__` — `python _analyza/radky.py`.)*
 
-**Zbývá 66 granul** (z 111; **45 měřeně hotových** po commitu — ověř
-`python tools/plan-status.py`). Hotové (souborem i měřením) navíc proti 3. session:
+**Zbývá 63 granul** (z 111; **48 měřeně hotových** po commitu — ověř
+`python tools/plan-status.py`; ⚠ **z toho 2 jsou artefakty metriky** — `assets.gump`
+a `data.recipes`, viz věc 69). Hotové (souborem i měřením) navíc proti 3. session:
 **`sim.entity_registry`** (4. session), **`sim.pathfind`** (5. session),
-**`entity.item` + `entity.container`** (9. session). *(Pozor: „měřeně hotové" je
-jiný čítač než `granuli_s_hotovym_souborem` v G4 — ten je **53**; viz
-`plan-status.py` vs `check-wiring.py`.)*
+**`entity.item` + `entity.container`** (9. session), **`sim.interaction`**
+(10. session). *(Pozor: „měřeně hotové" je jiný čítač než
+`granuli_s_hotovym_souborem` v G4 — ten je **54**; viz `plan-status.py` vs
+`check-wiring.py`.)*
 
 ## Co je hotové a ověřené (ne „soubor existuje")
 
@@ -568,7 +616,8 @@ data.recipes, world.tiledata, world.map, render.sort, render.textures,
 render.chunk, render.anim, render.hue** · **M2: world.doors, world.stairs,
 entity.stats, world.time, entity.skills, entity.mobile, world.walk,
 sim.movement, data.skills, `sim.entity_registry`, `sim.pathfind`,
-**`entity.item`, `entity.container`** (9. session)** ·
+**`entity.item`, `entity.container`** (9. session), **`sim.interaction`**
+(10. session)** ·
 **integrace (bez granul): `app/player_controller.gd`, `app/world_view.gd`
 (kreslení postavy + barva + registr), `app/main.tscn` (uzly), `app/main.gd`
 (registrace systémů, barva hráče, založení registru a jeho předání `movement`
@@ -614,10 +663,19 @@ Doklady, které jsem viděl na vlastní oči (ne opsané z předání):
   včetně reálných dat (`0x4EED` zlato ano, `0x4F52` dýka ne, longsword 3×7 = 21).
   Důkaz: `tests/cases/container.gd` (sekce D–K) + **20 mutací** (`--only
   item,container`), které to chytí.
-- **Testy 640/0 s assety**, **brány 11/0/0** (`exit 0`), **self-testy 19/0**,
-  **mutace 120/120** (`mutace-tests` **81** — z toho 8 `doors`, 5 `item`,
-  15 `container`, `skills` 8, `render-hue` 12, `render-anim` 11, `anim` 8),
-  vzory mutací **92** `OK`.
+- **Interakce je routing z DAT, ne větev v kódu (10. session)** — `use` na
+  **kovadlinu** nic neudělá a **řekne to** (kovadlina má v `data/items.json`
+  `category == "tool"`, ale je to cíl: `TARGET_ROLES`), neznámý předmět odpoví
+  hláškou (nikdy ticho), `use_on` bez systému vrátí `{ok:false,
+  reason:"not_available"}`, dveře jdou přes `world.doors.toggle` (`1721 → 1722`,
+  konvence z 8. session) a **každý z 15 párů** tabulky se měří se stubem
+  (zavolaná metoda **i argumenty**). Pokrytí §5.2.3 se měří **proti dokumentu**
+  (`docs/05` má 36 řádků, pokryto 10 = 11 párů) — nový řádek v dokumentu test
+  shodí. Důkaz: `tests/cases/interaction.gd` + **13 mutací**.
+- **Testy 806/0 s assety** (v CI stavu **748/0**), **brány 11/0/0** (`exit 0`),
+  **self-testy 19/0**, **mutace 133/133** (`mutace-tests` **94** — z toho 13
+  `interaction`, 8 `doors`, 5 `item`, 15 `container`, `skills` 8, `render-hue` 12,
+  `render-anim` 11, `anim` 8), vzory mutací **105** `OK`.
 - **Hra nespadne**: G11 `smoke` → `framu 120, script_error 0, parse_error 0`.
 
 ### ⚠ Co na obrazovce ještě NENÍ
@@ -628,35 +686,36 @@ druhé postavy, mount, pathfinding, zvuk. **Hratelná mechanika: chůze, otáče
 a barva kůže.** Statiky nesou barvu ze záznamu mapy, ale **nikdo ji nepoužívá**
 (věc 35).
 
-## Co brány dnes měří (2026-10-07, 9. session)
+## Co brány dnes měří (2026-10-07, 10. session)
 
 `run-all.py`: **11 měřeno / 0 NEMĚŘENO / 0 VADA**, `exit 0`.
 
 | Brána | Výsledek | Je to vada kódu? |
 |---|---|---|
 | G1–G11 | **OK** | NE |
-| G4 | OK — `granuli_s_hotovym_souborem: 53` (bylo 51), `volanych_z_produkce: 63` (bylo 59), `jen_z_testu: 37`, `neintegrovano: 8`; **`entity.item.is_on_ground`/`pile_weight`/`same_pile` i celý `entity.container` jsou „volá ho jen tests/"** (acceptance `wiring` nežádá — věc 64) | NE |
-| G6 | OK — měří `anim_decoder_kod: 0`, `anim_decoder_kontrol: 35` | NE |
-| G10 | OK — `barev: 2124`, `pixelu_mimo_pozadi: 892595`, **`kuze_pixelu: 8634`, `kuze_barva: R52 G42 B42`** — **stejná čísla jako 4., 5. a 8. session** (kód obrazu se nedotkl) | NE |
+| G4 | OK — `granuli_s_hotovym_souborem: 54` (bylo 53), `provides_jmen: 112`, `volanych_z_produkce: 67`, `jen_z_testu: 38`, `neintegrovano: 7`; **`sim.interaction.{use,use_on,context_menu,context_action}` i `entity.item`/`entity.container` jsou „volá ho jen tests/"** (acceptance `wiring` nežádá — věci 64 a 68) | NE |
+| G6 | OK — měří `anim_decoder_kod: 0`, `anim_decoder_kontrol: 35`, `spritu_zkontrolovano: 41874`, `stranek_chybi: 0` | NE |
+| G9 | OK — `tic_200` = `281e7802…`, `tic_1000` = `9e6218ab…` (**stejné hashe jako před session**; `sim.interaction` v replayi zaregistrovaný není) | NE |
+| G10 | OK — `barev: 2124`, `pixelu_mimo_pozadi: 892595`, **`kuze_pixelu: 8634`, `kuze_barva: R52 G42 B42`** — **stejná čísla jako 4., 5., 8. a 9. session** (kód obrazu se nedotkl) | NE |
 | G13 | PORADNÍ | NE — `vision.mjs` není (poradní je podle `docs/08 §8.2`) |
 
 ## Předletová kontrola (5 minut, než začneš psát)
 
-| Co | Jak | Očekáváno (2026-10-07, 9. session) |
+| Co | Jak | Očekáváno (2026-10-07, 10. session) |
 |---|---|---|
-| Strom je čistý | `git status --porcelain -uall` | **prázdné** po commitu této session (nové `.uid` u `item`/`container` jsou v commitu — vznikly `--import` pod plným přístupem) |
-| Je před GitHubem | `git rev-list --count origin/main..HEAD` | **`0`** — **9. session pushla** (trvalé povolení uživatele z 2026-10-07) |
+| Strom je čistý | `git status --porcelain -uall` | **prázdné** po commitu této session (nové `.uid` u `interaction.gd` i `tests/cases/interaction.gd` jsou v commitu — vznikly `--import` pod plným přístupem) |
+| Je před GitHubem | `git rev-list --count origin/main..HEAD` | **`0`** — **10. session pushla** (trvalé povolení uživatele z 2026-10-07) |
 | **Běží CI?** | `node _analyza/ci-beh-stav.mjs` (bez tokenu je limitovaný — viz past v `LESSONS`) · anotace: `node _analyza/ci-anotace.mjs` | **`#40` nad `17ebc04` (kód) a `#41` nad `adbd2cb` (dokumentace) = oba `success`, 17 kroků, job 2:03 / 1:57 min** (i krok 9 s **81 mutacemi** a krok 15 „Stav plánu"); předtím `#39` nad `bcd9128` a `#38` nad `98542a3` (8. session) = `success`. **sha rozhoduje**, ne „poslední běh" |
 | **Co v CI NEJDE ověřit bez tokenu** | `node _analyza/ci-log.mjs` → **HTTP 403**; `ci-artefakt.mjs` → **HTTP 401** | Kdo nemá token, **vidí jen stav kroků**, ne jejich obsah — takže „krok s mutacemi prošel" je naměřené, ale **počet chycených mutací v CI je neověřený** (naměřeno je **lokálně**). Nezapisuj do předání „CI má 81/81", když to nevidíš |
 | Repo je veřejné | API bez tokenu | `visibility: public` |
-| **Oprávnění** | `whoami /groups \| Select-String Mandatory` | **`Medium`** = plný přístup. `Low` = sandbox → **falešná selhání testů i bran** (9. session naměřila v `Low` **583/9** místo **584/0**: 8× `render.textures` + 1× `sim.world_loop` save — viz `LESSONS`) a `.uid` nevzniknou |
-| Testy | testy s `APPDATA` ve workspace (`Low`: dej ho do `.tmp`) | **640 kontrol, 0 selhání** (s assety), **30 case souborů**; **bez `assets/uo` (stav jako v CI) `582/0`** — měřeno 9. session tak, že se `assets/uo` **dočasně přesunul do `.cache`** a po běhu vrátil (ověřeno: `tiles.json` zpět, strom čistý). Souhrn vypisuje `case souboru spusteno: N z M` — když je M < 30, něco se ne načetlo |
+| **Oprávnění** | `whoami /groups \| Select-String Mandatory` | **`Medium`** = plný přístup. `Low` = sandbox → **falešná selhání testů i bran** (9. session naměřila v `Low` **583/9** místo **584/0** na téže sadě — 8× `render.textures` + 1× `sim.world_loop` save, viz `LESSONS`) a `.uid` nevzniknou. **Dnešní sada je 806/0 (s assety) a 748/0 (bez) — v `Low` by čísla byla zase jiná; měř ji znovu, neopisuj** |
+| Testy | testy s `APPDATA` ve workspace (`Low`: dej ho do `.tmp`) | **806 kontrol, 0 selhání** (s assety), **31 case souborů**; **bez `assets/uo` (stav jako v CI) `748/0`** — měřeno 10. session tak, že se `assets/uo` **dočasně přesunul do `.cache`** a po běhu vrátil (ověřeno: `tiles.json` zpět, strom čistý). Souhrn vypisuje `case souboru spusteno: N z M` — když je M < 31, něco se ne načetlo |
 | **FPS (nové)** | `& .cache\godot\...console.exe --path . --rendering-driver opengl3 --script res://.cache/analysis/sonda-fps.gd` | **40–45 FPS** (22–25 ms/frame), 5 767 objektů, 1 516 draw callů; cache se po nabehu nemění (27 načtení, 0 změn) |
 | Brány | `python tools/gates/run-all.py` | **11 měřeno / 0 NEMĚŘENO / 0 vad**, `exit 0` |
 | Self-testy | `python tools/gates/run-all.py --self-test` | **19, 0 chyb**, `exit 0` |
-| Mutační důkaz | `mutace-tests.py` (+ `--only doors` / `--only item,container`) + `mutace-skills.py` + `mutace-render-hue.py` + `mutace-render-anim.py` + `mutace-anim.py` | `81/81` (61 + **5 `item`** + **15 `container`**), `8/8`, `12/12`, `11/11`, `8/8` (= **120/120**); **první čtyři běží v CI**, poslední taky (bez instalace UO měří jen self-test a řekne to) |
+| Mutační důkaz | `mutace-tests.py` (+ `--only doors` / `--only item,container` / `--only interaction`) + `mutace-skills.py` + `mutace-render-hue.py` + `mutace-render-anim.py` + `mutace-anim.py` | `94/94` (81 + **13 `interaction`**), `8/8`, `12/12`, `11/11`, `8/8` (= **133/133**); **první čtyři běží v CI**, poslední taky (bez instalace UO měří jen self-test a řekne to) |
 | Fixture (nové) | `python tests/fixtures/{world,hues,anim}/make_fixture.py --check` | **3× OK**, `exit 0`; v CI je hlídá krok „Fixture sedí na generátor" |
-| Vzory mutací | `python _analyza/mutace-vzory.py` (gitignore) | `mutace-tests: 81 vzorů` (9. session: +5 `item`, +15 `container`) + `mutace-render-anim: 11` = **92 celkem**, `OK`, `exit 0`; **nové moduly mají všech 20 vzorů 1×** |
+| Vzory mutací | `python _analyza/mutace-vzory.py` (gitignore) | `mutace-tests: 94 vzorů` (10. session: +13 `interaction`) + `mutace-render-anim: 11` = **105 celkem**, `OK`, `exit 0`; **nové moduly `item`, `container` i `interaction` mají všechny vzory 1×** |
 | Animace | `python tools/uoextract/anim.py --self-test` | `35 kontrol, 0 chyb` |
 | Barvy | `python tools/uoextract/hues.py --self-test` | `5 kontrol, 0 chyb` |
 | Data skillů | `python tools/gates/gen-content.py --only skills --check` | `OK skills.json: shoda` |
@@ -1026,8 +1085,51 @@ a barva kůže.** Statiky nesou barvu ze záznamu mapy, ale **nikdo ji nepouží
     `movement/druhy krok v letu se neodmitne` je ve `sim/systems/movement.gd`
     **2×**, takže se mutuje první výskyt (dnes je to ten správný — mutace je
     chycená, ale je to **křehké**: přesun řádků v souboru by mohl měnit to, co
-    se měří). Nové moduly `item`/`container` mají všech 20 vzorů **1×** (ověřeno).
+    se měří). Nové moduly `item`/`container` mají všech 20 vzorů **1×** (ověřeno);
+    10. session přidala modul `interaction` (**13 vzorů, všechny 1×** — ověřeno
+    skriptem před během, protože mutuje se první výskyt).
     Stálo by za to, aby sonda u `mutace-tests` **selhala** jako u `render-anim`.
+68. **NOVÉ (10. session): `sim.interaction` JE HOTOVÝ, ALE NIKDO HO NEREGISTRUJE**
+    (a je to táž past jako věc 64). Kód je měřený testem, ale:
+    (a) **do hry se nepřidává** — `app/main.gd` registruje jen `movement` a `time`,
+    takže `SimWorld.systems["interaction"]` neexistuje a `Command{t:"use"}` skončí
+    v `sim/commands.gd` jako „Not available yet: use -> interaction.use.";
+    (b) **předměty nemají registr podle serialu** (věc 64), takže `use` bere
+    `items` **vstupem** (`{serial: Item}` nebo objekt s `get_item(serial)`) — kdo ho
+    nezaloží, dostane u každého předmětu `unknown` a hlášku (což je pořád lepší než
+    ticho, ale není to hratelné);
+    (c) `entity.equipment`/`sim.vendor`/`sim.combat`/`sim.craft`/`sim.magic`/
+    `sim.harvest` nejsou v `SimWorld.systems`, takže většina větví vrací
+    `not_available` **záměrně a viditelně**.
+    **Co s tím (návrh pro integrační session):** založit registr předmětů
+    (a rozhodnout, kdo ho plní), zaregistrovat `interaction` v `app/main.gd`
+    (a předat mu `world.doors`, kontejner, registr mobilů a ten item registr).
+    **Integrační session to má jako vlastní cíl — ne „přilepené" k dnešní práci.**
+69. **NOVÉ (10. session): `plan-status.py` UMÍ PŘIDAT „HOTOVÉ" ZA ZMÍNKU V CIZÍM TESTU.**
+    Metrika je „soubor v gitu + **kmen názvu souboru** kdekoliv v textu `tests/`".
+    Můj nový test používá slova `gump` (v `gump_open`) a `recipes_for`, takže
+    **`assets.gump`** a **`data.recipes`** přeskočily mezi měřeně hotové — obě mají
+    acceptance `content`/`schema`, což ten test neměří. Naměřeno diffem `--json`:
+    s testem **47**, s testem dočasně mimo strom **45**; `přibylo do hotových:
+    ['assets.gump', 'data.recipes']`. **Skutečná práce je z toho jedna**
+    (`sim.interaction`, po commitu → **48**). Kdo hlásí „stav se zvedl", musí
+    přírůstek rozdělit na *skutečně hotové* a *artefakty metriky* (past v `LESSONS`).
+70. **NOVÉ (10. session): DVĚ DÍRY VE SMLOUVĚ, KTERÉ ODHALILA INTERAKCE**
+    (obojí je zapsané v `docs/04 §4.2.1`):
+    (a) **§4.4 nemá událost „art existujícího předmětu se změnil"** — přepnutí
+    dveří posílá `item_added` se **stejným serialem** (obnovení u klienta); je to
+    nejbližší existující událost, ne správná;
+    (b) **seznam gumpů v §4.4 nemá `paperdoll`** (`craft|vendor|container|
+    spellbook|skills`), přesto ho `context_action` na `0x0193` posílá.
+    **Rozhodnutí patří uživateli** (rozšířit §4.4, nebo změnit kód) — do té doby
+    je to v hlavičce modulu i ve smlouvě pojmenované, ne tiché.
+71. **NOVÉ (10. session): VELIKOST `sim.interaction` JE 461 ŘÁDKŮ PROTI `<= 150`**
+    (**3,1×**, třetí největší překročení v projektu — po `textdata.py` 5,1×
+    a `gen-content.py` 4,4×). Drží to zadání „datová tabulka místo rozvětveného
+    kódu" (9 větví §5.2.2 + 15 párů §5.2.3), ale **`owns` je jediný soubor**, takže
+    se to nedá rozdělit bez porušení vlastnictví granule; rozhodnutí uživatele
+    (věc 2) platí: **měřit, nepřepisovat**. Kdo plánuje `strong <= 150`, ať počítá
+    s 250–450 řádky, když má granule víc metod a datové tabulky.
 
 ## Už není otevřené (přesunuto, nemaže se)
 
@@ -1076,7 +1178,7 @@ a barva kůže.** Statiky nesou barvu ze záznamu mapy, ale **nikdo ji nepouží
 0. **Než začneš hledat cokoli v referencích:** otevři
    `research/REJSTRIK-REFERENCI.md` a použij jeho řádek („otázka → `soubor:řádek`
    + jak ověřit"). Nález, který se nezmění v tvrzení v našem kódu + test, je dojem.
-1. **Pushnout a zkontrolovat CI** na nových commitech — **9. session pushla
+1. **Pushnout a zkontrolovat CI** na nových commitech — **10. session pushla
    sama** (trvalé povolení z 2026-10-07; HANDOFF to hlídá v „BLOKÁTORECH"
    a v „Předletové kontrole"). Po pushi čekej běh nad **svým** commitem
    a ověř **počet kroků** (`node _analyza/ci-beh-stav.mjs`; běh 8. session měl
@@ -1100,28 +1202,35 @@ a barva kůže.** Statiky nesou barvu ze záznamu mapy, ale **nikdo ji nepouží
 6. ~~**`entity.item` + `entity.container`** (Úkol 6, první dvě granule)~~ —
    **HOTOVO 9. session**: **640/0** testů, **20/20** mutací, smlouvy v `docs/04
    §4.2`/`§4.2.1`/`§4.5`; detaily výš.
-7. **Úkol 4 ze `ZADANI-DALSI-VYVOJ-2.md`: `sim.interaction`** (`use`, `use_on`,
-   kontextové menu; routing dynamicky, `not_available` místo ticha, neznámý
-   předmět → hláška) — **tohle je cíl 10. session** (viz „CÍL SESSION“); obě
-   `depends_on` (`entity.container`, `entity.item`) už jsou hotové, takže
-   `use_on` na kontejner se dá měřit.
-8. **Napojit registr na `sim.world_loop`** (věci 22, 48, 52): `snapshot().mobiles`,
-   `state_hash`, `save` — tím se rozhýbou replaye a klient uvidí i jiné mobily.
-   **Pozor: `save` bude muset řešit i PŘEDMĚTY** (věc 64) — jinak se uloží svět
-   bez nich (dnes `SimWorld` o předmětech ani neví).
-9. **`entity.equipment`** (poslední granule Úkolu 6) — obléknout postavu (ta je
-   dnes nahá); navazuje na `entity.item` i `entity.container` a **musí uklidit
-   předchozího rodiče „mobil“** (věc 66b). `render.hue` na to stroj má (věc 41)
-   a `render.anim` už tělo z registru bere.
-10. **Voják pro `sim.pathfind`** (věc 54): click-to-move přes `sim.commands`
+7. ~~**Úkol 4 ze `ZADANI-DALSI-VYVOJ-2.md`: `sim.interaction`**~~ — **HOTOVO
+   10. session**: `use`/`use_on`/`context_menu`/`context_action`, routing z dat,
+   parová tabulka §5.2.3 měřená proti dokumentu, dynamický routing s
+   `not_available` místo ticha; **806/0** testů, **13/13** mutací, **`docs/04`
+   §4.2/§4.2.1**. **Zbývá voják** (věc 68: registrace systému + registr předmětů).
+8. ~~**Napojit registr na `sim.world_loop`** (věci 22, 48, 52)~~ — **částečně
+   HOTOVO 4. session** (`sim.entity_registry` je hotový a zapojený do `movement`),
+   **ale `snapshot().mobiles`, `state_hash` a `save` o mobilech i PŘEDMĚTECH pořád
+   nevědí** (věc 64 + věc 68). **Pozor: kdo sáhne na `state_hash`, rozejde G9
+   replaye** (pevné hashe v `tests/replays/` patří granuli `boot.tests`, agent je
+   needituje) — takže tenhle krok potřebuje vlastní rozhodnutí a nové hashe.
+9. **`entity.equipment`** (poslední granule Úkolu 6) — **tohle je cíl 11. session**
+   (viz „CÍL SESSION“): obléknout postavu (ta je dnes nahá); navazuje na
+   `entity.item` i `entity.container`, **musí uklidit předchozího rodiče „mobil“**
+   (věc 66b) a **`sim.interaction` na něj čeká větví `equip`** (věc 68 — rozhodni,
+   kudy ho najde). `render.hue` na to stroj má (věc 41) a `render.anim` už tělo
+   z registru bere.
+10. **Integrace `sim.interaction` do hry** (věc 68): registr předmětů + registrace
+    v `app/main.gd` (`world.doors`, kontejner, registr mobilů, item registr) —
+    **až po `entity.equipment`**, jinak by `use` na zbraň nemělo co volat.
+11. **Voják pro `sim.pathfind`** (věc 54): click-to-move přes `sim.commands`
     (klik do světa → `next_step` → `Command{t:"move"}`), ať cesta není mrtvý kód.
-11. **Statiky s barvou** (věc 40): `render.chunk` + `hued_art()` — dveře a cedule.
-12. **Držení klávesy = chůze** (`app.input`, věc 27, Úkol 7) — bez toho se demo
+12. **Statiky s barvou** (věc 40): `render.chunk` + `hued_art()` — dveře a cedule.
+13. **Držení klávesy = chůze** (`app.input`, věc 27, Úkol 7) — bez toho se demo
     ovládá „klikatě“ (čeká na rozhodnutí uživatele, „Co čeká na tebe“ bod 4).
-13. Pak M2 zbytek: `entity.notoriety`, `world.teleport`, `world.regions`.
-14. (nepovinné) `if: always()` u diagnostických kroků CI (věc 26); časový strop
+14. Pak M2 zbytek: `entity.notoriety`, `world.teleport`, `world.regions`.
+15. (nepovinné) `if: always()` u diagnostických kroků CI (věc 26); časový strop
     v `mutace-tests.py` (věc 53) — **velikost už změřená**: 61 mutací se vešlo do
-    `timeout-minutes: 30` (8. session), dnes **81**; zbývá rozlišení „zasekla se“
+    `timeout-minutes: 30` (8. session), dnes **94**; zbývá rozlišení „zasekla se“
     od „je pomalá“. A **věc 67**: sonda `mutace-vzory.py` by měla u
     `mutace-tests` **selhat** na neunikátní vzor (dnes ho jen vypíše).
 

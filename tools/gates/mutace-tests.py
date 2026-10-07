@@ -331,6 +331,63 @@ MODULY = {
              "if use_run and mob.stam <= 0:", "if false:"),
         ],
     },
+    "interaction": {
+        "soubor": ROOT / "sim" / "systems" / "interaction.gd",
+        "prefix": "sim.interaction",
+        "prepinac": "--interaction-script",
+        "mutace": [
+            # Kovadlina a vyhen maji v datech `category == "tool"`, ale jsou to
+            # CÍLE - tahle mutace z nich udela nastroje (a `use` na ne zacne
+            # delat "cekam na cil" misto "nic se nedeje").
+            ("kovadlina se bere jako nastroj (TARGET_ROLES se ignoruje)",
+             'elif cat == "tool" and not (role in TARGET_ROLES):', 'elif cat == "tool":'),
+            # Dvere se poznavaji z artu (`world.doors.is_door`) - bez toho je
+            # dvojklik na ne "neznamy predmet".
+            ("dvere se nepoznaji (is_door se ignoruje)",
+             "\t\tif _is_door(tile):", "\t\tif false:"),
+            # Hlaska je jedina obrana proti tichu ("neznamy predmet -> hlaska").
+            ("hlaska se nikam neposle (ticho)",
+             '\t_event("message", {"text": text, "kind": "system"})',
+             "\tpass"),
+            # Chybejici system MUSI byt videt - nesmi vypadat jako uspech.
+            ("chybejici system vypada jako uspech",
+             '\t\treturn _fail("not_available")\n\tvar res = system.callv(method, args)',
+             '\t\treturn {"ok": true, "action": akce, "reason": ""}\n\tvar res = system.callv(method, args)'),
+            # Dynamicky routing: kdyz se system nenajde, nezavola se nikdy.
+            ("system se v SimWorld.systems nikdy nenajde",
+             "\tif systems is Dictionary and systems.has(name):", "\tif false:"),
+            # Parova tabulka musi porovnavat OBE strany (jinak se kladivo chová
+            # jako by cil byl anvil, i kdyz je to zlato).
+            ("par se porovnava jen podle zdroje (cil se ignoruje)",
+             '\t\tif str(par["od"]) == str(od.get("role", "")) and str(par["na"]) == hledane_na:',
+             '\t\tif str(par["od"]) == str(od.get("role", "")):'),
+            # Slouceni hromad se musi zastavit na MAX_STACK (docs/05 §5.4).
+            ("slouceni prekroci MAX_STACK",
+             "\tvar prevedeno: int = mini(int(zdroj.amount), Const.MAX_STACK - int(cil.amount))",
+             "\tvar prevedeno: int = int(zdroj.amount)"),
+            # Slouci se jen STEJNA hromada (tile + hue).
+            ("slouci se i jina hromada (same_pile se ignoruje)",
+             "\tif cil == null or zdroj == null or not zdroj.same_pile(cil):",
+             "\tif cil == null or zdroj == null:"),
+            # Prepnuti dveri je `toggle` z world.doors (konvence z 8. session).
+            ("dvere se prepnou na opacny clen dvojice",
+             "\tvar novy: int = int(_doors.toggle(tile))", "\tvar novy: int = int(tile) - 1"),
+            # Id prostory: `entity.item.tile` je ART ID, data maji TILEDATA ID.
+            ("id prostor se neprevadi (art id se hleda jako tiledata id)",
+             "\t\tvar rec = _by_tile.get(tile - ITEM_OFFSET)", "\t\tvar rec = _by_tile.get(tile)"),
+            # Neznamy cil NESMI skoncit jako uspech.
+            ("neznamy cil se tvari jako uspech",
+             '\treturn _fail("unknown")\n\n\nfunc _toggle_door',
+             '\treturn {"ok": true, "action": "nothing", "reason": ""}\n\n\nfunc _toggle_door'),
+            # Cislo, ktere klient zna (research/01 §2.4).
+            ("paperdoll ma spatne cislo klienta",
+             "const ENTRY_PAPERDOLL := 0x0193", "const ENTRY_PAPERDOLL := 0x0194"),
+            # Batoh bez `backpack` se nema otevrit prazdny.
+            ("batoh se otevre i bez `backpack`",
+             "\t\t\tif mob == null or int(mob.backpack) <= 0:",
+             "\t\t\tif mob == null or int(mob.backpack) < 0:"),
+        ],
+    },
 }
 
 
@@ -361,7 +418,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description="Mutacni dukaz testu")
     ap.add_argument("--only", default=None,
                     help="sort, map, walk, doors, movement, registry, pathfind, textures, "
-                         "item, container (nebo vic carkami)")
+                         "item, container, interaction (nebo vic carkami)")
     args = ap.parse_args()
     if godot_bin() is None:
         print("CHYBA: Godot nenalezen (nastav $GODOT) - mutace by nic nemerily")

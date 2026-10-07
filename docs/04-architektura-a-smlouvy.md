@@ -74,7 +74,7 @@ v `.forge/roadmap.json`.
 | id | soubor | provides | acceptance (konkrétní volání) |
 |---|---|---|---|
 | `sim.movement` | `sim/systems/movement.gd` | **odkud bere mobily (2026-10-06): z granule `sim.entity_registry`** — `register(mobile)->void` a `mobile(serial)` jsou jen průchod do registru; registr jde předat **konstruktorem** jako pátý argument (`_init(walk, clock, events, drain_model, registry)`), bez něj si systém založí vlastní. Dále `player_serial:int` (rozhoduje o asymetrické diagonále); `request_step(m:int, dir:int, run:bool)->Dictionary` (`{ok, delay_ms, reason}`), `apply_step(m:int, dir:int)->void`, `consume_stamina(m:int, steps:int)->void`, `pending_count()->int`, `delay_ms_for(run:bool)->int` | `request_step(m, 0, false).delay_ms == 400` **pro mobil v registru** (jinak `{ok:false, reason:"no_mobile"}`); po `apply_step` se `pos.x += 1`; viz §4.2.1 |
-| `sim.interaction` | `sim/systems/interaction.gd` | `use(m:int, serial:int)->void`, `use_on(m:int, serial:int, target:Dictionary)->void`, `context_menu(m:int, serial:int)->Array[Dictionary]`, `context_action(m:int, serial:int, entry:int)->void` | `use(m, anvil)` nic neudělá; `use_on(m, ore, {"serial": forge})` spustí tavení |
+| `sim.interaction` | `sim/systems/interaction.gd` | **KÓD JE (DOPLNĚNO 2026-10-07, 10. session)** `use(m:int, serial:int)->Dictionary`, `use_on(m:int, serial:int, target:Dictionary)->Dictionary`, `context_menu(m:int, serial:int)->Array[Dictionary]`, `context_action(m:int, serial:int, entry:int)->Dictionary` — každý vrací `{ok, reason, action}` (**původní znění `->void` je zapsané v §4.2.1 i s důvodem, proč se změnilo**) | `use(m, anvil)` nic neudělá; `use_on(m, ore, {"serial": forge})` spustí tavení |
 | `sim.combat` | `sim/systems/combat.gd` | `set_war(m:int, on:bool)->void`, `attack(m:int, target:int)->void`, `swing_delay_ms(m:int)->int`, `resolve_swing(m:int, t:int)->Dictionary`, `stop_combat(m:int)->void` | `swing_delay_ms` na `dex=100, speed=30` vrátí hodnotu dle vzorce z §5.5 |
 | `sim.magic` | `sim/systems/magic.gd` | `cast(m:int, spell:int)->Dictionary` (`{ok, delay_ms, reagents, reason}`), `interrupt(m:int)->void`, `add_spell(m:int, spell:int)->bool`, `scribe(m:int, scroll:int)->bool` | `cast` bez reagent → `{ok:false, reason:"reagents"}` |
 | `sim.skill_gain` | `sim/systems/skill_gain.gd` | `check(m:int, skill:int, difficulty:int)->Dictionary` (`{success, gained, new_value}`), `gain_stat(m:int, stat:int)->void` | opakované `check` s `difficulty` 0 při `value=0` dá za 100 pokusů > 0 |
@@ -283,6 +283,55 @@ změnil, je tu i **původní znění** — historie se nepřepisuje, jen doplňu
     Dále: vnořené kontejnery se do váhy nepočítají (ServUO `TotalWeight` je
     rekurzivní) a předchozí rodič **mobil** (nasazená výbava) se neuklízí —
     patří to `entity.equipment`.
+
+- **`sim.interaction` je HOTOVÝ (DOPLNĚNO 2026-10-07, 10. session).** Kód je
+  `sim/systems/interaction.gd`, test `tests/cases/interaction.gd` (cesta k měřenému
+  souboru je **vstup**: `-- --interaction-script=`), mutační modul `interaction`
+  v `tools/gates/mutace-tests.py` (**13 vzorů**). Co tabulka výš nepinovala a co je
+  **naměřené** (doklady v HANDOFF.md, „CO JE NOVÉHO (10. session)"):
+  - **Návrat `Dictionary` místo `->void`.** **Původní znění** řádku §4.2 bylo:
+    `use(...)->void`, `use_on(...)->void`, `context_action(...)->void` (a jen
+    `context_menu(...)->Array[Dictionary]`). Kód vrací `{ok, reason, action}`,
+    protože `void` **nerozliší „nic se nestalo" od „není to hotové"** — a cíl
+    10. session chce obojí rozlišit (`use_on` bez systému vrací
+    `{ok:false, reason:"not_available"}`). `context_menu` vrací `Array[Dictionary]`
+    podle smlouvy; položka je `{entry, text, custom}`.
+  - **Konstruktor (smlouva ho neuvádí):** `_init(world, events, doors, containers,
+    registry, items)` — všechno je **vstup**, aby se routing dal měřit bez assetů
+    (stejný vzor jako `world.walk` a `sim.movement`). `items` je `{serial: Item}`
+    nebo objekt s `get_item(serial)`: **registr předmětů neexistuje** (věc 64),
+    takže „odkud je předmět podle serialu" je dnes věc volajícího.
+  - **Routing se rozhoduje z DAT** (`data/items.json`, granule `data.items`):
+    `category` (container/weapon/armor/shield/clothing/tool/light/misc/material)
+    a `role` (pickaxe, smith hammer, anvil, forge, iron ore, …). Kdo si tabulku
+    opíše do kódu, rozejde se s daty. **Pozor na dva id prostory:** `entity.item.tile`
+    je **ART ID**, data mají **TILEDATA ID** (naměřeno: názvy v `tiles.json` sedí
+    na indexu `tile` i u **4 744** záznamů s `tile >= 0x4000`) — modul proto hledá
+    **nejdřív** `tile - 0x4000`.
+  - **`anvil` a `forge` mají v datech `category == "tool"`, ale jsou to CÍLE**
+    (naměřeno: 18 záznamů `tool`, z toho 16 nástrojů a tyto 2 cíle). Konstantní
+    `TARGET_ROLES` z nich dělá „neznámý předmět" — proto `use` na kovadlinu nic
+    neudělá **a řekne to** (přijímací kritérium).
+  - **Dynamický routing** do `SimWorld.systems` (`craft`, `magic`, `harvest`,
+    `vendor`, `combat`, `equipment`, `light`): když systém není nebo nemá metodu,
+    vrací `{ok:false, reason:"not_available"}` **a hlášku** — nikdy ticho.
+    Neúspěšné volání (`callv` vrátí `null`) je `reason:"bad_system"`, ne úspěch.
+  - **§5.2.3 je pokrytá 10 řádky z 36** (11 párů; řádek 26 má dvě podoby
+    materiálu — `logs` i `boards`). Zbytek potřebuje data, která v `data/items.json`
+    **nejsou** (ryba, vlna, nit, obvaz, klíč, lockpick, pochodeň, svitek do knihy,
+    reagent, runa, moongate, srp, vědro, měch, sextant, hodiny); chybějící řádek
+    odpoví hláškou. Test to měří **proti dokumentu** (`docs/05` musí mít 36 řádků
+    a množina párů v kódu = řádky + pár z §5.2.2), takže nový řádek v dokumentu
+    test shodí, dokud se pokrytí nedoplní.
+  - **Kontextové menu:** `0x0078` (Open Backpack) a `0x0193` (Paperdoll) jsou
+    čísla, která **klient zná** (ServUO `Server/ContextMenus/ContextMenu.cs:178-256`
+    přes `research/01` §2.4); ostatní jsou `>= 0x64` = vlastní (`custom: true`),
+    protože clilocy jsou UNVERIFIED (docs/11 O7).
+  - **⚠ Díry ve smlouvě, které kód odhalil (nezamlčené):** §4.4 **nemá událost
+    „art existujícího předmětu se změnil"** — přepnutí dveří posílá `item_added`
+    se **stejným serialem** (obnovení u klienta); a seznam gumpů v §4.4 **nemá
+    `paperdoll`**, přesto ho `context_action` posílá. Obě věci patří do rozhodnutí,
+    ne do tichého rozšíření smlouvy.
 
 ## 4.3 Příkazy klient → simulace
 
