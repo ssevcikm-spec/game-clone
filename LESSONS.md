@@ -24,6 +24,22 @@ Typy: `chyba` (moje vada) · `past-nástroje` (prostředí/nástroj, ne logika) 
 
 ---
 
+### 2026-10-07 — „Poslední běh CI" není to, co člověk myslí, a logy bez tokenu nejsou (past-nástroje)
+**Co se stalo:** po zapnutí trvalého pushu jsem pushl **tři commity za sebou**
+(kód → pravidlo do předání → zápis o CI). Každý push spustil **vlastní běh CI**,
+takže během pár minut vznikly **#23, #24 a #25** — a `ci-beh-stav.mjs` vypisuje
+běhy sestupně. Kdo se podívá na „první řádek", vidí **poslední běh**, ne běh nad
+commitem, který zkoumá; rozhoduje **`sha` v odpovědi**.
+**Doklad:** `node _analyza/ci-beh-stav.mjs` → `#25 sha=19311fb success`,
+`#24 sha=88b4747 success`, `#23 sha=e6ff22e success` (všechny 13/13 kroků).
+Logy ani artefakty se bez tokenu stáhnout nedají: `node _analyza/ci-log.mjs` →
+**HTTP 403**, `node _analyza/ci-artefakt.mjs` → **HTTP 401**.
+**Ponaučení:** u CI **vždy porovnej `sha` s `git rev-parse HEAD`**, ne pořadí běhu
+— série pushů vyrobí víc běhů a starý zelený běh vypadá stejně jako nový.
+A **co nejde přečíst, to se netvrdí**: „krok 9 prošel" je měřené (stav kroku),
+ale „CI chytilo 44/44 mutací" bych bez logu tvrdit nemohl — 44/44 je naměřeno
+**lokálně** a takhle je to i zapsané v předání.
+
 ### 2026-10-07 — Málem jsem „opravil" správný kód a napsal o tom nepravdivé ponaučení (chyba)
 **Co se stalo:** při psaní `sim.pathfind` jsem naměřil, že cesta na `(2,1,0)`
 stojí **341** tam, kde jsem čekal **241**, a hned jsem usoudil, že je vada
