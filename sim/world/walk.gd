@@ -23,7 +23,9 @@ extends RefCounted
 #
 # ⚠ DVERE MAJI `Impassable` V OBOU STAVECH (namEReno: 1717 i 1718 = 0x20006050,
 #   vyska 20). Stav se proto CTE z `world.doors.is_open` - z flagu ho poznat NELZE.
-#   Co je otevreny art, je otazka konvence `world.doors` (viz otevrena vec v HANDOFF).
+#   Ktery art je otevreny, rozhoduje `world.doors` KONVENCI ZMERENOU 2026-10-07:
+#   art z `doors.txt` je ZAVRENY, jeho `art + 1` je OTEVRENY (doklady v hlavicce
+#   `sim/world/doors.gd`; `walk` je na konvenci nezavisly, jen se na stav ptá).
 #
 # ⚠ SCHODY: `Surface` + vyska 5 nebo 10 (namEReno: 9 z 9 druhu schodu v Britanii)
 #   a skok mezi sousednimi schody je PRESNE vyska schodu (histogram skoku povrchu

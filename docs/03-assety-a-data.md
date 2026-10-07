@@ -364,7 +364,7 @@ Tohle je **zdroj pravdy pro chování**, ne kosmetika. Extrahuj do `data/`:
 |---|---|---|
 | `skills.mul` (ověřeno: 58 jmen) | jména a pořadí skillů | `data/skills.json` — id, jméno, pořadí v klientu |
 | `skillgrp.mul` (6 skupin: Combat, Trade Skills, Magic, Wilderness, Thieving, Bard) | skupiny skillů | seskupení v UI skill listu |
-| `doors.txt` (37 kategorií × 8 art ID + FeatureMask + jméno) | **dveře**: zavřené/otevřené × 4 orientace | `sim/world/doors.gd`: dvojklik přepne art v rámci kategorie, zvuk, průchodnost |
+| `doors.txt` (37 kategorií × 8 art ID + FeatureMask + jméno) | **dveře**: všech 8 artů je **zavřený stav** (8 směrů) a **otevřený = `art + 1`** — dřív tu stálo „zavřené/otevřené × 4 orientace" (oprava níže) | `sim/world/doors.gd`: `is_open`/`toggle` podle dvojice `(art, art+1)`, zvuk, průchodnost |
 | `stairs.txt` (19 kategorií: Block, North/East/South/West, Squared1/2, Rounded1/2, Multi*) | **schody** | určení, které dlaždice jsou schody a jak se na nich mění `z` |
 | `teleprts.txt` (kategorie teleportovacích dlaždic) | **teleporty** (alchymistické dlaždice, moongate) | průchod dlaždicí → teleport na cílové souřadnice |
 | `misc.txt` (kategorie × 8 dílů + TID + jméno) | stavební díly (archways, walls) | mimo rozsah stavění, ale používá se pro rozpoznání „dílu" |
@@ -382,6 +382,7 @@ Tohle je **zdroj pravdy pro chování**, ne kosmetika. Extrahuj do `data/`:
 
 ```
 doors.txt      kategorie 4 = "Wood Door":      1721 1723 1717 1719 1725 1727 1729 1731
+                                             otevřené téhož: 1722 1724 1718 1720 1726 1728 1730 1732 (= +1)
 doors.txt      kategorie 11 = "Weathered Stone Secret Door": 808 810 804 806 812 814 816 818
 stairs.txt     kategorie 0 = "Dark Wood": Block 1848, N 1849, E 1852, S 1851, W 1850,
                                             Squared 1856/1854, Rounded 1862/1861,
@@ -391,6 +392,19 @@ body.def       11 {28} 1401     (tělo 11 se kreslí jako 28 s hue 1401)
 Bodyconv.def   0–199 monstra, 200–399 zvířata, 400+ lidé, max index 2048
 Anim1.def      13 {5} 0         (tělo 13 používá animační skupinu 5)
 ```
+
+> **OPRAVA 2026-10-07 (8. session, měřeno):** v tabulce §3.6 dřív stálo u `doors.txt`
+> „**zavřené/otevřené × 4 orientace**" a `sim/world/doors.gd` podle toho pároval
+> `kus 1–4` (zavřené) s `kus 5–8` (otevřené). **Naměřeno nad všemi 230 arty:**
+> `doors.txt` uvádí **jen zavřené** arty (všech 230 má `Impassable`, 0 průchozích)
+> a otevřený je **`art + 1`** — `art + 1` existuje u všech 230 a **ani jednou** není
+> sám v `doors.txt` (0 z 230); `tiledata` je u 8 párů jmenuje „wooden door closed"
+> / „wooden door opened" a **ani jeden pár obráceně**. Parita ani `layer` kritériem
+> nejsou (120 artů lichých / 110 sudých, `layer` se u 39 z 230 párů liší), takže
+> „otevřeno = sudý art" by u 16 kategorií (všechny kusy sudé) označilo **každý
+> zavřený art za otevřený**. Důkazy a postup:
+> hlavička `sim/world/doors.gd`, skripty `_analyza/dvere-konvence.py`
+> a `_analyza/dvere-jmena.py`.
 
 ## 3.7 Nástroj `tools/uoextract/` — návrh
 

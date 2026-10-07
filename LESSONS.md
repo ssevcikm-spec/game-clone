@@ -24,6 +24,60 @@ Typy: `chyba` (moje vada) · `past-nástroje` (prostředí/nástroj, ne logika) 
 
 ---
 
+### 2026-10-07 — Přijímací kritérium mělo vadu: „otevřeno = sudý art" (vada-zadani)
+**Co se stalo:** cíl 8. session zapsaný v předání žádal `is_open(tile)` = „**sudý**
+člen dvojice". To platí jen pro blok `1717..1732`, ze kterého kritérium vzniklo —
+ne pro všech 37 kategorií: `doors.txt` má **120 artů lichých a 110 sudých** a
+**16 kategorií má všechny kusy sudé** (7, 9–14, 19, 23, 27, 28, 30, 32–34, 36).
+Parita není stav, ale **základ artů**: `closedID = base + 2*facing`, takže parita
+sleduje `base` (`MetalDoor` 0x675 = lichý, `IronGate` 0x824 = sudý).
+**Doklad:** `_analyza/dvere-konvence.py` (230 artů/37 kategorií: `par_ok 230`,
+`partner_v_doors 0`, `sudy 110`, `lichy 120`); `_analyza/dvere-jmena.py`
+(8 párů se ve `tiledata` jmenuje „closed"/„open(ed)", ani jeden obráceně).
+**Ponaučení:** **kritérium se musí přeměřit nad CELÝM souborem dat, ne nad
+blokem, ze kterého vzniklo** — tady stačilo spočítat paritu všech 230 artů
+(jedna smyčka). A když kritérium zní „sudý"/„lichý", ptej se, **čím je to dané**:
+u art id je to `base + 2*facing`, tedy konstanta, ne stav.
+
+### 2026-10-07 — „Rozhodnuto obrázkem" přežilo šest session a bylo to obráceně (chyba)
+**Co se stalo:** `sim/world/doors.gd` měl od 2026-10-02 v hlavičce „kusy 1–4 jsou
+čtyři zavřené orientace a kusy 5–8 tytéž otevřené" a `toggle` podle toho pároval
+`index` s `index + 4`. Ve skutečnosti je **všech 8 artů kategorie zavřených**
+(8 směrů = `facing` 0..7) a otevřený je **`art + 1`**. Starý `toggle` tedy přepnul
+dveře na **jiný směr téhož stavu** (`1721 → 1725`), ne na otevřeno — a `walk` to
+nemohl odhalit, protože se ptá jen `is_open` a v okolí startu **není ani jeden
+statik dveří** (0 z 6 750 kroků). Vada by se projevila až v Úkolu 4
+(`sim.interaction`), kde by se dveře „otvíraly" na špatnou stranu.
+**Doklad:** `_analyza/dvere-jmena.py`: `tiledata` jmenuje 11590 „wooden door
+closed" / 11591 „wooden door opened" (a 7 dalších párů); `data/doors.json` má
+`art+1` u 230/230 artů a **0/230** z nich je samo v datech; reference
+`base(closedID, openedID)` s `openedID = closedID + 1` (ServUO
+`Scripts/Items/Functional/Doors.cs:138`, ModernUO `HouseDoors.cs:48`).
+**Ponaučení:** rozhodnutí „podle obrázku" musí do kódu zapsat **co se na obrázku
+porovnávalo a co z něj poznat NELZE** — tady se z montáže nedalo poznat, že obě
+poloviny jsou zavřené (oba stavy mají stejné flagy, stejné jméno i stejnou
+kresbu zrcadleně). Než se podle vizuálního rozhodnutí začne psát logika, hledej
+**strukturní asymetrii v datech** (viz další záznam) — je levná a rozhodne.
+
+### 2026-10-07 — Párování dveří rozhodla asymetrie, ne „podobnost" (postup)
+**Co se stalo:** u konvence dveří šlo o to, který ze dvou artů je otevřený.
+Metriky „podobnosti" (zrcadlové IoU siluety) jsou **nasycené**: správné dvojice
+0,96–1,00, ale i nesprávné 0,81 a matice plná 0,99 — rozhodnout se s nimi nedá
+(6. session, věc 62(f); `.cache/analysis/dvere-zrcadlo-matice.py`). Rozhodly tři
+**asymetrické** signály: (1) jména v `tiledata` „closed"/„opened" u 8 párů, ani
+jedno obráceně; (2) `Impassable` má 230/230 artů z `doors.txt` a jen 71/230 jejich
+`+1` (opáčný směr by potřeboval 230 průchozích „zavřených"); (3) `art+1` **není**
+v `doors.txt` ani jednou (0/230), takže se otevřený art nedá postavit jako
+„jiný směr". Čtvrtý nezávislý zdroj je reference (viz předchozí záznam).
+**Doklad:** `_analyza/dvere-konvence.py` (sekce A–E), `_analyza/dvere-jmena.py`;
+test `tests/cases/doors.gd` měří **oba členy dvojice na všech 230 artech** a
+8 mutací v `mutace-tests.py` (modul `doors`) je chytá.
+**Ponaučení:** **metrika, která dá vysoké skóre i pro špatnou odpověď, neměří
+rozhodnutí** — hledej měřidlo, které se pro obě hypotézy **liší** (počty, ne
+podobnosti), a u každého pravidla napiš, **čím by se vyvrátilo**. Když se sejde
+víc nezávislých signálů, zapiš je do hlavičky modulu i s čísly — příští session
+je nemusí hledat znovu (a nebude moct „opravit" správné rozhodnutí).
+
 ### 2026-10-07 — Zelený test měřil JINOU konvenci id, než má reálná mapa (chyba)
 **Co se stalo:** `world.walk` četl u statiků `world.tiledata`, ale **jiným id
 prostorem**: `world.map.statics_at` vydává `tile` v prostoru **tiledata id

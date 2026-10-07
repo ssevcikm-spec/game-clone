@@ -1,22 +1,24 @@
-# Předání — UO-klon (testy už nemlčí; 2026-10-07, 7. session)
+# Předání — UO-klon (konvence dveří opravená; 2026-10-07, 8. session)
 
 > **Co je tenhle soubor:** **stav projektu** pro další session agenta. Přepisuje
 > se celý; historie je v `git log`. **Současný stav se bere odtud** — a ověřuje
 > se živě (je tu k tomu sekce „Předletová kontrola").
 > **Zadání pro další vývoj je `ZADANI-DALSI-VYVOJ-2.md`** (etapa 2, Úkoly 1–9);
-> **Úkoly 1, 2 a 3 jsou hotové**, další je **Úkol 4 (`sim.interaction`)** — ale
-> **před ním je potřeba rozhodnout konvenci dveří** (otevřená věc 62, cíl 8. session).
-> Předchozí etapa je v `ZADANI-DALSI-VYVOJ.md`.
+> **Úkoly 1, 2 a 3 jsou hotové a konvence dveří (věc 62) je od 8. session
+> rozhodnutá a opravená**, takže **další je Úkol 4 (`sim.interaction`)** —
+> `world.doors` na něm stát může (`toggle(tile) = tile ± 1`, `is_open` = členství
+> v `doors.txt`; viz „CO JE NOVÉHO (8. session)"). Předchozí etapa je
+> v `ZADANI-DALSI-VYVOJ.md`.
 > **Naměřený stav plánu je v `REVIZE-PLANU-2026-10-06.md`** a **stav granul
 > měří** `python tools/plan-status.py`.
 > **Kam pro co v referenčních zdrojích je `research/REJSTRIK-REFERENCI.md`**.
-> **Datum:** 2026-10-07 (7. session). **Poslední změna kódu:** tato session
-> (**slepé místo v `tests/run_tests.gd` zavřené** + **fixture pro `render.hue`
-> a `render.anim`** + **tři mutační harnessy v CI**; `tests/run_tests.gd`,
-> `tests/lib.gd`, `tests/cases/{render_hue,render_anim,walk}.gd`,
-> `tests/fixtures/{hues,anim}/`, `tools/gates/mutace-anim.py`, `.github/workflows/ci.yml`,
-> `docs/04 §4.8.1–4.8.2`). Předchozí commit `2c71911` = oddíl „Co čeká na tebe"
-> v předání (6. session).
+> **Datum:** 2026-10-07 (8. session). **Poslední změna kódu:** tato session
+> (**konvence dveří ve `world.doors`** — `is_open`/`toggle`/`is_door`/`orientation`
+> podle měření: art z `doors.txt` je zavřený, `art + 1` otevřený;
+> `sim/world/doors.gd`, `tests/cases/doors.gd` (přepsaný), `tests/cases/walk.gd` (8c),
+> `tools/gates/mutace-tests.py` (nový modul `doors`, 8 mutací), `docs/03 §3.6`,
+> `docs/04 §4.2`, `docs/05 §5.2.2` a hlavička `sim/world/walk.gd`).
+> Předchozí commit `ce0c38e` = zápis konvence dveří pro cíl 8. session (7. session).
 
 ## 🎬 DEMO JE NA SVĚTĚ — mapa Britainu + BAREVNÁ postava, která po ní chodí
 
@@ -81,6 +83,33 @@ nikdo ne„opraví" znovu.
 **Co zbývá (není to vada téhle granule):** zbytek je GPU — **1 516 draw callů**
 a 11 534 primitiv na frame při 5 767 spritech. To je práce pro **M9
 (`render.chunk_mesh`, dávkové kreslení)**; 40 FPS je dnes hratelných.
+
+## ✅ CO JE NOVÉHO (8. session) — konvence dveří je ZMĚŘENÁ a OPRAVENÁ
+
+**Cíl session (zadaný 7. session, věc 62):** „Rozhodnout a opravit konvenci dveří
+ve `world.doors`." **Splněno — ale ne tak, jak znělo přijímací kritérium:** to
+žádalo `is_open(tile)` = „**sudý** člen dvojice", což je **naměřená vada zadání**
+(platí jen pro blok 1717..1732, ne pro všech 37 kategorií). Správné pravidlo je
+**`art + 1`**, bez ohledu na paritu.
+
+| Co | Doklad (naměřeno dnes) |
+|---|---|
+| **Konvence: `doors.txt` = ZAVŘENÝ art, `art + 1` = OTEVŘENÝ** | Nad všemi **230 arty** ze `data/doors.json`: `art + 1` **existuje 230/230** a **ani jednou** není sám v `doors.txt` (**0/230** ⇒ otevřený art není „jiný směr", který by šel postavit); `Impassable` má **230/230** artů z `doors.txt` a **71/230** jejich `+1` (opačný směr by potřeboval 230 průchozích „zavřených"); `tiledata` jmenuje **8 párů** přímo „wooden door closed" / „wooden door opened" a **ani jeden obráceně**. Skripty `_analyza/dvere-konvence.py`, `_analyza/dvere-jmena.py` |
+| **Reference (ne dohad)** | `base(closedID, openedID)` s **`openedID = closedID + 1`**: ServUO `Scripts/Items/Functional/Doors.cs:138` (`0x675 + 2*facing` → `0x676 + 2*facing`), ModernUO `Items/Construction/Doors/HouseDoors.cs:48–49`; `doors.txt` dodává právě `closedID` (dveře se do světa staví zavřené) |
+| **⚠ PARITA ANI `layer` NEJSOU KRITÉRIUM** | Kusů je **120 lichých a 110 sudých** a **16 kategorií má všechny kusy sudé** (7, 9–14, 19, 23, 27, 28, 30, 32–34, 36) — parita sleduje `base` (`MetalDoor` 0x675 lichý, `IronGate` 0x824 sudý). `layer` se liší u **39 z 230** párů (u bloku 1717..1732 sedí, jinde ne). Kdo stav pozná z parity nebo z vrstvy, rozhodne u těch kategorií **opačně** |
+| **Starý omyl (2026-10-02) je pojmenovaný, ne smazaný** | Hlavička `doors.gd` tvrdila „kusy 1–4 zavřené, 5–8 tytéž otevřené" a `toggle` pároval `index` s `index + 4`; byl to **jiný směr téhož stavu** (`1721 → 1725`), ne otevřeno. Zůstává v hlavičce jako záznam i s následkem (Úkol 4 by otvíral na špatnou stranu) |
+| **Oprava modulu** | `sim/world/doors.gd` (**142 řádků**, deklarace `<= 60` — překročeno, viz věc 2): `is_door` platí pro **oba** členy dvojice, `is_open(t) = not has(t) and has(t-1)`, `toggle(t) = t + 1` (zavřený) / `t - 1` (otevřený), `category`/`orientation` berou zavřeného dvojčete, `orientation` je **index v `doors.txt` (0..7)**, ne `index % 4`; `open_tile(cat, i) = tiles[i] + 1` |
+| **Test granule (přepsaný)** | `tests/cases/doors.gd` (**102 řádků**, **25 kontrol**): literály pro kat. 4 (`1721` zavřený, `1722` otevřený, `toggle` oběma směry, `1733` není dveře, `orientation(1725) == 4`), **sudá kategorie 7** (`2084` zavřený / `2085` otevřený — tím padá „parita"), a **smyčka přes všech 230 artů** (`is_open`, `toggle`, `is_door`, `category`, `orientation`, „partner není v datech"; počty: 230 projitých, 110 sudých zavřených). Cesta k souboru je **vstup** (`-- --doors-script=…`) |
+| **`tests/cases/walk.gd` zůstal zelený** | Sekce 8c hledala dvojici přes `is_open(piece) != is_open(piece1)` (stará konvence) → přepsáno na `not is_open(piece) and is_open(piece + 1)`; `walk` je na konvenci nezávislý (ptá se `is_open`) |
+| **Mutační důkaz (nový modul `doors`)** | `python tools/gates/mutace-tests.py --only doors` → **8 z 8 chyceno**, smlouva vstupu OK: (1) `toggle` = starý omyl `index + 4`, (2) `otevřeno = sudý art`, (3) `is_open` hledá `+1`, (4) vratná cesta vrací `+1`, (5) `is_door` jen pro zavřený art, (6) `category`/`orientation` otevřeného artu nenajde, (7) `orientation` zpět na `% 4`, (8) `open_tile` zapomene `+1` |
+| **Testy a brány** | s assety **584 kontrol / 0 selhání** (bylo 574; +10), **bez `assets/uo` 529 / 0** (bylo 519; +10 — doors test měří `data/doors.json`, ta v gitu jsou), 28/28 case souborů, `exit 0`; brány **11 měřeno / 0 NEMĚŘENO / 0 vad**; self-testy **19 / 0**; `check-docs-refs.py`, `check-zadani.py`, `roadmap-gen.py --check` **exit 0** |
+| **Dokumentace doplněna (ne přepsána)** | `docs/03 §3.6`: řádek `doors.txt` opraven na měřený stav + datovaná oprava pod příkladem (i s tím, že parita kritérium není); `docs/04 §4.2`: smlouva `world.doors` má `is_open`, `orientation` a význam `art + 1`; `docs/05 §5.2.2`: „přepni art na `art + 1` a zpět"; hlavička `sim/world/walk.gd` už neříká „konvence je otevřená věc" |
+| **Co se NEMĚNILO** | `sim/interaction` (Úkol 4) se nedělal, vady ze snímků (věci 59–61) taky ne; `data/doors.json` ani `tools/uoextract/textdata.py` se nedotkly; `tools/roadmap-gen.py` se neměnil (`provides` zůstaly stejné, `.forge/roadmap.json` je aktuální) |
+
+**Dopad na obrazovku je dnes nulový** (v okolí startu není ani jeden statik
+dveří, 0 z 6 750 kroků) — obraz se proto neměnil a nic se nesnímkovalo.
+**Dopad na Úkol 4 je přímý:** `sim.interaction` teď může `toggle` použít
+a dostane otevřený art, ne jiný směr.
 
 ## ✅ CO JE NOVÉHO (5. session) — a čím je to doložené
 
@@ -292,36 +321,37 @@ ho celý." Každá session tedy **není „krok"**, ale **jeden celek s cílem**
    v pořádku.
 4. **Nedělat v jedné session víc cílů**, aniž by první byl uzavřený a ověřený.
 
-**⚠ CÍL TÉTO (8.) SESSION — až ho dokončíš, přepiš tuhle větu na další cíl:**
+**⚠ CÍL TÉTO (9.) SESSION — až ho dokončíš, přepiš tuhle větu na další cíl:**
 
-> **Rozhodnout a opravit konvenci dveří ve `world.doors`** (otevřená věc 62).
-> `doors.gd` dnes tvrdí „kusy 1–4 zavřené, 5–8 otevřené" a `toggle` páruje
-> `kus` s `kusem + 4` — což je **jiný směr stěny**, ne stav. **Evidence je
-> hotová** (věc 62): blok 1717..1732 = **8 × 2** podle `layer`, `doors.txt`
-> uvádí z dvojice **jeden** art, RunUO/ServUO párují `closed = base+2f`,
-> `open = closed+1`, sudé arty **nejsou v `doors.json`** (0 z 8), a uživatelův
-> model („otevření = křídlo pootočené o 90°, ne jiné dveře") je s tím ve shodě
-> (jen kresba **není** tatáž otočená — IoU 0,05).
-> **Přijímací kritérium:** `toggle(tile) = tile ± 1`, `is_open(tile)` = sudý
-> člen dvojice, `is_door(tile)` platí **i pro pootočený art**; hlavička
-> `doors.gd` řekne **nový popis i důvod** (dveře se staví kresbou z `doors.txt`
-> = „ve stěně"; stav se proto pozná z artu) a **starý omyl zůstane pojmenovaný**
-> (historický záznam se needituje, doplňuje se); `tests/cases/doors.gd` to měří
-> (`is_open`/`toggle`/`is_door` u obou členů dvojice), mutace v `mutace-tests.py`
-> (nový modul `doors` nebo stávající) to chytí a `tests/cases/walk.gd` zůstane
-> zelený. **Co do cíle NEPATŘÍ:** `sim.interaction` (Úkol 4), vady ze snímků
-> (věci 59–61), přepis `docs/03` (stačí doplnit, co je měřené).
+> **Dokončit `entity.item` a `entity.container`** (první dvě granule Úkolu 6
+> ze `ZADANI-DALSI-VYVOJ-2.md`) — hotové a měřené.
+> **Proč zrovna tohle:** Úkol 4 (`sim.interaction`) je v roadmapě
+> **závislý na `entity.container` a `entity.equipment`** (`depends_on`), takže
+> bez nich se `use_on` na kontejner nedá ani změřit; a `docs/04 §4.5` má v tvaru
+> dat známé rozpory (vada ZADÁNÍ 8), které se při té příležitosti mají opravit.
+> **Přijímací kritérium:** `sim/entity/item.gd` (tvar podle `docs/04 §4.5`,
+> invariant „**právě jeden rodič**" — ServUO `Server/Item.cs:759`) a
+> `sim/entity/container.gd` (`can_add(c, item) -> {ok, reason}`, `add`, `remove`,
+> `weight_of`, `contents`) mají testy v `tests/cases/` (předmět **nemůže být ve
+> dvou kontejnerech**, stacky a váha sedí), modul v `mutace-tests.py` je chytí,
+> smlouvy v `docs/04 §4.2`/`§4.5` sedí na kód a **`run-all.py`, testy hry
+> i self-testy jsou zelené**. **Co do cíle NEPATŘÍ:** `sim.interaction` (Úkol 4),
+> `entity.equipment`/`entity.notoriety`, vady ze snímků (věci 59–61), M9.
+
+**Předchozí cíl (8. session), splněný:** **konvence dveří ve `world.doors`**
+(věc 62) — rozhodnutá **měřením** (art z `doors.txt` je zavřený, `art + 1`
+otevřený; doklady v „CO JE NOVÉHO (8. session)"), opravená v modulu i v testu
+a doložená **8 mutacemi** (`--only doors` 8/8). **Přijímací kritérium bylo
+v jedné části vadné** („`is_open` = sudý člen dvojice" — platí jen pro blok
+1717..1732, ne pro všech 37 kategorií) a **nahradilo se měřeným pravidlem**;
+zapsáno v `LESSONS`. **Proč to bylo v pořadí před Úkolem 4:** `sim.interaction`
+má „dveře → otevřít/zavřít" a se starou konvencí by přepínal dveře na **jiný
+směr** téhož stavu. Byl to malý, uzavřený celek (jeden modul + test + mutace).
 
 **Předchozí cíl (7. session), splněný:** rozhodnutí uživatele „zavřít slepé místo
 v `tests/run_tests.gd` + přidat zbývající tři mutační harnessy podle návrhu" —
 slepé místo zavřené (tři mutace to dokazují), fixture pro `render.hue`
 a `render.anim` v gitu, tři harnessy v CI a ověřené v CI stavu (12/12, 11/11, 8/8).
-> konzumuje) zůstane zelený.
-> **Proč zrovna tohle:** Úkol 4 (`sim.interaction`) má „dveře → otevřít/zavřít"
-> a kdyby konvence zůstala špatná, interakce by přepínala na **jinou orientaci**
-> dveří. Je to malý, uzavřený celek (jeden soubor + test + mutace).
-> **Co do cíle NEPATŘÍ:** `sim.interaction` (Úkol 4), `render.chunk_mesh` (M9),
-> vady ze snímků (věci 59–61).
 
 **Předchozí cíl (6. session), splněný:** Úkol 3 ze `ZADANI-DALSI-VYVOJ-2.md`
 (dveře a schody ve `world.walk`) — přijímací kritérium splněno: test se
@@ -348,20 +378,26 @@ hotová:**
    **„8/8 chyceno" a nic neměřil** (chybějící baseline sondy) — dnes to řekne
    a měří aspoň self-test.
 
-**Co bude následovat (bez tebe):** cíl 8. session = **konvence dveří ve
-`world.doors`** (věc 62). Kdybys chtěl pomoct **očima**, je na to montáž
-`.cache/analysis/dvere-par-pohled.png` (dvojice `1717/1718` … `1731/1732`,
-vlevo art z `doors.txt`) — ale **rozhodnutí je podložené měřením** a nečeká na
-tebe; obrázek je jen nezávislá kontrola.
+**Co bude následovat (bez tebe):** cíl 9. session = **`entity.item`
+a `entity.container`** (první dvě granule Úkolu 6), protože na nich stojí Úkol 4
+(`sim.interaction`) — viz „CÍL SESSION" níže.
+
+**Konvence dveří (věc 62) je od 8. session rozhodnutá MĚŘENÍM a opravená** —
+nic na tebe nečeká. Montáž pro kontrolu pohledem
+(`.cache/analysis/dvere-par-pohled.png`, dvojice `1717/1718` … `1731/1732`) na
+disku pořád je, ale **rozhodnutí na ní nestojí**: je podložené třemi
+asymetrickými signály (jména „closed"/„opened", `Impassable` 230 vs 71, `art+1`
+nikdy v `doors.txt`) a referencí `openedID = closedID + 1`. Kdybys na ni koukl
+a viděl něco jiného, je to **nový nález**, ne oprava — ozvi se s ním.
 
 ## ⚠⚠ BLOKÁTORY
 
 **Žádný otevřený blokátor v kódu.** „Demo chodí a postava je barevná" je naměřené
-(viz tabulky výš), brány jsou zelené (11/0/0), testy **537/0** (s assety; v čistém
-klonu je kontrol méně, protože část měří data z `assets/uo/`) a **průchodnost je
-opravená** (6. session: statiky se čtou správnou tabulkou, dveře rozhoduje
-`world.doors`, schody svou výškou). **Hra jede 40–45 FPS** (bylo 1–2 FPS) — viz
-sekce VÝKON.
+(viz tabulky výš), brány jsou zelené (11/0/0), testy **584/0** (s assety; bez
+`assets/uo` **529/0** — část kontrol měří data z `assets/uo/`) a **průchodnost
+i konvence dveří jsou opravené** (6. session: statiky se čtou správnou tabulkou,
+schody svou výškou; 8. session: `world.doors` páruje `art` ↔ `art + 1`).
+**Hra jede 40–45 FPS** (bylo 1–2 FPS) — viz sekce VÝKON.
 
 **⚠ CI: BĚH NAD COMMITEM 7. SESSION JE ZELENÝ — `#34` nad `4259091` = `success`,
 17 kroků** (ověřeno živě přes API s tokenem z Credential Manageru; `ci-beh-stav.mjs`
@@ -372,8 +408,11 @@ animací` a `Fixture sedí na generátor`. Předtím: **#30 nad `f243ba2` = `suc
 `062f419`, #29 nad `702dac2`, #23 nad `e6ff22e`, #24 nad `88b4747` — vše `success`.
 **Pozor na hranici toho tvrzení:** logy ani artefakty nejdou bez tokenu stáhnout
 (`ci-log.mjs` → 403, `ci-artefakt.mjs` → 401), takže **obsah kroků v CI ověřený
-není** — mutace jsou naměřené **lokálně** (92/92) a v CI je ověřeno jen to, že
-krok nespadl. **A pozor na počet běhů:** série pushů pustí víc běhů; „poslední
+není** — mutace jsou naměřené **lokálně** (8. session: **100/100** = `mutace-tests`
+61 + `skills` 8 + `render-hue` 12 + `render-anim` 11 + `anim` 8) a v CI je ověřeno
+jen to, že krok nespadl. **Nově je v kroku 9 o 8 mutací víc** (`doors`) — lokálně
+celý běh `mutace-tests.py` trvá **3 min 27 s** (13:47:21 → 13:50:49), takže do
+`timeout-minutes: 30` se vejde; **konečné slovo má ale stav CI** (viz níže). **A pozor na počet běhů:** série pushů pustí víc běhů; „poslední
 běh" tedy nemusí být ten, který člověk myslí — **sha v odpovědi API je to, co
 rozhoduje.** Předchozí běhy #16, #17 a #19 mají poučení:
 
@@ -415,15 +454,15 @@ Dvě věci, které blokátor **nejsou**, ale je dobře je vědět:
 | **Referenční klony** | `_src/{runuo,servuo,modernuo,classicuo,sphere}` (**pinované**, gitignore, nejsou submoduly). Pozor: `research/_src/{servuo,modernuo}` jsou **druhé checkouty téhož** — pro čtení používej `_src/` |
 | Projekt | `E:\Workspaces\game-clone` (git, `main`) |
 | Generátor obsahu | `python tools/gates/gen-content.py [--check] [--only items\|recipes\|skills]` |
-| Testy | `$env:APPDATA="E:\Workspaces\game-clone\.cache\godot-appdata"` pak `godot --headless --path . --script res://tests/run_tests.gd` → **537 kontrol / 0 selhání** (28 case souborů). **Bez plného přístupu dej `APPDATA` do `.tmp`** (viz pasti) |
+| Testy | `$env:APPDATA="E:\Workspaces\game-clone\.cache\godot-appdata"` pak `godot --headless --path . --script res://tests/run_tests.gd` → **584 kontrol / 0 selhání** (s assety; **529/0** bez nich), 28 case souborů. **Bez plného přístupu dej `APPDATA` do `.tmp`** (viz pasti) |
 | Brány | `python tools/gates/run-all.py` → **11 měřeno / 0 NEMĚŘENO / 0 chyb**, `exit 0` |
 | Self-testy bran | `python tools/gates/run-all.py --self-test` → **19 self-testů (10 bran + 9 extrakčních nástrojů), 0 chyb**; **G10 má uvnitř 8 případů** |
-| **Mutační důkaz testů** | `python tools/gates/mutace-tests.py [--only sort\|map\|walk\|movement\|registry\|pathfind\|textures]` → **53 z 53** (trvá desítky minut; `walk` má 12 mutací) |
+| **Mutační důkaz testů** | `python tools/gates/mutace-tests.py [--only sort\|map\|walk\|doors\|movement\|registry\|pathfind\|textures]` → **61 z 61** (bylo 53; **+8 `doors`**; trvá desítky minut — `walk` má 12 mutací) |
 | **Mutační důkaz dekodéru animací** | `python tools/gates/mutace-anim.py [--install <UO>]` → **8 z 8** (bez instalace UO měří jen self-test a **řekne to**: `realna sonda: NEMERENA`; proměnná `UO_INSTALL`) |
 | **Mutační důkaz `data.skills`** | `python tools/gates/mutace-skills.py` → **8 z 8** |
 | **Mutační důkaz `render.anim`** | `python tools/gates/mutace-render-anim.py` → **11 z 11** (fixture v gitu, běží i v CI) |
 | **Mutační důkaz `render.hue`** | `python tools/gates/mutace-render-hue.py` → **12 z 12** (fixture v gitu, běží i v CI) |
-| **Sonda: unikátnost mutačních vzorů** | `python _analyza/mutace-vzory.py` (**gitignore**) → `mutace-tests: 53 vzorů` + `mutace-render-anim: 11` = **64**, `OK`; ověřená mutací sebe sama |
+| **Sonda: unikátnost mutačních vzorů** | `python _analyza/mutace-vzory.py` (**gitignore**) → `mutace-tests: 61 vzorů` (8. session: +8 `doors`) + `mutace-render-anim: 11` = **72**, `OK`; ověřená mutací sebe sama |
 | **Registr bytostí (nové)** | `sim/entity/registry.gd` + `tests/cases/registry.gd`; `register`, `get_mobile`, `all`, `remove`, `size` |
 | **Animace: dekodér** | `python tools/uoextract/anim.py --self-test \| --verify \| --export assets/uo/anim \| --export-check assets/uo/anim` |
 | **Dekodér: objevné sondy** | `_analyza/anim-rle-sonda.py`, `_analyza/anim-rle-hledani.py`, `_analyza/anim-dekod.py` (**gitignore** — v gitu je jen produkční `anim.py` a mutační harness) |
@@ -447,19 +486,21 @@ Dvě věci, které blokátor **nejsou**, ale je dobře je vědět:
 | složka | souborů (kód) | řádků kódu | poznámka |
 |---|---|---|---|
 | `core/` | 7 | 339 | hotové a otestované |
-| `sim/` | **14** | **1 810** | **`world/walk.gd` 150 → 220** (6. session: id prostor statiků, dveře, pásmo, výška schodů); dále `world/pathfind.gd` (5. session, 173 řádků), `entity/registry.gd`, `entity/skills.gd`, `entity/mobile.gd`, `systems/movement.gd` |
+| `sim/` | **14** | **1 848** | **`world/doors.gd` 106 → 142** (8. session: konvence `art` ↔ `art + 1` a důkazy v hlavičce); `world/walk.gd` **220** (6. session: id prostor statiků, dveře, pásmo, výška schodů); dále `world/pathfind.gd` (5. session, 173 řádků), `entity/registry.gd`, `entity/skills.gd`, `entity/mobile.gd`, `systems/movement.gd` |
 | `render/` | 5 | **770** | `sort.gd`, **`texture_cache.gd`** (+48: cache oken a počítadlo načtení), `chunk_renderer.gd`, `anim_player.gd`, `hue_cache.gd`; `ui/` pořád neexistuje |
 | `app/` | 6 (5 kód) | 651 | `main.gd`, `world_view.gd`, `player_controller.gd` (bez granule) |
-| `tests/` | **42** (33 kód) | **4 693** | **3 nové soubory fixture** (`tests/fixtures/{hues,anim}/make_fixture.py` + `hues.json`, `anim-sheets.json`, 2 PNG); `cases/render_hue.gd` +15 a `cases/render_anim.gd` +22 kontrol (7. session) |
+| `tests/` | **42** (33 kód) | **4 731** | **`cases/doors.gd` přepsaný** (8. session: 102 řádků, 25 kontrol, měří oba členy dvojice na všech 230 artech); `cases/walk.gd` 391; 3 soubory fixture (`tests/fixtures/{hues,anim}/`) |
 | `tools/uoextract/` | 38 | 6 278 | `anim.py` umí pixely, `--export`, `--export-check` |
-| `tools/gates/` | 22 | **4 996** | `mutace-anim.py` má navíc baseline reálné sondy + `--install` |
+| `tools/gates/` | 22 | **5 028** | **`mutace-tests.py` +32** (8. session: modul `doors`, 8 mutací); `mutace-anim.py` má baseline reálné sondy + `--install` |
 
 *(Počty jsou Pythonem `splitlines()` nad kódovými soubory `.gd`/`.py`/`.sh`/`.mjs`,
 bez `.uid` a `__pycache__` — `python _analyza/radky.py`.)*
 
-**Zbývá 61 granul** (z 111; 40 měřeně hotových po commitu této session — ověř
-`python tools/plan-status.py`). Hotové (souborem i měřením) navíc proti 3. session:
-**`sim.entity_registry`** (4. session) — **9 nových** proti předání z 2. session.
+**Zbývá 68 granul** (z 111; **43 měřeně hotových** — ověř `python tools/plan-status.py`).
+Hotové (souborem i měřením) navíc proti 3. session: **`sim.entity_registry`**
+(4. session), **`sim.pathfind`** (5. session) — **11 nových** proti předání
+z 2. session. *(Pozor: „měřeně hotové" je jiný čítač než `granuli_s_hotovym_souborem`
+v G4 — ten je 51; viz `plan-status.py` vs `check-wiring.py`.)*
 
 ## Co je hotové a ověřené (ne „soubor existuje")
 
@@ -500,9 +541,14 @@ Doklady, které jsem viděl na vlastní oči (ne opsané z předání):
 - **CI měří i render (7. session)** — `render.hue` a `render.anim` mají fixture
   v gitu, takže jejich mutační harnessy běží v CI a **v CI stavu** (bez
   `assets/uo`) dávají `12/12` a `11/11`.
-- **Testy 574/0 s assety (519/0 bez nich)**, **brány 11/0/0** (`exit 0`),
-  **mutace 92/92** (`mutace-tests` 53, `skills` 8, `render-hue` 12,
-  `render-anim` 11, `anim` 8).
+- **Konvence dveří je ZMĚŘENÁ, ne odhadnutá (8. session)** — `world.doors` páruje
+  `art z doors.txt` (zavřený) s `art + 1` (otevřený); tři nezávislé asymetrické
+  signály nad 230 arty + reference (`openedID = closedID + 1`) a **8 mutací**,
+  které to hlídají. **Sudý art ani `layer` kritériem nejsou** (16 kategorií má
+  všechny kusy sudé).
+- **Testy 584/0 s assety (529/0 bez nich)**, **brány 11/0/0** (`exit 0`),
+  **self-testy 19/0**, **mutace 100/100** (`mutace-tests` 61 — z toho 8 `doors`,
+  `skills` 8, `render-hue` 12, `render-anim` 11, `anim` 8), vzory mutací 72 `OK`.
 - **Hra nespadne**: G11 `smoke` → `framu 120, script_error 0, parse_error 0`.
 
 ### ⚠ Co na obrazovce ještě NENÍ
@@ -513,7 +559,7 @@ druhé postavy, mount, pathfinding, zvuk. **Hratelná mechanika: chůze, otáče
 a barva kůže.** Statiky nesou barvu ze záznamu mapy, ale **nikdo ji nepoužívá**
 (věc 35).
 
-## Co brány dnes měří (2026-10-07, 6. session)
+## Co brány dnes měří (2026-10-07, 8. session)
 
 `run-all.py`: **11 měřeno / 0 NEMĚŘENO / 0 VADA**, `exit 0`.
 
@@ -527,21 +573,21 @@ a barva kůže.** Statiky nesou barvu ze záznamu mapy, ale **nikdo ji nepouží
 
 ## Předletová kontrola (5 minut, než začneš psát)
 
-| Co | Jak | Očekáváno (2026-10-07, 6. session) |
+| Co | Jak | Očekáváno (2026-10-07, 8. session) |
 |---|---|---|
 | Strom je čistý | `git status --porcelain -uall` | **prázdné** po commitu této session |
-| Je před GitHubem | `git rev-list --count origin/main..HEAD` | **`0`** — **6. session pushla** (uživatel 2026-10-07 povolil commit i push po každé session) |
-| **Běží CI?** | `node _analyza/ci-beh-stav.mjs` (bez tokenu je limitovaný — viz past v `LESSONS`) · anotace: `node _analyza/ci-anotace.mjs` | **#34 nad `4259091` (7. session) = `success`, 17 kroků** (včetně nových 11–14: mutace render.hue, render.anim, dekodéru animací a kontrola fixture); předtím #30 nad `f243ba2` = `success` (13 kroků). **sha rozhoduje**, ne „poslední běh" |
-| **Co v CI NEJDE ověřit bez tokenu** | `node _analyza/ci-log.mjs` → **HTTP 403**; `ci-artefakt.mjs` → **HTTP 401** | Kdo nemá token, **vidí jen stav kroků**, ne jejich obsah — takže „krok 9 prošel" je naměřené, ale **počet chycených mutací v CI je neověřený** (naměřeno je 53/53 **lokálně**). Nezapisuj do předání „CI má 53/53", když to nevidíš |
+| Je před GitHubem | `git rev-list --count origin/main..HEAD` | **`0`** — **8. session pushla** (uživatel 2026-10-07 povolil commit i push po každé session) |
+| **Běží CI?** | `node _analyza/ci-beh-stav.mjs` (bez tokenu je limitovaný — viz past v `LESSONS`) · anotace: `node _analyza/ci-anotace.mjs` | **běh nad commitem 8. session = `success`, 17 kroků** (viz „BLOKÁTORY"); předtím #34 nad `4259091` (7. session) = `success`. **sha rozhoduje**, ne „poslední běh" |
+| **Co v CI NEJDE ověřit bez tokenu** | `node _analyza/ci-log.mjs` → **HTTP 403**; `ci-artefakt.mjs` → **HTTP 401** | Kdo nemá token, **vidí jen stav kroků**, ne jejich obsah — takže „krok s mutacemi prošel" je naměřené, ale **počet chycených mutací v CI je neověřený** (naměřeno je **lokálně**). Nezapisuj do předání „CI má 61/61", když to nevidíš |
 | Repo je veřejné | API bez tokenu | `visibility: public` |
 | **Oprávnění** | `whoami /groups \| Select-String Mandatory` | **`Medium`** = plný přístup. `Low` = sandbox → brány hlásí **falešné vady**, `.uid` nevzniknou a `run-all.py` spadne na `summary.json` (5. session to naměřila: G7 „VADA save/load", G11 NEMĚŘENO, self-test 9 chyb — **všechno byl sandbox**) |
-| Testy | testy s `APPDATA` ve workspace (`Low`: dej ho do `.tmp`) | **574 kontrol, 0 selhání** (s assety; bez `assets/uo/` **519/0**), 28 case souborů. Souhrn vypisuje `case souboru spusteno: N z M` — když je M < 28, něco se ne načetlo |
+| Testy | testy s `APPDATA` ve workspace (`Low`: dej ho do `.tmp`) | **584 kontrol, 0 selhání** (s assety; bez `assets/uo/` **529/0**), 28 case souborů. Souhrn vypisuje `case souboru spusteno: N z M` — když je M < 28, něco se ne načetlo |
 | **FPS (nové)** | `& .cache\godot\...console.exe --path . --rendering-driver opengl3 --script res://.cache/analysis/sonda-fps.gd` | **40–45 FPS** (22–25 ms/frame), 5 767 objektů, 1 516 draw callů; cache se po nabehu nemění (27 načtení, 0 změn) |
 | Brány | `python tools/gates/run-all.py` | **11 měřeno / 0 NEMĚŘENO / 0 vad**, `exit 0` |
 | Self-testy | `python tools/gates/run-all.py --self-test` | **19, 0 chyb**, `exit 0` |
-| Mutační důkaz | `mutace-tests.py` + `mutace-skills.py` + `mutace-render-hue.py` + `mutace-render-anim.py` + `mutace-anim.py` | `53/53`, `8/8`, `12/12`, `11/11`, `8/8` (= **92/92**); **první čtyři běží v CI**, poslední taky (bez instalace UO měří jen self-test a řekne to) |
+| Mutační důkaz | `mutace-tests.py` (+ `--only doors`) + `mutace-skills.py` + `mutace-render-hue.py` + `mutace-render-anim.py` + `mutace-anim.py` | `61/61` (53 + **8 doors**), `8/8`, `12/12`, `11/11`, `8/8` (= **100/100**); **první čtyři běží v CI**, poslední taky (bez instalace UO měří jen self-test a řekne to) |
 | Fixture (nové) | `python tests/fixtures/{world,hues,anim}/make_fixture.py --check` | **3× OK**, `exit 0`; v CI je hlídá krok „Fixture sedí na generátor" |
-| Vzory mutací | `python _analyza/mutace-vzory.py` (gitignore) | `mutace-tests: 53 vzorů` + `mutace-render-anim: 11` = **64 celkem**, `OK`, `exit 0` |
+| Vzory mutací | `python _analyza/mutace-vzory.py` (gitignore) | `mutace-tests: 61 vzorů` (8. session: +8 `doors`) + `mutace-render-anim: 11` = **72 celkem**, `OK`, `exit 0` |
 | Animace | `python tools/uoextract/anim.py --self-test` | `35 kontrol, 0 chyb` |
 | Barvy | `python tools/uoextract/hues.py --self-test` | `5 kontrol, 0 chyb` |
 | Data skillů | `python tools/gates/gen-content.py --only skills --check` | `OK skills.json: shoda` |
@@ -806,9 +852,11 @@ a barva kůže.** Statiky nesou barvu ze záznamu mapy, ale **nikdo ji nepouží
     vrátí `null` a `world_view._draw` udělá `continue` — díra v mapě tedy nemá
     jak být vidět. Patří tam viditelný placeholdr (magenta/šrafování) a vizuální
     kontrola úplnosti land artu (dnes ji nemá nikdo; G10 měří jen barvu postavy).
-62. **NOVÉ (6. session): KONVENCE DVEŘÍ v `world.doors` je podezřelá — a je to
-    CÍL 8. SESSION.** `doors.gd` tvrdí (hlavička, „rozhodnuto obrázkem"):
-    „kusy 1–4 = čtyři zavřené orientace, kusy 5–8 tytéž otevřené". **Naměřeno
+62. **VYŘEŠENO 8. session — konvence dveří je opravená** (viz „CO JE NOVÉHO
+    (8. session)" a `sim/world/doors.gd`: `toggle` = `art ± 1`, `is_open` =
+    členství v `doors.txt`, 8 mutací to hlídá). **Znění, jak bylo otevřené
+    6. session (záznam se nemaže):** `doors.gd` tvrdil (hlavička, „rozhodnuto
+    obrázkem"): „kusy 1–4 = čtyři zavřené orientace, kusy 5–8 tytéž otevřené". **Naměřeno
     (nic z toho nebylo při rozhodování k dispozici):**
     (a) `assets/uo/tiles.json` má u artů 1717..1732 sloupec `layer` **po
     dvojicích**: `1717`/`1718` = `0`, `1719`/`1720` = `1`, … `1731`/`1732` = `7`;
@@ -848,13 +896,19 @@ a barva kůže.** Statiky nesou barvu ze záznamu mapy, ale **nikdo ji nepouží
     **i pro pootočený art** (pootočené dveře jsou pořád dveře). Do hlavičky
     patří i to, co plyne z modelu uživatele: **dveře se vždy staví kresbou
     z `doors.txt`** (ta je „ve stěně"), a jen proto se dá stav poznat z artu.
+    **⚠ CO SE Z TOHOTO NÁVRHU ZMĚNILO (8. session, měřeno):** `toggle = tile ± 1`
+    a `is_door` pro oba členy platí; **ale `is_open` NENÍ „sudý člen dvojice"** —
+    parita je jen vlastnost bloku 1717..1732 (16 z 37 kategorií má všechny kusy
+    sudé). Správně je `is_open(t)` = „`t` není v `doors.txt`, ale `t - 1` je".
     **Dopad je dnes nulový** (v okolí startu 80×80 **není ani jeden statik
     dveří**) a `walk` je na konvenci nezávislý (ptá se `is_open`) — ale
-    **Úkol 4 (`sim.interaction`) na tom stát bude**.
+    **Úkol 4 (`sim.interaction`) na tom stát bude** (a od 8. session stojí na
+    správné konvenci).
     **Montáž pro nezávislou kontrolu pohledem** (gitignore):
     `.cache/analysis/dvere-par-pohled.png` + skripty `dvere-par-pohled.py`,
     `dvere-rotace.py`, `dvere-zrcadlo-matice.py`, `dvere-zrcadleni.py`,
-    `dvere-orientace.py`, `sonda-dvere-schody.py`.
+    `dvere-orientace.py`, `sonda-dvere-schody.py`; **nově (8. session)**
+    `_analyza/dvere-konvence.py` a `_analyza/dvere-jmena.py` (oba gitignore).
 63. **NOVÉ (6. session): pravidlo kroku na schod je ROZHODNUTÍ, ne opsaná
     reference.** `walk` dnes povoluje krok nahoru do **výšky schodu**
     (`world.stairs.is_stair` + `tiledata.height`), protože naměřené skoky mezi
@@ -869,6 +923,13 @@ a barva kůže.** Statiky nesou barvu ze záznamu mapy, ale **nikdo ji nepouží
     reference"** — a je to v `docs/04 §4.2.1` i s oběma citacemi.
 
 ## Už není otevřené (přesunuto, nemaže se)
+
+- **„Konvence dveří ve `world.doors` je podezřelá"** (věc 62 z 6. session) —
+  **VYŘEŠENO 2026-10-07 (8. session)**: `doors.txt` dodává **zavřené** arty a
+  otevřený je `art + 1`; `is_open`/`toggle`/`is_door`/`orientation` opravené,
+  test měří oba členy dvojice na všech 230 artech, **8 mutací** to hlídá.
+  Pozor: **přijímací kritérium věci 62 mělo vadu** („`is_open` = sudý art") —
+  naměřeno a zapsáno v `LESSONS` (parita sleduje `base`, ne stav).
 
 - **„Výkonnostní dluh: `AtlasTexture` na objekt"** (věc 19 z minula) — **VYŘEŠENO
   2026-10-07 (5. session)**: hotová okna se cachují, **655 ms → 22–25 ms/frame**.
@@ -919,16 +980,19 @@ a barva kůže.** Statiky nesou barvu ze záznamu mapy, ale **nikdo ji nepouží
    **HOTOVO 2026-10-07 (6. session)**: `world.doors.is_open`, výška schodů,
    výškové pásmo statiků **a oprava id prostoru statiků** (`+0x4000`).
    Testy `pathfind` (mají stub) zůstaly zelené ✓ — předpoklad z předání platil.
-4. **Rozhodnout konvenci dveří ve `world.doors`** (věc 62) — **cíl 8. session**;
-   je to vstup pro Úkol 4 (`sim.interaction`, „dveře → otevřít/zavřít").
-   Evidence je v věci 62 (blok 16 artů = 8 × 2; `doors.txt` má z dvojice jeden).
+4. ~~**Rozhodnout konvenci dveří ve `world.doors`** (věc 62)~~ — **HOTOVO
+   8. session**: `toggle(tile) = tile ± 1`, `is_open` = členství v `doors.txt`,
+   `is_door` i pro otevřený art, hlavička nese měřené důkazy; test přepsaný,
+   `--only doors` **8/8**. **Cestou se naměřilo, že kritérium věci 62 bylo
+   v části „`is_open` = sudý art" vadné** (viz `LESSONS`).
 5. ~~**Opravit slepé místo v `tests/run_tests.gd`**~~ — **HOTOVO 7. session**
    (rozhodnutí uživatele): `can_instantiate()` před `new()`, `script_at()`
    v `tests/lib.gd`, guard na „0 nových kontrol"; tři mutace to dokazují.
    Souhrn nově vypisuje `case souboru spusteno: N z M`.
 6. **Úkol 4 ze `ZADANI-DALSI-VYVOJ-2.md`: `sim.interaction`** (`use`, `use_on`,
    kontextové menu; routing dynamicky, `not_available` místo ticha) — **až po
-   věci 62**.
+   `entity.item` + `entity.container`** (roadmapa je má v `depends_on`); proto je
+   **cíl 9. session `entity.item` + `entity.container`** (Úkol 6, první dvě).
 7. **Napojit registr na `sim.world_loop`** (věci 22, 48, 52): `snapshot().mobiles`,
    `state_hash`, `save` — tím se rozhýbou replaye a klient uvidí i jiné mobily.
 8. **`entity.equipment` + `entity.item`** — obléknout postavu (ta je dnes nahá).
@@ -938,8 +1002,8 @@ a barva kůže.** Statiky nesou barvu ze záznamu mapy, ale **nikdo ji nepouží
 10. **Statiky s barvou** (věc 40): `render.chunk` + `hued_art()` — dveře a cedule.
 11. **Držení klávesy = chůze** (`app.input`, věc 27, Úkol 7) — bez toho se demo
     ovládá „klikatě".
-12. Pak M2 zbytek: `entity.container`, `entity.notoriety`, `world.teleport`,
-    `world.regions`, **`sim.interaction` (Úkol 4)**.
+12. Pak M2 zbytek: `entity.equipment` (po 9. session), `entity.notoriety`,
+    `world.teleport`, `world.regions`, **`sim.interaction` (Úkol 4)**.
 13. (nepovinné) `if: always()` u diagnostických kroků CI (věc 26); časový strop
     v `mutace-tests.py` (věc 53) — **velikost už změřená**: 53 mutací se vešlo do
     `timeout-minutes: 30`, zbývá rozlišení „zasekla se" od „je pomalá".
@@ -1135,6 +1199,19 @@ a barva kůže.** Statiky nesou barvu ze záznamu mapy, ale **nikdo ji nepouží
 30. **NOVÉ (4. session): `docs/04 §4.2` u `sim.world_loop` mlčí o registru.**
     `snapshot()->mobiles` je dnes `[]`, `save`/`state_hash` mobily nevidí
     (věci 48, 52) — smlouva to musí říct, až se registr napojí.
+31. **NOVÉ (8. session): `docs/03 §3.6` popisoval strukturu `doors.txt` špatně**
+    („zavřené/otevřené × 4 orientace") — **OPRAVENO 8. session** podle měření
+    (8 zavřených artů, otevřený = `art + 1`) a je u toho datovaná oprava
+    s důkazy. Zbývá jen to, co jsem **nemohl** ověřit z dat: u 4prvkových
+    kategorií (15–23, 26–34) nejsou v `doors.txt` všech 8 slotů, takže
+    „8 = 8 směrů" je doložené jen u kategorií s plnými 8 arty (a referencí
+    `DoorFacing`, která má právě 8 hodnot).
+32. **NOVÉ (8. session): cíl 8. session (v předání) měl v přijímacím kritériu
+    větu „`is_open(tile)` = sudý člen dvojice", která je v rozporu s daty**
+    (16 z 37 kategorií má všechny kusy sudé) — **nahrazeno měřeným pravidlem**;
+    HANDOFF je přepsaný a důvod je v `LESSONS`. Do `docs/09` patří pravidlo:
+    **kritérium se přeměřuje nad CELÝM souborem dat, ne nad blokem, ze kterého
+    vzniklo.**
 
 ## Prostředí a konvence
 
@@ -1150,6 +1227,11 @@ a barva kůže.** Statiky nesou barvu ze záznamu mapy, ale **nikdo ji nepouží
   **4. session:** `mutace-tests.py` dostal modul `registry` (4 mutace),
   `mutace-render-anim.py` 2 mutace na registr, a `docs/04 §4.2`/`§4.2.1` +
   `tools/roadmap-gen.py` mají `get` → `get_mobile` (**výslovné svolení uživatele**).
+  **8. session:** `mutace-tests.py` dostal modul `doors` (8 mutací), v
+  `tests/cases/walk.gd` je upravená sekce 8c (měřila starou konvenci dveří)
+  a `docs/03 §3.6` + `docs/04 §4.2` + `docs/05 §5.2.2` + hlavička
+  `sim/world/walk.gd` mají doplněnou měřenou konvenci — **cíl 8. session to
+  výslovně žádal** (test i mutace jsou součástí kritéria).
 - **Ve workspace může běžet paralelní session** (věc 39): `git add` jen na své
   cesty a před zápisem do `HANDOFF.md`/`LESSONS.md` je **znovu přečti**.
 - `python tools/check-docs-refs.py`, `check-zadani.py`, `roadmap-gen.py --check`

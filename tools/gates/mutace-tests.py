@@ -151,6 +151,38 @@ MODULY = {
              "			vyska = maxi(vyska, _height(tile))", "			vyska = Const.STEP_HEIGHT"),
         ],
     },
+    "doors": {
+        "soubor": ROOT / "sim" / "world" / "doors.gd",
+        "prefix": "world.doors",
+        "prepinac": "--doors-script",
+        "mutace": [
+            # Konvence paru je ZMERENA 2026-10-07 (8. session): art z doors.txt
+            # je zavreny, jeho +1 otevreny. Tahle mutace vraci presne tu vadu,
+            # ktera v modulu byla do 8. session (index +- 4 = jiny smer).
+            ("toggle vraci druhy SMER misto otevreniho artu (stary omyl index + 4)",
+             "\tif _by_tile.has(tile):\n\t\treturn tile + 1",
+             "\tif _by_tile.has(tile):\n\t\tvar e: Dictionary = _by_tile[tile]\n"
+             "\t\treturn int(_categories[int(e[\"category\"])][\"tiles\"][(int(e[\"index\"]) + 4) % PIECES])"),
+            ("otevreno = sudy art (parita misto clenstvi v doors.txt)",
+             "\treturn not _by_tile.has(tile) and _by_tile.has(tile - 1)",
+             "\treturn tile % 2 == 0"),
+            ("otevreny art se hleda jako +1 (opacny smer dvojice)",
+             "\treturn not _by_tile.has(tile) and _by_tile.has(tile - 1)",
+             "\treturn not _by_tile.has(tile) and _by_tile.has(tile + 1)"),
+            ("vratna cesta z otevreneho artu vraci +1",
+             "\t\treturn tile - 1", "\t\treturn tile + 1"),
+            ("is_door plati jen pro art z doors.txt (pootoceny ne)",
+             "\treturn found != null or _by_tile.has(tile - 1)",
+             "\treturn found != null"),
+            ("kategorie/orientace otevreneho artu se nenajde",
+             "\treturn _by_tile.get(tile - 1)", "\treturn null"),
+            ("orientace zpet na 'index % 4' (stary omyl)",
+             "\treturn -1 if found == null else int(found[\"index\"])",
+             "\treturn -1 if found == null else int(found[\"index\"]) % 4"),
+            ("open_tile zapomene +1 (vrati zavreny art)",
+             "\treturn 0 if closed == 0 else closed + 1", "\treturn closed"),
+        ],
+    },
     "registry": {
         "soubor": ROOT / "sim" / "entity" / "registry.gd",
         "prefix": "sim.entity_registry",
@@ -267,7 +299,7 @@ def fail_radky(vystup: str, prefix: str) -> list[str]:
 def main() -> int:
     ap = argparse.ArgumentParser(description="Mutacni dukaz testu")
     ap.add_argument("--only", default=None,
-                    help="sort, map, walk, movement, registry, pathfind, textures (nebo vic carkami)")
+                    help="sort, map, walk, doors, movement, registry, pathfind, textures (nebo vic carkami)")
     args = ap.parse_args()
     if godot_bin() is None:
         print("CHYBA: Godot nenalezen (nastav $GODOT) - mutace by nic nemerily")

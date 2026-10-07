@@ -347,8 +347,10 @@ func run(t) -> void:
 			% [nasel, zmereny, ocekavany])
 
 	# 8c) REALNE DVERE: stav bere walk z `world.doors` (art z `data/doors.json`).
-	#     Test netvrdi, KTERY art je otevreny (to je vec `world.doors`), jen to,
-	#     ze se walk na stav opravdu ptá: zavreny art blokuje, otevreny ne.
+	#     Konvence (8. session, `world.doors`): art z `doors.txt` je ZAVRENY a
+	#     `art + 1` je OTEVRENY. Test netvrdi, KTERA dvojice to je (to je vec
+	#     `world.doors`), jen to, ze se walk na stav opravdu ptá: zavreny art
+	#     blokuje, otevreny ne.
 	var DoorsScript = Lib.script_at("res://sim/world/doors.gd")
 	if DoorsScript == null:
 		t._pending("world.walk: sim/world/doors.gd se nenacetl (parse error?)")
@@ -358,18 +360,17 @@ func run(t) -> void:
 	var zavreny := 0
 	var otevreny := 0
 	for row in JSON.parse_string(FileAccess.get_file_as_string("res://data/doors.json"))["rows"]:
-		var kandidati: Array = []
 		for i in range(1, 9):
 			var tile: int = int(row.get("piece%d" % i, 0))
-			if tile != 0 and dvere.is_open(tile) != dvere.is_open(int(row.get("piece1", 0))):
-				kandidati.append(tile)
-		if kandidati.size() > 0:
-			kat = int(row.get("category", -1))
-			zavreny = int(row.get("piece1", 0))
-			otevreny = int(kandidati[0])
+			if tile != 0 and not dvere.is_open(tile) and dvere.is_open(tile + 1):
+				kat = int(row.get("category", -1))
+				zavreny = tile
+				otevreny = tile + 1
+				break
+		if kat >= 0:
 			break
 	t._check(kat >= 0 and zavreny != 0 and otevreny != 0,
-		"world.walk: v `data/doors.json` je kategorie s zavrenym i otevrenym artem (kat %d: %d / %d)"
+		"world.walk: v `data/doors.json` je dvojice zavreny/otevreny art (kat %d: %d / %d)"
 			% [kat, zavreny, otevreny])
 	if kat >= 0:
 		# Flagy se do fake tabulky daji STEJNE jako v realnych datech (oba stavy

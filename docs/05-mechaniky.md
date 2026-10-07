@@ -93,7 +93,7 @@ test):
 
 | Cíl | Akce |
 |---|---|
-| dveře (`world.doors.is_door`) | otevřít/zavřít (přepni art podle kategorie), zvuk, změna průchodnosti |
+| dveře (`world.doors.is_door`) | otevřít/zavřít: `toggle` přepne art na `art + 1` (otevřeno) a zpět, zvuk, změna průchodnosti |
 | kontejner (batoh, truhla, tělo, banka) | otevřít gump s obsahem (`event container_contents`) |
 | vendor (NPC s `vendor` flagem) | otevřít obchodní gump (buy/sell) |
 | nástroj (pickaxe, kladivo, jehla, …) | přepni do „čekám na cíl" → `target_request` |
