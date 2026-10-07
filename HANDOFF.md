@@ -171,6 +171,18 @@ kvůli které rejstřík vznikl.
 
 ## ⚠ POVINNÉ: na konci každé session (rozhodnutí uživatele, 2026-10-03)
 
+**⚠ ZMĚNA 2026-10-07 (rozhodl uživatel): „Můžeš povolit commit a push po každém
+sezení."** Od této session platí **trvalé povolení**: na konci session se **commituje
+i pushuje na `origin/main` bez ptaní** (dřív si to uživatel vyhrazoval po jedné
+session). Týká se to i **tohoto pravidla** — ať ho další session zkopíruje dál
+i s touhle větou, jinak se povolení zase ztratí.
+**Co to znamená konkrétně:** commitni (strom čistý) → `git push origin main` →
+**ověř, že push dorazil** (`git rev-list --count origin/main..HEAD` = `0`) →
+**počkej na CI** a zkontroluj běh nad **svým** commitem (`node _analyza/ci-beh-stav.mjs`);
+zelený běh nad starším commitem není důkaz (viz „Jak ověřit nasazení" v pravidlech).
+Push se **nikdy** nedělá s tajemstvím v diffu a **nikdy přes PAT vypsaný do historie**
+(credential helper `manager` si token drží sám).
+
 Uživatel volá **na každý krok novou session** a **po každé implementaci hned
 následuje předání**. Proto platí:
 
@@ -182,8 +194,10 @@ následuje předání**. Proto platí:
    hotové a ověřené, co je **otevřené a proč**, a co je příští krok.
 3. **Ověř před předáním:** brány (`run-all.py`), testy hry, self-testy —
    a napiš do předání **skutečná čísla**, ne ta z minula.
-4. **Commitni** (strom čistý) — `LESSONS.md` i `HANDOFF.md` patří do gitu,
-   protože další session je čte odtud.
+4. **Commitni a pushni** (strom čistý) — `LESSONS.md` i `HANDOFF.md` patří do
+   gitu, protože další session je čte odtud. **Push je od 2026-10-07 povolený
+   trvale** (viz věta na začátku téhle sekce) a po pushi se **kontroluje CI běh
+   nad tím commitem**.
 
 ## ⚠⚠ BLOKÁTORY
 
@@ -192,10 +206,11 @@ následuje předání**. Proto platí:
 klonu je kontrol méně, protože část měří data z `assets/uo/`) a mutační důkaz je
 **83/83** (44+8+8+11+12).
 
-**⚠ CI JE ZELENÉ, ALE NAD STARŠÍM COMMITEM (stav nezměněný od 4. session):** běh
-**#22 nad `137da89` = `success`, všech 13 kroků**. Commity 4. session (`a439716`)
-a 5. session **nejsou pushnuté** — než se podle CI něco tvrdí, ověř, nad kterým
-commitem běh byl. Předchozí běhy #16, #17 a #19 mají poučení:
+**⚠ CI: ZELENÉ BĚHY BYLY NAD STARŠÍMI COMMITY.** Naposledy ověřený stav před 5.
+session byl **běh #22 nad `137da89` = `success`, všech 13 kroků**. Commity 4. a 5.
+session byly **5. session pushnuté** — než se podle CI něco tvrdí, ověř, **nad
+kterým commitem** běh byl (`node _analyza/ci-beh-stav.mjs` vypíše i SHA).
+Předchozí běhy #16, #17 a #19 mají poučení:
 
 | běh | commit | spadl v | příčina | oprava |
 |---|---|---|---|---|
@@ -334,8 +349,8 @@ a barva kůže.** Statiky nesou barvu ze záznamu mapy, ale **nikdo ji nepouží
 | Co | Jak | Očekáváno (2026-10-07, 5. session) |
 |---|---|---|
 | Strom je čistý | `git status --porcelain -uall` | **prázdné** po commitu této session |
-| Je před GitHubem | `git rev-list --count origin/main..HEAD` | **`2`** (5. session **nepushuje** — uživatel si push vyhrazuje; CI proto poběží až po něm) |
-| **Běží CI?** | `node _analyza/ci-beh-stav.mjs` (funguje i bez tokenu) · anotace: `node _analyza/ci-anotace.mjs` | **běh #22 nad `137da89` = `success`, 13/13 kroků** — to je stav **před** commity 4. a 5. session (ty ještě nejsou pushnuté); po pushi čekej běh nad `a439716`/HEAD |
+| Je před GitHubem | `git rev-list --count origin/main..HEAD` | **`0`** — **5. session pushla** (uživatel 2026-10-07 povolil commit i push po každé session) |
+| **Běží CI?** | `node _analyza/ci-beh-stav.mjs` (funguje i bez tokenu) · anotace: `node _analyza/ci-anotace.mjs` | **běh #22 nad `137da89` = `success`, 13/13 kroků**; 5. session pushla `a439716` + svůj commit → **čekej běh nad novým HEAD** (zkontroluj ho, ne ten starý) |
 | Repo je veřejné | API bez tokenu | `visibility: public` |
 | **Oprávnění** | `whoami /groups \| Select-String Mandatory` | **`Medium`** = plný přístup. `Low` = sandbox → brány hlásí **falešné vady**, `.uid` nevzniknou a `run-all.py` spadne na `summary.json` (5. session to naměřila znovu: G7 „VADA save/load", G11 NEMĚŘENO, self-test 9 chyb — **všechno byl sandbox**) |
 | Testy | testy s `APPDATA` ve workspace (`Low`: dej ho do `.tmp`) | **507 kontrol, 0 selhání**, 27 case souborů (v čistém klonu je kontrol méně — část měří data z `assets/uo/`) |
@@ -834,8 +849,9 @@ a barva kůže.** Statiky nesou barvu ze záznamu mapy, ale **nikdo ji nepouží
 - Testy potřebují `APPDATA` ve workspace; **brány si to nastavují samy** —
   **bez plného přístupu dej `APPDATA` do `.tmp`** (past 31) a **neoznačuj
   brány za vadné**.
-- **Push je povolený jen na vyžádání** (4. session nepushovala; uživatel si push
-  vyhrazuje). Před commitem ukázat `git status` a `git diff --stat`.
-- **Push je povolený** (uživatel 2026-10-06: „máš povoleny commity i pushe").
-  *(4. session: uživatel si push vyhradil — věta platí pro session, která ho
-  dostala; **nová session se ptá**.)*
+- **Push je POVOLENÝ TRVALE** (rozhodnutí uživatele 2026-10-07: „Můžeš povolit
+  commit a push po každém sezení"). Platí **bez ptaní na konci každé session**:
+  commit → push → ověřit `git rev-list --count origin/main..HEAD` = `0` →
+  zkontrolovat CI nad svým commitem. Před commitem ukázat `git status`
+  a `git diff --stat`. *(Starší věty „jen na vyžádání" a „nová session se ptá"
+  jsou od 2026-10-07 ZRUŠENÉ — jsou tu jen proto, že historie se nemaže.)*
