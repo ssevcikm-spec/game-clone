@@ -48,7 +48,7 @@ v `.forge/roadmap.json`.
 |---|---|---|---|
 | `world.tiledata` | `sim/world/tiledata.gd` | `flags(tile:int)->int`, `height(tile:int)->int`, `layer(tile:int)->int`, `weight(item:int)->int`, `value(item:int)->int`, `name(tile:int)->String`, `is_land(tile:int)->bool`, **`texture(tile:int)->int`** (TexID z land záznamu = index do `texmaps.mul`; u předmětů 0) — doplněno 2026-10-07 pro svahy; data z `assets/uo/manifest.json` + `data/tiles.json` | závisí na vyřešení §3.3.1 |
 | `world.map` | `sim/world/map.gd` | `_init(prefix:String = "res://assets/uo/world/map0")` — **cesty jsou vstup, ne konstanta** (`assets/uo` je v `.gitignore`, takže v CI nejsou); `land_at(x:int,y:int)->int`, `z_at(x:int,y:int)->int`, `statics_at(x:int,y:int)->Array[Dictionary]` — vrací **celý blok 8×8**, každý záznam `{tile,x,y,z,hue}` s **lokálním** `x`,`y` (0..7), světová dlaždice je `(bx*8+x, by*8+y)`; `load_block(bx:int,by:int)->void`, `is_loaded(bx:int,by:int)->bool` | čte `.land`/`.statics` po blocích; **není to „statiky na dlaždici"** — filtr na dlaždici si dělá volající (`world.walk`, `render.chunk`); viz §4.2.1 |
-| `world.walk` | `sim/world/walk.gd` | `_init(map = null, tiledata = null, stairs = null, doors = null)` — **závislosti konstruktorem, ne konstantou** (jinak by `can_step` nešel změřit bez `assets/uo`); `can_step(from:Vector3i, dir:int, height:int = PERSON_HEIGHT, is_player:bool = true)->Dictionary` → `{ok:bool, z:int, reason:String}`; `surface_z(x:int,y:int)->int` | **jádro věrnosti pohybu**, algoritmus v §5.1; dveře rozhoduje `world.doors.is_open` (oba stavy mají v `tiledata` `Impassable`), statiky se ptají `tiledata` s `+0x4000`; viz §4.2.1 |
+| `world.walk` | `sim/world/walk.gd` | `_init(map = null, tiledata = null, stairs = null, doors = null)` — **závislosti konstruktorem, ne konstantou** (jinak by `can_step` nešel změřit bez `assets/uo`); `can_step(from:Vector3i, dir:int, height:int = PERSON_HEIGHT, is_player:bool = true)->Dictionary` → `{ok:bool, z:int, reason:String}`; `surface_z(x:int,y:int)->int` | **jádro věrnosti pohybu**, algoritmus v §5.1; **od 2026-10-07 se výška počítá z ROHŮ dlaždice** (`landLow`/`landCenter`/`startTop`) a `Bridge` půlí výšku — viz §4.2.1; `reason == "blocked"` (voda/zeď/dveře) vs `"height"` (povrch je výš než strop); dveře rozhoduje `world.doors.is_open` (oba stavy mají v `tiledata` `Impassable`), statiky se ptají `tiledata` s `+0x4000`; viz §4.2.1 |
 | `world.doors` | `sim/world/doors.gd` | `is_door(tile:int)->bool` (**i pro otevřený art**), `is_open(tile:int)->bool`, `toggle(tile:int)->int` (`art + 1` / `art - 1`; `0` = není dveře), `category(tile:int)->int`, `orientation(tile:int)->int` (index v `doors.txt`, 0..7), `open_tile(cat:int, index:int)->int` | data z `doors.txt`: **art je zavřený, `art + 1` otevřený** (měřeno 2026-10-07 nad 230 arty; důkazy v hlavičce modulu a docs/03 §3.6) |
 | `world.teleport` | `sim/world/teleport.gd` | `teleport_target(x:int,y:int,z:int)->Variant` (`{x,y,z}` nebo `null`) | data z `teleprts.txt` + moongates z `data/moongates.json` |
 | `world.stairs` | `sim/world/stairs.gd` | `is_stair(tile:int)->bool`, `stair_group(tile:int)->Dictionary` | data z `stairs.txt` |
@@ -73,7 +73,7 @@ v `.forge/roadmap.json`.
 
 | id | soubor | provides | acceptance (konkrétní volání) |
 |---|---|---|---|
-| `sim.movement` | `sim/systems/movement.gd` | **odkud bere mobily (2026-10-06): z granule `sim.entity_registry`** — `register(mobile)->void` a `mobile(serial)` jsou jen průchod do registru; registr jde předat **konstruktorem** jako pátý argument (`_init(walk, clock, events, drain_model, registry)`), bez něj si systém založí vlastní. Dále `player_serial:int` (rozhoduje o asymetrické diagonále); `request_step(m:int, dir:int, run:bool)->Dictionary` (`{ok, delay_ms, reason}`), `apply_step(m:int, dir:int)->void`, `consume_stamina(m:int, steps:int)->void`, `pending_count()->int`, `delay_ms_for(run:bool)->int` | `request_step(m, 0, false).delay_ms == 400` **pro mobil v registru** (jinak `{ok:false, reason:"no_mobile"}`); po `apply_step` se `pos.x += 1`; viz §4.2.1 |
+| `sim.movement` | `sim/systems/movement.gd` | **odkud bere mobily (2026-10-06): z granule `sim.entity_registry`** — `register(mobile)->void` a `mobile(serial)` jsou jen průchod do registru; registr jde předat **konstruktorem** jako pátý argument (`_init(walk, clock, events, drain_model, registry)`), bez něj si systém založí vlastní. Dále `player_serial:int` (rozhoduje o asymetrické diagonále); `request_step(m:int, dir:int, run:bool)->Dictionary` (`{ok, delay_ms, reason}`), `apply_step(m:int, dir:int)->void` (**od 2026-10-07 zapisuje i `pos.z`** — stojnou výšku z `can_step`), `pending_step(serial:int)->Dictionary` (`{dir, run, start_ms, delay_ms, due_ms, z}`; prázdný = žádný krok v letu; vstup klienta pro vadu V2), `consume_stamina(m:int, steps:int)->void`, `pending_count()->int`, `delay_ms_for(run:bool)->int` | `request_step(m, 0, false).delay_ms == 400` **pro mobil v registru** (jinak `{ok:false, reason:"no_mobile"}`); po `apply_step` se `pos.x += 1`; viz §4.2.1 |
 | `sim.interaction` | `sim/systems/interaction.gd` | **KÓD JE (DOPLNĚNO 2026-10-07, 10. session)** `use(m:int, serial:int)->Dictionary`, `use_on(m:int, serial:int, target:Dictionary)->Dictionary`, `context_menu(m:int, serial:int)->Array[Dictionary]`, `context_action(m:int, serial:int, entry:int)->Dictionary` — každý vrací `{ok, reason, action}` (**původní znění `->void` je zapsané v §4.2.1 i s důvodem, proč se změnilo**) | `use(m, anvil)` nic neudělá; `use_on(m, ore, {"serial": forge})` spustí tavení |
 | `sim.combat` | `sim/systems/combat.gd` | `set_war(m:int, on:bool)->void`, `attack(m:int, target:int)->void`, `swing_delay_ms(m:int)->int`, `resolve_swing(m:int, t:int)->Dictionary`, `stop_combat(m:int)->void` | `swing_delay_ms` na `dex=100, speed=30` vrátí hodnotu dle vzorce z §5.5 |
 | `sim.magic` | `sim/systems/magic.gd` | `cast(m:int, spell:int)->Dictionary` (`{ok, delay_ms, reagents, reason}`), `interrupt(m:int)->void`, `add_spell(m:int, spell:int)->bool`, `scribe(m:int, scroll:int)->bool` | `cast` bez reagent → `{ok:false, reason:"reagents"}` |
@@ -200,6 +200,56 @@ změnil, je tu i **původní znění** — historie se nepřepisuje, jen doplňu
   `startTop + StepHeight`, což by v reálné mapě znamenalo, že se po schodech nedá
   jít vůbec; Sphere má na schody **zvláštní** pravidlo (`CAN_I_CLIMB`,
   `m_zClimbHeight`, `zHeight/2` v `src/common/CServerMap.cpp:221`).
+- **⚠ `world.walk` — VÝŠKA SE POČÍTÁ Z ROHŮ, NE Z `dz` (2026-10-07, 14. session,
+  vady V4 a V5).** Do této session se krok povoloval podle
+  `dz = z_cíl − z_start ≤ STEP_HEIGHT` z **jednoho** čísla mapy. Reference
+  (`_src/servuo` `Scripts/Services/Pathing/Movement.cs:170-171`, `:211-343`,
+  `Server/Map.cs:552-607`, `Server/TileData.cs:112-125`) porovnává **horní hrany**:
+  `stepTop = startTop + StepHeight`, kde `startTop` je **nejvyšší roh** dlaždice,
+  na které postava stojí (u statiku jeho horní hrana). Pro **land** je povolený krok
+  `stepTop ≥ landLow` (**nejnižší** roh cíle) a stojná výška je `landCenter`
+  (průměr dvojice rohů s větším absolutním rozdílem, celočíselně dolů); pro
+  **statik** je povolený krok `stepTop ≥ itemTop`, kde `itemTop = z + (Bridge ?
+  0 : výška)`, a stojná výška `z + CalcHeight`, kde `CalcHeight = Bridge ?
+  výška/2 : výška`. Povrchů může být víc — vyhrává ten s nejmenším `|ourZ − p.Z|`
+  (rovnost → nižší). **Dolů reference žádný limit nemá.** Při výběru povrchu se
+  ptáme i na statiky (`Surface` **bez** `Impassable`) a každý kandidát musí projít
+  `IsOk` (`Movement.cs:74-132`) — i statik se `Surface` blokuje, když svým pásmem
+  protne postavu stojící na zemi (proto se nedá stát na zemi pod schodem).
+  **Naměřeno na reálné mapě** (`_analyza/vlna14-svah-most.gd`, okno x1400..1620 /
+  y1540..1760, 165 985 kroků, proti **celému** modelu reference včetně statiků):
+  před opravou jsme blokovali **14 965** kroků, které reference povolí, po opravě
+  **0**; naopak my povolíme **298** kroků, které by reference blokovala — **všech
+  298 je schodová výjimka** (vědomá a měřená, viz bod výš) a **žádný jiný**.
+- **⚠ `world.walk` — VODA SE PTÁ AŽ PO STATICÍCH (vada V5).** `F_WET` se
+  kontroloval před statiky, takže molo nad vodou bylo nedosažitelné. V UO most
+  **není entita**; je to statik se `Surface`/`Bridge` nad vodou
+  (`TileData.cs:138-142`) a kandidátem povrchu je i on. Naměřeno: z 24 zkoušených
+  kroků na molo u Britannie (`x1522..1525 y1470..1500`, paluba `z=10`, voda
+  `z=−5`) jich před opravou prošlo **0**, po opravě **16**; BFS z prkna dosáhlo
+  před opravou **1** dlaždici, po opravě **4 000** (limit sondy). Voda zůstává
+  blokující (u nás má `Impassable|Wet` a `canSwim` neumíme — reference ji blokuje
+  také, `Movement.cs:211`).
+- **⚠ `sim.movement` — `pos.z` se MUSÍ ZAPSAT a krok se hlásí klientovi
+  (2026-10-07, 14. session).** Dvě věci, které smlouva neměla:
+  (1) `apply_step` zapisuje **stojnou výšku z `can_step`** do `mob.pos.z`
+  (do této session zůstalo `z` z prvního kroku, takže se na svahu každý další krok
+  měřil proti staré výšce); (2) `pending_step(serial)->Dictionary`
+  (`{dir, run, start_ms, delay_ms, due_ms, z}`, prázdný slovník = žádný krok v letu)
+  je vstup klienta pro posun mezi dlaždicemi a pro start animace v okamžiku záměru.
+- **⚠ `app.player_controller` — POSUN A ANIMACE V JEDNÉ FÁZI (vada V2,
+  2026-10-07).** Klient si kroku všímal až po změně dlaždice (`_action = WALK` po
+  commitu) — uživatel to viděl jako „prvně posune postavu a až potom animaci".
+  Reference (`_src/classicuo` `Mobile.cs:776-782`, `:836-844`) dlaždici commitne až
+  na konci kroku, ale do té doby kreslí postavu posunutou v pixelech o `Offset`
+  (`x = delay / 80`, `steps = maxDelay / 80`). Dnes: `update_step(krok)` řídí stav
+  (walk/run/idle) z `sim.movement.pending_step`, `step_fraction(elapsed, delay)`
+  kvantuje posun po `ANIM_FRAME_MS = 80 ms` a `player_pixel_offset()` vrací posun
+  v pixelech; `app.world_view.set_player_offset(px)` ho přičte ke kreslení
+  (`player_ground_position()`). **`process_priority = 1` je součást smlouvy**:
+  `app.loop` je ve scéně až za controllerem, takže bez priority by controller četl
+  stav před tickem a v rámci commitu přičetl posun k již posunuté dlaždici
+  (naměřeno v běhu hry: skok obrazu **37,33 px** místo **6,23 px**).
 - **`sim.movement`: kde bere mobily.** Smlouva uváděla jen `request_step(m, ...)`
   a neříkala, odkud systém `m` vezme. Dnes si je drží **sám** (`register(mobile)`,
   `mobile(serial)`) a `SimWorld` dostane systém z integračního místa (`app/main.gd`).

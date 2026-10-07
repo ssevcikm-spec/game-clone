@@ -253,6 +253,23 @@ func run(t) -> void:
 		"app.world_view: klic hrace == sort_key(mobile 10,20,0) (namEReno %s, ocekavano %d)"
 			% [str(klic), ocekavany])
 
+	# 7b) ⚠ V2 (2026-10-07): POSUN POSTAVY MEZI DLAZDICEMI. `set_player_offset`
+	#     posune KRESLENI postavy, i kdyz `player.pos` je porad stara dlazdice
+	#     (presne to dela reference: `Mobile.cs:776-782` kresli `Offset`,
+	#     `:836-844` commitne dlazdici az na konci kroku). Meri se to na
+	#     `player_ground_position()` - to je funkce, kterou `_draw_player` vola.
+	var zakladni: Vector2 = view.player_ground_position()
+	view.set_player_offset(Vector2(11.0, -7.0))
+	var posunuty: Vector2 = view.player_ground_position()
+	t._check(posunuty - zakladni == Vector2(11.0, -7.0),
+		"app.world_view: posun kroku se pricte ke kresleni postavy (%s -> %s, rozdil %s)"
+			% [str(zakladni), str(posunuty), str(posunuty - zakladni)])
+	t._check(int(hrac.pos.x) == 10 and int(hrac.pos.y) == 20,
+		"app.world_view: pri posunu se dlazdice postavy NEMENI (pos %s)" % str(hrac.pos))
+	view.set_player_offset(Vector2.ZERO)
+	t._check(view.player_ground_position() == zakladni,
+		"app.world_view: vynulovany posun vraci kresleni na dlazdici")
+
 	# 8) klic hrace SEDI MEZI STATIKY: na sve diagonale (x+y=30) je za kazdym
 	#    statikem i landem, a pred vsim, co zacina dalsi diagonala (31).
 	var z_min: int = int(consts["Z_MIN"])

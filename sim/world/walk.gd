@@ -3,7 +3,7 @@ extends RefCounted
 #
 # PRAVIDLA (doslovne ze zadani, ne z dojmu):
 #   * PERSON_HEIGHT = 16, STEP_HEIGHT = 2 (`core/const.gd`),
-#   * z cilove dlazdice = NEJVYSsi povrch (land + statiky s flagem `Surface`),
+#   * z cilove dlazdice = povrch, ktery je postave VYSKOVE NEJBLIZ (viz V4/V5 niz),
 #   * blokuje se jen Impassable / Surface / Wet (a Door, Container);
 #     Wall, Window, Roof, Foliage, NoShoot, StairBack, StairRight NE,
 #   * blokujici statik blokuje jen tehdy, kdyz se jeho vyskove pasmo protne
@@ -35,6 +35,39 @@ extends RefCounted
 #   `startTop + StepHeight`, coz by v realne mape znamenalo, ze se po schodech
 #   neda jit vubec).
 #
+# ⚠⚠ V4 + V5 (2026-10-07, 14. session) - VYSKA SE POCITA Z HORNICH HRAN, NE Z `dz`:
+#   Do teto session se krok povoloval jen kdyz `z_cil - z_start <= STEP_HEIGHT`,
+#   kde `z_cil` bylo JEDNO cislo mapy (`map.z_at`). Uzivatel: "do kopce me
+#   nepusti", "pres most me nepusti (nad vodou)". Reference (`_src/servuo`
+#   `Scripts/Services/Pathing/Movement.cs:170-171`, `:211-343`, `Server/Map.cs:
+#   552-607`, `Server/TileData.cs:112-125`) porovnava HORNI HRANU:
+#
+#     stepTop = startTop + StepHeight(2)      # Movement.cs:170
+#     land:   povoleno, kdyz stepTop >= landLow    # :319-321 (landLow = NEJNIZSI roh cile)
+#             stojna vyska = landCenter            # GetAverageZ, Map.cs:552-607
+#     statik: povoleno, kdyz stepTop >= itemTop    # :216-236
+#             itemTop = itemZ + (Bridge ? 0 : height)   # TileData.cs:112-125
+#             stojna vyska = itemZ + CalcHeight          # CalcHeight = Bridge ? h/2 : h
+#     povrchu je vic -> vyhrava ten s |ourZ - p.Z| NEJMENSI, pri rovnosti nizsi  # :222-228
+#     DOLU nema reference zadny limit (zadna dolni mez v `Movement.cs` neni)
+#
+#   Tri veci, ktere z toho plynou a kazda byla namerena jako vada:
+#     (1) svah: povoleny vzestup je `stepTop - landLow`, ne `2` - svah, ktery
+#         klient kresli jako rampu (`z_corners`, `render/chunk_renderer.gd:113`),
+#         simulace do teto session nevidela (`_analyza/vada-svah.py`: 4 013 kroku
+#         z 165 985 = 2,4 %, ktere reference povoli a my blokovali),
+#     (2) most: voda se kontrolovala DRIV nez statiky (`return _no("blocked")`),
+#         takze molo nad vodou bylo nedosazitelne - pritom v UO most NENI entita,
+#         je to statik se `Surface`/`Bridge` nad vodou (`TileData.cs:138-142`);
+#         `_analyza/vada-most-mapa.py`: 2 973 ploch nad vodou, molo u Britannie
+#         `x1522..1525 y1470..1500` (paluba z=10, voda z=-5),
+#     (3) statik se `Bridge` (flag 0x400) ma `CalcHeight = height / 2` a jeho
+#         strop pro krok je `itemZ` (ne `itemZ + height`).
+#
+#   Voda zustava blokujici: `F_WET` je u nas v datech soucasne s `Impassable`
+#   (namEReno: land water flags 0x000000C0) a `canSwim` neumime - reference ji
+#   blokuje tehoz (`Movement.cs:211`), takze se chovame stejne.
+#
 # CO SMLOUVA NEPINUJE (patri do docs/04 §4.2): zavislosti (mapa, tiledata,
 # schody, dvere) se predavaji KONSTRUKTOREM, aby se `can_step` dal merit bez
 # assetu `assets/uo/` (ta jsou v .gitignore, takze v CI nejsou) - stejny duvod
@@ -43,12 +76,17 @@ extends RefCounted
 const F_IMPASSABLE := 0x00000040
 const F_WET := 0x00000080
 const F_SURFACE := 0x00000200
+const F_BRIDGE := 0x00000400
 const F_CONTAINER := 0x00200000
 const F_DOOR := 0x20000000
 
 # Statiky z mapy jsou v prostoru tiledata id predmetu; `world.tiledata` chce
 # art id (viz hlavicka). Jedno misto, kde se to prevadi.
 const ITEM_OFFSET := 0x4000
+
+# Zadny kandidat na povrch cilove dlazdice (nemeni se s daty - `z` muze byt
+# i zaporne, proto se "neni" neda poznat podle nuly).
+const NO_SURFACE := -100000
 
 const Const = preload("res://core/const.gd")
 const MapScript = preload("res://sim/world/map.gd")
@@ -87,23 +125,20 @@ func can_step(from: Vector3i, dir: int, height: int = Const.PERSON_HEIGHT,
 	var land: int = _land_at(to.x, to.y)
 	if land < 0:
 		return _no("off_map")
-	if _tiledata.flags(land) & F_WET != 0:
-		return _no("blocked")           # voda: `request_step` vraci {ok:false}
-	if _tiledata.flags(land) & F_IMPASSABLE != 0:
-		return _no("blocked")
-	# Statiky na CILOVE dlazdici blokuji stejne jako land (docs/05 §5.1.2 bod 3).
-	# Tuhle kontrolu test odhalil: `can_step` ji nejdriv nemel a zed ze statiku
-	# se dala projit (namEReno 2026-10-06).
-	if _blokuje_statik(to.x, to.y, from.z, height):
-		return _no("blocked")
-	var z: int = _surface_z(to.x, to.y)
-	if not _fits(from.z, z, height, _vyska_kroku(to.x, to.y)):
-		return _no("height")
+	# Strop kroku: horni hrana toho, na cem stojim (V4), + povoleny vzestup
+	# (STEP_HEIGHT, na dlazdici se schodem vyska toho schodu).
+	var strop: int = _start_top(from) + _vyska_kroku(to.x, to.y)
+	var vyber: Dictionary = _vyber_povrch(to, from.z, strop, height)
+	if int(vyber["z"]) == NO_SURFACE:
+		return _no(str(vyber["reason"]))
+	var z: int = int(vyber["z"])
 	return {"ok": true, "z": z, "reason": ""}
 
 
 func surface_z(x: int, y: int) -> int:
 	# Nejnizsi povrch, na ktery se da stanout: land, nebo vyssi statik s `Surface`.
+	# Pozor: `can_step` pouziva JINE pravidlo (povrch nejblizsi postave, V4/V5) -
+	# tenhle dotaz je "kam az se da vystoupit", ne "kam se postava postavi".
 	return _surface_z(x, y)
 
 
@@ -121,16 +156,130 @@ func _height(tile: int) -> int:
 	return _tiledata.height(tile + ITEM_OFFSET)
 
 
+func _calc_height(tile: int) -> int:
+	# `CalcHeight` z `TileData.cs:112-125`: most puli vysku. Pouziva se pro
+	# stojnou vysku statiku i pro jeho vyskove pasmo.
+	if _flags(tile) & F_BRIDGE != 0:
+		return _height(tile) / 2
+	return _height(tile)
+
+
+func _corners(x: int, y: int) -> Array:
+	# Vysky ROHU dlazdice, presne jako `Map.GetAverageZ` (`Server/Map.cs:552-607`):
+	# [0] = (x,y) "top", [1] = (x+1,y) "right", [2] = (x,y+1) "left",
+	# [3] = (x+1,y+1) "bottom". Roh pouziva vysku SOUSEDNI dlazdice - stejne to
+	# dela klient pro svah (`render/chunk_renderer.gd:153-166`).
+	return [int(_map.z_at(x, y)), int(_map.z_at(x + 1, y)),
+		int(_map.z_at(x, y + 1)), int(_map.z_at(x + 1, y + 1))]
+
+
+func _low(c: Array) -> int:
+	return mini(mini(int(c[0]), int(c[1])), mini(int(c[2]), int(c[3])))
+
+
+func _top(c: Array) -> int:
+	return maxi(maxi(int(c[0]), int(c[1])), maxi(int(c[2]), int(c[3])))
+
+
+func _center(c: Array) -> int:
+	# Stojna vyska rovne plochy (`GetAverageZ`, Map.cs:587-594): prumer dvojice
+	# s VETSiM absolutnim rozdilem (tedy po spadnici svahu), celociselne DOLU
+	# (`FloorAverage`, Map.cs:597-607 - u zapornych cisel se zaokrouhluje dolu).
+	var z_top: int = int(c[0])
+	var z_left: int = int(c[2])
+	var z_right: int = int(c[1])
+	var z_bottom: int = int(c[3])
+	if absi(z_top - z_bottom) > absi(z_left - z_right):
+		return _floor_avg(z_left, z_right)
+	return _floor_avg(z_top, z_bottom)
+
+
+static func _floor_avg(a: int, b: int) -> int:
+	var v: int = a + b
+	if v < 0:
+		v -= 1
+	return v / 2
+
+
+func _start_top(from: Vector3i) -> int:
+	# Horni hrana toho, na cem postava stoji (`GetStartZ`, Movement.cs:585-670):
+	# u landu je to NEJVYSSI roh dlazdice, ale jen kdyz na ni opravdu stoji
+	# (`loc.Z >= landCenter`) a neni blokujici (voda/zed). Kdo stoji na statiku
+	# (molo, schod), ma `from.z` uz na jeho hrane - proto se bere `from.z`.
+	var land: int = _land_at(from.x, from.y)
+	if land < 0:
+		return from.z
+	if _tiledata.flags(land) & (F_IMPASSABLE | F_WET) != 0:
+		return from.z
+	var c: Array = _corners(from.x, from.y)
+	if from.z >= _center(c):
+		return maxi(_top(c), from.z)
+	return from.z
+
+
 func _surface_z(x: int, y: int) -> int:
 	var z: int = int(_map.z_at(x, y))
 	for s in _statiky(x, y):
 		var tile: int = int(s["tile"])
 		if _flags(tile) & F_SURFACE == 0:
 			continue
-		var top: int = int(s["z"]) + _height(tile)
+		var top: int = int(s["z"]) + _calc_height(tile)
 		if top > z:
 			z = top
 	return z
+
+
+func _vyber_povrch(to: Vector3i, from_z: int, strop: int, height: int) -> Dictionary:
+	# VYBER POVRCHU cilove dlazdice presne v poradi reference
+	# (`Movement.cs:177-343`): nejdriv statiky se `Surface` BEZ `Impassable`,
+	# pak land. Kazdy kandidat musi projit `IsOk` (`:74-132`, u nas
+	# `_blokuje_statik`); kdyz je kandidatu vic, vyhrava ten s |ourZ - p.Z|
+	# NEJMENSI a pri rovnosti nizsi (`:222-228`).
+	# Vraci `{z, reason}`: `z == NO_SURFACE` znamena "neprojed" a `reason` rekne
+	# PROC - "height", kdyz neco padlo na vysku, jinak "blocked" (voda, zed,
+	# dvere). Duvod je soucast chovani (hlaska v `movement`) i testu.
+	var vybrany: int = NO_SURFACE
+	var videl_vysku: bool = false
+	for s in _statiky(to.x, to.y):
+		var tile: int = int(s["tile"])
+		var flags: int = _flags(tile)
+		# `(flags & ImpassableSurface) == Surface` z `Movement.cs:211`.
+		if flags & F_SURFACE == 0 or flags & F_IMPASSABLE != 0 or flags & F_WET != 0:
+			continue
+		var item_z: int = int(s["z"])
+		# Strop statiku: u mostu jen `itemZ` (`if (!itemData.Bridge) itemTop +=
+		# itemData.Height;`, Movement.cs:233-234).
+		var item_top: int = item_z
+		if flags & F_BRIDGE == 0:
+			item_top += _height(tile)
+		if strop < item_top:
+			videl_vysku = true
+			continue
+		var our_z: int = item_z + _calc_height(tile)
+		if vybrany != NO_SURFACE:
+			var cmp: int = absi(our_z - from_z) - absi(vybrany - from_z)
+			if cmp > 0 or (cmp == 0 and our_z > vybrany):
+				continue
+		if _blokuje_statik(to.x, to.y, our_z, height):
+			continue
+		vybrany = our_z
+	var land: int = _land_at(to.x, to.y)
+	if land >= 0 and _tiledata.flags(land) & (F_IMPASSABLE | F_WET) == 0:
+		var c: Array = _corners(to.x, to.y)
+		if strop >= _low(c):
+			var our_land: int = _center(c)
+			var ber: bool = true
+			if vybrany != NO_SURFACE:
+				var cmp2: int = absi(our_land - from_z) - absi(vybrany - from_z)
+				if cmp2 > 0 or (cmp2 == 0 and our_land > vybrany):
+					ber = false
+			if ber and not _blokuje_statik(to.x, to.y, our_land, height):
+				vybrany = our_land
+		else:
+			videl_vysku = true
+	if vybrany == NO_SURFACE:
+		return {"z": NO_SURFACE, "reason": "height" if videl_vysku else "blocked"}
+	return {"z": vybrany, "reason": ""}
 
 
 func _vyska_kroku(x: int, y: int) -> int:
@@ -156,22 +305,38 @@ func _statiky(x: int, y: int) -> Array:
 
 
 func _blokuje_statik(x: int, y: int, z: int, height: int) -> bool:
-	# Statik blokuje, kdyz ma `Impassable`/`Container`, neni to OTEVRENE dvere
-	# a jeho vyskove pasmo se protne s pasmem postavy (docs/05 §5.1.2 bod 2).
-	# Pasmo blokujiciho statiku je `max(height, 1)`: 645 druhu Impassable artu ma
-	# v tiledata vysku 0 (namEReno) a prazdny interval by z nich udelal pruchozi.
+	# `IsOk` z `Movement.cs:74-132`: statik blokuje, kdyz se jeho vyskove pasmo
+	# protne s pasmem postavy stojici na zvolenem povrchu (docs/05 §5.1.2 bod 2).
+	# Pocita se i `Surface` (ne jen `Impassable`): kandidatem na povrch je sice
+	# jen `Surface` bez `Impassable`, ale DELSI statik se stejnym pasmem kandidata
+	# zablokuje - presne proto reference neprijme land pod schodem (schod svym
+	# pasmem protne postavu stojici na zemi).
+	# Dve ruzna pasma, kazde ma namEReny duvod:
+	#   * PRUCHOZI povrch (`Surface` bez `Impassable`) - pasmo je `z + CalcHeight`
+	#     PRESNE (reference `checkTop > ourZ`): nulova vyska podlahy nesmi
+	#     zablokovat povrch, na kterem prave stojim,
+	#   * BLOKUJICI statik (`Impassable`/`Container`/zavrene dvere) - pasmo je
+	#     `z + max(CalcHeight, 1)`: 645 druhu Impassable artu ma v tiledata vysku 0
+	#     (namEReno) a prazdny interval by z nich udelal pruchozi.
 	var nase_do: int = z + height
 	for s in _statiky(x, y):
 		var tile: int = int(s["tile"])
 		var flags: int = _flags(tile)
+		var od: int = int(s["z"])
 		if flags & F_DOOR != 0:
 			# Dvere maji `Impassable` v obou stavech - rozhoduje stav z `world.doors`.
 			if _doors.is_open(tile):
 				continue
-		elif flags & (F_IMPASSABLE | F_CONTAINER) == 0:
+			if od + maxi(_calc_height(tile), 1) > z and nase_do > od:
+				return true
 			continue
-		var od: int = int(s["z"])
-		var do: int = od + maxi(_height(tile), 1)
+		if flags & F_SURFACE != 0 and flags & F_IMPASSABLE == 0:
+			if od + _calc_height(tile) > z and nase_do > od:
+				return true
+			continue
+		if flags & (F_IMPASSABLE | F_CONTAINER) == 0:
+			continue
+		var do: int = od + maxi(_calc_height(tile), 1)
 		if do > z and nase_do > od:
 			return true
 	return false
@@ -186,11 +351,12 @@ func _passable(x: int, y: int, z: int, height: int) -> bool:
 	if flags & (F_IMPASSABLE | F_WET | F_CONTAINER) != 0:
 		return false
 	var nase_do: int = z + height
+	var strop: int = z + _vyska_kroku(x, y)
 	for s in _statiky(x, y):
 		var tile: int = int(s["tile"])
 		var sf: int = _flags(tile)
 		var od: int = int(s["z"])
-		var h: int = _height(tile)
+		var h: int = _calc_height(tile)
 		if sf & F_DOOR != 0:
 			# Zavrene dvere protnou pasmo postavy (namEReno: vyska 20) - blokuji.
 			if not _doors.is_open(tile) and od + maxi(h, 1) > z and nase_do > od:
@@ -202,19 +368,8 @@ func _passable(x: int, y: int, z: int, height: int) -> bool:
 			continue
 		# `Surface` nad hlavou (od >= nase_do) se diagonaly netyka; povrch, ktery
 		# je vys, nez se da krok, naopak blokuje (neda se na nej vstoupit).
-		if sf & F_SURFACE != 0 and od < nase_do and not _fits(z, od + h, height, _vyska_kroku(x, y)):
+		if sf & F_SURFACE != 0 and od < nase_do and od + h > strop:
 			return false
-	return true
-
-
-func _fits(z_from: int, z_to: int, height: int, vyska_kroku: int) -> bool:
-	# Vyskova mezera: rozdil musi byt mensi nez krok (dolu i nahoru). Kdyz je
-	# cilova podlaha vys, nevejde se tam postava (`height`), kdyz niz, je to pruchod.
-	var dz: int = z_to - z_from
-	if dz > vyska_kroku:
-		return false
-	if dz < -height:
-		return false
 	return true
 
 

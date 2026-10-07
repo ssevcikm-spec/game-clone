@@ -100,7 +100,17 @@ func run(t) -> void:
 		"player_controller: bez hrace vraci player_tile() (0,0), ne pád")
 	t._check(controller.action() == 4,
 		"player_controller: vychozi akce je 4 = idle (namEReno %d)" % controller.action())
+	# PORADI VE FRAMU (V2): controller musi bezet AZ PO `app.loop`, jinak v ramci
+	# commitu pricte posun k jiz posunute dlazdici (namEReno 37,33 px skok).
+	# `setup` to nastavuje; tady se meri, ze to po `setup` opravdu plati.
 	var MobileScript = Lib.script_at("res://sim/entity/mobile.gd")
+	if MobileScript != null:
+		var c2 = script.new()
+		c2.setup(MobileScript.new(0x40000002, 400, Vector3i(0, 0, 0)), null, null, null, null, null)
+		t._check(int(c2.get("process_priority")) > 0,
+			"player_controller: po setup() bezi AZ po `app.loop` (process_priority %s)"
+				% str(c2.get("process_priority")))
+		c2.free()
 	if MobileScript != null:
 		controller.player = MobileScript.new(0x40000001, 400, Vector3i(1495, 1630, 0))
 		t._check(controller.player_tile() == Vector2i(1495, 1630),
@@ -108,6 +118,69 @@ func run(t) -> void:
 				% str(controller.player_tile()))
 	else:
 		print("[test]      NEMERENO: player_controller nad mobilem - chybi sim/entity/mobile.gd")
+
+	# 5) ⚠ V2 (2026-10-07): POSUN A ANIMACE V JEDNE FAZI. `update_step` dostane
+	#    bezici krok (`sim.movement.pending_step`) a HNED z nej udela stav:
+	#    animace chuze zacina v okamziku ZAMERU, ne az po zmene dlazdice
+	#    (uzivatel: "prvne posune postavu a az potom zobrazi animaci chuze").
+	var krok := {"dir": 0, "run": false, "start_ms": 1000, "delay_ms": 400,
+		"due_ms": 1400, "z": 0}
+	controller.update_step(krok)
+	t._check(controller.action() == 0,
+		"player_controller: krok v letu = animace CHUZE hned (akce %d, cekano 0)"
+			% controller.action())
+	controller.update_step({"dir": 0, "run": true, "start_ms": 1000, "delay_ms": 200,
+		"due_ms": 1200, "z": 0})
+	t._check(controller.action() == 1,
+		"player_controller: bezici krok s `run` = animace BEHU (akce %d, cekano 1)"
+			% controller.action())
+	controller.update_step({})
+	t._check(controller.action() == 4,
+		"player_controller: zadny krok = idle (akce %d, cekano 4)" % controller.action())
+
+	# 6) POSUN V PIXELECH: roste po 80ms framech (ClassicUO `delay / 80`), na
+	#    konci kroku je presne jedna dlazdice - a mezi framy se NEMENI
+	#    (linearni prubeh by dal jine cislo, proto se meri i 79 ms).
+	var iso_step: int = int(consts.get("ISO_STEP", 22))
+	var tabulka := [[0, 0.0], [79, 0.0], [80, 0.2], [160, 0.4], [240, 0.6],
+		[320, 0.8], [400, 1.0], [9999, 1.0], [-5, 0.0]]
+	var chyby: Array = []
+	for radek in tabulka:
+		var f: float = script.step_fraction(int(radek[0]), 400)
+		if absf(f - float(radek[1])) > 0.0001:
+			chyby.append("%d ms -> %.3f (cekano %.1f)" % [int(radek[0]), f, float(radek[1])])
+	t._check(chyby.is_empty(),
+		"player_controller: krok se posouva po 80ms framech (odchylky: %s)" % str(chyby))
+	controller.update_step(krok)
+	var o0: Vector2 = controller.player_pixel_offset(1000)
+	var o80: Vector2 = controller.player_pixel_offset(1080)
+	var o320: Vector2 = controller.player_pixel_offset(1320)
+	var o400: Vector2 = controller.player_pixel_offset(1400)
+	t._check(o0 == Vector2.ZERO,
+		"player_controller: na zacatku kroku je posun nulovy (namEReno %s)" % str(o0))
+	t._check(absf(o80.x - float(iso_step) * 0.2) < 0.001 and absf(o80.y - float(iso_step) * 0.2) < 0.001,
+		"player_controller: po 80 ms je posun 0,2 dlazdice (%s, ISO_STEP %d)" % [str(o80), iso_step])
+	t._check(absf(o320.x - float(iso_step) * 0.8) < 0.001,
+		"player_controller: po 320 ms je posun 0,8 dlazdice (%s)" % str(o320))
+	t._check(absf(o400.x - float(iso_step)) < 0.001 and absf(o400.y - float(iso_step)) < 0.001,
+		"player_controller: na konci kroku je posun PRESNE jedna dlazdice (%s)" % str(o400))
+	# smer 1 = NE: v izometrii je to (2*ISO_STEP, 0) - jina velikost nez vychod.
+	# POZOR: 200 ms neni "0,5 kroku" - posun se dela po 80ms framech, takze
+	# 200 ms = frame 2 z 5 = 0,4 (presne to dela ClassicUO `delay / 80`).
+	controller.update_step({"dir": 1, "run": false, "start_ms": 1000, "delay_ms": 400,
+		"due_ms": 1400, "z": 0})
+	var one: Vector2 = controller.player_pixel_offset(1200)
+	t._check(absf(one.x - float(iso_step) * 2.0 * 0.4) < 0.001 and absf(one.y) < 0.001,
+		"player_controller: smer NE se posouva po 2*ISO_STEP na ose X (namEReno %s)" % str(one))
+	# krok nahoru se kresli jako krok nahoru: cilove `z` meni i svislou slozku
+	controller.update_step({"dir": 0, "run": false, "start_ms": 1000, "delay_ms": 400,
+		"due_ms": 1400, "z": 8})
+	var nahoru: Vector2 = controller.player_pixel_offset(1400)
+	t._check(absf(nahoru.y - (float(iso_step) - 8.0 * float(consts.get("Z_SCALE", 4)))) < 0.001,
+		"player_controller: posun pocita i s vyskou cile z=8 (namEReno %s)" % str(nahoru))
+	controller.update_step({})
+	t._check(controller.player_pixel_offset(1400) == Vector2.ZERO,
+		"player_controller: bez kroku je posun nulovy")
 	controller.free()          # Node, ne RefCounted - jinak zustane viset
 
 

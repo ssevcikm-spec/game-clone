@@ -73,6 +73,7 @@ var _hue_last: Texture2D = null    # posledni prebarveny zaklad
 var _hue_last_hued: Texture2D = null
 var _hlasene_diry: Dictionary = {} # art id, o kterych uz bylo hlaseno, ze chybi
 var _list_center: Vector2i = Vector2i(-99999, -99999)   # stred postaveneho seznamu
+var _player_offset: Vector2 = Vector2.ZERO  # posun postavy mezi dlazdicemi (V2)
 
 
 func _ready() -> void:
@@ -116,6 +117,27 @@ func set_player(mobile) -> void:
 
 func set_action(action: int) -> void:
 	_action = action
+
+
+func set_player_offset(offset: Vector2) -> void:
+	# POSUN POSTAVY MEZI DLAZDICEMI (vada V2): dokud krok neni commitnuty,
+	# `player.pos` je porad stara dlazdice a obraz se posune timhle vektorem
+	# (`app/player_controller.player_pixel_offset`). Svet se hybe po
+	# dlazdicich (kamera v `look_at_tile`), postava plynule - jako v reference
+	# (`_src/classicuo` `Mobile.cs:776-782` kresli `Offset`, `:836-844`
+	# commitne dlazdici az na konci kroku).
+	_player_offset = offset
+
+
+func player_ground_position() -> Vector2:
+	# KAM SE KRESLI POSTAVA (bez kresleni - da se merit testem i sondou).
+	# Je to stred dlazdice, na ktere postava stoji, plus posun kroku.
+	if _player == null:
+		return Vector2.ZERO
+	if _iso == null:
+		_iso = Iso.new()          # testy tvori uzel bez `_ready()` (N8)
+	return _iso.to_screen(int(_player.pos.x), int(_player.pos.y), int(_player.pos.z)) \
+		+ Vector2(Const.ISO_STEP, Const.TILE_H / 2) + _player_offset
 
 
 func anim_available() -> bool:
@@ -355,8 +377,9 @@ func _draw_player() -> void:
 	player_missing = false
 	drawn += 1
 	var anchor: Vector2 = clip["anchor"]
-	var ground: Vector2 = _iso.to_screen(_player.pos.x, _player.pos.y, _player.pos.z) \
-		+ Vector2(Const.ISO_STEP, Const.TILE_H / 2)
+	# Pozice vcetne posunu mezi dlazdicemi (V2) - jedna funkce pro kresleni
+	# i pro mereni (`player_ground_position`).
+	var ground: Vector2 = player_ground_position()
 	var texture: Texture2D = clip["texture"]
 	texture = player_hue(texture, int(_player.hue))
 	if not bool(clip.get("mirror", false)):

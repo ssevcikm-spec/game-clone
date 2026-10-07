@@ -1,24 +1,45 @@
-# Předání — UO-klon (VLNA OPRAV ze snímků; 2026-10-07, 12. session)
+# Předání — UO-klon (VLNA POHYBU DOKONČENA: V2, V4, V5; 2026-10-07, 14. session)
 
 > **Co je tenhle soubor:** **stav projektu** pro další session agenta. Přepisuje
 > se celý; historie je v `git log`. **Současný stav se bere odtud** — a ověřuje
 > se živě (je tu k tomu sekce „Předletová kontrola").
 > **Zadání pro další vývoj je `ZADANI-DALSI-VYVOJ-2.md`** (etapa 2, Úkoly 1–9);
 > **Úkoly 1–4 jsou HOTOVÉ** a z Úkolu 6 jsou hotové `entity.item`,
-> `entity.container` — **další je `entity.equipment`**. Tato (12.) session šla
-> **vlnou oprav podle snímků od uživatele** (chybějící dlaždice na svazích,
-> chůze držením, stopa animačních framů, sekání) — plánovaný cíl
-> (`sim.harvest` + `sim.craft` + `ui.journal`) se tím **posunul na 13. session**.
+> `entity.container` — **další je `entity.equipment`**. Tato (14.) session
+> **uzavřela vlnu pohybu** z `REVIZE-POHYB-2026-10-07.md`: vady **V2**
+> (posun a animace v jedné fázi), **V4** (svahy — výška z rohů) a **V5** (most nad
+> vodou) jsou **opravené a měřené**; plánovaný cíl (`sim.harvest` + `sim.craft` +
+> `ui.journal`) se tím **posunul na 15. session**.
 > Předchozí etapa je v `ZADANI-DALSI-VYVOJ.md`.
 > **Naměřený stav plánu je v `REVIZE-PLANU-2026-10-06.md`** a **stav granul
 > měří** `python tools/plan-status.py`.
 > **Kam pro co v referenčních zdrojích je `research/REJSTRIK-REFERENCI.md`**.
-> **Datum:** 2026-10-07 (12. session). **Poslední změna kódu:** tato session
-> (`tools/uoextract/atlas.py` + **nový `texmaps.py`**, `render/chunk_renderer.gd`,
-> `render/texture_cache.gd`, `render/hue_cache.gd`, `render/sort.gd`,
-> `sim/world/tiledata.gd`, `app/input_map.gd`, `app/player_controller.gd`,
-> `app/world_view.gd`, `tests/cases/{input,player_controller,chunk_renderer,world_view,render_hue,tiledata}.gd`,
-> `tools/gates/{mutace-tests,mutace-render-hue,run-all}.py`, `docs/03`, `docs/04`).
+> **Datum:** 2026-10-07 (14. session). **Poslední změna kódu:** tato session
+> (`sim/world/walk.gd`, `sim/systems/movement.gd`, `app/player_controller.gd`,
+> `app/world_view.gd`, `tests/cases/{walk,movement,player_controller,world_view}.gd`,
+> `tools/gates/mutace-tests.py`, `docs/04` (§4.2, §4.2.1), `docs/05` (§5.1.2),
+> nové sondy a nástroje v `_analyza/`).
+
+## ✅ CO JE NOVÉHO (14. session) — VLNA POHYBU UZAVŘENA (V2, V4, V5)
+
+**Zadání uživatele (doslova):** „Pokračuj v plánu" + volba cíle
+**„Dokončit vlnu pohybu: V2, V4, V5"**. Měření je v
+**[`REVIZE-POHYB-2026-10-07.md`](REVIZE-POHYB-2026-10-07.md)** (§2 příčiny, §5 co
+zbývalo); tato session z něj provedla **B (V2)** a **C (V4, V5)** a **nechala
+otevřené jen F/M9 a brány na chování v čase**.
+
+| Co | Doklad (naměřeno dnes) |
+|---|---|
+| **V4 — výška kroku se počítá z ROHŮ dlaždice, ne z `dz`** | `sim/world/walk.gd` přepsán podle `_src/servuo` `Movement.cs:170-171`, `:211-343`, `Map.cs:552-607`, `TileData.cs:112-125`: `stepTop = startTop + STEP_HEIGHT`, u landu `stepTop ≥ landLow` (nejnižší roh) a stojná výška `landCenter`; u statiku `stepTop ≥ itemTop` a `z + CalcHeight`; **dolů žádný limit**; povrch nejbližší postavě; `IsOk` (blokuje i delší `Surface`). **Důkaz na reálné mapě** (`_analyza/vlna14-svah-most.gd`, okno x1400..1620 / y1540..1760, **165 985** kroků, proti **celému** modelu reference): **před 14 965 blokovaných → po 0**; my povolíme 298 navíc a **všech 298 je schodová výjimka** (`_analyza/vlna14-svah-most-PRED.txt` vs `_analyza/vlna14-svah-most.txt`) |
+| **V5 — statik se `Surface` rozhoduje i nad vodou (most)** | Voda se kontrolovala **před** statiky → molo bylo nedosažitelné. Naměřeno na molu u Britannie (`x1522..1525 y1470..1500`, paluba `z=10`, voda `z=−5`): kroků na molo povoleno **0 → 16** (z 24 zkoušených) a **BFS z prkna 1 → 4 000** dlaždic (limit sondy). Voda zůstává blokující (má `Impassable|Wet`, `canSwim` neumíme — reference ji blokuje také, `Movement.cs:211`) |
+| **V4 — `apply_step` zapisuje `pos.z`** | Stojná výška z `can_step` se do `mob.pos.z` **nikdy nezapsala**, takže postava zůstala ve výšce prvního kroku (a na svahu se každý další krok měřil proti staré výšce). Dnes ji bere z `_pending`. Test: `tests/cases/movement.gd` 3b (stub s `z=7` → `pos == (6,5,7)`) |
+| **V2 — posun a animace v JEDNÉ fázi** | `sim.movement.pending_step(serial)` (`{dir, run, start_ms, delay_ms, due_ms, z}`), `app/player_controller.update_step()/step_fraction()/player_pixel_offset()` (posun po **80ms framech**, jako `Mobile.cs:776-782`), `app.world_view.set_player_offset()`/`player_ground_position()`. **V běhu hry** (`_analyza/vlna14-pohyb.gd`): 3 záměry → **3× animace v témže framu**, 38 framů nakreslených **mezi dlaždicemi** (offset 0 → 4,4 → 8,8 → 13,2 → 17,6 px), **max skok obrazu 6,23 px** (starý klient: **31,11 px** = celá dlaždice), skok v okamžiku commitu **0,00 px** |
+| **⚠ Vlastní vada nalezená sondou (a opravená)** | Offset se počítal **před** tickem simulace (`app.loop` je ve scéně až za controllerem) → v rámci commitu se posun přičetl k již posunuté dlaždici a obraz skočil **37,33 px** (hůř než před opravou). Řešení: `process_priority = 1` v `setup()` (a test to měří). Zapsáno v `LESSONS` |
+| **Vizuální důkaz (pohledem)** | `_analyza/frames14/montaz-krok.png` (3× zoom, dva framy uvnitř jednoho kroku): postava na **dvou místech v téže dlaždici**, svět **stejný**. Měřeno `_analyza/vlna14-posun-snimku.py`: mezi framy uvnitř kroku se mění **0,09–0,11 %** obrazu (obalka změny se posouvá monotónně), commit kroku mění **59,5 %** (svět se posune o dlaždici) |
+| **Brány** | testy **997 kontrol / 0 selhání**, `run-all.py` **11 měřeno / 0 vad**, self-testy **21 / 0 chyb**, `check-docs-refs` / `check-zadani` / `roadmap-gen --check` **exit 0**, replaye **beze změny hashů** |
+| **Mutační důkaz** | `mutace-tests.py`: modul `walk` **přepsán** (2 mrtvé vzory nahrazeny, 8 nových na V4/V5), `movement` **+3** (V2/V4), `player_controller` **+4** (V2), `world_view` **+1** (V2) — výsledek v „integračních číslech" níž a v `_analyza/vlna14-mutace.txt` |
+| **Co se NEMĚNILO** | `sim.harvest`/`sim.craft`/`ui.journal` (cíl 15. session), `entity.equipment`, M9 (`render.chunk_mesh`), `data/*.json`, `app/main.tscn`, `project.godot`, `render/sort.gd`, `render/chunk_renderer.gd` |
+| **Nová měřená zjištění (neopravená, patří do rozhodnutí/plánu)** | **(1)** `TileFlag.Bridge` (0x400) mají i **schody** (`stone stairs` art 1823 = `0x2600`) → `CalcHeight` půlí výšku, takže stojná výška na schodu je `z + výška/2` (naše dřívější `z + výška` bylo vlastní pravidlo); **(2)** `GetAverageZ` u **osamocené** vyvýšené dlaždice vrací 0 (rohy `[3,0,0,0]` → průměr `0`), a přesto je průchozí — je to vlastnost reference, měřená testem 1c; **(3)** sondy `_analyza/vada-svah.py` a `vada-most*.gd` z 13. session měřily **opis** našeho pravidla v Pythonu (bez statiků) — srovnání s **celým** modelem reference dává jiná čísla (23 212 vs 0) |
 
 ## ✅ CO JE NOVÉHO (13. session) — OPRAVY A, D, E Z VLNY POHYBU
 
@@ -471,6 +492,15 @@ ho celý." Každá session tedy **není „krok"**, ale **jeden celek s cílem**
    v pořádku.
 4. **Nedělat v jedné session víc cílů**, aniž by první byl uzavřený a ověřený.
 
+**✅ CÍL 14. SESSION — SPLNĚN (ať ho další session přepíše):**
+> **Dokončit vlnu pohybu z `REVIZE-POHYB-2026-10-07.md` — V2, V4, V5** (uživatel
+> zvolil z nabídky „Dokončit vlnu pohybu: V2, V4, V5"). **Všechny tři jsou
+> opravené a měřené** (doklady v „CO JE NOVÉHO (14. session)"): svah a most
+> (0 blokovaných proti celému modelu reference, molo 0 → 16 kroků a BFS 1 → 4 000),
+> posun s animací v jedné fázi (max skok obrazu 6,23 px místo 31,11 px, 3/3 záměry
+> animované v témže framu), `pos.z` se zapisuje. **Z vlny pohybu tak zůstává jen
+> F/M9** (`render.chunk_mesh`, 1 516 draw callů) a „brány na chování v čase".
+
 **⚠ CÍL TÉTO (12.) SESSION — SPLNĚN, ať ho další session přepíše:**
 > **Vlna oprav ze snímků od uživatele (2026-10-07):** (1) chybějící výškové
 > assety na svazích, (2) chůze držením klávesy i pravého tlačítka myši,
@@ -479,7 +509,7 @@ ho celý." Každá session tedy **není „krok"**, ale **jeden celek s cílem**
 > svým zadáním **posunul plánovaný cíl** (`sim.harvest` + `sim.craft` +
 > `ui.journal`) na **13. session**.
 
-**🎯 CÍL 13. SESSION (přejatý plán, nezměněný):**
+**🎯 CÍL 15. SESSION (přejatý plán — 13. a 14. session dělaly vlnu pohybu):**
 
 > **Dokončit `sim.harvest` + `sim.craft` + `ui.journal` (BIG WIN č. 1: „umět
 > pracovat“).** Uživatel 11. session zvolil priority: **nejdřív řemeslo, souboj
@@ -585,14 +615,16 @@ tady je jen to, co čeká na tebe (obojí vratné, obojí doložené měřením)
 
 | # | Na co se čeká | Co to blokuje | Cena / cesta zpět |
 |---|---|---|---|
-| 1 | **Smím přepsat `docs/05 §5.1.4`** — zákaz „pohybu plynulého (lerp mezi dlaždicemi jako moderní hry)"? Referenční klient pohyb **plynule vykresluje** (ClassicUO `Mobile.cs:776-782` + `MovementSpeed.GetPixelOffset`: dlaždici commitne až na konci kroku, do té doby kreslí `Offset` v pixelech) — zákaz je tedy věcně nesprávné tvrzení o UO. Navržená formulace: krok zůstává **diskrétní 400/200 ms**, klient **smí** vykreslit posun mezi dlaždicemi plynule | vadu **V2** („postava se posune dřív, než se objeví animace") **nelze opravit**, dokud zákaz platí | Přepsat 2 řádky v `docs/05`; vratné |
+| 1 | ~~Smím přepsat `docs/05 §5.1.4` (zákaz plynulého pohybu)?~~ **✅ VYŘEŠENO 13. session** — zákaz zrušen, `docs/05 §5.1.4` přepsán (doklad v „CO JE NOVÉHO (13. session)"). Dnes je **V2 opravená a měřená** (14. session) | — | — |
 | 2 | **Předsunout `render.chunk_mesh` (M9) před obsah M3+?** Dnes naměřeno: 1 516 draw callů na frame a **27 FPS při chůzi**, kritérium `docs/01 §1.6` (≤ 16 ms / 60 FPS) nedodržené | plynulost hry; každá další práce na klientu se dělá nad provizoriem | Granule v roadmapě **už je** (M9, `size_lines <= 150`); jde jen o pořadí. Vratné |
+| 3 | **NOVÉ (14. session): mají být „brány na chování v čase" i v CI?** `REVIZE-POHYB` §5 je žádá (kadence a rozestup kroků, ms na frame proti `docs/01 §1.6`, `can_step` na reálné mapě, vizuální kontrola pohybu). Dnes jsou to **sondy v `_analyza/`** (`vlna14-pohyb.gd`, `vlna14-svah-most.gd`), ne krok CI — běží minuty a chtějí `assets/uo` (v CI nejsou) | regrese v časování a ve pravidlech chůze se v CI nepozná | Zavést jako krok CI jen to, co jde bez assetů (fixtures), zbytek nechat jako sondu; vratné |
 
-**Šest vad je naměřených (ne odhadnutých):** kadence kroku **718 / 530 ms místo
-400** (dva běhy téhož kódu, 7 a 9 kroků za 5 s místo 13), 2,4 % kroků do kopce
-blokujeme i když UO povolí, most nad vodou je neprůchodný (kontrola `WET` je
-před statiky), a zábradlí je pod dlaždicemi na **6 401** dlaždici mapy
-(z toho 71 nad vodou). Detaily a opravy: `REVIZE-POHYB-2026-10-07.md` §2 a §5.
+**Šest vad pohybu je od 14. session VYŘEŠENÝCH (a měřených):** kadence kroku
+(718/530 ms → 12 kroků za 5 s, median 404 ms — A, 13. session), směr z myši
+(D, 13. session), zábradlí mostu (`PriorityZ`, E, 13. session), **posun s animací
+v jedné fázi (V2)**, **svah (V4)** a **most nad vodou (V5)** — poslední tři
+v této session; doklady v „CO JE NOVÉHO (14. session)" a v
+`REVIZE-POHYB-2026-10-07.md` §2 a §7.
 
 **⚠ TAKÉ NOVÉ (13. session, k rozhodnutí): směr projektu — singleplayer vs.
 cizí shardy vs. vlastní server.** Uživatel se zeptal na hodnotu tří variant
@@ -611,12 +643,24 @@ oprav pohybu má cenu ve všech třech variantách, takže práce může začít
 | 2 | **Svahy se kreslí BEZ osvětlení rohů** (`CalculateNormal` v ClassicUO) — plocha je rovnoměrně barevná, v klientu je svah stínovaný | „vypadá to jako UO" | Patří k `render.light` (docs/07, M9+); dnes zapsané v kódu i v `docs/03`. Vratné (je to jen `draw_polygon` s bílou barvou) |
 
 **Z plánu 13. session (nezměněné, čeká se jen na provedení):** `sim.harvest` +
-`sim.craft` + `ui.journal` (viz „CÍL 13. SESSION").
+`sim.craft` + `ui.journal` (viz „CÍL 15. SESSION").
 
 **Ostatní otevřené (měřené, neopravené — detaily v tabulce V1–V6 výš):**
 `V3` přestavba seznamu 45,8 ms každé 4 kroky (M9 `render.chunk_mesh`),
 `V4` slabý heuristický test kůže v řidiči důkazu G10, `V5` posunutý první land
 záznam v `tiledata.mul` (týká se jen id 0), `V2` `TexTerr.def` remap (aplikován).
+
+**⚠ NOVÉ Z 14. SESSION (měřené, neopravené — k rozhodnutí nebo do plánu):**
+`(1)` **stojná výška na schodu je `z + výška/2`**, protože `stone stairs`
+(art 1823) mají flag `Bridge` (`0x2600`) — je to věrné referenci
+(`TileData.cs:112-125`), ale mění to, jak vysoko postava na schodu stojí (o 3
+jednotky níž u výšky 5); kdo bude dělat `render.anim` vrstvy nebo souboj, musí
+s tím počítat. `(2)` **`GetAverageZ` u osamocené vyvýšené dlaždice vrací 0**
+(rohy `[3,0,0,0]`) a krok na ni je povolený — měřená vlastnost reference
+(`tests/cases/walk.gd` 1c), ne vada. `(3)` **sondy z 13. session měřily opis
+našeho pravidla v Pythonu** (bez statiků): srovnání s **celým** modelem reference
+dává jiná čísla (23 212 vs 0) — kdo z nich bude citovat, musí říct, která
+reference to je (`LESSONS` 14. session).
 
 **Na dnešní cíl nečeká nic** — 10. session se rozhodla měřením (`TARGET_ROLES`
 z dat, oba id prostory) a cíl je hotový. **Ale čtyři rozhodnutí z
@@ -651,7 +695,7 @@ a `CONTAINER_MAX_WEIGHT` v setinách; cena je zásah do `core/const.gd` a
 `world.tiledata` (obojí jiná granule), cesta zpět je triviální (konstanta).
 Do rozhodnutí je to **zdokumentované jako omezení**, ne zamčené v kódu.
 
-**Co bude následovat (bez tebe):** cíl 12. session = **`sim.harvest` + `sim.craft` + `ui.journal`** (BIG WIN č. 1 „umět pracovat“) — viz „CÍL SESSION“ níže. **Odložený** je `entity.equipment` (potřebný pro souboj, ne pro řemeslo).
+**Co bude následovat (bez tebe):** cíl 15. session = **`sim.harvest` + `sim.craft` + `ui.journal`** (BIG WIN č. 1 „umět pracovat“) — viz „CÍL 15. SESSION“ výš. **Odložený** je `entity.equipment` (potřebný pro souboj, ne pro řemeslo).
 
 **Konvence dveří (věc 62) je od 8. session rozhodnutá MĚŘENÍM a opravená** —
 nic na tebe nečeká. Montáž pro kontrolu pohledem
@@ -666,14 +710,18 @@ a viděl něco jiného, je to **nový nález**, ne oprava — ozvi se s ním.
 ## ⚠⚠ BLOKÁTORY
 
 **Žádný otevřený blokátor v kódu.** „Demo chodí, postava je barevná a **vlevo nahoře je stavový pruh**" je naměřené
-(viz tabulky výš), brány jsou zelené (**11/0/0**), testy **954/0** (s assety) a **průchodnost
-i konvence dveří jsou opravené** (6. session: statiky se čtou správnou tabulkou,
+(viz tabulky výš), brány jsou zelené (**11/0/0**), testy **999/0** (s assety) a **průchodnost,
+svahy i most jsou opravené** (6. session: statiky se čtou správnou tabulkou,
 schody svou výškou; 8. session: `world.doors` páruje `art` ↔ `art + 1`;
 9. session: `entity.item` + `entity.container` hotové, **20/20 mutací**;
 10. session: `sim.interaction` hotový, **13/13 mutací** a routing z dat;
 11. session: `sim.skill_gain` + první UI, **15/15 nových mutací**, plán
 **50 měřeně hotových**; 12. session: **vlna oprav ze snímků** — svahy (atlas +
-texmapy), držení vstupu, stopa framů, sekání; **20 nových/rozšířených mutací**).
+texmapy), držení vstupu, stopa framů, sekání; **20 nových/rozšířených mutací**;
+13. session: vlna pohybu A/D/E (kadence, směr z myši, `PriorityZ`);
+**14. session: vlna pohybu DOKONČENA — V2 (posun + animace v jedné fázi),
+V4 (výška z rohů) a V5 (most nad vodou); `pos.z` se zapisuje; `walk`/`movement`/
+`player_controller`/`world_view` = 41/41 mutací**).
 **Hra jede 29 FPS PŘI CHUZI** (34,6 ms median; ve stoji 29 FPS/34,5 ms; bez
 svahů by byla ~36 FPS) — naměřeno `_analyza/vlna5-chuze.gd`; zbývající záseky
 jsou **10 z 496 framů** (přestavba seznamu 45,8 ms každé 4 kroky, viz V3).
@@ -894,32 +942,27 @@ a barva kůže.** Statiky nesou barvu ze záznamu mapy, ale **nikdo ji nepouží
 
 ## Předletová kontrola (5 minut, než začneš psát)
 
-| Co | Jak | Očekáváno (2026-10-07, 10. session) |
+| Co | Jak | Očekáváno (2026-10-07, **14. session**) |
 |---|---|---|
-| Strom je čistý | `git status --porcelain -uall` | **prázdné** po commitu této session (nové `.uid` u `interaction.gd` i `tests/cases/interaction.gd` jsou v commitu — vznikly `--import` pod plným přístupem) |
-| Je před GitHubem | `git rev-list --count origin/main..HEAD` | **`0`** — **10. session pushla** (trvalé povolení uživatele z 2026-10-07) |
-| **Běží CI?** | `node _analyza/ci-beh-stav.mjs` (bez tokenu je limitovaný — viz past v `LESSONS`) · anotace: `node _analyza/ci-anotace.mjs` | **`#43` nad `200fdc6` (kód + smlouvy + HANDOFF/LESSONS) a `#44` nad `4d0715c` (dokumentační dotyk + `cursor()`) = oba `success`, 17 kroků (+3 post), job 2:56 a 3:09 min** — ověřeno živě přes API včetně **všech 17 kroků** (7 testy bez assetů, 8 brány, 9 **94 mutací**, 10–13 ostatní harnessy, 15 stav plánu = **48 hotových, 0 rozporů**); předtím `#42` nad `2ede2c9` a `#41` nad `adbd2cb` (9. session) = `success`. **sha rozhoduje**, ne „poslední běh" |
-| **Co v CI NEJDE ověřit bez tokenu** | `node _analyza/ci-log.mjs` → **HTTP 403**; `ci-artefakt.mjs` → **HTTP 401** | Kdo nemá token, **vidí jen stav kroků**, ne jejich obsah — takže „krok s mutacemi prošel" je naměřené, ale **počet chycených mutací v CI je neověřený** (naměřeno je **lokálně**). Nezapisuj do předání „CI má 81/81", když to nevidíš |
+| Strom je čistý | `git status --porcelain -uall` | **prázdné** po commitu této session |
+| Je před GitHubem | `git rev-list --count origin/main..HEAD` | **`0`** — 14. session pushla (trvalé povolení uživatele z 2026-10-07) |
+| **Běží CI?** | `node _analyza/ci-beh-stav.mjs` (bez tokenu je limitovaný — viz past v `LESSONS`) · anotace: `node _analyza/ci-anotace.mjs` | **viz odstavec „CI" v BLOKÁTORECH níž** (vyplněno po pushi této session); sha rozhoduje, ne „poslední běh" |
+| **Co v CI NEJDE ověřit bez tokenu** | `node _analyza/ci-log.mjs` → **HTTP 403**; `ci-artefakt.mjs` → **HTTP 401** | Kdo nemá token, **vidí jen stav kroků**, ne jejich obsah — „krok s mutacemi prošel" je naměřené, ale **počet chycených mutací v CI je neověřený** (naměřeno je **lokálně**). Nezapisuj do předání „CI má 41/41", když to nevidíš |
 | Repo je veřejné | API bez tokenu | `visibility: public` |
-| **Oprávnění** | `whoami /groups \| Select-String Mandatory` | **`Medium`** = plný přístup. `Low` = sandbox → **falešná selhání testů i bran** (9. session naměřila v `Low` **583/9** místo **584/0** na téže sadě — 8× `render.textures` + 1× `sim.world_loop` save, viz `LESSONS`) a `.uid` nevzniknou. **Dnešní sada je 806/0 (s assety) a 748/0 (bez) — v `Low` by čísla byla zase jiná; měř ji znovu, neopisuj** |
-| Testy | testy s `APPDATA` ve workspace | **954 kontrol, 0 selhání** (s assety), **38 case souborů** (`case souboru spusteno: 38 z 38`), `exit 0` — měřeno 12. session pod **plným přístupem**; v `workspace-write` (Low) hlásí sada **8 falešných selhání** (`render.textures` si staví fixture v `.cache`, `sim.world_loop` ukládá do `user://`) — viz `LESSONS` |
-| **FPS (nové, 12. session)** | `& .cache\godot\...console.exe --path . --rendering-driver opengl3 --script res://_analyza/vlna5-chuze.gd` (+ `--kroku=0` = ve stoji) | **ve stoji 34,5 ms (29 FPS)**, 4 314 kreslených objektů, 1 673 draw callů; **v chůzi 34,6 ms median / p90 39,6 / max 141 ms (29 FPS)**, 10 framů nad 2× median z 496; **bez ořezu** 46,6 ms (21 FPS), **bez svahů** 28,0 ms (36 FPS) |
-| Brány | `python tools/gates/run-all.py` | **11 měřeno / 0 NEMĚŘENO / 0 vad**, `exit 0` |
-| Self-testy | `python tools/gates/run-all.py --self-test` | **21, 0 chyb**, `exit 0` (přibyl `atlas.py` 46 kontrol a **nový `texmaps.py`** 5 kontrol) |
-| Mutační důkaz | `mutace-tests.py --only sort` / `--only chunk_renderer,world_view` / `--only input,player_controller` + `mutace-render-hue.py` | `sort` **10/10**, `chunk_renderer+world_view` **7/7**, `input+player_controller` **8/8** (v dřívějším širším běhu 19/20 — ta jedna byla **neopravitelná mutace ve starém kódu `sort`**, dnes přepsaná), `mutace-render-hue` **14/14** (2 nové na okno `region`; **jedna z nich poprvé v CI NEprošla** — viz past „nový test za `return`" v `LESSONS`) + v **CI stavu** (bez `assets/uo`) ověřeno zvlášť: `cely_atlas_misto_okna` a `okno_vzdy_z_pocatku_stranky` **chyceny**; smlouvy vstupů OK. **Plný běh dělá CI** |
-| Fixture (nové) | `python tests/fixtures/{world,hues,anim}/make_fixture.py --check` | **3× OK**, `exit 0`; v CI je hlídá krok „Fixture sedí na generátor" |
-| Animace | `python tools/uoextract/anim.py --self-test` | `35 kontrol, 0 chyb` |
-| Barvy | `python tools/uoextract/hues.py --self-test` | `5 kontrol, 0 chyb` |
-| **Texmapy (nové)** | `python tools/uoextract/texmaps.py --verify` | **4 116 texmap** z 16 384, remap z `TexTerr.def` 284; `--dump` dá 64x64 trávu a 128x128 hlínu (pohledem ověřeno) |
-| **Atlas (nové)** | `python tools/uoextract/atlas.py --verify --out assets/uo` | **49 705 spritů / 77 stranek, 0 chyb** (land 4 244, item 39 326, gump 2 019, texmap 4 116) |
-| Data skillů | `python tools/gates/gen-content.py --only skills --check` | `OK skills.json: shoda` |
-| Fixture sedí na generátor | `python tests/fixtures/world/make_fixture.py --check` | `4× OK`, `exit 0` |
-| **Snímek je z běhu** | `Get-Item .cache/render/snapshot.png \| % LastWriteTime` | **dnešní** (frame z `demo-hue.gd`); G10 z něj měří `kuze_pixelu 9100`, barva `R52 G42 B42` |
+| **Oprávnění** | `whoami /groups \| Select-String Mandatory` | **⚠ 14. session začala v `Low`** (`workspace-write`): brány hlásily **2 falešné vady** (G3 `sim.world_loop` save a `render.textures`, protože podproces nesměl zapsat do `.cache`) a sada **9 selhání**; po přepnutí na **plný přístup** (`danger-full-access`, přepnul uživatel) je vše zelené. **Měř vždy pod plným přístupem** (`LESSONS` 14. session) |
+| Testy | `$env:APPDATA="$PWD\.cache\godot-appdata"` pak `godot --headless --path . --script res://tests/run_tests.gd` | **999 kontrol, 0 selhání**, **38 case souborů** (`case souboru spusteno: 38 z 38`), **`$LASTEXITCODE` = 0** (`_analyza/t14-testy6.txt`). ⚠ exit kód ber z `$LASTEXITCODE` hned po Godotu — `exit code` celého `pwsh` s rourou je kód posledního příkazu v rouře |
+| **FPS** | `& .cache\godot\...console.exe --path . --rendering-driver opengl3 --script res://_analyza/vlna5-chuze.gd` (+ `--kroku=0` = ve stoji) | **NEMĚŘENO 14. session** (kód V2 přidává jen výpočet offsetu, ale číslo není změřené) — platí **12. session**: ve stoji 34,5 ms (29 FPS), v chůzi 34,6 ms median / p90 39,6 / max 141 ms; **bez ořezu** 46,6 ms, **bez svahů** 28,0 ms |
+| Brány | `python tools/gates/run-all.py` | **11 měřeno / 0 NEMĚŘENO / 0 vad**, `exit 0` (`_analyza/zaver14-brany.txt`) |
+| Self-testy | `python tools/gates/run-all.py --self-test` | **21 celkem (10 bran + 11 extrakčních nástrojů), 0 chyb**, `exit 0` |
+| Mutační důkaz | `python tools/gates/mutace-tests.py --only walk,movement,player_controller,world_view` | **41 z 41 chyceno**, smlouvy vstupů OK (`_analyza/vlna14-mutace.txt` = `walk`+`movement`+`player_controller`+`world_view` v prvním běhu 38/41 → doplněny 2 slepé kontroly a 1 mrtvý vzor → `_analyza/vlna14-mutace2.txt` 30/30 pro `walk,movement`); plný běh dělá CI |
+| Fixture | `python tests/fixtures/{world,hues,anim}/make_fixture.py --check` | **3× OK**, `exit 0` |
+| Animace / Barvy / Texmapy | `anim.py` / `hues.py` / `texmaps.py --verify` | `35 / 5 / 4 116` kontrol a texmap, 0 chyb (v self-testech bran) |
+| **Snímek je z běhu** | `Get-Item .cache/render/snapshot.png` | G10 prošla (`_analyza/zaver14-brany.txt`); **nové snímky** této session: `_analyza/frames14/montaz-krok.png` + `frame00000024/42.png` (V2) |
 | Godot běží | `& .cache\godot\...console.exe --headless --version` | `4.7.2.stable.official.ed1daf0bf` |
 | Instalace UO na místě | `Test-Path 'D:\Games\...\tiledata.mul'` | `True` |
-| Kontroly zadání | `check-docs-refs.py`, `check-zadani.py`, `roadmap-gen.py --check` | `exit 0` |
-| Stav plánu | `python tools/plan-status.py` | `111 granul`, **`45` měřeně hotových**, 0 rozporů (12. session neměnila `roadmap.json`) |
-| **Sandbox** | `whoami /groups \| Select-String Mandatory` | **12. session běžela pod plným přístupem** (`danger-full-access`); v `workspace-write` (Low) **nejde zapsat do `.cache`, `tools/` ani `assets/uo`** → sada hlásí 8 falešných selhání a atlas se nedá přegenerovat (viz `LESSONS`) |
+| Kontroly zadání | `check-docs-refs.py`, `check-zadani.py`, `roadmap-gen.py --check` | `exit 0` (všechny tři, 14. session) |
+| Stav plánu | `python tools/plan-status.py` | `111 granul`, **`53` měřeně hotových**, **0 rozporů** — **stejné číslo jako před session** (session nepřidala granuli; opravovala existující) |
+| **Sandbox** | `whoami /groups \| Select-String Mandatory` | **musí být `Medium`** (plný přístup); `Low` = `workspace-write` → falešné vady (viz „Oprávnění" výš a `LESSONS`) |
 
 ## Otevřené věci a co je potřeba dodělat
 

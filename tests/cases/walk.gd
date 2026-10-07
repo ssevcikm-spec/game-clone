@@ -25,6 +25,7 @@ const ITEM_OFFSET := 0x4000
 const F_IMPASSABLE := 0x00000040
 const F_WET := 0x00000080
 const F_SURFACE := 0x00000200
+const F_BRIDGE := 0x00000400
 const F_CONTAINER := 0x00200000
 const F_DOOR := 0x20000000
 
@@ -46,6 +47,8 @@ const DVER := 0x0007        # statik, Door + Impassable + height 20 (ZAVRENE)
 const DVER_OTEVRENE := 0x0008   # statik, Door + Impassable + height 20 (OTEVRENE)
 const NIZKO := 0x0009       # statik, Impassable, ale z = -40 (pod nohama)
 const VYSOKO := 0x000A      # statik, Impassable, z = 60 (nad hlavou)
+const PRKNO := 0x000B       # statik, Surface + height 1 (prkno mostu/mola)
+const MOST := 0x000C        # statik, Surface + Bridge + height 4 (puli vysku)
 
 
 class FakeTiledata:
@@ -109,6 +112,10 @@ func _fake() -> Array:
 	td.h[NIZKO + ITEM_OFFSET] = 5
 	td.f[VYSOKO + ITEM_OFFSET] = F_IMPASSABLE
 	td.h[VYSOKO + ITEM_OFFSET] = 5
+	td.f[PRKNO + ITEM_OFFSET] = F_SURFACE
+	td.h[PRKNO + ITEM_OFFSET] = 1
+	td.f[MOST + ITEM_OFFSET] = F_SURFACE | F_BRIDGE
+	td.h[MOST + ITEM_OFFSET] = 4
 
 	var map = FakeMap.new()
 	for y in 8:
@@ -136,19 +143,79 @@ func run(t) -> void:
 	var td = pair[1]
 	var walk = _new(script, map, td)
 
-	# 1) volna dlazdice: jde se, z se bere z mapy
+	# 1) volna dlazdice: jde se, z se bere z ROHU (landCenter, `Map.GetAverageZ`)
 	var free: Dictionary = walk.can_step(Vector3i(5, 5, 0), 0, Const.PERSON_HEIGHT, true)
 	t._check(free["ok"] == true and int(free["z"]) == 0 and str(free["reason"]) == "",
 		"world.walk: volna trava na vychod (dir 0) vraci ok (namEReno %s)" % str(free))
-	map.zs[Vector2i(6, 5)] = 3
-	var vyska: Dictionary = walk.can_step(Vector3i(5, 5, 0), 0, Const.PERSON_HEIGHT, true)
-	t._check(vyska["ok"] == false and str(vyska["reason"]) == "height",
-		"world.walk: krok nahoru o 3 (> STEP_HEIGHT 2) vraci reason 'height' (namEReno %s)" % str(vyska))
-	map.zs[Vector2i(6, 5)] = 2
+
+	# 1b) ⚠ V4 (2026-10-07): vyska se pocita z HORNICH HRAN, ne z `dz` jednoho
+	#     `z` mapy (`REVIZE-POHYB` §2.4; `Movement.cs:170-171,319-321`).
+	#     Náhorní PLOSINA (vsechny 4 rohy vysky +3) se nevyjde - `stepTop =
+	#     startTop + 2` je nizsi nez `landLow = 3`.
+	var plocha := [Vector2i(6, 5), Vector2i(7, 5), Vector2i(6, 6), Vector2i(7, 6)]
+	for bod in plocha:
+		map.zs[bod] = 3
+	var plosina3: Dictionary = walk.can_step(Vector3i(5, 5, 0), 0, Const.PERSON_HEIGHT, true)
+	t._check(plosina3["ok"] == false and str(plosina3["reason"]) == "height",
+		"world.walk: plosina o 3 (> STEP_HEIGHT 2) vraci reason 'height' (namEReno %s)" % str(plosina3))
+	for bod in plocha:
+		map.zs[bod] = 2
 	var step2: Dictionary = walk.can_step(Vector3i(5, 5, 0), 0, Const.PERSON_HEIGHT, true)
 	t._check(step2["ok"] == true and int(step2["z"]) == 2,
-		"world.walk: krok nahoru o 2 (STEP_HEIGHT) jeste jde (namEReno %s)" % str(step2))
+		"world.walk: plosina o 2 (STEP_HEIGHT) jeste jde a stoji se na ni (namEReno %s)" % str(step2))
+	for bod in plocha:
+		map.zs[bod] = 0
+
+	# 1c) OSAMOCENA dlazdice se zvednutym `z` (rohy 3,0,0,0) se PODARI: `landLow`
+	#     je z rohu (0), ne z dlazdice. Stojna vyska je `landCenter` = 0 - prumer
+	#     dvojice s VETSiM rozdilem (`GetAverageZ`, Map.cs:587-594: |3-0| > |0-0|,
+	#     takze se prumeruji rohy (x,y+1) a (x+1,y)). Je to vlastnost reference,
+	#     ne nase volba - proto se meri, aby ji nikdo "neopravil" potichu.
+	map.zs[Vector2i(6, 5)] = 3
+	var spice: Dictionary = walk.can_step(Vector3i(5, 5, 0), 0, Const.PERSON_HEIGHT, true)
+	t._check(spice["ok"] == true and int(spice["z"]) == 0,
+		"world.walk: osamoceny zvednuty roh je pruchozeny a stoji se na landCenter (namEReno %s)" % str(spice))
 	map.zs[Vector2i(6, 5)] = 0
+
+	# 1d) ⚠ V4: SVAH se VYJDE i kdyz je rozdil PRUMERU 4 (stare pravidlo `dz <= 2`
+	#     ho blokovalo - presne to uzivatel hlasi jako "do kopce me nepusti").
+	#     Dlazdice (6,5) ma rohy [4,8,4,8] (svah na vychod), stojim na (5,5) v z=2
+	#     (coz je landCenter te dlazdice: jeji rohy jsou [0,4,0,4]) -> startTop =
+	#     max(top(5,5)=4, 2) = 4, strop = 6 >= low(6,5) = 4 -> jde se, z = 6.
+	map.zs[Vector2i(6, 5)] = 4
+	map.zs[Vector2i(7, 5)] = 8
+	map.zs[Vector2i(6, 6)] = 4
+	map.zs[Vector2i(7, 6)] = 8
+	var svah: Dictionary = walk.can_step(Vector3i(5, 5, 2), 0, Const.PERSON_HEIGHT, true)
+	t._check(svah["ok"] == true and int(svah["z"]) == 6,
+		"world.walk: svah o 4 se vyjde (rohy), z = prumer rohu 6 (namEReno %s)" % str(svah))
+	# 1e) ⚠ V4: DOLU nema reference zadny limit (`Movement.cs` dolni mez nezna).
+	#     Stare pravidlo blokovalo `dz < -PERSON_HEIGHT`; dnes se skoci i o 40 dolu.
+	var dolu: Dictionary = walk.can_step(Vector3i(5, 5, 40), 0, Const.PERSON_HEIGHT, true)
+	t._check(dolu["ok"] == true and int(dolu["z"]) == 6,
+		"world.walk: dolu bez limitu (z 40 na svah, z=6) (namEReno %s)" % str(dolu))
+	for bod in plocha:
+		map.zs[bod] = 0
+
+	# 1d2) ⚠ V4: `startTop` je HORNI HRANA (nejvyssi roh) toho, na cem postava
+	#      stoji - ne jeji `z`. Stojim na (5,5), jejiz rohy jsou [0,6,0,6] (roh na
+	#      vychod patri cili), takze `top = 6` a `landCenter = 3`; postava stoji
+	#      v `z = 3`. Cil (6,5) ma rohy [6,10,6,10] -> `low = 6`, `landCenter = 8`.
+	#      S `startTop = max(6, 3) = 6` je strop `6 + 2 = 8 >= 6` -> JDE SE
+	#      (a stoji se v 8). Kdyby se `startTop` vzalo z `from.z = 3`, byl by
+	#      strop 5 < 6 -> blok: tuhle vetev meri tahle kontrola.
+	map.zs[Vector2i(5, 5)] = 0
+	map.zs[Vector2i(5, 6)] = 0
+	map.zs[Vector2i(6, 5)] = 6
+	map.zs[Vector2i(7, 5)] = 10
+	map.zs[Vector2i(6, 6)] = 6
+	map.zs[Vector2i(7, 6)] = 10
+	var start_top: Dictionary = walk.can_step(Vector3i(5, 5, 3), 0, Const.PERSON_HEIGHT, true)
+	t._check(start_top["ok"] == true and int(start_top["z"]) == 8,
+		"world.walk: startTop je horni hrana (nejvyssi roh), ne moje z (namEReno %s)"
+			% str(start_top))
+	for bod in [Vector2i(6, 5), Vector2i(7, 5), Vector2i(6, 6), Vector2i(7, 6)]:
+		map.zs[bod] = 0
 
 	# 2) voda (Wet) a zed (Impassable) blokuji - presne podle smlouvy
 	map.land[Vector2i(6, 5)] = VODA
@@ -197,6 +264,45 @@ func run(t) -> void:
 	t._check(dvere_nizko["ok"] == true,
 		"world.walk: zavrene dvere 40 pod nohama neblokuji (namEReno %s)" % str(dvere_nizko))
 	map.statics.erase(Vector2i(6, 5))
+
+	# 2e) ⚠ V5 (2026-10-07): STATIK SE `Surface` ROZHODUJE I NAD VODOU. Uzivatel
+	#     "pres most me nepusti (nad vodou)". Do teto session se voda kontrolovala
+	#     DRIV nez statiky (`F_WET` -> `blocked`), takze molo nad vodou bylo
+	#     nedosazitelne; reference ma statik kandidatem povrchu (`Movement.cs:211`)
+	#     a most NENI entita - je to statik se `Surface`/`Bridge` (`TileData.cs:138`).
+	#     Stojim na brehu v z=10, cilova dlazdice je VODA (z=-5), na ni prkno z=10.
+	map.zs[Vector2i(5, 5)] = 10
+	map.zs[Vector2i(5, 6)] = 10
+	map.zs[Vector2i(6, 6)] = 10
+	map.land[Vector2i(6, 5)] = VODA
+	map.zs[Vector2i(6, 5)] = -5
+	var voda_bez: Dictionary = walk.can_step(Vector3i(5, 5, 10), 0, Const.PERSON_HEIGHT, true)
+	t._check(voda_bez["ok"] == false and str(voda_bez["reason"]) == "blocked",
+		"world.walk: do vody se nesmi (bez prkna) (namEReno %s)" % str(voda_bez))
+	map.statics[Vector2i(6, 5)] = [_statik(PRKNO, 6, 5, 10)]
+	var molo: Dictionary = walk.can_step(Vector3i(5, 5, 10), 0, Const.PERSON_HEIGHT, true)
+	t._check(molo["ok"] == true and int(molo["z"]) == 11,
+		"world.walk: prkno nad vodou je pruchozeny povrch (z=11) (namEReno %s)" % str(molo))
+	map.statics.erase(Vector2i(6, 5))
+
+	# 2f) ⚠ V4 bod 3: statik s `Bridge` (0x400) ma `CalcHeight = vyska/2` a jeho
+	#     strop pro krok je jen `itemZ` (`TileData.cs:112-125`, `Movement.cs:233-234`).
+	#     Stejna vyska 4 na vode: s `Bridge` se vstoupi (stojim 10 + 4/2 = 12),
+	#     bez nej ne (strop 12 < itemTop 14) - rozhoduje JEN flag.
+	map.statics[Vector2i(6, 5)] = [_statik(MOST, 6, 5, 10)]
+	var most: Dictionary = walk.can_step(Vector3i(5, 5, 10), 0, Const.PERSON_HEIGHT, true)
+	t._check(most["ok"] == true and int(most["z"]) == 12,
+		"world.walk: Bridge puli vysku (10 + 4/2 = 12) (namEReno %s)" % str(most))
+	map.statics[Vector2i(6, 5)] = [_statik(PLOSINA, 6, 5, 10)]
+	var bez_mostu: Dictionary = walk.can_step(Vector3i(5, 5, 10), 0, Const.PERSON_HEIGHT, true)
+	t._check(bez_mostu["ok"] == false and str(bez_mostu["reason"]) == "height",
+		"world.walk: stejne vysoka plosina BEZ Bridge se nevyjde (namEReno %s)" % str(bez_mostu))
+	map.statics.erase(Vector2i(6, 5))
+	map.land[Vector2i(6, 5)] = TRAVA
+	map.zs[Vector2i(6, 5)] = 0
+	map.zs[Vector2i(5, 5)] = 0
+	map.zs[Vector2i(5, 6)] = 0
+	map.zs[Vector2i(6, 6)] = 0
 
 	# 3) statik s `Surface` ZVEDNE povrch; `Wall` (dekor) ho nezvysuje
 	map.statics[Vector2i(6, 5)] = [_statik(PLOSINA, 6, 5, 10)]
@@ -291,10 +397,17 @@ func run(t) -> void:
 		t._check(z_walku == z_mapy,
 			"world.walk: bez statiku je surface_z tolik co z mapy (%d vs %d)" % [z_walku, z_mapy])
 		var fix_walk = _new(script, fix, td)
+		# ⚠ V4: stojna vyska je `landCenter` z ROHU cilove dlazdice, ne jeji
+		# `z_at` (na fixture vychazi -7 proti -11 v mape). Test proto meri
+		# ROZSAH rohu a to, ze se jde - ne jednu hodnotu, ktera by jen
+		# zrcadlila implementaci.
+		var rohy := [fix.z_at(1, 0), fix.z_at(2, 0), fix.z_at(1, 1), fix.z_at(2, 1)]
+		var r_low: int = mini(mini(int(rohy[0]), int(rohy[1])), mini(int(rohy[2]), int(rohy[3])))
+		var r_top: int = maxi(maxi(int(rohy[0]), int(rohy[1])), maxi(int(rohy[2]), int(rohy[3])))
 		var krok: Dictionary = fix_walk.can_step(Vector3i(0, 0, z_mapy), 0, Const.PERSON_HEIGHT, false)
-		t._check(krok["ok"] == true and int(krok["z"]) == fix.z_at(1, 0),
-			"world.walk: na fixture se da jit na vychod a z je z mapy (namEReno %s, mapa %d)"
-				% [str(krok), fix.z_at(1, 0)])
+		t._check(krok["ok"] == true and int(krok["z"]) >= r_low and int(krok["z"]) <= r_top,
+			"world.walk: na fixture se da jit na vychod a z je z ROHU cile (namEReno %s, rohy %d..%d, z_at cile %d)"
+				% [str(krok), r_low, r_top, fix.z_at(1, 0)])
 	else:
 		print("[test]      NEMERENO: world.walk nad fixture - chybi tests/fixtures/world/map0.meta.json")
 
@@ -314,8 +427,11 @@ func run(t) -> void:
 	t._check(pocet_ok > 0,
 		"world.walk: z britskeho namesti se da jit aspon jednim smerem (namEReno %d z 8)" % pocet_ok)
 
-	# 8b) REALNE SCHODY: `world.stairs` zna art a jeho vyska se pocita do povrchu.
-	#     (Overuje se na dlazdici, ktera v mape opravdu schod ma - hleda se v okoli.)
+	# 8b) REALNE SCHODY: `world.stairs` zna art a jeho vyska se pocita do povrchu
+	#     PRES `CalcHeight` (`TileData.cs:112-125`): `Bridge` (0x400) puli vysku.
+	#     NamEReno: `stone stairs` (art 1823) ma flagy 0x2600 - `Bridge` MEZI NIMI,
+	#     takze stojna vyska je `z + 5/2 = z + 2` (drive test cekal `z + 5`,
+	#     coz byla nase vlastni, ne referencni hodnota).
 	var StairsScript = Lib.script_at("res://sim/world/stairs.gd")
 	if StairsScript == null:
 		t._pending("world.walk: sim/world/stairs.gd se nenacetl (parse error?)")
@@ -324,27 +440,36 @@ func run(t) -> void:
 	var nasel := -1
 	var ocekavany := 0
 	var zmereny := 0
+	var flagy_nalezu := 0
 	for y in range(1560, 1610):
 		for x in range(1470, 1530):
 			var vrchol := -99999
 			var ma_schod := -1
+			var flagy := 0
 			for s in real._map.statics_at(x, y):
 				if int(s["x"]) != x % Const.BLOCK_SIZE or int(s["y"]) != y % Const.BLOCK_SIZE:
 					continue
 				var tile: int = int(s["tile"])
-				if real._tiledata.flags(tile + ITEM_OFFSET) & F_SURFACE == 0:
+				var fl: int = real._tiledata.flags(tile + ITEM_OFFSET)
+				if fl & F_SURFACE == 0:
 					continue
-				var top: int = int(s["z"]) + real._tiledata.height(tile + ITEM_OFFSET)
+				var h: int = real._tiledata.height(tile + ITEM_OFFSET)
+				var calc: int = h / 2 if fl & F_BRIDGE != 0 else h
+				var top: int = int(s["z"]) + calc
 				if top > vrchol:
 					vrchol = top
 					ma_schod = tile if schody.is_stair(tile) else -1
+					flagy = fl
 			if ma_schod >= 0 and vrchol > real._map.z_at(x, y):
 				nasel = ma_schod
 				ocekavany = vrchol
 				zmereny = real.surface_z(x, y)
+				flagy_nalezu = flagy
 	t._check(nasel >= 0 and zmereny == ocekavany,
-		"world.walk: povrch realneho schodu je `z + vyska` z tiledata (art %d: mereno %d, ocekavano %d)"
-			% [nasel, zmereny, ocekavany])
+		"world.walk: povrch realneho schodu je `z + CalcHeight` (art %d, flagy 0x%08X: mereno %d, ocekavano %d)"
+			% [nasel, flagy_nalezu, zmereny, ocekavany])
+	t._check(flagy_nalezu & F_BRIDGE != 0,
+		"world.walk: nalezeny schod ma `Bridge` (0x%08X) - proto se vyska pultí" % flagy_nalezu)
 
 	# 8c) REALNE DVERE: stav bere walk z `world.doors` (art z `data/doors.json`).
 	#     Konvence (8. session, `world.doors`): art z `doors.txt` je ZAVRENY a

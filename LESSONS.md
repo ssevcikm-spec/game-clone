@@ -24,6 +24,105 @@ Typy: `chyba` (moje vada) · `past-nástroje` (prostředí/nástroj, ne logika) 
 
 ---
 
+### 2026-10-07 — Sonda odhalila vadu v MOJÍ vlastní opravě: číslo bylo HORŠÍ než před ní (chyba)
+**Co se stalo:** oprava V2 (posun postavy mezi dlaždicemi) prošla testy i vypadala
+správně — offset rostl 0 → 4,4 → 8,8 → 13,2 → 17,6 px, animace startovala se
+záměrem. Sonda v **běhu hry** ale naměřila **maximální skok obrazu postavy na frame
+37,33 px** místo 31,11 px u starého klienta: `app/player_controller._process` běžel
+**před** `app/loop` (ten se do scény přidává až za controllerem), takže v rámci,
+kdy se krok commitnul, přičetl posun k **již posunuté** dlaždici (1,8 dlaždice).
+Oprava = `process_priority = 1` (controller běží po smyčce); po ní max skok 6,23 px.
+**Doklad:** `_analyza/vlna14-pohyb.gd` (`_analyza/vlna14-pohyb.txt`): 3 záměry,
+3× animace v témže framu, 38 framů nakreslených mezi dlaždicemi, max skok 6,23 px;
+před opravou 37,33 px a „zameru 3, z toho s animaci 0".
+**Ponaučení:** jednotkový test na **vzorec** (frakce, pixely) je nutný, ale
+**nedokazuje fázi** — fázi měří jen běh. Každá změna časování/pořadí musí mít sondu
+v reálné smyčce, která měří **velikost skoku mezi framy**, ne jen to, že hodnoty
+„vypadají správně". A když sonda vyjde hůř než před změnou, je to nález o změně,
+ne o sondě.
+
+### 2026-10-07 — Návratový kód `pwsh` s rourou NENÍ kód nativního programu (past-nástroje)
+**Co se stalo:** testy vypsaly `997 kontrol, 0 selhani` a nástroj hlásil
+`[exit code: 1]` — protože posledním příkazem v `pwsh` byl `Select-String`/`Out-File`
+v rouře. Totéž volání s `$LASTEXITCODE` hned po Godotu dalo **`EXIT_TESTY=0`**.
+Předchozí session (12.) dostala 0 právě proto, že četla `$LASTEXITCODE`.
+**Doklad:** `_analyza/t14-testy4.txt` (`EXIT_TESTY=0`) vs `[exit code: 1]` u téhož běhu
+s `| Select-String`; v `_analyza/prelet14.txt` (workspace-write) je `EXIT_TESTY=1`
+u běhu s **9 selháními** — tam se obojí shoduje, takže past je vidět jen v zeleném běhu.
+**Ponaučení:** u nativního programu čti **`$LASTEXITCODE` ihned po něm** (a zapiš ho
+do logu, jako `_analyza/prelet14-full.txt`); `exit code` celého `pwsh` je kód
+posledního příkazu v rouře a u zeleného běhu lže.
+
+### 2026-10-07 — Referenční pravidlo přepsané do Pythonu měří NĚCO JINÉHO než kód (postup)
+**Co se stalo:** `_analyza/vada-svah.py` (13. session) měřil UO pravidlo i naše
+pravidlo **přepsané v Pythonu** (bez statiků). Nová sonda volá **skutečný**
+`world.walk.can_step` a proti němu staví **celý** model reference (statiky + `IsOk`,
+`Movement.cs:74-132`): s modelem bez statiků vycházelo „23 212 kroků blokujeme
+neoprávněně (13,98 %)", proti celému modelu **0** — všech 23 212 bylo způsobeno
+statikem, který referenční vzorec v Pythonu vůbec nevidí.
+**Doklad:** `_analyza/vlna14-svah-most.gd` (dvě matice: „vs vzorec z Pythonu"
+a „vs CELÝ model"); `_analyza/vlna14-svah-most-PRED.txt` (před opravou: 14 965).
+**Ponaučení:** sonda musí volat **skutečný kód**, ne jeho opis; a porovnává-li se
+s referencí, musí reference umět **všechno, co umí kód** (statiky, `IsOk`, dveře) —
+jinak se „vada" vyrobí v sondě. Když se dvě reference rozcházejí, hledej **čím se
+liší**, ne která „je správná".
+
+### 2026-10-07 — Přepsaný modul nechá v mutačním harnessu mrtvé vzory (vada-zadani)
+**Co se stalo:** po přepsání `sim/world/walk.gd` (V4/V5) dvě mutace odkazovaly na
+text, který v souboru už není (`if dz > vyska_kroku:`, `F_WET != 0:`). Harness to
+**ohlásil** („PATRANA VETA SE VE ZDROJI NENASLA - mutace se neprovedla, nepocita se"),
+takže se na to nepřišlo až v CI — ale kdyby to nehlásil, byl by to tichý úbytek
+důkazu.
+**Doklad:** `tools/gates/mutace-tests.py` (modul `walk`, 14. session: 2 vzory
+nahrazeny, 8 nových na V4/V5); `_analyza/vlna14-mutace.txt`.
+**Ponaučení:** kdo přepíše modul, **ve stejné session srovná i vzory v harnessu**
+a spustí `--only <modul>`; „harness vzory hlásí" je vlastnost, na které se dá stavět,
+ale nesmí se na ni spoléhat jako na kontrolu (počítá se jen provedená mutace).
+
+### 2026-10-07 — `TileFlag.Bridge` (0x400) mají i SCHODY: půlí jim stojnou výšku (vada-zadani)
+**Co se stalo:** test tvrdil, že povrch schodu je `z + výška` (`art 1823` → 35).
+Naměřeno: `stone stairs` (art 1823) má flagy **`0x2600`**, tedy `Surface | Bridge |
+NoShoot`; `TileData.CalcHeight` u `Bridge` vrací **výšku/2** (`TileData.cs:112-125`),
+takže stojná výška je `30 + 2 = 32`. Naše `z + výška` bylo **naše vlastní pravidlo**,
+ne referenční.
+**Doklad:** `assets/uo/tiles.json` (art 1823: `flags 9728 = 0x2600`, `height 5`);
+`tests/cases/walk.gd` 8b po opravě (`mereno 32`); `_src/servuo/Server/TileData.cs:112-125`.
+**Ponaučení:** než označíš číslo v kódu za správné, **přečti flagy toho artu** —
+`Bridge` není jen „prkno mostu", v datech je i na schodech a půlí výšku.
+
+### 2026-10-07 — `GetAverageZ` u osamocené vyvýšené dlaždice vrací 0 (past-nástroje)
+**Co se stalo:** dlaždice se `z = +3` uprostřed roviny má rohy `[3, 0, 0, 0]`;
+`Map.GetAverageZ` (`Map.cs:587-594`) průměruje dvojici s **větším** absolutním
+rozdílem, takže vrací `(0+0)/2 = 0` — postava se „postaví" na 0. Vypadá to jako vada
+výpočtu, ale je to reference; a protože `landLow = 0`, krok na ni reference **povolí**.
+**Doklad:** `tests/cases/walk.gd` 1c (měří to jako vlastnost), `_src/servuo/Server/Map.cs:552-607`.
+**Ponaučení:** u referenčních vzorců měř **i případy, které vypadají divně**, a zapiš
+je jako měřenou vlastnost — jinak je příští session „opraví" a rozbije shodu.
+
+### 2026-10-07 — Vlastní metrika „težiště nejtmavších pixelů" neměřila posun (chyba)
+**Co se stalo:** posun postavy mezi dvěma snímky jsem chtěl měřit jako težiště
+nejtmavších pixelů v okně kolem postavy. Vyšlo **−0,48 px**, když se postava
+posunula o 4,4 px (v okně je i tmavá dlažba mapy). Funkční mírou je **obalka
+změněných pixelů** mezi dvojicemi snímků v jednom kroku: ta se posouvala monotónně
+(644,5/338,0 → 647,0/340,0 → 651,0/344,0) při **0,09–0,11 %** změněných pixelů,
+a commit kroku (pár 43→44) změnil **59,5 %** obrazu.
+**Doklad:** `_analyza/vlna14-posun-snimku.py`, `_analyza/vlna14-posun-snimku.txt`,
+`_analyza/frames14/montaz-krok.png` (pohledem: postava na dvou místech, svět stejný).
+**Ponaučení:** nefunkční metriku **smaž a napiš, co naměřila špatně**; a míru, která
+má něco tvrdit, ověř na **více dvojicích** — jedna dvojice nedokazuje směr.
+
+### 2026-10-07 — `git.cmd` v této stanici v PATH není (past-nástroje)
+**Co se stalo:** skript `_analyza/vlna14-stary-walk.py` volal `git.cmd` (vzor
+z projektu `orchestra`, tam leží v `orchestra/tools/`), dostal
+`'git.cmd' is not recognized` a **sonda správně ohlásila NEMĚŘENO** — místo aby
+měřila prázdný soubor.
+**Doklad:** `_analyza/vlna14-stary-walk.py` (po opravě `GIT = "git"`; zapsáno
+`8 900 B`, první tři bajty `[101, 120, 116]` = `ext`, tj. bez BOM).
+**Ponaučení:** cesta k nástroji patří **projektu**, ne kopírovanému skriptu;
+a když nástroj chybí, skript to musí **říct** (exit 2), ne pokračovat.
+
+---
+
 ### 2026-10-07 — `run()` v case souboru umře a sada to nevidí: 0 kontrol, exit 0 (past-nástroje)
 **Co se stalo:** subagent měřil „cizí soubor" v `tests/cases/hud.gd` (přepnul vstup
 na `ui/status_bar.gd`). Chybějící metoda shodila `run()` na *Invalid call*, case

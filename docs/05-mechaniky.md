@@ -40,10 +40,28 @@ různé věci se stejnou hodnotou — proto je tabulka výš uvádí jako dva ř
 
 Konstanty: `PERSON_HEIGHT = 16`, `STEP_HEIGHT = 2`.
 
-1. **Výchozí `z`** se počítá z dlaždic pod cílovou pozicí (land + statiky,
-   které mají `Surface`) — bere se nejvyšší povrch, na který se vejde postava.
-2. **Blokuje se**, když se výškový interval cíle `[z, z + výška_dlaždice)`
-   protne s `[z_postavy, z_postavy + 16)` — s povoleným krokem `STEP_HEIGHT = 2`.
+1. **Povrch a stojná výška se berou z HORNÍCH HRAN, ne z jednoho `z`.**
+   Kandidátem na povrch cílové dlaždice je land a statiky se `Surface` **bez**
+   `Impassable`; vyhrává ten, jehož stojná výška je postavě **výškově nejblíž**
+   (rovnost → nižší). Stojná výška landu je `landCenter` (průměr dvojice rohů
+   s větším absolutním rozdílem, celočíselně dolů; `Map.GetAverageZ`,
+   `_src/servuo` `Server/Map.cs:552-607`), u statiku `z + CalcHeight`
+   (`CalcHeight` = `Bridge` ? výška/2 : výška, `TileData.cs:112-125`).
+2. **Blokuje se**, když `stepTop = startTop + STEP_HEIGHT` (kde `startTop` je
+   **nejvyšší roh** dlaždice, na které postava stojí) nepřekročí horní hranu cíle
+   — u landu `landLow` (**nejnižší** roh), u statiku `itemTop` (`z + (Bridge ?
+   0 : výška)`). Navíc blokuje statik se `Impassable`/`Container`/zavřené dveře,
+   jehož pásmo `[z, z + max(výška, 1))` se protne s pásmem postavy. **Dolů
+   žádný limit není** (`Movement.cs` dolní mez nezná).
+   > ⚠ **PŘEPIS 2026-10-07 (14. session, vady V4 a V5).** Dřív tu stálo „bere se
+   > nejvyšší povrch" a „blokuje se, když se interval `[z, z + výška_dlaždice)`
+   > protne s `[z_postavy, z_postavy + 16)` — s povoleným krokem 2". To bylo
+   > **měřením vyvráceno jako přísnější než UO**: 4 013 z 165 985 kroků do kopce
+   > (2,4 %) reference povolí a my je blokovali (`_analyza/vada-svah.py`), a most
+   > nad vodou byl nedosažitelný (`_analyza/vada-most-mapa.py`). Nové znění je
+   > přepsané podle `_src/servuo` `Movement.cs:170-171`, `:211-343`,
+   > `Map.cs:552-607`, `TileData.cs:112-125`; důkaz: `_analyza/vlna14-svah-most.gd`
+   > (před: 14 965 kroků blokovaných, které reference povolí; po: **0**).
 3. Z **všech** flagů dlaždice mají na pohyb vliv jen **`Impassable`, `Surface`,
    `Wet`** (a výjimečně `Door` a `Container`). `Wall`, `Window`, `Roof`,
    `Foliage`, `NoShoot`, `StairBack`, `StairRight` pohyb **neovlivňují**.

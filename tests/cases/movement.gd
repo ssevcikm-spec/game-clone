@@ -111,6 +111,49 @@ func run(t) -> void:
 	t._check(jmena.has("mobile_anim") and jmena.has("mobile_moved"),
 		"sim.movement: posila mobile_anim i mobile_moved (namEReno %s)" % str(jmena))
 
+	# 3b) ⚠ V4/V2 (2026-10-07): krok musi klientovi rict, KDY zacal a JAKA je
+	#     stojna vyska (`pending_step`), a po vykonani se musi ZAPSAT do `pos.z`.
+	#     Do teto session se `z` z `can_step` zahodilo, takze postava zustala
+	#     ve vysce prvniho kroku (na svahu se pak kazdy dalsi krok meril proti
+	#     stare vysce a cesta do kopce se zablokovala - vada V4).
+	#     Krok se zadava DRUHemu mobilu, aby se `mob` (a jeho pozice pro dalsi
+	#     sekce) nerozjel.
+	var mob3 = MobileScript.new(0x40000007, 400, Vector3i(5, 5, 0))
+	mv.register(mob3)
+	var cas_zadosti: int = int(clock.now_ms())
+	var krok_zadost: Dictionary = mv.request_step(mob3.serial, 0, false)
+	t._check(krok_zadost["ok"] == true,
+		"sim.movement: krok druheho mobilu projde (namEReno %s)" % str(krok_zadost))
+	var krok_v_letu: Dictionary = mv.pending_step(mob3.serial)
+	var ma_cas: bool = krok_v_letu.has("start_ms") and int(krok_v_letu["delay_ms"]) == 400 \
+		and int(krok_v_letu["z"]) == 0
+	t._check(ma_cas,
+		"sim.movement: pending_step nese start_ms, delay_ms i z (namEReno %s)" % str(krok_v_letu))
+	# `start_ms` musi byt CAS ZADOSTI (klient z nej pocita posun): hodnota 0 by
+	# prosla kontrole "klic existuje", ale posun by vysel jinde.
+	t._check(int(krok_v_letu.get("start_ms", -1)) == cas_zadosti,
+		"sim.movement: start_ms je cas zadosti (%s, cekano %d)"
+			% [str(krok_v_letu.get("start_ms")), cas_zadosti])
+	t._check(mv.pending_step(0x40009999).is_empty(),
+		"sim.movement: pending_step pro neznamy serial vraci prazdno")
+	clock.advance(Const.WALK_MS)
+	mv.tick(Const.TICK_MS)
+	t._check(mv.pending_step(mob3.serial).is_empty(),
+		"sim.movement: po vykonani kroku je pending_step prazdny")
+	# vlastni instance se stubem, ktery vraci z=7: po kroku musi byt `pos.z == 7`
+	var walkv = FakeWalk.new()
+	walkv.vysledky[0] = {"ok": true, "z": 7, "reason": ""}
+	var clockv = ClockScript.new()
+	var MovementScript = Lib.script_at(_arg("movement-script", MOVEMENT_SCRIPT))
+	var mvv = MovementScript.new(walkv, clockv, EventsScript.new(), "run_only", null)
+	var mobv = MobileScript.new(0x40000002, 400, Vector3i(5, 5, 0))
+	mvv.register(mobv)
+	mvv.request_step(mobv.serial, 0, false)
+	clockv.advance(Const.WALK_MS)
+	mvv.tick(Const.TICK_MS)
+	t._check(mobv.pos == Vector3i(6, 5, 7),
+		"sim.movement: stojna vyska z `can_step` se zapise do pos.z (pos %s)" % str(mobv.pos))
+
 	# 4) beh: 200 ms a 1 bod staminy za krok (model run_only)
 	var beh: Dictionary = mv.request_step(m, 0, true)
 	t._check(beh["ok"] == true and int(beh["delay_ms"]) == 200,

@@ -126,10 +126,16 @@ MODULY = {
         "prefix": "world.walk",
         "prepinac": "--walk-script",
         "mutace": [
+            # ⚠ PREDELANO 2026-10-07 (14. session, V4/V5): pravidla vysky se
+            # prepsala z `dz <= STEP_HEIGHT` na HORNI HRANY (`Movement.cs:170-171,
+            # 319-321`), takze dve puvodni mutace odkazovaly na text, ktery uz
+            # v souboru neni (`if dz > vyska_kroku:`, `F_WET != 0:`) - harness je
+            # hlasil jako "PATRANA VETA SE NENASLA". Nahrazuji je mutace nize.
             ("krok nahoru jen o 1 (STEP_HEIGHT ignorovan)",
-             "if dz > vyska_kroku:", "if dz > 1:"),
-            ("voda neblokuje",
-             "if _tiledata.flags(land) & F_WET != 0:", "if false:"),
+             "var vyska: int = Const.STEP_HEIGHT", "var vyska: int = 1"),
+            ("voda neblokuje (mokry land je kandidat)",
+             "if land >= 0 and _tiledata.flags(land) & (F_IMPASSABLE | F_WET) == 0:",
+             "if land >= 0:"),
             ("diagonala symetricka i pro hrace",
              "if dx != 0 and dy != 0 and is_player:", "if false:"),
             ("statik s Impassable neblokuje",
@@ -159,6 +165,28 @@ MODULY = {
              "if do > z and nase_do > od:", "if true:"),
             ("schod se chova jako plosina (vyska kroku = STEP_HEIGHT)",
              "			vyska = maxi(vyska, _height(tile))", "			vyska = Const.STEP_HEIGHT"),
+            # --- V4 (svah, 14. session): vyska z ROHU dlazdice, ne z jednoho `z`
+            ("svah se meri z NEJVYSSIHO rohu (nejnizsi se ignoruje)",
+             "if strop >= _low(c):", "if strop >= _top(c):"),
+            ("stojna vyska svahu je z dlazdice, ne prumer rohu",
+             "return _floor_avg(z_top, z_bottom)", "return z_top"),
+            ("vzestup se pocita z MEHO z, ne z horni hrany (startTop)",
+             "return maxi(_top(c), from.z)", "return from.z"),
+            ("dolu se vraci limit (krok dolu je omezeny)",
+             "var ber: bool = true",
+             "var ber: bool = from_z - _center(c) <= Const.STEP_HEIGHT"),
+            # --- V4 bod 3 + V5 (most, 14. session)
+            ("Bridge nepuli vysku (CalcHeight se ignoruje)",
+             "if _flags(tile) & F_BRIDGE != 0:\n\t\treturn _height(tile) / 2",
+             "if false:\n\t\treturn _height(tile) / 2"),
+            ("strop statiku se bere i u mostu (itemTop += vyska)",
+             "if flags & F_BRIDGE == 0:\n\t\t\titem_top += _height(tile)",
+             "if true:\n\t\t\titem_top += _height(tile)"),
+            ("statik se `Surface` se vubec nezkusi (most nad vodou neni)",
+             "if flags & F_SURFACE == 0 or flags & F_IMPASSABLE != 0 or flags & F_WET != 0:\n\t\t\tcontinue",
+             "if true:\n\t\t\tcontinue"),
+            ("pruchozi povrch se pri IsOk ignoruje (land pod schodem projde)",
+             "if flags & F_SURFACE != 0 and flags & F_IMPASSABLE == 0:", "if false:"),
         ],
     },
     "doors": {
@@ -326,7 +354,7 @@ MODULY = {
             ("chuze ma prodlevu behu (200 misto 400)",
              "return Const.RUN_MS if run else Const.WALK_MS", "return Const.RUN_MS"),
             ("krok se vykona hned (prodleva 0)",
-             '"due_ms": _now() + delay', '"due_ms": _now()'),
+             '"due_ms": start + delay,', '"due_ms": start,'),
             ("druhy krok v letu se neodmitne",
              'if _pending.has(m):', "if false:"),
             ("beh nebere staminu",
@@ -339,6 +367,16 @@ MODULY = {
              "m == player_serial", "true"),
             ("bez staminy se porad bezi",
              "if use_run and mob.stam <= 0:", "if false:"),
+            # --- V2/V4 (14. session): krok musi klientovi rict, KDY zacal, a
+            # stojna vyska se musi zapsat do `pos.z` (vada V4 - jinak se na
+            # svahu kazdy dalsi krok meri proti stare vysce).
+            ("pending_step vraci prazdny slovnik (klient nevidi krok)",
+             "return (_pending[serial] as Dictionary).duplicate()", "return {}"),
+            ("krok si nepamatuje cas zacatku (klient nema z ceho pocitat)",
+             '"start_ms": start,', '"start_ms": 0,'),
+            ("stojna vyska se do pos.z nezapise (vada V4)",
+             'z = int(_pending[m]["z"])       # stojna vyska z `can_step` (vada V4)',
+             "z = int(mob.pos.z)"),
         ],
     },
     "interaction": {
@@ -553,6 +591,17 @@ MODULY = {
             ("prave tlacitko se zaregistruje jako klavesa",
              "var klik := InputEventMouseButton.new()\n\t\tklik.button_index = MOUSE[action]",
              "var klik := InputEventKey.new()\n\t\tklik.keycode = KEY_F1"),
+            # --- V2 (14. session): posun a animace v jedne fazi
+            ("krok v letu necha akci idle (animace startuje az po skoku)",
+             '_action = ACTION_RUN if bool(_step["run"]) else ACTION_WALK',
+             "_action = ACTION_IDLE"),
+            ("posun se nepocita po 80ms framech (linearni prubeh)",
+             "var zaokrouhleno: int = (maxi(elapsed_ms, 0) / ANIM_FRAME_MS) * ANIM_FRAME_MS",
+             "var zaokrouhleno: int = maxi(elapsed_ms, 0)"),
+            ("posun postavy mezi dlazdicemi se nekresli (offset vzdy nula)",
+             "return (kam_px - od) * f", "return Vector2.ZERO"),
+            ("controller bezi pred smyckou (cte stav pred tickem)",
+             "\tprocess_priority = 1", "\tprocess_priority = 0"),
         ],
     },
     "world_view": {
@@ -575,6 +624,10 @@ MODULY = {
             ("seznam se prestavuje pri kazdem kroku",
              "or absi(center_tile.y - _list_center.y) >= RECENTER_TILES:",
              "or absi(center_tile.y - _list_center.y) >= 1:"),
+            # V2 (14. session): posun kroku se do kresleni postavy musi pricist.
+            ("posun kroku se do kresleni postavy neprida (V2)",
+             "+ Vector2(Const.ISO_STEP, Const.TILE_H / 2) + _player_offset",
+             "+ Vector2(Const.ISO_STEP, Const.TILE_H / 2)"),
         ],
     },
     # DATA se mutuji po bajtech: mutant je kopie JSON s priponou `.gd`

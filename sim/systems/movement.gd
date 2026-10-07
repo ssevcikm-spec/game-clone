@@ -23,6 +23,24 @@ extends RefCounted
 # (`app/main.gd`). `sim_world.snapshot()` mobily porad nevraci (`mobiles: []`) -
 # to je otevrena vec granule `sim.world_loop`, ne teto.
 #
+# ⚠⚠ STOJNA VYSKA SE MUSI ZAPSAT (2026-10-07, 14. session - vada V4):
+#   `can_step` vraci `z` (stojnou vysku povrchu), ale `apply_step` ji do
+#   `mob.pos.z` NIKDY nezapsal - postava tedy mela `z` porad z prvniho kroku.
+#   Namerene dusledky: (a) na svahu se `from.z` neposunul, takze kazdy dalsi
+#   krok nahoru se meril proti stare vysce a cesta do kopce se po par
+#   dlazdicich zablokovala, (b) kamera i kresleni pouzivaji `pos.z`
+#   (`app/player_controller.gd:160`, `app/world_view.gd:358`), takze postava
+#   zustala ve vysce prvniho kroku. `z` se proto bere z `_pending` (kde ho
+#   ulozil `request_step`) - `apply_step` ho dostane i tehdy, kdyz se vola
+#   pozdeji v ticku bez vysledku `can_step`.
+#
+# ⚠ KLIENT POTREBUJE ROZJETY KROK (2026-10-07, 14. session - vada V2):
+#   `pending_step(serial)` vraci prave bezici krok (`{}` kdyz zadny neni):
+#   `{dir, run, start_ms, delay_ms, due_ms, z}`. Klient z nej pocita posun
+#   postavy MEZI dlazdicemi (`app/player_controller.step_offset_px`) a start
+#   animace v okamziku zamERu - do teto session si klient vse domyslel az po
+#   zmene dlazdice (`app/player_controller.gd:_process`).
+#
 # CO SMLOUVA NEPINUJE (patri do docs/04 §4.2, agent docs/ needituje):
 #   * `_init(walk, clock, events, drain_model, registry)` - peti argument (registr)
 #     smlouva neuvadi; bez nej si system zalozi vlastni (testy tim meri obe cesty),
@@ -88,6 +106,15 @@ func pending_count() -> int:
 	return _pending.size()
 
 
+func pending_step(serial: int) -> Dictionary:
+	# PRAVE BEZICI krok (docs/04 §4.2): klient z nej kresli postavu mezi
+	# dlazdicemi a startuje animaci v okamziku zameru (vada V2). Prazdny
+	# slovnik = zadny krok v letu; kopie, aby si klient nemohl prepsat stav.
+	if not _pending.has(serial):
+		return {}
+	return (_pending[serial] as Dictionary).duplicate()
+
+
 func request_step(m: int, dir: int, run: bool) -> Dictionary:
 	var mob = _registry.get_mobile(m)
 	if mob == null:
@@ -103,7 +130,10 @@ func request_step(m: int, dir: int, run: bool) -> Dictionary:
 		_message("You cannot move there.")
 		return _no(0, str(result["reason"]))
 	var delay: int = delay_ms_for(use_run)
-	_pending[m] = {"dir": dir, "run": use_run, "due_ms": _now() + delay}
+	var start: int = _now()
+	# `z` = stojna vyska povrchu, na ktery se dojde - `apply_step` ji zapise.
+	_pending[m] = {"dir": dir, "run": use_run, "due_ms": start + delay,
+		"start_ms": start, "delay_ms": delay, "z": int(result["z"])}
 	_events_push("mobile_anim", {"serial": m,
 		"action": ACTION_RUN if use_run else ACTION_WALK, "frame_ms": Const.TURN_MS})
 	return {"ok": true, "delay_ms": delay, "reason": ""}
@@ -114,10 +144,12 @@ func apply_step(m: int, dir: int) -> void:
 	if mob == null:
 		return
 	var run: bool = false
+	var z: int = int(mob.pos.z)
 	if _pending.has(m):
 		run = bool(_pending[m]["run"])
+		z = int(_pending[m]["z"])       # stojna vyska z `can_step` (vada V4)
 		_pending.erase(m)
-	mob.pos = Vector3i(mob.pos.x + Const.DIR_DX[dir], mob.pos.y + Const.DIR_DY[dir], mob.pos.z)
+	mob.pos = Vector3i(mob.pos.x + Const.DIR_DX[dir], mob.pos.y + Const.DIR_DY[dir], z)
 	mob.dir = dir
 	# Model "emulator" pocita i chuzi (1 bod za 16 kroku), "run_only" jen beh.
 	if run or _drain_model == "emulator":
