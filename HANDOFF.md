@@ -661,6 +661,27 @@ a barva kůže.** Statiky nesou barvu ze záznamu mapy, ale **nikdo ji nepouží
     40–45 FPS). **Chůze** (přestavba chunku, vstup do nových dlaždic, možné
     načtení dalších stránek) změřená není — a je to právě stav, kdy se může
     sekat. Kdo bude dělat M9, ať měří i chůzi, ne jen postoj.
+59. **NOVÉ (5. session): ŠEDÁ PLOCHA v místě změny výšky — chybí překlad land
+    tile id → art id.** `world.map` vydává land **tile id**, ale atlas
+    i `render.textures` pracují s **art id z pole `texture`** v tiledata; kde se
+    liší, `texture()` vrátí `null`, `_draw()` udělá `continue` a vznikne **díra**
+    (vidět jako šedé pozadí). Naměřeno v okolí `(1519,1657)`: chybí arty
+    `{83:12, 95:12, 100:53, 84:1, 88:1, 96:1}`; v `tiles.json` mají 83/95/100
+    `texture = 76`; atlas má **3 732 z 16 384** land artů (chybí 12 652).
+    **`sim/world/tiledata.gd` neumí `texture`** — to je ta chybějící znalost.
+    Detail, snímky a návrh: **`REVIZE-VADY-ZE-SNIMKU-2026-10-07.md` §Vada B**.
+    **Neopravovat teď** (rozhodnutí uživatele: až bude čas a bude to relevantní).
+60. **NOVÉ (5. session): „stopa" animačních framů při pohybu (vada A).**
+    Uživatel vidí na snímku několik postav v různých fázích chůze. **Co to NENÍ
+    (naměřeno):** animace v čase funguje (`0->f0 80->f1 160->f2 … 480->f6`)
+    a reset při změně klíče taky; past je, že `play(1, …)` měří jinou věc —
+    serial 1 není v registru, takže `body_of` vrátí `-1`. **Nedořešeno** —
+    hypotézy a způsob ověření (dva framy do PNG a porovnat) jsou v
+    **`REVIZE-VADY-ZE-SNIMKU-2026-10-07.md` §Vada A**. Neopravovat teď.
+61. **NOVÉ (5. session): chybějící art se kreslí jako TICHO.** `render.textures`
+    vrátí `null` a `world_view._draw` udělá `continue` — díra v mapě tedy nemá
+    jak být vidět. Patří tam viditelný placeholdr (magenta/šrafování) a vizuální
+    kontrola úplnosti land artu (dnes ji nemá nikdo; G10 měří jen barvu postavy).
 
 ## Už není otevřené (přesunuto, nemaže se)
 

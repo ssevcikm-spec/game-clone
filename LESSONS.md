@@ -24,6 +24,27 @@ Typy: `chyba` (moje vada) · `past-nástroje` (prostředí/nástroj, ne logika) 
 
 ---
 
+### 2026-10-07 — Dvě vady viditelné jen POHLEDEM: testy 520/0 a brány zelené (chyba)
+**Co se stalo:** uživatel poslal dva snímky hry — (A) při pohybu je vidět „stopa"
+všech framů postavy, (B) v místě změny výšky mapy je **šedá plocha** a břeh je
+plochý. Přitom sada hlásila **520 kontrol, 0 selhání** a brány **11/0/0**. Je to
+znovu táž past jako „postava stojí 40 px nad středem" (2. session): **měření se
+ptalo na jinou věc, než co je vidět**.
+**Doklad:** (A) sonda `sonda-vady2.gd` **vyvrátila** podezření na animaci
+(`0->f0 40->f0 80->f1 … 480->f6`; past: `play(1, …)` měří nic, protože serial 1
+není v registru a `body_of` vrátí `-1`) — příčina zůstává **otevřená**;
+(B) sonda `sonda-vady.gd` příčinu **našla**: `world.map` vydává land **tile id**,
+ale atlas i `render.textures` pracují s **art id z pole `texture`** tiledata
+(`tiles.json`: land 83/95/100 → `texture 76`), takže `texture()` vrátí `null`,
+`_draw()` udělá `continue` a vznikne díra. Naměřeno: atlas má **3 732 z 16 384**
+land artů (chybí 12 652) a v okně hry chybělo 6 různých artů na ~80 dlaždicích.
+**Ponaučení:** **zelené testy nejsou důkaz, že je hra v pořádku** — vizuální vada
+se hledá **pohledem na běžící hru**, a teprve pak se hledá, které měření ji mělo
+chytit (tady: nikdo neměřil úplnost land artu proti mapě). A **chybějící data se
+nesmí kreslit jako ticho**: kdo vrací `null` a volající udělá `continue`, vyrábí
+neviditelnou vadu — má být vidět placeholdr. Zapsáno do
+`REVIZE-VADY-ZE-SNIMKU-2026-10-07.md` (nic se neopravovalo, rozhodnutí uživatele).
+
 ### 2026-10-07 — 655 ms na frame: `AtlasTexture` se vyráběl pro každý objekt každý frame (chyba)
 **Co se stalo:** uživatel se zeptal, jestli „obcházení assetů" (extrakce do
 `.gitignore`) způsobuje, že se hra nesmírně seká. **Nezpůsobuje** — extrakce se
