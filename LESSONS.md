@@ -24,6 +24,47 @@ Typy: `chyba` (moje vada) · `past-nástroje` (prostředí/nástroj, ne logika) 
 
 ---
 
+### 2026-10-07 — `run()` v case souboru umře a sada to nevidí: 0 kontrol, exit 0 (past-nástroje)
+**Co se stalo:** subagent měřil „cizí soubor" v `tests/cases/hud.gd` (přepnul vstup
+na `ui/status_bar.gd`). Chybějící metoda shodila `run()` na *Invalid call*, case
+skončil **`0 kontrol, 0 selhani`, exit 0** — a `only_case.gd` to neohlásil
+(NEMĚŘENO hlásí jen při 0 kontrolách v CELÉM běhu). Pro `tools/gates/mutace-tests.py`
+je to past dvojnásobná: pouští **celou sadu** a „PROBĚHLALA" testuje jen
+`checks > 0` v součtu sady, takže mutant, který odebere metodu, vyjde jako
+**„PROSLA – TEST JE SLEPÝ"** = falešný nález o správném testu.
+**Doklad:** `hud: --hud-script=res://ui/status_bar.gd` → `[test] 0 kontrol,
+0 selhani`, EXIT=0 (naměřeno subagentem `ui-zaklad`); `tests/run_tests.gd` přitom
+tuhle díru MÁ zavřenou („case X neprobehl: 0 novych kontrol"), `.cache/only_case.gd` ne.
+**Ponaučení:** (1) každý case, který volá cizí API, ať má **guard na přítomnost
+celého API** a při chybějící metodě přidá `t._check(false, …)` a skončí — kontrola
+se přidá JEN v rozbitém případě, takže zdravé počty zůstanou přesné. (2) mutace
+dělej na **těla metod**, ne na signatury (`has_method` signaturu nechytí a volání
+pak spadne do téhož ticha). (3) `only_case.gd` je pomocník v `.cache` — jeho díry
+nejsou díry sady, ale nesmí se přes ně měřit.
+
+### 2026-10-07 — `_ready()` se v běhu `--script` z `add_child()` NEZAVOLÁ (past-nástroje)
+**Co se stalo:** test `world_view.gd` přidal uzel do stromu a čekal inicializaci
+v `_ready()`; ta se ale neprovedla (kořen v `SceneTree._initialize()` není „inside
+tree"), takže `_sort`/`_hues`/`_camera` zůstaly `null` → **8 falešných selhání**.
+**Doklad:** `tests/cases/world_view.gd` (první běh 8 selhání; po ručním zavolání
+`_ready()` a kontrole, že proběhl, 19/0).
+**Ponaučení:** v `--headless --script` testech **nevolej `add_child()` a nečekej
+`_ready()`** — zavolej inicializaci přímo a **změř, že proběhla** (jinak test
+měří neinicializovaný uzel a vypadá to jako vada kódu).
+
+### 2026-10-07 — `set_position` je metoda `Control`, ne naše API (past-nástroje)
+**Co se stalo:** `ui/hud.gd` dnes `extends CanvasLayer` a `set_position(id, pos)`
+je v pořádku. Kdyby ale hud přešel na `Control`, narazí na **zabudovanou**
+`set_position(Vector2, bool)` → `The function signature doesn't match the parent`
+= parse error, který sada tiše přeskočí. Subagent si toho všiml tak, že jeho
+guard u `status_bar` (který `Control` JE) `set_position` „našel", i když tam žádný
+náš není.
+**Doklad:** `ui/hud.gd`, `ui/status_bar.gd`, `tests/cases/status_bar.gd`; stejná
+rodina jako `entity_registry.get()` (`docs/04 §4.2.1` — proto se jmenuje `get_mobile`).
+**Ponaučení:** u UI granule **zkontroluj jméno metody proti třídě, kterou dědí**
+(`Control`/`Node`/`CanvasLayer` mají svoje API) — a do smlouvy to napiš, aby to
+neobjevil až ten, kdo hud přesune na jinou bázi.
+
 ### 2026-10-07 — Sandbox `workspace-write` blokuje zápis PODPROCESŮM, ale nástroje souborů píšou dál (past-nástroje)
 **Co se stalo:** `python tools/roadmap-gen.py` spadl na `PermissionError: [Errno 13]
 Permission denied: '.forge/roadmap.json'` a `Set-Content` selhal i na

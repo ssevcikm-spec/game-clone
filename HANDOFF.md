@@ -1,24 +1,62 @@
-# Předání — UO-klon (interakce hotová; 2026-10-07, 10. session)
+# Předání — UO-klon (první UI + `sim.skill_gain`; 2026-10-07, 11. session)
 
 > **Co je tenhle soubor:** **stav projektu** pro další session agenta. Přepisuje
 > se celý; historie je v `git log`. **Současný stav se bere odtud** — a ověřuje
 > se živě (je tu k tomu sekce „Předletová kontrola").
 > **Zadání pro další vývoj je `ZADANI-DALSI-VYVOJ-2.md`** (etapa 2, Úkoly 1–9);
-> **Úkoly 1–4 jsou HOTOVÉ** (poslední = `sim.interaction`, tato session) a z Úkolu 6
-> jsou hotové `entity.item` + `entity.container` — **další je `entity.equipment`**
-> (poslední granule Úkolu 6): sedí na obě, zavře invariant „právě jeden rodič"
-> i pro nasazený předmět (věc 66b) a je to systém, který dnes `sim.interaction`
-> hledá pro větev `equip` (věc 68). Předchozí etapa je v `ZADANI-DALSI-VYVOJ.md`.
+> **Úkoly 1–4 jsou HOTOVÉ** a z Úkolu 6 jsou hotové `entity.item`,
+> `entity.container` — **další je `entity.equipment`**. Tato (11.) session šla
+> jinou tratí: **rozhodnutí uživatele** (éra AoS, stupnice kvality dle UO, zvuk
+> vlastní trať) + **první UI v projektu** + **`sim.skill_gain`** (společný
+> předek řemesla i souboje) + **odemknutí měření** (`render.chunk`,
+> `app.player_view`, `data.recipes`). Předchozí etapa je v `ZADANI-DALSI-VYVOJ.md`.
 > **Naměřený stav plánu je v `REVIZE-PLANU-2026-10-06.md`** a **stav granul
 > měří** `python tools/plan-status.py`.
 > **Kam pro co v referenčních zdrojích je `research/REJSTRIK-REFERENCI.md`**.
-> **Datum:** 2026-10-07 (10. session). **Poslední změna kódu:** tato session
-> (**`sim/systems/interaction.gd`** — `use`/`use_on`/`context_menu`/
-> `context_action`, routing z dat `data/items.json`, parová tabulka §5.2.3,
-> dynamický routing do `SimWorld.systems`; dále `tests/cases/interaction.gd`,
-> modul `interaction` v `tools/gates/mutace-tests.py`, smlouvy
-> `docs/04 §4.2`/`§4.2.1`).
-> Předchozí commit `2ede2c9` = CI #41 nad `adbd2cb` zelený (9. session).
+> **Datum:** 2026-10-07 (11. session). **Poslední změna kódu:** tato session
+> (**`sim/systems/skill_gain.gd`**, **`ui/hud.gd`**, **`ui/status_bar.gd`**,
+> `app/main.gd` (zapojení UI + registrace `skill_gain`), `sim/entity/item.gd`
+> (stupnice kvality), `data/balance.json` (éra AoS), `tools/roadmap-gen.py`
+> + `docs/07` (zvuk vlastní trať), tři nové case soubory a **6 nových mutačních
+> modulů**). Push ověřen: `origin/main = HEAD = 135e175`, `ahead 0`.
+> Předchozí commit `df2d81b` = HANDOFF 10. session (CI #43 i #44 zelené).
+
+## ✅ CO JE NOVÉHO (11. session) — PRVNÍ UI, `sim.skill_gain` a odemknutí měření
+
+**Cíl session (zadaný uživatelem, „režim Lead“):** rozšířit frontier měřením,
+dodat společný předek řemesla i souboje a postavit první UI; **tři dráhy
+paralelně** (3 subagenti), integrace a ověření = Lead.
+
+| Co | Doklad (naměřeno dnes) |
+|---|---|
+| **`sim/systems/skill_gain.gd`** (325 řádků, 45 kontrol) | `check(m, skill, difficulty) -> {success, gained, new_value, reason}`, `gain_stat(m, stat)`; **růst je nezávislý na úspěchu** (rozhodnutí uživatele; v UO `CheckSkill` je passive check PŘED hodem — `_src/servuo/.../CraftItem.cs:1400-1403`). Naměřeno: 100 pokusů s `difficulty=0` při value 0 → **zisků 100, neúspěchů 89**, value 0 → 100. Dále: GGS mez přesně 1 619 999 / 1 620 000 ms, strop 1000 i celkový 7000 (s arbitráží skillem se zámkem `down`), zámky, determinismus dvou běhů |
+| **`ui/hud.gd` (60) + `ui/status_bar.gd` (59) — PRVNÍ UI V PROJEKTU** | `ui/` do dneška neexistoval a ve scéně nebyl žádný CanvasLayer. HUD drží okna a pozice (`register_window`/`window_of`/`position_of`/`set_position`/`layout()` (kopie)/`restore_layout`), status bar skládá text z **vstupního slovníku** (`update`/`text_for`/`apply_event`). **Zapojeno v `app/main.gd`** (`_setup_ui` + `_process` s guardem na změnu textu) |
+| **Na obrazovce je vidět** | `.cache/render/run11/frame00000149.png` (150 framů): mapa Britainu, postava a **vlevo nahoře `hp=55/55, stam=10/10, mana=10/10, weight=0, gold=0`** — ověřeno **pohledem** |
+| **Odemčené měření (3 nové case soubory)** | `tests/cases/chunk_renderer.gd` (**19**), `world_view.gd` (**19**), `recipes.gd` (**12**). Tím je **měřeně hotový** `render.chunk` (odemkl `render.names`, `render.effects`, `render.chunk_mesh`, `app.player_view`), `app.player_view` a **`data.recipes` je konečně měřené obsahem, ne zmínkou** (dřív falešná zelená — viz `LESSONS`) |
+| **Rozhodnutí uživatele (11. session)** | **Éra AoS** — `era.loot` a `era.content` přepnuty z `pre-aos` na `aos` (`combat`/`ui` už AoS byly). **Stupnice kvality dle UO**: `quality` = **0 Low (zpackaný) / 1 Normal / 2 Exceptional** — naměřeno v ServUO `Items/Internal/ItemInterfaces.cs:67-72` + `CraftItem.cs:1356`; `docs/04 §4.2` mělo „0 normal, 1 exceptional" (posun o jedna + chybějící Low) → **opraveno** v `item.gd`, `docs/04` i `tests/cases/item.gd`. **Zvuk = vlastní trať** (vyjmut z M8 v `tools/roadmap-gen.py` + `docs/07`; `.forge/roadmap.json` upraven přesně podle generátoru a doložen `--check`). **Váha odložena** (zůstává jako omezení) |
+| **Světlo: naměřeno, NIC k rozhodnutí** | Uživatel zadal „naměř" → měření ukázalo, že **rozhodnutí existuje od 2026-10-06** (den 0 = nejjasnější, noc 12, dungeon 26, rampy 4–6 a 22–24; ServUO/ModernUO `LightCycle.cs:13-16`, ClassicUO `IsometricLight.cs:69`) a **kód to tak má** (`sim/world/time.gd:19-31,86-101`) i testy (`tests/cases/time.gd`, `time_clock.gd`). **Zestárlý je jen ZÁZNAM** — `HANDOFF` (bod 2 v „Co čeká na tebe") a `ZADANI-DALSI-VYVOJ-2.md` F10 ho vedly jako otevřený. **Vada záznamu, ne kódu** |
+| **Mutační důkaz nových kontrol** | **6 nových modulů** v `tools/gates/mutace-tests.py` (skill_gain, hud, status_bar, chunk_renderer, world_view, recipes) = **15 vzorů, 15/15 chyceno**, smlouvy vstupů OK. Harness má **14 modulů** (bylo 11) |
+| **Integrační čísla** | sada **928 kontrol / 0 selhání** (bylo 806/0), **30 → 37 case souborů**; brány `run-all.py`: **11 měřeno / 0 NEMĚŘENO / 0 vad**, `exit 0`; `plan-status.py`: **50 měřeně hotových** (bylo 45), **0 rozporů**; `roadmap-gen.py --check` **OK** |
+| **⚠ Prostředí: sandbox blokuje zápis PODPROCESŮM** | V této session `python tools/roadmap-gen.py` spadl na `PermissionError` a `Set-Content` selhal i na `tests/…tmp`, přitom nástroj souborů psát uměl. Godot sám **běžel** (jen neškodný `user://logs` ERROR). Ověření (brány, mutace, snímek) proto potřebovalo **jedno eskalační volání**; v režimu `workspace-write` hlásí brány falešné vady (9 „selhání" v sadě = `render.textures` si vyrábí fixture v `.cache`, `sim.world_loop` ukládá do `user://`). Zapsáno v `LESSONS` |
+| **Co se NEMĚNILO** | `entity.equipment`, `entity.notoriety`, vady ze snímků (věci 59–61), M9, `sim.pathfind` (voják), `docs/05` (jen se hlásí) a **`data/recipes.json` ani `data/items.json`** (mutace je čtou jako VSTUP) |
+
+**Nálezy z 11. session, které patří jinam (neopravené, měřené):**
+
+| # | Nález | Doklad |
+|---|---|---|
+| N1 | **`docs/06 §6.1` tvrdí 1150 receptů, data mají 1053** (id 0..1052) — 97 chybí, nebo je dokument zastaralý | `tests/cases/recipes.gd`, `data/recipes.json` |
+| N2 | **`docs/04 §4.5` nesedí na data receptů**: smlouva má `skill:int`, `category`, `name`, `exceptional`, `tool`; data mají `skill` jako **název** (11 hodnot), `result` nese `kind/name/type/amount/tile`, `category`/`name`/`exceptional`/`tool` nejsou | tamtéž |
+| N3 | 1 recept (id 525, Cooking) má `min_skill`/`max_skill` **null**; 3 z 11 názvů skillů **nejsou** v `data/skills.json` (BowFletching, Glassblowing, Masonry) | tamtéž |
+| N4 | `data/skills.json` **nemá `GainFactor`** (UO per-skill konstanta, `SkillCheck.cs:300`) → v kódu je 1.0 | `sim/systems/skill_gain.gd` |
+| N5 | `entity.stats` **nemá zámky statů** (`str_lock`/`dex_lock`/`int_lock`) → atrofie ubírá nejslabší stat > 10, ne podle zámku | `sim/systems/skill_gain.gd` |
+| N6 | Událost **`stats_changed` v `docs/04 §4.4` nemá `stam_max`/`mana_max`** a **nikdo ji neposílá**; `ui.status_bar` proto bere `max_hp` jako alias a je napojen jen přes `update()` | `tests/cases/status_bar.gd`, `app/main.gd` |
+| N7 | **`set_position` je zabudovaná metoda `Control`** (signatura `(Vector2, bool)`) — kdyby `ui.hud` přešel na `Control`, vznikne tichý parse error (rodina pasti `entity_registry.get()`, `docs/04 §4.2.1`) | `ui/hud.gd` |
+| N8 | **`_ready()` se v běhu `--script` z `add_child()` NEZAVOLÁ** (kořen není „inside tree") → uzel zůstane neinicializovaný (8 falešných selhání v prvním běhu) | `tests/cases/world_view.gd` |
+| N9 | Smlouva **nedefinuje `difficulty`** u `sim.skill_gain` (zvoleno `minSkill` v desetinách, `maxSkill = difficulty + 500`; 183/196 Blacksmithy receptů) — doplněno do `docs/04 §4.2` | `docs/04` |
+| N10 | 661/1696 materiálů a 699/1053 výsledků nemá `tile`; **jmenné párování proti `items.json` nefunguje** (212/286 jmen chybí) | `tests/cases/recipes.gd` |
+| N11 | **Mutace na SIGNATURU metody harness nechytí** (viz `LESSONS`: guard v case souborech + mutace jen na těla) | `tools/gates/mutace-tests.py` |
+
+
 
 ## ✅ CO JE NOVÉHO (10. session) — `sim.interaction` je HOTOVÝ a měřený
 
@@ -380,7 +418,45 @@ ho celý." Každá session tedy **není „krok"**, ale **jeden celek s cílem**
    v pořádku.
 4. **Nedělat v jedné session víc cílů**, aniž by první byl uzavřený a ověřený.
 
-**⚠ CÍL TÉTO (11.) SESSION — až ho dokončíš, přepiš tuhle větu na další cíl:**
+**⚠ CÍL TÉTO (12.) SESSION — až ho dokončíš, přepiš tuhle větu na další cíl:**
+
+> **Dokončit `sim.harvest` + `sim.craft` + `ui.journal` (BIG WIN č. 1: „umět
+> pracovat“).** Uživatel 11. session zvolil priority: **nejdřív řemeslo, souboj
+> hned po něm**; `sim.skill_gain` (společný předek obou) je hotový, `entity.container`
+> i `data.recipes` taky — **řemeslo je tím odblokované**.
+> **Co musí umět (`docs/05 §5.7` a `§5.8`, měřená pravidla):** `harvest.mine/chop/fish`
+> (respawn žíly 10–20 min), `craft.recipes_for/craft/smelt/repair` a **průběh
+> s výzvou podle rozhodnutí uživatele**:
+>   * **neúspěch craftu = materiál zmizí** (u `UseAllRes` polovina) a **skill
+>     roste i při neúspěchu** (už to umí `sim.skill_gain` — jen to spoj),
+>   * **dvojitý hod**: exceptionalita z **1. hodu**, úspěch z **2. hodu**
+>     (`CraftItem.cs:1352-1359`), kvalita **Low 0 / Normal 1 / Exceptional 2**,
+>   * exceptional = +14/+15 resist, +20 % trvanlivosti, zbraň +35 WeaponDamage,
+>     nástroje 2× uses; **značka výrobce** při `MainSkill >= 100`.
+> **`ui.journal`** je viditelná část (dnes zprávy jen `print`uje `app/loop.gd`):
+> textový žurnál s barvami podle typu (`docs/05 §5.4`), napojený na událost
+> `message`; **hlášky vlastními anglickými řetězci** (klilocy až po změření
+> `assets.cliloc`, `docs/03 §3.5`).
+> **Navíc (malé, uživatelem schválené):** **chůze držením** — pravé tlačítko myši
+> i klávesa (UO umí obojí: `GameSceneInputHandler.cs:41` a `_flags[4]`, řádky
+> 1277-1279/1404-1406); soubory `app/input_map.gd` (granule `app.input`) +
+> `ui/hotkeys.gd` + `app/player_controller.gd` — **uživatel do cizí granule svolil
+> (věc 27 je tím vyřešená)**.
+> **Přijímací kritérium:** testy `tests/cases/harvest.gd`, `craft.gd`, `journal.gd`
+> (cesta jako VSTUP přes `--<…>-script=`, jako u ostatních), **čtyři výsledky
+> měřené se seedem** (fail / low / normal / exceptional), materiál se opravdu
+> odečte, skill roste i při neúspěchu, `sim.craft` je zaregistrovaný v
+> `SimWorld.systems` (aby `sim.interaction.use_on` přestal vracet
+> `not_available`), mutační moduly v `tools/gates/mutace-tests.py`, `run-all.py`
+> a sada zelené, **snímek s hláškou v žurnálu**.
+> **Co do cíle NEPATŘÍ:** `sim.enhance` (zpackaná dýka — samostatná výzva,
+> viz „Co čeká na tebe“ bod 5), mistrovské kousky s vlastností (runic/reforging
+> až po `data.item_properties.json`), `ui.craft_gump`/`ui.backpack` (až bude
+> vidět průběh), `entity.equipment`, souboj a M9.
+
+**⏸ ODLOŽENÝ CÍL (původně 11. session) — `entity.equipment`:** uživatel ho
+11. session nahradil vlnou „řemeslo“; **zadání níž platí dál** (je potřeba pro
+souboj, ne pro řemeslo):
 
 > **Dokončit `entity.equipment` (poslední granule Úkolu 6 ze
 > `ZADANI-DALSI-VYVOJ-2.md`)** — `equip(m, item)`, `unequip(m, layer)`,
@@ -450,10 +526,23 @@ z nich blokuje jinou trať, ne tu dnešní:
 
 | # | Na co se čeká | Co to blokuje | Cena / cesta zpět |
 |---|---|---|---|
-| 1 | **Éra** — `docs/05 §5.16` (9 skillů `implemented: false`) vs zadání granule (7); a pořadí skillů 55–57 (`skills.mul`: 55 Throwing / 56 Imbuing / 57 Mysticism vs `research/02`: 55 Mysticism … 57 Throwing) | `sim.skill_gain`, souboj, magii, tvrzení o věrnosti | Rozhodnutí je **jeden řádek v `data/balance.json`** (`combat_era`), kód se nepřepisuje; do té doby je obojí zdokumentované |
-| 2 | **Světlo** — „den 12“ (`ZADANI §10`, `docs/05 §5.11`) vs `DayLevel = 0` / `NightLevel = 12` (`research/01 §4.2`) | `render.light` (Úkol 5) | Podklady se dají **doměřit z `light.mul`/klienta**; dnes je `world.time.light_level()` v noci špatně a **přiznává to** (věc 12) |
-| 3 | **Zvuk** — patří do M8 (kde je `audio.playback`), nebo vlastní trať? | plán M8 | Změna plánu (roadmapa), žádný kód |
-| 4 | **`ui.hotkeys` vs `app.input`** — smí session sáhnout do `app/input_map.gd` kvůli **držení klávesy** (věc 27), i když soubor patří jiné granuli? | chůze „klikatě“ místo držení | Malý zásah do cizí granule; bez rozhodnutí se do něj nechodi |
+**✅ VYŘEŠENO 11. session (rozhodl uživatel):**
+
+| # | Rozhodnutí | Co z něj plyne |
+|---|---|---|
+| 1 | **Éra = AoS** (novější) | `era.loot` a `era.content` přepnuty na `aos`; skilly 48–57 zůstávají `implemented:false`, pořadí 55–57 se bere z `skills.mul`; **AoS loot znamená víc práce v `sim.loot`** (AoS packy + `data.item_properties.json`) |
+| 2 | **Světlo — „naměř"** | **Naměřeno a nic k rozhodnutí:** den 0 (nejjasnější), noc 12, dungeon 26, rampy 4–6 a 22–24; kód i testy to už mají. Zestárlý byl jen **záznam** (`ZADANI F10`, bod 2 tady) — opraveno v této session |
+| 3 | **Zvuk = vlastní trať** | Vyjmuto z M8 (`tools/roadmap-gen.py` + `docs/07`), schedulovatelné po `assets.sounds`; `.forge/roadmap.json` doložen `--check` |
+| 4 | **Chůze držením** = ano, **myš i klávesa** | Session smí sáhnout do `app/input_map.gd` (věc 27 vyřešena); UO umí obojí (`GameSceneInputHandler.cs:41`, `_flags[4]`) |
+| 5 | **Váha** | Odloženo; zůstává zapsané jako omezení (`docs/05 §5.4` chce 0.02 stones, data mají 0) |
+
+**❓ NOVÉ OTÁZKY Z 11. SESSION (čekají na uživatele):**
+
+| # | Otázka | Co to blokuje | Doporučení a cena |
+|---|---|---|---|
+| 1 | **AoS vs „učit se z chyb“:** v AoS dává neúspěch do šance na růst **0,0**, v pre-AoS **0,2** (`SkillCheck.cs:295`) — tedy v AoS se z neúspěchu učíš MÉNĚ, i když růst nezávisí na úspěchu | pocit z řemesla (BIG WIN č. 1) | **`era.skill_gain: "pre-aos"`** = jeden klíč v `data/balance.json` + 3 řádky větve v `skill_gain.gd`; `combat`/`loot`/`content` zůstávají AoS. Vratné |
+| 2 | **`docs/06 §6.1` tvrdí 1150 receptů, data mají 1053** (97 chybí) | tvrzení o obsahu | Opravit dokument, nebo dostavět chybějících 97 (generátor). Doklad v nálezu N1 |
+| 3 | **`sim.enhance`** (zpackaná dýka: neúspěch = půl materiálu, `Broken` = zničeno — `Enhance.cs:303-326`): do vlny s `sim.craft`, nebo až po ní? | „výzva a uspokojení“ (přání uživatele) | **Až po `sim.craft`** (samostatný cíl), ať se řemeslo nejdřív rozjede |
 
 **Nová otázka z dnešní (9.) session (drobnost, ale ať se neztratí):** **váha
 předmětů je u nás `int` ve stones a zlato má v datech 0** — `docs/05 §5.4` chce
@@ -463,8 +552,7 @@ a `CONTAINER_MAX_WEIGHT` v setinách; cena je zásah do `core/const.gd` a
 `world.tiledata` (obojí jiná granule), cesta zpět je triviální (konstanta).
 Do rozhodnutí je to **zdokumentované jako omezení**, ne zamčené v kódu.
 
-**Co bude následovat (bez tebe):** cíl 11. session = **`entity.equipment`**
-(poslední granule Úkolu 6) — viz „CÍL SESSION“ níže.
+**Co bude následovat (bez tebe):** cíl 12. session = **`sim.harvest` + `sim.craft` + `ui.journal`** (BIG WIN č. 1 „umět pracovat“) — viz „CÍL SESSION“ níže. **Odložený** je `entity.equipment` (potřebný pro souboj, ne pro řemeslo).
 
 **Konvence dveří (věc 62) je od 8. session rozhodnutá MĚŘENÍM a opravená** —
 nic na tebe nečeká. Montáž pro kontrolu pohledem
@@ -478,13 +566,15 @@ a viděl něco jiného, je to **nový nález**, ne oprava — ozvi se s ním.
 
 ## ⚠⚠ BLOKÁTORY
 
-**Žádný otevřený blokátor v kódu.** „Demo chodí a postava je barevná" je naměřené
-(viz tabulky výš), brány jsou zelené (11/0/0), testy **806/0** (s assety; bez
+**Žádný otevřený blokátor v kódu.** „Demo chodí, postava je barevná a **vlevo nahoře je stavový pruh**" je naměřené
+(viz tabulky výš), brány jsou zelené (11/0/0), testy **928/0** (s assety; bez
 `assets/uo` část kontrol hlásí NEMĚŘENO — viz „Předletová kontrola") a **průchodnost
 i konvence dveří jsou opravené** (6. session: statiky se čtou správnou tabulkou,
 schody svou výškou; 8. session: `world.doors` páruje `art` ↔ `art + 1`;
 9. session: `entity.item` + `entity.container` hotové, **20/20 mutací**;
-10. session: `sim.interaction` hotový, **13/13 mutací** a routing z dat).
+10. session: `sim.interaction` hotový, **13/13 mutací** a routing z dat;
+11. session: `sim.skill_gain` + první UI, **15/15 nových mutací**, plán
+**50 měřeně hotových**).
 **Hra jede 40–45 FPS** (bylo 1–2 FPS) — viz sekce VÝKON.
 
 **⚠ CI NAD COMMITTY 10. SESSION JE ZELENÝ — `#43` nad `200fdc6` (kód, smlouvy,
