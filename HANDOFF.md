@@ -1,18 +1,18 @@
-# Předání — UO-klon (registr bytostí hotový; 2026-10-06 noc, 4. session)
+# Předání — UO-klon (hledání cesty hotové; 2026-10-07, 5. session)
 
 > **Co je tenhle soubor:** **stav projektu** pro další session agenta. Přepisuje
 > se celý; historie je v `git log`. **Současný stav se bere odtud** — a ověřuje
 > se živě (je tu k tomu sekce „Předletová kontrola").
 > **Zadání pro další vývoj je `ZADANI-DALSI-VYVOJ-2.md`** (etapa 2, Úkoly 1–9);
-> **Úkol 1 je hotový**, další je **Úkol 2 (`sim.pathfind`)**. Předchozí etapa je
-> v `ZADANI-DALSI-VYVOJ.md`.
+> **Úkoly 1 a 2 jsou hotové**, další je **Úkol 3 (dveře a schody ve `world.walk`)**.
+> Předchozí etapa je v `ZADANI-DALSI-VYVOJ.md`.
 > **Naměřený stav plánu je v `REVIZE-PLANU-2026-10-06.md`** a **stav granul
 > měří** `python tools/plan-status.py`.
 > **Kam pro co v referenčních zdrojích je `research/REJSTRIK-REFERENCI.md`**.
-> **Datum:** 2026-10-06 (noc, 4. session). **Poslední změna kódu:** tato session
-> (**granule `sim.entity_registry`**; `sim.movement` z ní bere mobily a
-> `render.anim` si z ní bere číslo těla). Předchozí commit `137da89` = rozhodnutí
-> uživatele o éře (základ AoS) a světle (varianta V1: den 0 / noc 12).
+> **Datum:** 2026-10-07 (5. session). **Poslední změna kódu:** tato session
+> (**granule `sim.pathfind`**; `sim/world/pathfind.gd` + `tests/cases/pathfind.gd`
+> + modul `pathfind` v `mutace-tests.py`). Předchozí commit `a439716` =
+> granule `sim.entity_registry` (4. session).
 
 ## 🎬 DEMO JE NA SVĚTĚ — mapa Britainu + BAREVNÁ postava, která po ní chodí
 
@@ -50,6 +50,29 @@ otevřená věc 27).
 **výbava na postavě** (postava je nahá), jiné postavy (NPC), mount, pathfinding,
 zvuk. Barva kůže od této session **je** (věc 1 → vyřešeno, viz nová tabulka).
 
+## ✅ CO JE NOVÉHO (5. session) — a čím je to doložené
+
+**Granule `sim.pathfind` (Úkol 2 ze `ZADANI-DALSI-VYVOJ-2.md`) je hotová**:
+hra umí odpovědět „kudy z A do B" — A* nad dlaždicemi, který se na průchodnost
+**ptá `world.walk.can_step`** a nikde si nevede vlastní kopii pravidel.
+
+| Co | Doklad (naměřeno dnes) |
+|---|---|
+| **`sim.pathfind`** | `sim/world/pathfind.gd` (**173 řádků**, deklarace `<= 150` — překročeno, viz věc 2): `find(from, to, limit) -> Array[Vector3i]` (cesta bez startu, prázdné pole = cesta není), `next_step(from, to) -> Vector3i`, navíc `nodes_visited()` a `cost_last()` |
+| **Algoritmus je z referencí, ne z dojmu** | ceny kroků ortogonala **100** / diagonala **141** a strop uzlů **1000** = `MaxSearchNodes` v ModernUO (`dev-docs/pathfinding.md:81`); `MaxDepth 300` a oblast 38×38 v ServUO (`FastAStarAlgorithm.cs:26–28`); lineární hledání minima v open listu jako `FindBest` tamtéž |
+| **Průchodnost se neopisuje** | test podstrčí `walk` jako **stub, který si sám určuje průchodnost** a počítá volání: kdyby měl pathfind vlastní kopie pravidel, stub by neobesel a počty kroků by neseděly (`sim.pathfind: pruchodnost se PTÁ walk.can_step (namEReno volani …)`) |
+| **Heuristika je octilová (diagonala 141, zbytek 100)** | Test to měří na **4 vzorcích cesty**: odhad nikde nepřekročí skutečnou cenu (přípustnost) a u žádné hrany neklesne víc, než hrana stojí (konzistence) |
+| **⚠ FALEŠNÝ POPLACH, korekce 5. session** | Nejprve jsem (podle chybně zapsaného očekávání v testu) tvrdil, že předchozí heuristika `maxi(dx,dy)*100` byla vada. **Nebyla.** Sonda porovnala obě na **256 cílech** (`.cache/analysis/sonda-srovnani.gd`): `rozdilnych 0, stara drazsi 0, nova drazsi 0, uzlu stara 19207 / nova 16673` → octil je **úspora 13 % uzlů**, ne oprava. V kódu je to tak i popsané (+ „ať se to neopravuje znovu") a `LESSONS.md` to má jako záznam o mé chybě |
+| **Test granule** | `tests/cases/pathfind.gd` (**27 kontrol**): přímka, souvislost kroků, diagonála, obcházení dírou v překážce, neexistující cesta → prázdno, start == cíl, `next_step` na obě strany, rozpočet uzlů, cena cesty (ortogonala/diagonala), přípustnost + konzistence heuristiky, cíl mimo mapu, `nodes_visited` a **reálná mapa** (když jsou `assets/uo/world`) |
+| Testy hry | **507 kontrol, 0 selhání** (bylo 480; +27), `exit 0`; case souborů **27** |
+| **Mutační důkaz** | `mutace-tests.py` **44/44** (bylo 38/38, +6 za `sim.pathfind`), smlouva vstupu OK; `mutace-render-anim.py` 11/11, `mutace-render-hue.py` 12/12, `mutace-skills.py` 8/8, `mutace-anim.py` 8/8 → **celkem 83/83** |
+| **Dvě slepá místa, která mutace odhalily** | (a) mutant „diagonala za 200" **prošel všemi kontrolami na počet kroků** — test měřil jen počet kroků, ne cenu; doplněno `cost_last()` a kontroly ceny. (b) mutant „předchůdce se přepíše i pro rozbalený uzel" **nedoběhl** (exit 124 = timeout) — harness to hlásí jako „sada vůbec neproběhla"; mutace vyřazena a **zapsána jako otevřená věc 53** (harness neumí rozeznat zaseknutí od pomalého běhu) |
+
+**Co pathfind ZATÍM NEUMÍ (otevřené, hlasím):** dveře a schody (`world.walk` je
+neřeší — vada F9 / Úkol 3), moby/statiky jako překážky, dosah ani preferenci
+trasy (klient `ClassicUO Pathfinder.cs:868`), a **nikdo ho ještě nevolá** z
+`sim.ai` ani z click-to-move (to je další krok: `app.player_view`/`sim.commands`).
+
 ## ✅ CO JE NOVÉHO (4. session) — a čím je to doložené
 
 **Granule `sim.entity_registry` (Úkol 1 ze `ZADANI-DALSI-VYVOJ-2.md`) je hotová**
@@ -66,7 +89,7 @@ nedrží sám a `render.anim` nebere `serial` jako číslo těla.
 | **Zapojení do hry** | `app/main.gd` zakládá registr a registruje hráče, předává ho `movement` i `view.set_registry(...)`; `app/world_view.gd:_draw_player` volá `play(int(_player.serial), …)` (dřív `body`) |
 | **Test granule** | `tests/cases/registry.gd` (95 řádků, 11 kontrol): prázdný registr, neznámý serial, `get_mobile` vrací **tentýž objekt**, řazení `all()`, odmítnutí serialu 0 a `null`, `remove`, přepsání téhož serialu, a **`render.anim.body_of` z registru** (měří se i v CI — `body_of` nepotřebuje assety) |
 | **Testy navazujících granul** | `tests/cases/movement.gd` (+4 kontroly: registr 5. argumentem), `tests/cases/render_anim.gd` (+5: `play(serial)` přes registr, `body_of`, neznámý serial, starší cesta) |
-| Testy hry | **480 kontrol, 0 selhání** (bylo 460; +20), `exit 0`; case souborů **26** |
+| Testy hry | **480 kontrol, 0 selhání** (bylo 460; +20), `exit 0`; case souborů **26** *(5. session: dnes **507/0**, 27 case souborů — registr zůstal součástí)* |
 | Brány | **11 měřeno / 0 NEMĚŘENO / 0 vad**, `exit 0`; self-testy **19 (10 bran + 9 nástrojů), 0 chyb** |
 | **Mutační důkaz** | `mutace-tests.py` **38/38** (bylo 34/34, +4 registry), `mutace-render-anim.py` **11/11** (bylo 9/9, +2 registr), `mutace-skills.py` 8/8, `mutace-render-hue.py` 12/12, `mutace-anim.py` 8/8 → **celkem 77/77** |
 | **Obraz se NEZMĚNIL** | Snímek z běhu `demo-hue.gd`: `postava nakreslena true`, `chybi sprite false`, `kresleno objektu 5767`, `VERDIKT: KUZE JE BAREVNA`; G10 `kuze_pixelu 8634`, `kuze_barva R52 G42 B42` — **stejná čísla jako před zásahem** (změna je jen v tom, ODKUD se bere tělo) |
@@ -165,13 +188,14 @@ následuje předání**. Proto platí:
 ## ⚠⚠ BLOKÁTORY
 
 **Žádný otevřený blokátor v kódu.** „Demo chodí a postava je barevná" je naměřené
-(viz tabulky výš), brány jsou zelené (11/0/0) a testy taky (**480/0** s assety;
-v čistém klonu je kontrol méně, protože část měří data z `assets/uo/`).
+(viz tabulky výš), brány jsou zelené (11/0/0), testy **507/0** (s assety; v čistém
+klonu je kontrol méně, protože část měří data z `assets/uo/`) a mutační důkaz je
+**83/83** (44+8+8+11+12).
 
-**⚠ CI JE ZELENÉ (ověřeno živě 2026-10-06 touto session přes GitHub API):** běh
-**#22 nad `137da89` = `success`, všech 13 kroků** (import, testy, snímek, brány,
-mutace testů, mutace dat, stav plánu). Předchozí běhy #16, #17 a #19 mají
-poučení:
+**⚠ CI JE ZELENÉ, ALE NAD STARŠÍM COMMITEM (stav nezměněný od 4. session):** běh
+**#22 nad `137da89` = `success`, všech 13 kroků**. Commity 4. session (`a439716`)
+a 5. session **nejsou pushnuté** — než se podle CI něco tvrdí, ověř, nad kterým
+commitem běh byl. Předchozí běhy #16, #17 a #19 mají poučení:
 
 | běh | commit | spadl v | příčina | oprava |
 |---|---|---|---|---|
@@ -240,12 +264,12 @@ Dvě věci, které blokátor **nejsou**, ale je dobře je vědět:
 | složka | souborů (kód) | řádků kódu | poznámka |
 |---|---|---|---|
 | `core/` | 7 | 339 | hotové a otestované |
-| `sim/` | **13** | **1 564** | nově **`entity/registry.gd`** (4. session); `entity/skills.gd`, `entity/mobile.gd`, `world/walk.gd`, `systems/movement.gd`; `systems` **už není prázdné** (registruje `app/main.gd`) |
-| `render/` | **5** | **722** | `sort.gd`, `texture_cache.gd`, `chunk_renderer.gd`, **`anim_player.gd`** (+24 řádků: `body_of` a registr), `hue_cache.gd`; `ui/` pořád neexistuje |
-| `app/` | **6** (5 kód) | **651** | `main.gd` (zakládá registr) a `world_view.gd` (`set_registry`, kreslení podle serialu) rozšířené; **`player_controller.gd`** (bez granule) |
-| `tests/` | **36** (29 kód) | **3 268** | **26 case souborů** (+1 za 4. session: `registry.gd`) |
+| `sim/` | **14** | **1 737** | nově **`world/pathfind.gd`** (5. session, 173 řádků); `entity/registry.gd`, `entity/skills.gd`, `entity/mobile.gd`, `world/walk.gd`, `systems/movement.gd` |
+| `render/` | 5 | 722 | `sort.gd`, `texture_cache.gd`, `chunk_renderer.gd`, `anim_player.gd`, `hue_cache.gd`; `ui/` pořád neexistuje |
+| `app/` | 6 (5 kód) | 651 | `main.gd`, `world_view.gd`, `player_controller.gd` (bez granule) |
+| `tests/` | **37** (30 kód) | **3 495** | **27 case souborů** (+1 za 5. session: `pathfind.gd`) |
 | `tools/uoextract/` | 38 | 6 278 | `anim.py` umí pixely, `--export`, `--export-check` |
-| `tools/gates/` | **22** | **4 891** | `mutace-tests.py` (+ modul `registry`), `mutace-render-anim.py` (+2 mutace), `mutace-render-hue.py` |
+| `tools/gates/` | 22 | **4 923** | `mutace-tests.py` (+ modul `pathfind`, 6 mutací) |
 
 *(Počty jsou Pythonem `splitlines()` nad kódovými soubory `.gd`/`.py`/`.sh`/`.mjs`,
 bez `.uid` a `__pycache__` — `python _analyza/radky.py`.)*
@@ -261,25 +285,28 @@ textdata, cliloc, anim (VČETNĚ pixelů), data.items, data.gen_content,
 data.recipes, world.tiledata, world.map, render.sort, render.textures,
 render.chunk, render.anim, render.hue** · **M2: world.doors, world.stairs,
 entity.stats, world.time, entity.skills, entity.mobile, world.walk,
-sim.movement, data.skills, `sim.entity_registry`** · **integrace (bez granul):
-`app/player_controller.gd`, `app/world_view.gd` (kreslení postavy + barva +
-registr), `app/main.tscn` (uzly), `app/main.gd` (registrace systémů, barva hráče,
-založení registru a jeho předání `movement` i `world_view`)**.
+sim.movement, data.skills, `sim.entity_registry`, `sim.pathfind`** ·
+**integrace (bez granul): `app/player_controller.gd`, `app/world_view.gd`
+(kreslení postavy + barva + registr), `app/main.tscn` (uzly), `app/main.gd`
+(registrace systémů, barva hráče, založení registru a jeho předání `movement`
+i `world_view`)**.
 
 Doklady, které jsem viděl na vlastní oči (ne opsané z předání):
 
 - **Na snímku je mapa Britainu i BAREVNÁ postava** — `read_image` na
-  `.cache/render/snapshot.png` (4. session znovu, po změně odkud se bere tělo).
+  `.cache/render/snapshot.png` (4. session; 5. session obraz neměnila, G10 dává
+  **stejná čísla**: `kuze_pixelu 8634`, `kuze_barva R52 G42 B42`).
 - **Postava se pohnula po skutečných klávesách** — log řidiče `demo-chuze.gd`:
   6 pozic, směry 0/2/7/4, animace `4 ↔ 0`.
 - **Postava je z dat, ne kreslená**: výřez z `anim.mul` (tělo 400, 10 framů chůze),
   0 pixelů mimo frame na 30 blocích.
 - **Barva je z dat**: `hues.json` sada 1002, reference na recept
   (`IsometricWorld.fx:127–129`, `HuesHelper.cs`).
-- **Tělo se bere z registru** — log `demo-hue.gd`: `postava nakreslena true`,
-  `chybi sprite false`; testy `body_of` + `play(serial)` a **2 mutace** na to.
-- **Testy 480/0**, **brány 11/0/0** (`exit 0`), **mutace 38/38 + 8/8 + 8/8 +
-  11/11 + 12/12** (= 77/77).
+- **Cesta je z dat a z `walk`** — 5. session: `find` na reálné mapě Británie
+  projde 4 dlaždice, každý krok je soused a `z` v rozsahu; na cenu i heuristiku
+  jsou kontroly a 6 mutací.
+- **Testy 507/0**, **brány 11/0/0** (`exit 0`), **mutace 44/44 + 8/8 + 8/8 +
+  11/11 + 12/12** (= **83/83**).
 - **Hra nespadne**: G11 `smoke` → `framu 120, script_error 0, parse_error 0`.
 
 ### ⚠ Co na obrazovce ještě NENÍ
@@ -290,32 +317,32 @@ druhé postavy, mount, pathfinding, zvuk. **Hratelná mechanika: chůze, otáče
 a barva kůže.** Statiky nesou barvu ze záznamu mapy, ale **nikdo ji nepoužívá**
 (věc 35).
 
-## Co brány dnes měří (2026-10-06 noc, 4. session)
+## Co brány dnes měří (2026-10-07, 5. session)
 
 `run-all.py`: **11 měřeno / 0 NEMĚŘENO / 0 VADA**, `exit 0`.
 
 | Brána | Výsledek | Je to vada kódu? |
 |---|---|---|
 | G1–G11 | **OK** | NE |
-| G4 | OK — `granuli_s_hotovym_souborem: 50`, `volanych_z_produkce: 57`; u `sim.entity_registry` už **není** poznámka „`get` je próza" (smlouva opravena na `get_mobile`) | NE |
+| G4 | OK — `granuli_s_hotovym_souborem: 51`, `volanych_z_produkce: 58`; `sim.pathfind.find` i `next_step` jsou **„volá ho jen tests/ — čeká na integraci"** (věc 54) | NE |
 | G6 | OK — měří `anim_decoder_kod: 0`, `anim_decoder_kontrol: 35` | NE |
-| G10 | OK — `barev: 2124`, `pixelu_mimo_pozadi: 892595`, **`kuze_pixelu: 8634`, `kuze_barva: R52 G42 B42`** (shoda s paletou sady 1002; čísla **shodná s 3. session**, obraz se nezměnil) | NE |
+| G10 | OK — `barev: 2124`, `pixelu_mimo_pozadi: 892595`, **`kuze_pixelu: 8634`, `kuze_barva: R52 G42 B42`** — **stejná čísla jako 4. session** (kód obrazu se nedotkl) | NE |
 | G13 | PORADNÍ | NE — `vision.mjs` není (poradní je podle `docs/08 §8.2`) |
 
 ## Předletová kontrola (5 minut, než začneš psát)
 
-| Co | Jak | Očekáváno (2026-10-06 noc, 4. session) |
+| Co | Jak | Očekáváno (2026-10-07, 5. session) |
 |---|---|---|
 | Strom je čistý | `git status --porcelain -uall` | **prázdné** po commitu této session |
-| Je před GitHubem | `git rev-list --count origin/main..HEAD` | **`0`** (tato session **nepushuje** — uživatel si push vyhrazuje; CI proto poběží až po něm) |
-| **Běží CI?** | `node _analyza/ci-beh-stav.mjs` (funguje i bez tokenu) · anotace: `node _analyza/ci-anotace.mjs` | **běh #22 nad `137da89` = `success`, 13/13 kroků** (předchozí #16, #17 spadly, #19 bylo zelené — viz BLOKÁTORY) |
+| Je před GitHubem | `git rev-list --count origin/main..HEAD` | **`2`** (5. session **nepushuje** — uživatel si push vyhrazuje; CI proto poběží až po něm) |
+| **Běží CI?** | `node _analyza/ci-beh-stav.mjs` (funguje i bez tokenu) · anotace: `node _analyza/ci-anotace.mjs` | **běh #22 nad `137da89` = `success`, 13/13 kroků** — to je stav **před** commity 4. a 5. session (ty ještě nejsou pushnuté); po pushi čekej běh nad `a439716`/HEAD |
 | Repo je veřejné | API bez tokenu | `visibility: public` |
-| **Oprávnění** | `whoami /groups \| Select-String Mandatory` | **`Medium`** = plný přístup. `Low` = sandbox → brány hlásí **falešné vady** a `.uid` nevzniknou (viz pasti 31) |
-| Testy | testy s `APPDATA` ve workspace (`Low`: dej ho do `.tmp`) | `480 kontrol, 0 selhání` (v čistém klonu je kontrol méně — část měří data z `assets/uo/`) |
-| Brány | `python tools/gates/run-all.py` | `11/0/0`, `exit 0` |
-| Self-testy | `python tools/gates/run-all.py --self-test` | `19, 0 chyb`, `exit 0` |
-| Mutační důkaz | `mutace-tests.py` + `mutace-anim.py` + `mutace-skills.py` + `mutace-render-anim.py` + `mutace-render-hue.py` | `38/38`, `8/8`, `8/8`, `11/11`, `12/12` |
-| Vzory mutací | `python _analyza/mutace-vzory.py` (gitignore) | `49 vzorů`, `OK`, `exit 0` |
+| **Oprávnění** | `whoami /groups \| Select-String Mandatory` | **`Medium`** = plný přístup. `Low` = sandbox → brány hlásí **falešné vady**, `.uid` nevzniknou a `run-all.py` spadne na `summary.json` (5. session to naměřila znovu: G7 „VADA save/load", G11 NEMĚŘENO, self-test 9 chyb — **všechno byl sandbox**) |
+| Testy | testy s `APPDATA` ve workspace (`Low`: dej ho do `.tmp`) | **507 kontrol, 0 selhání**, 27 case souborů (v čistém klonu je kontrol méně — část měří data z `assets/uo/`) |
+| Brány | `python tools/gates/run-all.py` | **11 měřeno / 0 NEMĚŘENO / 0 vad**, `exit 0` |
+| Self-testy | `python tools/gates/run-all.py --self-test` | **19, 0 chyb**, `exit 0` |
+| Mutační důkaz | `mutace-tests.py` + `mutace-anim.py` + `mutace-skills.py` + `mutace-render-anim.py` + `mutace-render-hue.py` | `44/44`, `8/8`, `8/8`, `11/11`, `12/12` (= **83/83**) |
+| Vzory mutací | `python _analyza/mutace-vzory.py` (gitignore) | `mutace-tests: 44 vzorů` + `mutace-render-anim: 12` = **56 celkem**, `OK`, `exit 0` |
 | Animace | `python tools/uoextract/anim.py --self-test` | `35 kontrol, 0 chyb` |
 | Barvy | `python tools/uoextract/hues.py --self-test` | `5 kontrol, 0 chyb` |
 | Data skillů | `python tools/gates/gen-content.py --only skills --check` | `OK skills.json: shoda` |
@@ -324,7 +351,7 @@ a barva kůže.** Statiky nesou barvu ze záznamu mapy, ale **nikdo ji nepouží
 | Godot běží | `& .cache\godot\...console.exe --headless --version` | `4.7.2.stable.official.ed1daf0bf` |
 | Instalace UO na místě | `Test-Path 'D:\Games\...\tiledata.mul'` | `True` |
 | Kontroly zadání | `check-docs-refs.py`, `check-zadani.py`, `roadmap-gen.py --check` | `exit 0` |
-| Stav plánu | `python tools/plan-status.py` | `111 granul`, **`40` měřeně hotových**, 0 rozporů |
+| Stav plánu | `python tools/plan-status.py` | `111 granul`, **`41` měřeně hotových**, 0 rozporů (po commitu; před ním `40`) |
 | **Sandbox** | `whoami /groups \| Select-String Mandatory` | **`Medium`** = plný přístup |
 
 ## Otevřené věci a co je potřeba dodělat
@@ -506,6 +533,24 @@ a barva kůže.** Statiky nesou barvu ze záznamu mapy, ale **nikdo ji nepouží
     ukládá `mobiles: []`, takže poloha hráče se do save nepromítne (G7 měří jen
     hash stavu). Až se registr napojí na `sim.world_loop` (věc 48), musí se
     rozhodnout, co z registru patří do save.
+53. **NOVÉ (5. session): `mutace-tests.py` neumí rozeznat ZASEKNUTÍ od pomalého
+    běhu.** Mutant `sim.pathfind` s obráceným porovnáním ceny („dražší cesta
+    přepíše levnější") **zacyklí rekonstrukci cesty**; Godot nedoběhne do
+    `timeout=900`, harness vypíše **„SADA VUBEC NEPROBEHLA (0 kontrol)"** a
+    mutant se počítá jako nechyceny — přitom je to vada, kterou by šlo chytit
+    časovým stropem (`subprocess` s kratším limitem + klasifikace „ZASEKLA SE").
+    Dnes je mutace ze seznamu vyřazená (a je to v `mutace-tests.py` u modulu
+    `pathfind` popsané), aby 6/6 nebylo postavené na neměřeném.
+54. **NOVÉ (5. session): `sim.pathfind` NEMÁ VOJÁKA.** Nikdo ho nevolá —
+    `sim.ai` ani click-to-move neexistují, `sim.commands` cestu nezná. Je to
+    hotová granule bez volajícího (stejná past jako `hued_art`, věc 40). Další
+    krok: `sim.commands`/`app.player_view` poslat krok z `next_step(from, to)`.
+55. **NOVÉ (5. session): smlouva `sim.pathfind` NENÍ v `docs/04 §4.2`.**
+    Roadmapa `provides` ji má (`find(from, to, limit)`, `next_step(from, to)`),
+    ale dokumentace komponent ji nezmiňuje (a `docs/` agent needituje). Navíc
+    implementace přidává **`nodes_visited()` a `cost_last()`** (nad smlouvu,
+    používá je test a budou je chtít `app.metrics`) a **`limit` je rozpočet
+    uzlů**, ne délka cesty — to patří do smlouvy.
 
 ## Už není otevřené (přesunuto, nemaže se)
 
@@ -544,30 +589,36 @@ a barva kůže.** Statiky nesou barvu ze záznamu mapy, ale **nikdo ji nepouží
    `research/REJSTRIK-REFERENCI.md` a použij jeho řádek („otázka → `soubor:řádek`
    + jak ověřit"). Nález, který se nezmění v tvrzení v našem kódu + test, je dojem.
 1. **Pushnout a zkontrolovat CI** na nových commitech — **tato session
-   nepushovala** (uživatel si push vyhrazuje). Po pushi čekej běh nad commitem
-   této session a ověř **13/13 kroků**.
-2. **Úkol 2 ze `ZADANI-DALSI-VYVOJ-2.md`: `sim.pathfind`** (nová granule,
-   `sim/world/pathfind.gd`, `strong` ≤ 150 řádků) — A* nad dlaždicemi, průchodnost
-   **jen přes `world.walk.can_step`** (nikdy vlastní kopie pravidel). Vzory:
-   `_src/classicuo/.../Pathfinder.cs:868`, `_src/servuo/.../FastAStarAlgorithm.cs:16`
-   (rejstřík §…). Přijímací kritérium: cesta A→B má správný počet kroků, cesta
-   přes vodu vrací prázdno, `next_step` vrací sousední dlaždici.
-3. **Opravit slepé místo v `tests/run_tests.gd`** (`script.can_instantiate()`
-   před `script.new()`) — pořád jediná známá slepá brána (věc 21) a **4. session
-   na ni znovu naletěla** (parse error v case souboru → `438/0` místo `480/0`).
-   Soubor je `boot.tests` → **potřebuje rozhodnutí uživatele**.
-4. **Napojit registr na `sim.world_loop`** (věci 22, 48, 52): `snapshot().mobiles`,
+   nepushovala** (uživatel si push vyhrazuje). Před GitHubem jsou **2 commity**
+   (4. a 5. session). Po pushi čekej běh nad HEAD a ověř **13/13 kroků**.
+2. ~~**Úkol 2 ze `ZADANI-DALSI-VYVOJ-2.md`: `sim.pathfind`**~~ — **HOTOVO
+   2026-10-07 (5. session)**: `sim/world/pathfind.gd` + `tests/cases/pathfind.gd`
+   + modul `pathfind` v `mutace-tests.py` (6/6). **Zbývá jen voják** (věc 54).
+3. **Úkol 3 ze `ZADANI-DALSI-VYVOJ-2.md`: dveře a schody ve `world.walk`**
+   (`Door` zavřené blokuje / otevřené ne, výška schodů) — dnes to drží otevřená
+   věc 31 a mutace `walk` na to nemá jak mrknout, dokud tam pravidla nejsou.
+   **Pozor:** cesta z `sim.pathfind` se tím změní — testy `pathfind` na to mají
+   stub, takže se nic nerozbije, ale je to důvod, proč jít po Úkolu 3 hned.
+4. **Opravit slepé místo v `tests/run_tests.gd`** (`script.can_instantiate()`
+   před `script.new()`) — pořád jediná známá slepá brána (věc 21) a **5. session
+   na ni naletěla znovu** (parse error v `tests/cases/pathfind.gd` → sada
+   hlásila `480 kontrol, 0 selhání`; poznat se to dalo **jen podle poklesu
+   počtu kontrol**). Soubor je `boot.tests` → **potřebuje rozhodnutí uživatele**.
+5. **Napojit registr na `sim.world_loop`** (věci 22, 48, 52): `snapshot().mobiles`,
    `state_hash`, `save` — tím se rozhýbou replaye a klient uvidí i jiné mobily.
-5. **`entity.equipment` + `entity.item`** — obléknout postavu (ta je dnes nahá).
+6. **`entity.equipment` + `entity.item`** — obléknout postavu (ta je dnes nahá).
    `render.hue` na to stroj má (věc 41); `render.anim` už tělo z registru bere.
-6. **Dveře a schody v `world.walk`** (věc 31, Úkol 3) + `world.doors` napojit.
-7. **Statiky s barvou** (věc 40): `render.chunk` + `hued_art()` — dveře a cedule.
-8. **Držení klávesy = chůze** (`app.input`, věc 27, Úkol 7) — bez toho se demo
+7. **Voják pro `sim.pathfind`** (věc 54): click-to-move přes `sim.commands`
+   (klik do světa → `next_step` → `Command{t:"move"}`), ať cesta není mrtvý kód.
+8. **Statiky s barvou** (věc 40): `render.chunk` + `hued_art()` — dveře a cedule.
+9. **Držení klávesy = chůze** (`app.input`, věc 27, Úkol 7) — bez toho se demo
    ovládá „klikatě".
-9. Pak M2 zbytek: `entity.container`, `entity.notoriety`, `world.teleport`,
-   `world.regions`, `sim.interaction` (Úkol 4).
-10. (nepovinné) `if: always()` u diagnostických kroků CI (věc 26) a doplnit
-    **čtyři** mutační harnessy do `ci.yml`.
+10. Pak M2 zbytek: `entity.container`, `entity.notoriety`, `world.teleport`,
+    `world.regions`, `sim.interaction` (Úkol 4).
+11. (nepovinné) `if: always()` u diagnostických kroků CI (věc 26) a doplnit
+    **čtyři** mutační harnessy do `ci.yml`; časový strop v `mutace-tests.py`
+    (věc 53) — plný běh harnessu je dnes **44 mutací × celá sada** a v CI má
+    job `timeout-minutes: 30`, takže to chce změřit, než se přidá víc.
 
 ## Jak to dělat (co se osvědčilo)
 
@@ -706,7 +757,8 @@ a barva kůže.** Statiky nesou barvu ze záznamu mapy, ale **nikdo ji nepouží
     má `<= 60`**, přitom generovaný JSON má **640 řádků**.
 11. **`app/main.tscn` + kamera + kreslicí uzel + `app/player_controller.gd`
     nemají vlastníka** v roadmapě.
-12. **V roadmapě chybí vlastník pro pathfinding.**
+12. **V roadmapě chybí vlastník pro pathfinding** — **VYŘEŠENO 2026-10-06**
+    (revize Z5: granule `sim.pathfind` je v roadmapě i v `docs/07` W10).
 13. **Soubor pro zvuk/hudbu nemá žádná granule** (0× `AudioStream`).
 14. **`docs/07 §7.3` (vlny) pokrývá 62 granul z 101.**
 15. **`ZADANI-DALSI-VYVOJ` §7 zakazuje měnit `tests/`**, ale acceptance

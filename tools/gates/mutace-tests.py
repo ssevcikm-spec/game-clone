@@ -149,6 +149,38 @@ MODULY = {
              "if m == null or int(m.serial) <= 0:", "if m == null:"),
         ],
     },
+    "pathfind": {
+        "soubor": ROOT / "sim" / "world" / "pathfind.gd",
+        "prefix": "sim.pathfind",
+        "prepinac": "--pathfind-script",
+        "mutace": [
+            ("cil se nikdy netrefi (cesta vzdy prazdna)",
+             "if cur.x == to.x and cur.y == to.y and cur.z == to.z:",
+             "if false:"),
+            ("diagonala stoji jako ortogonala (cena 200 misto 141)",
+             "var cost: int = COST_STEP if dir % 2 == 0 else COST_DIAG",
+             "var cost: int = COST_STEP if dir % 2 == 0 else 2 * COST_STEP"),
+            ("frontier se nevybira podle ceny (bere se prvni uzel)",
+             "var index := _best(frontier, g, to)", "var index := 0"),
+            ("heuristika je neprustezna (Chebyshev * 141 prekroci cenu)",
+             "\treturn diagonal * COST_DIAG + rovne * COST_STEP + dz * COST_Z",
+             "\treturn maxi(dx, dy) * COST_DIAG + dz * COST_Z"),
+            ("rozpocet uzlu se nikdy nevycerpa (_nodes zacina na -1000000)",
+             "	_nodes = 0", "	_nodes = -1000000"),
+            ("predchudce se neuklada (cesta se neda poskladat)",
+             "			parent[nxt] = cur\n", ""),
+        ],
+        # CO TU ZAMERNE NENI (a proc):
+        #   * "cena uzlu se neporovnava obracene" (`<=` -> `>`) ZKOUSENA a do
+        #     seznamu NEPATRI: hledani se zacykli v rekonstrukci cesty, Godot
+        #     nedobehne do 900 s, harness hlasi "SADA VUBEC NEPROBEHLA (0 kontrol)"
+        #     - a to NENI dukaz, ze test meri (ne rozlisuje zaseknuti od pomaleho
+        #     behu). Je to otevrena vec 53 v HANDOFF.md, ne zelená.
+        #   * "diagonala stoji jako ortogonala" ve VERZI, ktera meni jen cenu
+        #     (200 misto 141): testy na POCET KROKU ji nechyti, protoze A* i s ni
+        #     dojde stejnou trasou - chyti ji az kontrola `cost_last()` (a ta tam
+        #     je). Kdyby se vyhodila, byla by to slepá kontrola.
+    },
     "movement": {
         "soubor": ROOT / "sim" / "systems" / "movement.gd",
         "prefix": "sim.movement",
@@ -201,7 +233,7 @@ def fail_radky(vystup: str, prefix: str) -> list[str]:
 def main() -> int:
     ap = argparse.ArgumentParser(description="Mutacni dukaz testu")
     ap.add_argument("--only", default=None,
-                    help="sort, map, walk, movement, registry (nebo vic carkami)")
+                    help="sort, map, walk, movement, registry, pathfind (nebo vic carkami)")
     args = ap.parse_args()
     if godot_bin() is None:
         print("CHYBA: Godot nenalezen (nastav $GODOT) - mutace by nic nemerily")

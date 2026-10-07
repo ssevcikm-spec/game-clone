@@ -24,6 +24,76 @@ Typy: `chyba` (moje vada) · `past-nástroje` (prostředí/nástroj, ne logika) 
 
 ---
 
+### 2026-10-07 — Málem jsem „opravil" správný kód a napsal o tom nepravdivé ponaučení (chyba)
+**Co se stalo:** při psaní `sim.pathfind` jsem naměřil, že cesta na `(2,1,0)`
+stojí **341** tam, kde jsem čekal **241**, a hned jsem usoudil, že je vada
+v heuristice (`maxi(dx,dy) * 100` = Chebyshev) — „přípustná, ale nekonzistentní,
+proto A* skončil dřív". Přepsal jsem heuristiku na octilovou, **do hlavičky kódu
+napsal, že předchozí verze byla vada**, a napsal o tom i první verzi tohohle
+záznamu. **Nebyla to pravda.** Můj test čekal u `(0,0) → (2,2)` cenu 241, ale
+správně je **282** (dvě diagonály jsou tam nejlepší cesta: 141 + 141) — a chybná
+byla i moje ruční úvaha u `(2,1)`.
+**Doklad:** starou heuristiku jsem vrátil do **kopie** souboru
+(`.cache/analysis/pathfind-stara-heuristika.gd`) a porovnal obě na **256 cílech**
+mapy 16×16 s překážkou (`.cache/analysis/sonda-srovnani.gd`):
+**`cilu 256 | rozdilnych 0 | stara drazsi 0 | nova drazsi 0 | uzlu stara 19207
+nova 16673`** — obě vracejí stejné (optimální) cesty, octil jen rozbalí o 13 %
+méně uzlů. Stará heuristika byla **správná**.
+**Ponaučení:** **selhaný test není důkaz vady v kódu** — je to důkaz **rozporu**,
+a rozpor může být na straně testu. Než začnu vysvětlovat, *proč* je kód vadný,
+musím vědět, že **moje očekávaná hodnota je vůbec dosažitelná** (tady: dá se na
+(2,2) dojít za 241? Ne — je to 2×141). A „vysvětlení vady" se **musí naměřit
+proti staré verzi**, ne odvodit na papíře: reprodukce na 256 případech ukázala
+0 rozdílů, což by jediný ruční příklad nikdy neukázal. **Do hlavičky kódu nepatří
+tvrzení „dřív to bylo vadné", dokud to není naměřené.** (Dnešní změna proto
+v kódu zůstává, ale je popsaná jako **úspora**, ne oprava.)
+
+### 2026-10-07 — Mutační test odhalil, že kontroluji jinou vlastnost, než si myslím (postup)
+**Co se stalo:** mutace „diagonala stojí jako ortogonala (200 místo 141)"
+**prošla** celou sadou (`507 kontrol, 0 selhání`): testy měřily **počet kroků**
+a ten se nezměnil (A* i s dražší diagonalou došel stejnou trasou) — vada to byla,
+ale **neměřitelná**. Druhý pokus (mutace porovnání ceny `<=` → `>`) se
+**zacyklil** v rekonstrukci cesty a harness po 900 s vypsal „SADA VUBEC
+NEPROBEHLA (0 kontrol)".
+**Doklad:** `python tools/gates/mutace-tests.py --only pathfind` — nejdřív
+„4 z 7 chyceno; NECHYCENE: diagonala…, heuristika…, predchudce…"; po doplnění
+`cost_last()` a kontrol ceny **6 z 6 chyceno** a v celém harnessu **44/44**
+(bylo 38/38). Mutace se zacyklením je ze seznamu vyřazená a je zapsaná jako
+otevřená věc 53 v `HANDOFF.md`.
+**Ponaučení:** **mutant, který projde, není nutně slabý test** — může to být
+vlastnost, kterou test vůbec neměří. Rozdíl je vidět jen tak, že se u mutanta
+**pojmenuje, co by měl změnit**, a test se na to **doptá** (tady `cost_last()`).
+A když mutant **nedoběhne**, je to **neměřené**, ne chycené — kdo to zapíše jako
+zelenou, tvrdí víc, než naměřil.
+
+### 2026-10-07 — Fixture, která měří špatnou věc (chyba)
+**Co se stalo:** test obcházení překážky postavil stěnu a nechal v ní díru; cesta
+ale šla **okolo celé stěny** (vyšlo 5 kroků místo čekaných 7), protože to bylo
+**levnější**. Test hlásil „FAIL … namEReno 5" a málem to vypadalo jako vada kódu
+— vada byla ve **fixture** (díra, kterou nikdo nepoužije, netestuje nic).
+**Doklad:** `[test] FAIL sim.pathfind: dirou v prekazce to je 7 kroku (namEReno 5)`;
+po přeskládání překážky (díra v x=2, y=2, cíl (6,6)) test měří **6 kroků**
+a kontroluje, že cesta dírou **opravdu jde** (`okolo.has(Vector3i(2,2,0))`).
+**Ponaučení:** u testu na „obcházení" se musí ověřit **i to, že cesta vede
+hledaným místem** — jinak test měří jen „nějak to došlo" a díra v překážce
+v něm hraje dekoraci. A když test hlásí „jiný počet kroků, než čekám", je to
+**signál k přepočítání fixture**, ne k přepisování algoritmu.
+
+### 2026-10-07 — Parse error v case souboru znovu: sada hlásila 480/0 místo 507 (past-nástroje)
+**Co se stalo:** v `tests/cases/pathfind.gd` jsem měl dvakrát deklarované jméno
+`pred` (`var pred` a pak `var pred` ve smyčce) → **parse error**. Sada vypsala
+**`480 kontrol, 0 selhání`, `exit 0`** a case soubor **tiše přeskočila**; jediná
+stopa byl **pokles počtu kontrol** (baseline měřený na začátku session: 480).
+**Doklad:** `SCRIPT ERROR: Parse Error: There is already a variable named "pred"
+declared in this scope.` + `Failed to load script "res://tests/cases/pathfind.gd"`
+vs. `[test] 480 kontrol, 0 selhani`; po opravě `507 kontrol, 0 selhání`.
+**Ponaučení:** **baseline `N kontrol` si změř PŘED prvním zásahem** a po každé
+změně ho porovnej — u téhle pasti je to jediný viditelný příznak (věc 21;
+oprava `script.can_instantiate()` v `tests/run_tests.gd` čeká na rozhodnutí
+uživatele). A při psaní case souboru si **hlídej jména proměnných**: GDScript
+nedovolí dvě deklarace téhož jména v jednom scope (ani když je ta vnější
+v cyklu).
+
 ### 2026-10-06 — Smlouva žádala metodu, kterou GDScript NEMŮŽE mít: `get(serial)` (vada-zadani)
 **Co se stalo:** smlouva `docs/04 §4.2` i roadmapa žádaly u `sim.entity_registry`
 metodu `get(serial)->Mobile|null`. Napsal jsem ji přesně tak — a `registry.gd`
