@@ -543,11 +543,16 @@ g("assets.sounds", "Zvuky a hudba (extrakce)", ["tools/uoextract/sounds.py"],
   deps=["assets.uop"], provides=["zvuky z sound.mul/.uop", "hudba z music/digital"],
   acceptance=["assets", "content"], milestone="M1",
   prompt="Extrakce jako u ostatních assetů. POZOR (naměřeno v ClassicUO `SoundsLoader.cs:266`): přehrávač odmítne audio, které není 44,1 kHz stereo - při konverzi to musí sedět, jinak se soubor tiše nepřehraje.")
+# ZVUK JE VLASTNI TRAT (rozhodnuti uzivatele 2026-10-07): `audio.playback` uz
+# neni soucasti uzaviraciho milniku M8 - je schedulovatelny samostatne, jakmile
+# je zmereny `assets.sounds` (M1). Poradi je tim "assets.sounds -> audio.playback",
+# ne "cely M8". Kdyby se melo prejmenovat na vlastni milnik "A", musi se rozsirit
+# MILNIKY_PORADI tady, MILNIKY v tools/plan-status.py a tabulka v docs/07 §7.2.
 g("audio.playback", "Přehrávání zvuku", ["app/sound.gd"],
   deps=["assets.sounds", "app.loop"],
   provides=["play(id, volume)", "play_at(id, pos, listener)", "music(id)"],
-  acceptance=["tests"], milestone="M8",
-  prompt="Zvuk nikdy nemění stav simulace (docs/02 §2.2) - jen reaguje na události z `sim.events`. Vzdálenost tlumí podle pozice hráče.")
+  acceptance=["tests"], milestone="M2",
+  prompt="VLASTNI TRAT (rozhodnuti uzivatele 2026-10-07): neni vazany na M8. Zvuk nikdy nemění stav simulace (docs/02 §2.2) - jen reaguje na události z `sim.events`. Vzdálenost tlumí podle pozice hráče.")
 g("app.config", "Typovaná konfigurace", ["app/config.gd"],
   deps=["data.balance"],
   provides=["get(key, default) -> Variant", "known_keys() -> Array", "check() -> Array chyb"],

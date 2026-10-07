@@ -17,8 +17,8 @@
   "combat_era": "aos",
   "era": {
     "combat": "aos",
-    "loot": "pre-aos",
-    "content": "pre-aos",
+    "loot": "aos",
+    "content": "aos",
     "ui": "aos",
     "movement": "pre-aos",
     "tooltips": "on"

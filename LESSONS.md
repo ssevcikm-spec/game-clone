@@ -24,6 +24,26 @@ Typy: `chyba` (moje vada) · `past-nástroje` (prostředí/nástroj, ne logika) 
 
 ---
 
+### 2026-10-07 — Sandbox `workspace-write` blokuje zápis PODPROCESŮM, ale nástroje souborů píšou dál (past-nástroje)
+**Co se stalo:** `python tools/roadmap-gen.py` spadl na `PermissionError: [Errno 13]
+Permission denied: '.forge/roadmap.json'` a `Set-Content` selhal i na
+`tests\_test.tmp` — tedy kdekoliv v pracovním stromě. Přitom zápis týmž agentem
+přes nástroj souborů (`edit`) do `.forge/roadmap.json` **prošel**. Rozdíl není
+v cestě ani v ACL (ta je `Modify` pro Authenticated Users), ale v tom, KDO píše:
+konfinovaný podproces vs. nástroj souborů.
+**Doklad:** `Set-Content` → `Access to the path ... is denied` pro `.cache`,
+`.forge`, `.godot` i `tests`; naproti tomu `edit` na `.forge/roadmap.json` prošel
+a `python tools/roadmap-gen.py --check` po té ruční úpravě hlásí
+`OK: DAG je konzistentní ... roadmap.json je aktuální` (exit 0). Godot pod
+sandboxem **běží**: `only_case.gd` nad `tests/cases/stats.gd` → `16 kontrol,
+0 selhani`, exit 0; na stderr jen `Failed to open log file for writing:
+user://logs/godot.log` (neškodný šum, ne vada testu).
+**Ponaučení:** (1) „brána hlásí vadu“ může být sandbox, ne kód — první otázka je,
+jestli nástroj potřebuje **zapsat**. (2) Generovaný soubor (`.forge/roadmap.json`)
+jde v nouzi upravit nástrojem souborů, ale jen přesně tak, jak by ho vypsal
+generátor, a **dokázat to `--check`** (ten je read-only). (3) Brány, mutace
+a snímek (`.cache/...`) potřebují **jedno eskalační volání**, ne „opravu“ kódu.
+
 ### 2026-10-07 — `plan-status.py` posune na „měřeně hotové“ i granuli, kterou cizí test jen ZMÍNÍ (past-nástroje)
 **Co se stalo:** přidal jsem `tests/cases/interaction.gd`, který čte `data/items.json`
 (routing z `category`/`role`) a `data/skills.json` (id skillu pro gump). Metrika

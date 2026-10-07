@@ -55,12 +55,18 @@ kontrola (snímek + projití scénáře).
 | **M5** | **Souboj a smrt** | zabije kostlivce, dostane loot, umře, stane se duchem, nechá se vzkřísit | G3, G8, G9 |
 | **M6** | **Magie** | sesílá kouzla 1.–8. kruhu s many a reagenty; spellbook a svitky | G3, G5 |
 | **M7** | **Ekonomika a svět** | koupí a prodá u vendora, uloží zlato do banky, potká spawny ve 3 dungeonech, **funguje den/noc a světlo (`render.light`)** | G3, G5, G9, G12 |
-| **M8** | **Trvanlivost a uzavření** | uložení/načtení, determinismus, replaye, výkon, makra, **zvuk a hudba**, credits, vydání | G7, G8, G9, G12, G13 |
+| **M8** | **Trvanlivost a uzavření** | uložení/načtení, determinismus, replaye, výkon, makra, credits, vydání (**zvuk a hudba je od 2026-10-07 VLASTNÍ TRAŤ** — viz poznámka pod tabulkou) | G7, G8, G9, G12, G13 |
 | **M9** | **Modernizace** | typovaná konfigurace, dávkové kreslení bloků (mesh), měření výkonu a parity cache; **pravidlo: modernizace nesmí ubrat žádné měření** (každá změna má stejnou nebo silnější bránu) | G1–G13 (nesmí jich ubýt) |
 
 **Pravidlo pro milníky:** milník není hotový, dokud **člověk** neprojde jeho
 scénář a neuvidí ho. Zelené brány k tomu **nestačí** (naměřeno: hráč nebyl
 na obrazovce, a všechny brány byly zelené).
+
+**Zvuk a hudba je od 2026-10-07 vlastní trať** (rozhodnutí uživatele), ne
+součást M8: `assets.sounds` (M1) → `audio.playback`. Kdo trať přejmenuje na
+vlastní milník `A`, musí rozšířit `MILNIKY_PORADI` v `tools/roadmap-gen.py`,
+`MILNIKY` v `tools/plan-status.py` a tuhle tabulku — jinak se granule přestane
+řadit.
 
 ## 7.3 Vlny (co může běžet paralelně)
 

@@ -1,11 +1,14 @@
 extends RefCounted
 # Predmet (granule `entity.item`, smlouva docs/04 §4.2, tvar dat §4.5).
 #
-# TVAR DAT je dany smlouvou. Dve veci v ni nesedi (hlasim, docs/ needituje
-# agent - viz "Vady ZADANI" v HANDOFF.md):
-#   * §4.2 u `entity.item` vyjmenovava `durability`/`max_durability`, ale
-#     `quality` (ktery je v §4.5) tam nema - kod ma OBOJE,
-#   * `provides` v `.forge/roadmap.json` ma `quality`, ale `max_durability` ne.
+# TVAR DAT je dany smlouvou. STUPNICE KVALITY je ROZHODNUTA 2026-10-07 (11.
+# session, uzivatel: "srovnat s UO"): `quality` = 0 Low (zpackany), 1 Normal,
+# 2 Exceptional - merene v ServUO `Items/Internal/ItemInterfaces.cs:67-72`
+# (`Low, Normal, Exceptional`) a `CraftItem.cs:1356` (exceptional = 2). Tentyz
+# den se opravil docs/04 §4.2 (mel "0 normal, 1 exceptional" = posun o jedna
+# a chybejici Low) i tests/cases/item.gd; vychozi hodnota je 1 = Normal.
+# ZBYVA JEDNA NESHODA (hlasim, docs/ needituje agent): `provides` v
+# `.forge/roadmap.json` ma `quality`, ale `max_durability` ne.
 #
 # INVARIANT "PRAVE JEDEN RODIC": predmet sam nevi, ve kterych kontejnerech je,
 # takze ho NEDRZI tenhle soubor - drzi ho `entity.container` (`add` predmet
@@ -39,7 +42,7 @@ var pos: Vector3i = Vector3i.ZERO  # plati JEN na zemi (parent == 0)
 var flags: int = 0               # 0x01 blessed, 0x02 newbie, 0x04 locked, 0x08 insured
 var durability: int = 0
 var max_durability: int = 0
-var quality: int = 0             # 0 = normal, 1 = exceptional
+var quality: int = 1             # 0 = low (zpackany), 1 = normal, 2 = exceptional
 var props: Dictionary = {}       # AoS properties: {"damage_increase": 25, ...}
 
 

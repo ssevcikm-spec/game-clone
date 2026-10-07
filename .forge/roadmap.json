@@ -2678,8 +2678,8 @@
       ],
       "size_lines": "<= 60",
       "model": "any",
-      "milestone": "M8",
-      "prompt": "Zvuk nikdy nemění stav simulace (docs/02 §2.2) - jen reaguje na události z `sim.events`. Vzdálenost tlumí podle pozice hráče."
+      "milestone": "M2",
+      "prompt": "VLASTNI TRAT (rozhodnuti uzivatele 2026-10-07): neni vazany na M8. Zvuk nikdy nemění stav simulace (docs/02 §2.2) - jen reaguje na události z `sim.events`. Vzdálenost tlumí podle pozice hráče."
     },
     {
       "id": "app.config",

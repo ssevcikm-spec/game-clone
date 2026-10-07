@@ -388,6 +388,95 @@ MODULY = {
              "\t\t\tif mob == null or int(mob.backpack) < 0:"),
         ],
     },
+    "skill_gain": {
+        "soubor": ROOT / "sim" / "systems" / "skill_gain.gd",
+        "prefix": "sim.skill_gain",
+        "prepinac": "--skill-gain-script",
+        "mutace": [
+            ("rust je podmíněný úspěchem (klíčové pravidlo 2026-10-07)",
+             "\tvar gained: bool = _gain(mob, skill, value, chance, success)",
+             "\tif not success:\n\t\treturn _result(false, false, value, \"\")\n"
+             "\tvar gained: bool = _gain(mob, skill, value, chance, success)"),
+            ("zámky skillu se ignorují",
+             "if mob.skills.lock(skill) != LOCK_UP:",
+             "if false and mob.skills.lock(skill) != LOCK_UP:"),
+            ("strop jednotlivého skillu se ignoruje",
+             "if value >= mob.skills.cap(skill):",
+             "if false and value >= mob.skills.cap(skill):"),
+            ("GGS v sekundách místo minut (mez mimo rozsah)",
+             "return int(GGS_TABLE[row][column]) * MS_PER_MINUTE",
+             "return int(GGS_TABLE[row][column]) * 1000"),
+        ],
+    },
+    # POZOR na vyber mutaci u UI: meni se TELA metod, ne signatury. Kdyby
+    # mutant zmenil pocet argumentu, `has_method` ho pusti, volani spadne na
+    # "Invalid call" a case zmeri 0 kontrol - v CELOSADOVEM souctu to vypada
+    # jako "PROSLA" (namEReno 11. session: `only_case.gd` u ciziho souboru
+    # hlasi `0 kontrol, 0 selhani`, exit 0). Ochrana v case souborech je
+    # pritomnost celeho API pred volanim, ne signatury.
+    "hud": {
+        "soubor": ROOT / "ui" / "hud.gd",
+        "prefix": "ui.hud",
+        "prepinac": "--hud-script",
+        "mutace": [
+            ("set_position pozici nezapamatuje",
+             "\tif not _positions.has(id):\n\t\treturn false\n\t_positions[id] = pos",
+             "\tif not _positions.has(id):\n\t\treturn false"),
+            ("layout() vraci ZIVY slovnik misto kopie",
+             "return _positions.duplicate()", "return _positions"),
+            ("position_of vraci (0,0) pro neznama okna",
+             "return _positions.get(id)", "return Vector2.ZERO"),
+        ],
+    },
+    "status_bar": {
+        "soubor": ROOT / "ui" / "status_bar.gd",
+        "prefix": "ui.status_bar",
+        "prepinac": "--status-bar-script",
+        "mutace": [
+            ("vaha se vypise bez maxima",
+             'parts.append("weight=%d/%d" % [_num(values, "weight"), _num(values, "weight_max")])',
+             'parts.append("weight=%d" % _num(values, "weight"))'),
+            ("apply_event prijme i cizi udalost",
+             '!= "stats_changed"', '!= "stats"'),
+            ("update() nenastavi text Labelu",
+             "_ensure_label().text = text_for(_values)", "_ensure_label()"),
+            ("zahodi se alias max_hp z udalosti",
+             "return _num(values, key) if values.has(key) else _num(values, alias)",
+             "return _num(values, key)"),
+        ],
+    },
+    "chunk_renderer": {
+        "soubor": ROOT / "render" / "chunk_renderer.gd",
+        "prefix": "render.chunk",
+        "prepinac": "--chunk-script",
+        "mutace": [
+            ("art_id bez posunu 0x4000 (dva id prostory)",
+             "const ITEM_OFFSET: int = 0x4000", "const ITEM_OFFSET: int = 0"),
+        ],
+    },
+    "world_view": {
+        "soubor": ROOT / "app" / "world_view.gd",
+        "prefix": "app.world_view",
+        "prepinac": "--world-view-script",
+        "mutace": [
+            ("kamera ignoruje vysku (z = 0)",
+             "to_screen(tile.x, tile.y, z)", "to_screen(tile.x, tile.y, 0)"),
+        ],
+    },
+    # DATA se mutuji po bajtech: mutant je kopie JSON s priponou `.gd`
+    # v `.cache` (ta ma `.gdignore`, takze ho Godot neimportuje) a case ho
+    # cte pres `--recipes-path=`, protoze cteni na pripone nezalezi.
+    "recipes": {
+        "soubor": ROOT / "data" / "recipes.json",
+        "prefix": "data.recipes",
+        "prepinac": "--recipes-path",
+        "mutace": [
+            ("vysledek ztrati kind = result",
+             '"kind": "result"', '"kind": "output"'),
+            ("odkaz na neexistujici tile",
+             '"tile": 3621', '"tile": 999999'),
+        ],
+    },
 }
 
 
@@ -418,7 +507,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description="Mutacni dukaz testu")
     ap.add_argument("--only", default=None,
                     help="sort, map, walk, doors, movement, registry, pathfind, textures, "
-                         "item, container, interaction (nebo vic carkami)")
+                         "item, container, interaction, skill_gain (nebo vic carkami)")
     args = ap.parse_args()
     if godot_bin() is None:
         print("CHYBA: Godot nenalezen (nastav $GODOT) - mutace by nic nemerily")

@@ -17,6 +17,14 @@ const MobileScript = preload("res://sim/entity/mobile.gd")
 const RegistryScript = preload("res://sim/entity/registry.gd")
 const TimeScript = preload("res://sim/world/time.gd")
 const HueScript = preload("res://render/hue_cache.gd")
+# Prvni UI v projektu (11. session): `ui.hud` je CanvasLayer, ktery drzi okna
+# a jejich pozice; `ui.status_bar` je prvni z nich. Oba moduly jsou hotove a
+# merene (`tests/cases/hud.gd`, `tests/cases/status_bar.gd`).
+const HudScript = preload("res://ui/hud.gd")
+const StatusBarScript = preload("res://ui/status_bar.gd")
+# Rust skillu a statu (granule `sim.skill_gain`, 11. session). Registruje se
+# s RNG ze `SimWorld` - vlastni RNG by rozbil determinismus a `state_hash`.
+const SkillGainScript = preload("res://sim/systems/skill_gain.gd")
 
 const DEFAULT_SEED: int = 1234
 const BRITAIN := Vector2i(1495, 1630)   # namesti Britainu (docs/01 §1.4)
@@ -35,6 +43,9 @@ var registry = null
 var time = null
 var map = null
 var controller = null
+var hud = null
+var status_bar = null
+var _last_status_text: String = ""
 
 
 func _ready() -> void:
@@ -44,8 +55,43 @@ func _ready() -> void:
 	loop.sim = sim
 	loop.input_map = InputMapScript.new()
 	add_child(loop)
+	_setup_ui()
 	_setup_world()
 	print("[main] sim spusten (seed ", DEFAULT_SEED, ", datovych souboru ", data.size(), ")")
+
+
+func _process(_delta: float) -> void:
+	# Stavovy pruh se aktualizuje JEN kdyz se text zmeni (ne kazdy frame).
+	# Hodnoty jdou z `entity.mobile` - `max_hp`/`max_stam`/`max_mana` plni
+	# `Mobile._init` ze statu (`entity.stats`), takze nejsou opsane cisla.
+	# Vaha a zlato jsou 0, dokud neni batoh s predmety (M3) - je to pravda,
+	# ne "nevim": hrac dnes nic nema.
+	if status_bar == null or player == null:
+		return
+	var values: Dictionary = {
+		"name": player.name,
+		"hp": player.hp, "hp_max": player.max_hp, "max_hp": player.max_hp,
+		"stam": player.stam, "stam_max": player.max_stam,
+		"mana": player.mana, "mana_max": player.max_mana,
+		"weight": 0, "gold": 0,
+	}
+	var text: String = status_bar.text_for(values)
+	if text == _last_status_text:
+		return
+	_last_status_text = text
+	status_bar.update(values)
+
+
+func _setup_ui() -> void:
+	# Slozeni UI (zadna herni logika): HUD je koren oken, status bar prvni okno.
+	# Kdyby UI chybelo, hra se o tom ozve - tiche "nic se nezobrazuje" je vada.
+	hud = HudScript.new()
+	add_child(hud)
+	status_bar = StatusBarScript.new()
+	hud.add_child(status_bar)
+	if not hud.register_window("status_bar", status_bar, Vector2(8.0, 8.0)):
+		push_warning("app.main: status bar se nepodarilo zaregistrovat v HUD")
+	print("[main] UI: okna ", hud.layout().keys())
 
 
 func _setup_world() -> void:
@@ -89,6 +135,11 @@ func _setup_player(view) -> void:
 	movement = MovementScript.new(walk, sim.clock(), sim.events(), "", registry)
 	movement.player_serial = serial
 	sim.systems["movement"] = movement
+
+	# `sim.skill_gain` dostava STEJNY registr jako `sim.movement` a RNG z
+	# `SimWorld` (vlastni RNG by rozbil determinismus). System nema `tick`,
+	# takze ho `SimWorld._tick_system` jen preskoci - slouzi volanim.
+	sim.systems["skill_gain"] = SkillGainScript.new(registry, sim.rng(), sim.clock(), sim.events())
 
 	# `world.time` se musi napojit na clock simulace (vada F6 z etapy 1: do
 	# 2026-10-06 `world_time_ms` plnily jen testy, takze `hour()` vratilo ve hre

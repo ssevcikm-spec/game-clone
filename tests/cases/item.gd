@@ -35,8 +35,8 @@ func run(t) -> void:
 		"sim.entity.item: _init(serial, tile, amount) nastavi vsechny tri")
 	t._check(zlato.hue == 0 and zlato.parent == 0 and zlato.layer == 0 and zlato.flags == 0,
 		"sim.entity.item: hue/parent/layer/flags zacinaji na 0")
-	t._check(zlato.durability == 0 and zlato.max_durability == 0 and zlato.quality == 0,
-		"sim.entity.item: durability/max_durability/quality zacinaji na 0")
+	t._check(zlato.durability == 0 and zlato.max_durability == 0 and zlato.quality == 1,
+		"sim.entity.item: durability/max_durability zacinaji na 0, quality na 1 = Normal (Low 0 / Normal 1 / Exceptional 2, rozhodnuti 2026-10-07)")
 	t._check(zlato.props is Dictionary and zlato.props.is_empty(),
 		"sim.entity.item: props je slovnik (AoS properties)")
 	t._check(zlato.pos is Vector3i and zlato.pos == Vector3i.ZERO,
