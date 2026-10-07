@@ -33,9 +33,18 @@ const STRANKA: int = 64              # velikost runtime atlasu v testu
 
 
 class FakeChunk:
-	# Jen to, co davka od `render.chunk` chce: `screen_position`.
+	# STEJNY VZOREC jako `render.chunk.screen_position` (a `core/iso.to_screen`):
+	#   screen.x = (x - y) * ISO_STEP
+	#   screen.y = (x + y) * ISO_STEP - z * Z_SCALE   (minus `offset` statiku)
+	# Modul pozici pocita INLINE (kvuli rychlosti), takze test musi merit proti
+	# TOMU vzorci. Ze sedi na skutecny `render.chunk`, meri sekce D nize.
 	func screen_position(obj: Dictionary) -> Vector2:
-		return Vector2(float(int(obj["x"]) * 10), float(int(obj["y"]) * 10))
+		var x: int = int(obj["x"])
+		var y: int = int(obj["y"])
+		var z: int = int(obj["z"])
+		return Vector2(float(x - y) * float(Const.ISO_STEP),
+			float(x + y) * float(Const.ISO_STEP) - float(z * Const.Z_SCALE)) \
+			- Vector2(obj["offset"])
 
 
 class FakeMap:
@@ -157,7 +166,8 @@ func run(t) -> void:
 		_obj("static", 4, 0, 0x4000 + 9),                                   # dira
 		_obj("mobile", 5, 5, 0x4000 + 5),                                   # hranice
 	]
-	var mesh = script.new(FakeChunk.new(), textury, STRANKA)
+	var kanal := FakeChunk.new()
+	var mesh = script.new(kanal, textury, STRANKA)
 	var hold_framu: int = int(Lib.consts_at(cesta).get("HOLD_FRAMU", 0))
 	var ok: bool = mesh.build(seznam, 10)          # diagonala hrace 5+5 = 10
 	# Stranka se na GPU kresli JEDNOU za zmenu: dokud nema obsah, NESMI se
@@ -188,28 +198,36 @@ func run(t) -> void:
 	var barvy: PackedColorArray = mesh.get("_barvy")
 	t._check(body.size() == 4 * 6 and uv.size() == body.size() and barvy.size() == body.size(),
 		"render.chunk_mesh: vrcholu je 4 kvadry x 6 (namEReno %d)" % body.size())
-	# 1) land art 3 (4x4) na pozici (0,0)
+	# Ocekavane pozice se berou z `screen_position` (stejny vzorec jako
+	# `render.chunk`); tvary kvadru se overuji vuci nim.
+	var p0: Vector2 = kanal.screen_position(seznam[0])     # land (0,0)
+	var p2: Vector2 = kanal.screen_position(seznam[2])     # svah (2,0,z=4)
+	var p3: Vector2 = kanal.screen_position(seznam[3])     # statik (3,0)
+	var p4: Vector2 = kanal.screen_position(seznam[4])     # dira (4,0)
+	# 1) land art 3 (4x4) na sve pozici
 	var r0: Array = _rohy(body, 0)
-	t._check(r0[0] == Vector2(0, 0) and r0[1] == Vector2(4, 0)
-		and r0[2] == Vector2(4, 4) and r0[3] == Vector2(0, 4),
+	t._check(r0[0] == p0 and r0[1] == p0 + Vector2(4, 0)
+		and r0[2] == p0 + Vector2(4, 4) and r0[3] == p0 + Vector2(0, 4),
 		"render.chunk_mesh: land kvadr sedi na pozici a rozmeru artu (namEReno %s)" % str(r0))
-	# 2) svah na pozici (20,0): vsechny ctyri rohy z `slope_polygon` - kazdy
-	#    roh ma JINOU vysku (4/1/2/3), takze prohozeni stran se pozna.
+	# 2) svah: vsechny ctyri rohy z `slope_polygon` - kazdy roh ma JINOU vysku
+	#    (4/1/2/3), takze prohozeni stran se pozna.
 	var zs: float = float(Const.Z_SCALE)
 	var r1: Array = _rohy(body, 1)
-	t._check(r1[0] == Vector2(20.0 + krok, 0.0)
-		and r1[1] == Vector2(20.0 + 2.0 * krok, krok + 3.0 * zs)
-		and r1[2] == Vector2(20.0 + krok, 2.0 * krok + 1.0 * zs)
-		and r1[3] == Vector2(20.0, krok + 2.0 * zs),
+	t._check(r1[0] == p2 + Vector2(krok, 0.0)
+		and r1[1] == p2 + Vector2(2.0 * krok, krok + 3.0 * zs)
+		and r1[2] == p2 + Vector2(krok, 2.0 * krok + 1.0 * zs)
+		and r1[3] == p2 + Vector2(0.0, krok + 2.0 * zs),
 		"render.chunk_mesh: svah ma vsechny rohy z `slope_polygon` (namEReno %s)" % str(r1))
-	# 3) statik na pozici (30,0) s rozmerem 3x2
+	# 3) statik s rozmerem 3x2
 	var r2: Array = _rohy(body, 2)
-	t._check(r2[0] == Vector2(30, 0) and r2[1] == Vector2(33, 0)
-		and r2[2] == Vector2(33, 2),
+	t._check(r2[0] == p3 and r2[1] == p3 + Vector2(3, 0)
+		and r2[2] == p3 + Vector2(3, 2),
 		"render.chunk_mesh: statik ma rozmer regionu (namEReno %s)" % str(r2))
 	# 4) dira: stejny tvar jako `_draw_hole` (ctverec u spodni hrany dlazdice)
 	var r3: Array = _rohy(body, 3)
-	t._check(r3[0] == Vector2(40.0 + krok, 0.0) and r3[2] == Vector2(40.0 + 2.0 * krok, krok),
+	t._check(r3[0] == p4 + Vector2(krok, 0.0)
+		and r3[1] == p4 + Vector2(2.0 * krok, 0.0)
+		and r3[2] == p4 + Vector2(2.0 * krok, krok),
 		"render.chunk_mesh: dira ma tvar z `_draw_hole` (namEReno %s)" % str(r3))
 	# barvy: sprity bile, dira magenta (jinak by dira zmizela)
 	var hole_color: Color = Lib.consts_at(cesta).get("HOLE_COLOR", Color.WHITE)

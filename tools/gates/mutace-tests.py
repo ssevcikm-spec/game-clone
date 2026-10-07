@@ -630,10 +630,13 @@ MODULY = {
             ("posun kroku se do kresleni postavy neprida (V2)",
              "+ Vector2(Const.ISO_STEP, Const.TILE_H / 2) + _player_offset",
              "+ Vector2(Const.ISO_STEP, Const.TILE_H / 2)"),
-            # M9 (15. session): priprava davky se NESMI preskocit.
-            ("davka se nikdy nepripravi (mesh se nepouzije)",
-             "if mesh_enabled and _mesh != null and _priprav_mesh():",
-             "if false:"),
+            # M9 (15. session): davka se NESMI preskocit - jinak zustane
+            # `mesh_stats()` prazdny a `tests/cases/world_view.gd` (sekce 12)
+            # to vidi. (Kresleni `_draw()` se v headless testu volat neda -
+            # Godot dovoli `draw_*` jen v NOTIFICATION_DRAW - takze se meri
+            # PRIPRAVA dávky.)
+            ("davka se nikdy nepostavi (mesh zustane prazdny)",
+             "if not _mesh.build(seznam, diagonala):", "if false:"),
         ],
     },
     # M9 (15. session): davkove kresleni. Mutace miri na GEOMETRII, PORADI
@@ -650,24 +653,22 @@ MODULY = {
              "if kind == \"land\" and je_svah(obj, _textures):",
              "if false:"),
             ("rohy svahu prohozene (pravy za levy)",
-             "pos + Vector2(2.0 * krok, krok + float(z - z_pravy) * zs)",
-             "pos + Vector2(2.0 * krok, krok + float(z - z_levy) * zs)"),
+             "krok + float(z - int(obj[\"z_corners\"][1])) * zs",
+             "krok + float(z - int(obj[\"z_corners\"][2])) * zs"),
             ("dira dostane bilou barvu misto magenta (zmizi)",
              "barva = HOLE_COLOR", "barva = Color.WHITE"),
             ("druhy trojuhelnik kvadru je spatne (geometrie se rozsype)",
-             "const TROJUHELNIKY := [[0, 1, 2], [2, 3, 0]]",
-             "const TROJUHELNIKY := [[0, 1, 2], [2, 3, 1]]"),
+             "_verts[b + 3] = body2", "_verts[b + 3] = body0"),
             ("UV se pocitaji bez posunu ve spritu (rozsypany atlas)",
-             "(float(slot.position.x) + lokalni.x * float(slot.size.x)) / float(_velikost)",
-             "float(slot.position.x) / float(_velikost)"),
+             "var ux: float = float(slot.position.x) / stranka_f",
+             "var ux: float = 0.0"),
             ("sprite se do runtime atlasu nekresli (jen UV)",
              "\"pos\": Vector2(r.position), \"tex\": tex,",
              "\"pos\": Vector2(r.position), \"tex\": null,"),
             ("po zmene stranky se dávka pouzije hned (prazdna textura)",
              "_hold = HOLD_FRAMU", "_hold = 0"),
             ("mobil na diagonale hrace se do hranice nedava (rozbite poradi)",
-             "if vrstva == Sort.LAYER_MOBILE and diagonala == diagonal_hrace:",
-             "if vrstva == Sort.LAYER_MOBILE:"),
+             "if diagonala == diagonal_hrace:", "if true:"),
             ("split radi podle spatne hranice (hrac je jinde)",
              "if _diag[stred] <= diagonal:", "if _diag[stred] < diagonal:"),
             ("pretek stranky se nehlasi (ticha degradace)",

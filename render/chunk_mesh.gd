@@ -58,8 +58,7 @@ const VOID_LAND_MAX: int = 2         # land id <= 2 UO vubec nekresli
 const BILY: int = -1                 # klic bileho texelu (dira)
 const HOLE_COLOR := Color(1.0, 0.0, 1.0, 0.85)
 const BILA_VELIKOST: int = 2         # strana bileho ctverecku v atlase
-const VRCHOLU_NA_KVADR: int = 6      # dva trojuhelniky, bez indexoveho pole
-const TROJUHELNIKY := [[0, 1, 2], [2, 3, 0]]
+const VRCHOLU_NA_KVADR: int = 6      # dva trojuhelniky [0,1,2] a [2,3,0], bez indexu
 const HOLD_FRAMU: int = 2            # frame, nez se smi pouzit nova stranka
 
 
@@ -320,6 +319,7 @@ func _stavba(objects: Array, diagonal_hrace: int) -> bool:
 		var body3 := Vector2.ZERO
 		var barva: Color = Color.WHITE
 		var stred_uv := Vector2.ZERO
+		var je_to_svah: bool = false
 		if kind == "land" and je_svah(obj, _textures):
 			slot = _slot(int(obj["texmap"]) + TEXMAP_OFFSET,
 				_textures.texmap(int(obj["texmap"])))
@@ -333,6 +333,7 @@ func _stavba(objects: Array, diagonal_hrace: int) -> bool:
 				2.0 * krok + float(z - int(obj["z_corners"][3])) * zs)
 			body3 = pozice + Vector2(0.0,
 				krok + float(z - int(obj["z_corners"][2])) * zs)
+			je_to_svah = true
 			svahu += 1
 		else:
 			var tex: Texture2D = _textures.texture(art_id)
@@ -357,7 +358,6 @@ func _stavba(objects: Array, diagonal_hrace: int) -> bool:
 				var sx: float = (float(slot.position.x) + 0.5 * float(slot.size.x)) / stranka_f
 				var sy: float = (float(slot.position.y) + 0.5 * float(slot.size.y)) / stranka_f
 				stred_uv = Vector2(sx, sy)
-				body0 = body0
 			else:
 				slot = _slot(art_id, tex)
 				if slot.size.x <= 0:
@@ -383,7 +383,8 @@ func _stavba(objects: Array, diagonal_hrace: int) -> bool:
 		_barvy[b + 3] = barva
 		_barvy[b + 4] = barva
 		_barvy[b + 5] = barva
-		if der > 0 and barva == HOLE_COLOR:
+		if barva == HOLE_COLOR:
+			# DIRA: barvu nese vrchol, textura je bily ctverecek.
 			_uvs[b] = stred_uv
 			_uvs[b + 1] = stred_uv
 			_uvs[b + 2] = stred_uv
@@ -399,7 +400,7 @@ func _stavba(objects: Array, diagonal_hrace: int) -> bool:
 			var uv1 := Vector2(ux + uw, uy)
 			var uv2 := Vector2(ux + uw, uy + uh)
 			var uv3 := Vector2(ux, uy + uh)
-			if svahu > 0 and slot == _sloty.get(int(obj.get("texmap", 0)) + TEXMAP_OFFSET):
+			if je_to_svah:
 				# SVAH: UV jdou na ROHY diamantu, ne na rohy obdelniku
 				# (`slope_uv`: horni 0.5/0, pravy 1/0.5, dolni 0.5/1, levy 0/0.5).
 				uv0 = Vector2(ux + 0.5 * uw, uy)
@@ -483,14 +484,6 @@ func _mesh_z_rozsahu(a: int, b: int) -> ArrayMesh:
 	return m
 
 
-func _v_uv(slot: Rect2i, lokalni: Vector2) -> Vector2:
-	# STEJNE LINEARNI mapovani jako `AtlasTexture`: `(region + lokalni * rozmer)
-	# / stranka`. S NEAREST filtrem to sejme presne ten texel, ktery kreslil
-	# puvodni `draw_texture` (proto se nikde nepridava 0,5).
-	return Vector2((float(slot.position.x) + lokalni.x * float(slot.size.x)) / float(_velikost),
-		(float(slot.position.y) + lokalni.y * float(slot.size.y)) / float(_velikost))
-
-
 func _bily_slot() -> void:
 	# Bily ctverecek pro diry (barvu pak dava vrchol, ne textura).
 	var r := Rect2i(0, 0, BILA_VELIKOST, BILA_VELIKOST)
@@ -534,16 +527,3 @@ func _slot_rozmer(klic: int, sirka: int, vyska: int, tex) -> Rect2i:
 	_x += sirka + PAD
 	_vyska_radku = maxi(_vyska_radku, vyska)
 	return r
-
-
-static func _dira_polygon(kind: String, pozice: Vector2) -> PackedVector2Array:
-	# Stejny tvar jako `app/world_view._draw_hole` (land = diamant 44x44,
-	# statik = ctverec u spodni hrany dlazdice) - dira v mape musi byt VIDET.
-	var krok: float = float(Const.ISO_STEP)
-	if kind == "land":
-		return PackedVector2Array([
-			pozice + Vector2(krok, 0.0), pozice + Vector2(2.0 * krok, krok),
-			pozice + Vector2(krok, 2.0 * krok), pozice + Vector2(0.0, krok)])
-	return PackedVector2Array([
-		pozice + Vector2(krok, 0.0), pozice + Vector2(2.0 * krok, 0.0),
-		pozice + Vector2(2.0 * krok, krok), pozice + Vector2(krok, krok)])

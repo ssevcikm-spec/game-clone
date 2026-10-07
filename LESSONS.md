@@ -24,6 +24,83 @@ Typy: `chyba` (moje vada) · `past-nástroje` (prostředí/nástroj, ne logika) 
 
 ---
 
+### 2026-10-08 — M9: modernizace se MUSÍ měřit dvakrát — a měřidlo, které si vymyslíš, může být to, co tě zastaví (postup + past-nástroje)
+**Co se stalo:** milník M9 („modernizace nesmí ubrat žádné měření“) měl tři granule.
+Než se cokoli napsalo, naměřilo se, KDE ty milisekundy jsou: `render.chunk_mesh`
+nemohl být „dávka místo 1 324 draw callů“, dokud se nezměřilo, že **přesná parita
+má dno v počtu „běhů“ se stejnou texturou = 1 219** (`_analyza/m9-vykon-pred.gd`) —
+engine už totiž souvislé běhy sám slučuje. A `ArrayMesh.add_surface_from_arrays`
+stojí **0,3 ms na surface** (2 090 surface = 633 ms), takže „mesh se surface pro
+každou stránku atlasu“ by bylo **pomalejší** než dnešní stav. Zbývala jediná cesta:
+dostat sprity do JEDNÉ textury. První verze to dělala kopírováním na CPU
+(`Image.blit_rect`) a **stavba trvala 3 342 ms** — ne kvůli kopírování, ale kvůli
+`ImageTexture.get_image()`, což je kopie **16 MB na stránku**, a LRU při 398 spritech
+thrashoval. Druhá verze skládá atlas **na GPU** (`SubViewport` + `UPDATE_ONCE`) a
+stavba spadla na **~54 ms** (první stavba 2 008 ms je ale **načtení 34 stránek
+atlasu z disku** — to platí i pro původní cestu).
+**Doklad:** `_analyza/m9-cena-meshe.gd` (0,3 ms/surface, 343 artů = 1,3 Mpx),
+`_analyza/m9-vykon-pred.gd` (1 324 draw callů, 48,75 ms, 24 FPS, 1 219 běhů),
+`_analyza/m9-vykon-po.gd` (4 draw cally, **0,25–0,26 ms** frame, Engine FPS ~3 700,
+stavba 53,8 ms, split 0,7 ms), `_analyza/m9-parita.gd` + `.py` (tři scény, stejné
+hashe), `_analyza/m9-snimek.gd` (G10 `kuze_pixelu 9101`).
+**Ponaučení:** (1) **Modernizace se rozhoduje měřením, ne názvem** — „mesh“ sám o
+sobě nezrychlí nic; zrychlí jen to, co se naměří jako drahé. (2) **Dno parity se dá
+spočítat předem** (počet běhů se stejnou texturou) a je to nejlepší důkaz, že
+„stejný obraz“ a „méně draw callů“ nejdou dohromady — pak je potřeba změnit
+architekturu (jedna textura), ne hádat. (3) Když je optimalizace drahá, **zjisti,
+která její část je drahá** (`get_image()`), a nahraď ji, místo abys zvyšoval cache.
+
+### 2026-10-08 — Past, která vypadala jako vada kreslení: rozdíl 1 001 px byl FRAME ANIMACE (past-nástroje)
+**Co se stalo:** paritní sonda porovnává dva snímky téhož stavu (dávka vs. původní
+cesta). U scény „po chůzi“ vyšlo **1 001 rozdílných pixelů** (0,109 %) přesně v místě
+postavy — vypadalo to jako vada dávky. Příčina byla v sondě: `render.anim.play()` bez
+`now_ms` bere **nástěnné hodiny** (`Time.get_ticks_msec()`), takže se postava animovala
+i ve „zmrazeném“ stavu a dva snímky se lišily **framem animace**. Po zafixování
+jednoho framu (stub `AnimStub`) mají všechny tři scény **stejný hash**.
+**Druhá past téhož běhu:** sonda čekala **framy** (`_cekani = 250/50`) — po zrychlení
+na ~3 700 FPS je 5 framů 1,5 ms, takže se postava **vůbec nepohnula** a všechny tři
+„scény“ měly stejný hash. Čekání musí být na **nástěnných hodinách**.
+**Doklad:** `_analyza/m9-parita.gd` (tři scény, hashe `6104e1d9` / `4e6e3d60` /
+`9a3479fe` shodné pro obě cesty).
+**Ponaučení:** (1) Než označíš rozdíl za vadu kódu, **zjisti, co se mezi snímky ještě
+měnilo** — kandidáti: animace (čas), časovač, kamera. (2) **Po zrychlení je čekání
+na framy nesmysl** — měř a čekej v čase, ne v framech; jinak test „proběhne“, ale
+neměří. (3) Sonda, která nemá **kontrolu, že se stav opravdu změnil** (jiný hash mezi
+scénami), tiše měří totéž třikrát.
+
+### 2026-10-08 — Mutace odhalily, že optimalizace ZABILA tři kontroly (postup)
+**Co se stalo:** po zrychlení horké smyčky (`render.chunk_mesh._stavba`: místo
+alokací `PackedVector2Array` a dvou vnořených smyček rozepsané zápisy a inline
+výpočet pozice i UV) klesla stavba **100,3 → 53,8 ms**, ale mutační důkaz spadl
+z **25/25 na 22/25**: tři mutace mířily na kód, který už neexistuje (const
+`TROJUHELNIKY`, volání `_v_uv`, `vrstva == Sort.LAYER_MOBILE`) — tedy na **mrtvé
+vzory**. Testy zůstaly zelené a nic by to neprozradilo.
+**Doklad:** `tools/gates/mutace-tests.py --only chunk_mesh,config,metrics` (25/25 po
+přepsání vzorů na nový kód), `_analyza/m9-vykon-po.gd` (`stavba_ms 53,759`).
+**Ponaučení:** (1) **Mutační harness je kotva i pro refaktoring** — když se kód
+přepíše, vzory se musí přepsat s ním; „neprovedená mutace“ se počítá jako
+nechycení, a to je správně. (2) Když optimalizuješ horkou smyčku, **smaž i to, co
+tím osiřelo** (jinak zůstane mrtvá funkce, na kterou se mutace chytá).
+
+### 2026-10-08 — `get` nejde použít jako jméno metody a JSON vrací čísla jako float (past-nástroje)
+**Co se stalo:** `app/config.gd` měl podle `provides` v roadmapě metodu
+`get(key, default)`. GDScript to odmítl: „The method get() overrides a method from
+native class Object“ — a protože je to **chyba parseru**, soubor se **vůbec
+nenačetl** (test hlásil „NENÍ HOTOV“). Metoda se proto jmenuje **`value`** (odchylka
+zapsaná v `docs/04 §4.2.1`). Druhá věc téhož souboru: `JSON.parse_string` vrací
+**všechna čísla jako float** (`7000` → `7000.0`), takže každý klíč typu `TYPE_INT`
+hlásil „špatný typ“ a **přeskočila se i kontrola rozsahu**; config celá čísla
+normalizuje na `int`.
+**Doklad:** `tests/cases/config.gd` (před opravou hlásil 5 chyb u správných dat),
+běh testů **1 053 kontrol / 0 selhání** po opravě.
+**Ponaučení:** (1) **Jméno z `provides` se musí ověřit proti jazyku** — `get`, `set`,
+`position`… kolidují s `Object`/`Node`/`Control` a projeví se jako parse error
+(stejná rodina jako `set_position` u `ui.hud`). (2) Když data procházejí JSONem,
+**typ z JSONu není typ z dat** — normalizuj podle schématu a měř to na reálných
+datech (fixture by vadu neodhalila, protože bych ji napsal „správně“).
+
+---
+
 ### 2026-10-07 — Bez PAT vypadá CI jako „nedostupné“, ale je to rate limit — a s PAT jde ověřit i OBSAH kroků (past-nástroje)
 **Co se stalo:** po sérii dotazů na GitHub API začalo neautentizované API vracet
 **HTTP 403** — nejen u logů (`ci-log.mjs`, dřív 403) a artefaktů (401), ale i u

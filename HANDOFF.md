@@ -1,26 +1,49 @@
-# Předání — UO-klon (VLNA POHYBU DOKONČENA: V2, V4, V5; 2026-10-07, 14. session)
+# Předání — UO-klon (M9 MODERNIZACE HOTOVÁ: 3 ze 3 granul; 2026-10-08, 15. session)
 
 > **Co je tenhle soubor:** **stav projektu** pro další session agenta. Přepisuje
 > se celý; historie je v `git log`. **Současný stav se bere odtud** — a ověřuje
 > se živě (je tu k tomu sekce „Předletová kontrola").
 > **Zadání pro další vývoj je `ZADANI-DALSI-VYVOJ-2.md`** (etapa 2, Úkoly 1–9);
-> **Úkoly 1–4 jsou HOTOVÉ** a z Úkolu 6 jsou hotové `entity.item`,
-> `entity.container` — **další je `entity.equipment`**. Tato (14.) session
-> **uzavřela vlnu pohybu** z `REVIZE-POHYB-2026-10-07.md`: vady **V2**
-> (posun a animace v jedné fázi), **V4** (svahy — výška z rohů) a **V5** (most nad
-> vodou) jsou **opravené a měřené**. **Cíl 15. session je `M9` (modernizace)** —
-> uživatel ho večer 2026-10-07 předsunul („zavolám novou session pro M9“), takže
-> `sim.harvest` + `sim.craft` + `ui.journal` se posouvá na **16. session**
-> (viz „CÍL 15. SESSION“ níž s celým zadáním a kritériem).
+> **Úkoly 1–4 jsou HOTOVÉ**, z Úkolu 6 hotové `entity.item`, `entity.container`
+> — **další je `entity.equipment`** — a **Úkol 8 = M9 je od 15. session HOTOVÝ**
+> (tři granule: `app.config`, `app.metrics`, `render.chunk_mesh`). Cíl 16. session
+> je `sim.harvest` + `sim.craft` + `ui.journal` (viz „CÍL 16. SESSION“ níž).
 > Předchozí etapa je v `ZADANI-DALSI-VYVOJ.md`.
 > **Naměřený stav plánu je v `REVIZE-PLANU-2026-10-06.md`** a **stav granul
 > měří** `python tools/plan-status.py`.
 > **Kam pro co v referenčních zdrojích je `research/REJSTRIK-REFERENCI.md`**.
-> **Datum:** 2026-10-07 (14. session). **Poslední změna kódu:** tato session
-> (`sim/world/walk.gd`, `sim/systems/movement.gd`, `app/player_controller.gd`,
-> `app/world_view.gd`, `tests/cases/{walk,movement,player_controller,world_view}.gd`,
-> `tools/gates/mutace-tests.py`, `docs/04` (§4.2, §4.2.1), `docs/05` (§5.1.2),
-> nové sondy a nástroje v `_analyza/`).
+> **Datum:** 2026-10-08 (15. session). **Poslední změna kódu:** tato session
+> (`render/chunk_mesh.gd` — nový, `app/config.gd` — nový, `app/metrics.gd` — nový,
+> `app/world_view.gd` (dávka jako výchozí cesta + fallback), `app/main.gd`
+> (config + metrics zapojené), `tests/cases/{chunk_mesh,config,metrics}.gd`,
+> `tools/gates/mutace-tests.py` (3 nové moduly, 25 vzorů), `tools/plan-status.py`
+> (M9 chyběl v `MILNIKY`), `docs/04` (§4.2, §4.2.1), nové sondy v `_analyza/`).
+
+## ✅ CO JE NOVÉHO (15. session) — M9 „MODERNIZACE" JE HOTOVÁ (3 ze 3 granul)
+
+**Zadání uživatele (doslova):** „Je čas pokračovat a provést M9. Pokud ti zbude
+kontext, pusť se i do dalšího tématu." **M9 je hotové a měřené**; na další téma
+kontext nezbyl (M9 si vylámala celou session — nejdražší část bylo **měření**,
+které ukázalo, že naivní „mesh“ by byl pomalejší než dnešní stav).
+
+| Co | Doklad (naměřeno dnes) |
+|---|---|
+| **VÝKON: 1 324 → 4 draw cally, 48,75 → 0,25 ms/frame** | Před: `_analyza/m9-vykon-pred.gd` (300 framů, vsync vypnutý): **1 324 draw callů, 4 655 objektů v rendereru, `TIME_PROCESS` 48,75 ms, 24 FPS**. Po: `_analyza/m9-vykon-po.gd` (3 s stoj + 6 s chůze, čeká se **nástěnnými hodinami**): **4 draw cally, frame ms median 0,25 (stoj) / 0,26 (chůze), p90 0,33/0,34, Engine FPS 3 724/2 593**. Kritérium `docs/01 §1.6` (60 FPS / ≤ 16 ms) je splněné s velkou rezervou |
+| **STEJNÝ OBRAZ (podmínka M9) — pixel na pixel** | `_analyza/m9-parita.gd` + `_analyza/m9-parita.py`: tři scény (stojí / uprostřed kroku / po chůzi), stav je mezi snímky **zmrazený** (loop i controller vypnuté + zafixovaný frame animace) → **stejný hash** pro dávku i původní cestu: `6104e1d9…`, `4e6e3d60…`, `9a3479fe…` |
+| **⚠ Měření, které rozhodlo architekturu (a zachránilo session)** | `_analyza/m9-cena-meshe.gd`: (1) **`ArrayMesh.add_surface_from_arrays` stojí 0,3 ms/surface** → 2 090 surface = 633 ms, takže „surface na každou stránku atlasu“ je **pomalejší** než dnešní stav; (2) **přesná parita má dno 1 219 draw callů** = počet souvislých „běhů“ se stejnou texturou (engine je už sám slučuje) — pod to se dá jít JEN jednou texturou; (3) 343 unikátních artů v pohledu = **1,3 Mpx**, vejde se do stránky 2048² |
+| **Runtime atlas se skládá NA GPU** | První verze kopírovala sprity na CPU (`Image.blit_rect`) → `ImageTexture.get_image()` je kopie **16 MB na stránku** a LRU při 398 spritech thrashoval → **stavba 3 342 ms**. Dnes `SubViewport` + `Kreslic` (`UPDATE_ONCE`) → **stavba 53,8 ms** (po optimalizaci horké smyčky; před ní 100,3 ms), split **0,66 ms** |
+| **⚠ První stavba je 2 008 ms — ale to je NAČTENÍ ATLASU, ne mesh** | `render.textures.stats()` po první stavbě: **`nacteni_stranek` 34** (PNG 2048² z disku). Stejnou cenu platí původní cesta ve svém prvním `_draw`; mesh k ní jen přidává prvních ~50 ms. **Není to regrese M9, ale je to nejdražší věc na startu hry** (viz „Co čeká na tebe“) |
+| **`render/chunk_mesh.gd` (nový, M9)** | `build(objects, diagonal_hrace)`, `split(diagonal)`, `draw_before/draw_after`, `hranice()`, `missing_art_ids()`, `stats()`, `hold()/tick_hold()`, `invalidate()`, statické `slope_polygon`/`slope_uv`/**`je_svah`**. Geometrie svahu se tím **přestěhovala** z `app/world_view` (potřebuje ji i dávka) a `world_view` ji jen předává dál, takže testy i smlouva zůstávají na stejném místě |
+| **`app/config.gd` (nový, M9)** | Typovaná konfigurace nad `data/balance.json`: `SCHEMA` (klíč + typ + default + rozsah/`values`), `value(key, default)`, `known_keys()`, `check()->Array chyb`, `all()`, `values()`, `source()`, `stats()`. `check()` na **reálných datech** hlásí **0 chyb**; na fixture hlásí chybějící klíč, špatný typ, mimo rozsah, mimo výčet i neznámý klíč |
+| **⚠ `app.config` NEMÁ `get`, ale `value`** | `provides` v roadmapě říká `get(key, default)`, jenže `Object.get(StringName)` koliduje a GDScript to hlásí jako **chybu parseru** → soubor se vůbec nenačte. Stejná rodina jako `set_position` u `ui.hud` (věc N7). Odchylka je zapsaná v `docs/04 §4.2.1` |
+| **⚠ JSON v Godotu vrací VŠECHNA čísla jako FLOAT** | `7000` z `data/balance.json` je `7000.0`, takže každý klíč typu `TYPE_INT` hlásil „špatný typ“ **a přeskočila se kontrola rozsahu**. `app.config` celá čísla normalizuje na `int` (naměřeno: 5 chyb u správných dat → 0) |
+| **`app/metrics.gd` (nový, M9)** | `tick(frame_ms, drawn, textury, davka)`, `fps()`, `frame_ms()`, `drawn_objects()`, `report()`, `text()`, `set_window()`, `samples()`, `reset()` — FPS se **počítá z měřeného frame času** (ne z `Performance`, ten je klouzavý průměr a po dvousekundové stavbě hlásil „46,69 ms konstantně“) |
+| **Zapojení v produkci (ne jen v testech)** | `app/main.gd`: `_load_data()` jde přes `app.config` (chyby se `push_warning`), `_process()` plní `app.metrics` a **jednou za sekundu** vypíše `[metrics] fps … frame_ms … kresleno … textur … kvadru … stavba …`. `app/world_view._draw()` kreslí **dávkou jako výchozí cestou** a původní cestu si drží jako fallback pro `pretek()` |
+| **Testy granul** | `tests/cases/chunk_mesh.gd`, `config.gd`, `metrics.gd` (nové): geometrie (4 rohy, pořadí, 6 vrcholů kvadru), UV, díry (barva `HOLE_COLOR`), svahy (`z_corners` 4/1/2/3 → prohození stran se pozná), hranice hráče, `split`, přetečení stránky (obě větve), `hold`; config na reálných datech i na fixture; metrics (prázdno = NEMĚŘENO, okno, reset). Sada: **1 053 kontrol / 0 selhání** (bylo 998 s 9 chybami prostředí; po přesunu na plný přístup 998/0 → **+55 kontrol**) |
+| **Mutační důkaz** | `tools/gates/mutace-tests.py`: **3 nové moduly** (`chunk_mesh` 10 vzorů, `config` 7, `metrics` 6) → `--only chunk_mesh,config,metrics` = **25 z 25 chyceno**, smlouva vstupu OK. **⚠ Cestou se to zhoršilo na 22/25** (optimalizace horké smyčky zabila 3 vzory) → vzory přepsané, znovu 25/25 (viz `LESSONS`) |
+| **`tools/plan-status.py`: M9 chyběl v `MILNIKY`** | Granule milníku M9 se v přehledu „po milnících“ **vůbec nezobrazovaly** (a stav „0/3“ se z něj nedal přečíst). Dnes je `M9` v seznamu (v `tools/roadmap-gen.py` i `docs/07 §7.2` byl od začátku) |
+| **Co se NEMĚNILO** | `sim.harvest`/`sim.craft`/`ui.journal` (cíl 16. session), `entity.equipment`, `data/*.json`, `project.godot`, `app/main.tscn`, `render/texture_cache.gd` (atlas se skládá **mimo** něj), `render/chunk_renderer.gd`, `render/sort.gd` |
+| **⚠ Vědomá omezení M9 (zapsaná, ne zamlčená)** | (1) **První frame stojí ~2 s** — načtení 34 stránek atlasu z disku (platí i pro původní cestu; mesh přidává ~50 ms). (2) **Přestavba dávky stojí 53,8 ms každé 4 kroky** chůze (max frame 149,8 ms) — to je dnes největší zásek hry; další krok je stavět po částech nebo cachovat geometrii. (3) **Nový art je vidět o 2 frame později** (stránka se kreslí `UPDATE_ONCE`; `hold()` to řeší). (4) Mesh **neorezává** podle kamery (posílá 15 838 primitiv místo 9 310, ale draw callů má 4) |
 
 ## ✅ CO JE NOVÉHO (14. session) — VLNA POHYBU UZAVŘENA (V2, V4, V5)
 
@@ -511,15 +534,27 @@ ho celý." Každá session tedy **není „krok"**, ale **jeden celek s cílem**
 > svým zadáním **posunul plánovaný cíl** (`sim.harvest` + `sim.craft` +
 > `ui.journal`) na **13. session**.
 
-**🎯 CÍL 15. SESSION — **M9 „MODERNIZACE“** (rozhodl uživatel 2026-10-07 večer:
-„já mezitím zavolám novou session pro M9“). M9 se tím **PŘEDSUBUJE** před obsah
-M3+ a `sim.harvest`/`sim.craft`/`ui.journal` se posouvá na **16. session**.**
+**✅ CÍL 15. SESSION — SPLNĚN (ať ho další session přepíše): M9 „MODERNIZACE“,
+3 ze 3 granul.** Uživatel 2026-10-07 večer M9 předsunul („já mezitím zavolám novou
+session pro M9“) a 15. session ho provedla: **`app.config` + `app.metrics` +
+`render.chunk_mesh`**, s paritním testem, snímkem a měřením PŘED/PO:
+**1 324 → 4 draw cally, 48,75 → 0,25 ms/frame, 24 → ~3 700 FPS** (doklady
+v „CO JE NOVÉHO (15. session)“). Přijímací kritérium splněno celé: 3 nové case
+soubory, 3 nové modula v `mutace-tests.py` (**25/25**), sada **1 055/0**,
+`run-all` **11/0/0**, self-testy **21/0**, `check-docs-refs`/`check-zadani`/
+`roadmap-gen --check` **exit 0**, `plan-status` **56 měřeně hotových, 0 rozporů**
+(M9 **3/0/0**), smlouvy v `docs/04 §4.2`/`§4.2.1`.
+**Co zůstalo jako vědomé omezení** (viz „Co čeká na tebe“ bod 4): první frame ~2 s
+(načtení 34 stránek atlasu — platí i pro původní cestu), přestavba dávky 53,8 ms
+každé 4 kroky chůze, nový art vidět o 2 frame později, mesh neorezává podle kamery.
+
+**Původní zadání M9 (15. session) — text se NEMAŽE, historie se jen doplňuje:**
 
 > **Co je M9:** poslední milník plánu (dřív „až po M8“) — `docs/07 §7.2` (řádek
 > M9), vlna `docs/07 §7.3` **W11**, zadání granulí `tools/roadmap-gen.py:556-570`,
 > generovaný plán `.forge/roadmap.json`. **Je to totéž jako „Úkol 8“ v
 > `ZADANI-DALSI-VYVOJ-2.md §3`** a jako bod **F** v `REVIZE-POHYB §5`.
-> **Tři granule (změřeno: 0 ze 3 hotových, žádný soubor v repu není):**
+> **Tři granule (před session: 0 ze 3):**
 >   1. **`app.config`** (`app/config.gd`, `<= 60`, `any`, deps `data.balance`):
 >      `provides` = `get(key, default) -> Variant`, `known_keys() -> Array`,
 >      `check() -> Array chyb`. Jedna tabulka **klíč + typ + default + rozsah**;
@@ -659,6 +694,17 @@ zavřenými i otevřenými dveřmi, test kroku na schod nahoru/dolů, obojí s m
 
 ## Co čeká na tebe
 
+**⚠ NOVÉ (15. session, k rozhodnutí): čtyři věci kolem M9 — tři z nich jsou
+vědomá omezení, jedno je nový nález.** Všechna čísla jsou naměřená
+(`_analyza/m9-vykon-po.gd`, `m9-snimek.gd`), cesty zpět jsou levné:
+
+| # | Na co se čeká | Co to blokuje | Cena / cesta zpět |
+|---|---|---|---|
+| 4a | **První frame hry stojí ~2 008 ms** — je to **načtení 34 atlasových stránek z disku** (`nacteni_stranek 34`; PNG 2048²), ne mesh (ten přidá ~50 ms). **Platí i pro původní cestu** (načítá je ve svém prvním `_draw`) | start hry (dnes 2 s černo/zmrzlý frame) | Buď přesunout načítání do úvodu s progress barem, nebo zmenšit stránky atlasu (`tools/uoextract/atlas.py`), nebo držet jen `Image` místo `ImageTexture`. Vratné; je to **samostatné téma**, ne M9 |
+| 4b | **Přestavba dávky stojí 53,8 ms každé 4 kroky chůze** (max frame 149,8 ms) — seznam se přestavuje 45,8 ms + mesh 53,8 ms. Je to dnes **největší zásek hry** (dřív to bylo 45,8 ms, ale hra jela 24 FPS trvale) | plynulost (uživatel si na sekání stěžoval 12. session) | Stavět dávku **po částech** (time-sliced) nebo cachovat geometrii objektů mezi přestavbami; split je 0,66 ms. Vratné |
+| 4c | **Nový art je vidět o 2 frame později** (`SubViewport` + `UPDATE_ONCE`; `hold()` to řeší) a **mesh neorezává podle kamery** (posílá 15 838 primitiv místo 9 310) | věrnost obrazu na 1 frame / zbytečná práce GPU | Obojí je zapsané v hlavičce `render/chunk_mesh.gd`; ořez podle kamery je možné přidat (drift pohledu je ±4 dlaždice). Vratné |
+| 4d | **`app.config` se ptají jen `app.main` a testy** — `sim.movement` a `sim.skill_gain` čtou `data/balance.json` dál samy (vrstvové pravidlo: `sim/` nesmí volat `app/`) | jedno místo pro konfiguraci | Buď `app.config` přesunout do `core/` (pak ho smí použít i `sim/`), nebo nechat a zapsat jako omezení. Vyžaduje rozhodnutí o vrstvách — proto to není uděláno |
+
 **⚠ NOVÉ (13. session, k rozhodnutí): šest vad pohybu od uživatele + dvě
 rozhodnutí, která z nich plynou.** Celé měření (citace z ClassicUO/ServUO/Sphere
 i sondy) je v **[`REVIZE-POHYB-2026-10-07.md`](REVIZE-POHYB-2026-10-07.md)**;
@@ -667,8 +713,8 @@ tady je jen to, co čeká na tebe (obojí vratné, obojí doložené měřením)
 | # | Na co se čeká | Co to blokuje | Cena / cesta zpět |
 |---|---|---|---|
 | 1 | ~~Smím přepsat `docs/05 §5.1.4` (zákaz plynulého pohybu)?~~ **✅ VYŘEŠENO 13. session** — zákaz zrušen, `docs/05 §5.1.4` přepsán (doklad v „CO JE NOVÉHO (13. session)"). Dnes je **V2 opravená a měřená** (14. session) | — | — |
-| 2 | ~~Předsunout `render.chunk_mesh` (M9) před obsah M3+?~~ **✅ ROZHODNUTO 2026-10-07 večer (uživatel): „já mezitím zavolám novou session pro M9“ — M9 se PŘEDSUBUJE a je to CÍL 15. SESSION** (celé zadání + kritérium viz „CÍL 15. SESSION“). Co je M9 a kde je zapsané: `docs/07 §7.2` (řádek M9), `docs/07 §7.3` (vlna **W11**), `tools/roadmap-gen.py:556-570`, `.forge/roadmap.json`; **je to totéž jako „Úkol 8“ v `ZADANI-DALSI-VYVOJ-2.md §3` a jako bod F v `REVIZE-POHYB §5`** (odtud potíž s hledáním). Tři granule: `app.config`, `app.metrics`, `render.chunk_mesh`; **změřeno 0 ze 3** (žádný z těch souborů v repu není). Naměřeno, proč to řešit: **1 516 draw callů** a **27 FPS při chůzi** proti kritériu `docs/01 §1.6` (**60 FPS / ≤ 16 ms**), plus V3 (přestavba seznamu **45,8 ms** každé 4 kroky) | — | Už rozhodnuto; cesta zpět je jen pořadí (granule v roadmapě existuje, `done` se nepřepisuje ručně) |
-| 3 | **NOVÉ (14. session): mají být „brány na chování v čase" i v CI?** `REVIZE-POHYB` §5 je žádá (kadence a rozestup kroků, ms na frame proti `docs/01 §1.6`, `can_step` na reálné mapě, vizuální kontrola pohybu). Dnes jsou to **sondy v `_analyza/`** (`vlna14-pohyb.gd`, `vlna14-svah-most.gd`), ne krok CI — běží minuty a chtějí `assets/uo` (v CI nejsou) | regrese v časování a ve pravidlech chůze se v CI nepozná | Zavést jako krok CI jen to, co jde bez assetů (fixtures), zbytek nechat jako sondu; vratné |
+| 2 | ~~Předsunout `render.chunk_mesh` (M9) před obsah M3+?~~ **✅ VYŘEŠENO 15. session — M9 je HOTOVÉ (3 ze 3 granul), naměřeno 1 324 → 4 draw cally a 48,75 → 0,25 ms/frame** (doklady v „CO JE NOVÉHO (15. session)“). Zbývají jen vědomá omezení 4a–4d výš | — | — |
+| 3 | **NOVÉ (14. session): mají být „brány na chování v čase" i v CI?** `REVIZE-POHYB` §5 je žádá (kadence a rozestup kroků, ms na frame proti `docs/01 §1.6`, `can_step` na reálné mapě, vizuální kontrola pohybu). Dnes jsou to **sondy v `_analyza/`** (`vlna14-pohyb.gd`, `vlna14-svah-most.gd`, nově `m9-vykon-po.gd`, `m9-parita.gd`) | regrese v časování a ve pravidlech chůze se v CI nepozná | Zavést jako krok CI jen to, co jde bez assetů (fixtures), zbytek nechat jako sondu; vratné |
 
 **Šest vad pohybu je od 14. session VYŘEŠENÝCH (a měřených):** kadence kroku
 (718/530 ms → 12 kroků za 5 s, median 404 ms — A, 13. session), směr z myši
@@ -746,7 +792,7 @@ a `CONTAINER_MAX_WEIGHT` v setinách; cena je zásah do `core/const.gd` a
 `world.tiledata` (obojí jiná granule), cesta zpět je triviální (konstanta).
 Do rozhodnutí je to **zdokumentované jako omezení**, ne zamčené v kódu.
 
-**Co bude následovat (bez tebe):** cíl 15. session = **`sim.harvest` + `sim.craft` + `ui.journal`** (BIG WIN č. 1 „umět pracovat“) — viz „CÍL 15. SESSION“ výš. **Odložený** je `entity.equipment` (potřebný pro souboj, ne pro řemeslo).
+**Co bude následovat (bez tebe):** cíl 16. session = **`sim.harvest` + `sim.craft` + `ui.journal`** (BIG WIN č. 1 „umět pracovat“) — viz „CÍL 16. SESSION“ výš. **Odložený** je `entity.equipment` (potřebný pro souboj, ne pro řemeslo).
 
 **Konvence dveří (věc 62) je od 8. session rozhodnutá MĚŘENÍM a opravená** —
 nic na tebe nečeká. Montáž pro kontrolu pohledem
@@ -760,8 +806,8 @@ a viděl něco jiného, je to **nový nález**, ne oprava — ozvi se s ním.
 
 ## ⚠⚠ BLOKÁTORY
 
-**Žádný otevřený blokátor v kódu.** „Demo chodí, postava je barevná a **vlevo nahoře je stavový pruh**" je naměřené
-(viz tabulky výš), brány jsou zelené (**11/0/0**), testy **999/0** (s assety) a **průchodnost,
+**Žádný otevřený blokátor v kódu.** „Demo chodí, postava je barevná, **vlevo nahoře je stavový pruh** a **od 15. session je svět kreslený dávkou**" je naměřené
+(viz tabulky výš), brány jsou zelené (**11/0/0**), testy **1 055/0** a **průchodnost,
 svahy i most jsou opravené** (6. session: statiky se čtou správnou tabulkou,
 schody svou výškou; 8. session: `world.doors` páruje `art` ↔ `art + 1`;
 9. session: `entity.item` + `entity.container` hotové, **20/20 mutací**;
@@ -770,12 +816,15 @@ schody svou výškou; 8. session: `world.doors` páruje `art` ↔ `art + 1`;
 **50 měřeně hotových**; 12. session: **vlna oprav ze snímků** — svahy (atlas +
 texmapy), držení vstupu, stopa framů, sekání; **20 nových/rozšířených mutací**;
 13. session: vlna pohybu A/D/E (kadence, směr z myši, `PriorityZ`);
-**14. session: vlna pohybu DOKONČENA — V2 (posun + animace v jedné fázi),
-V4 (výška z rohů) a V5 (most nad vodou); `pos.z` se zapisuje; `walk`/`movement`/
-`player_controller`/`world_view` = 41/41 mutací**).
-**Hra jede 29 FPS PŘI CHUZI** (34,6 ms median; ve stoji 29 FPS/34,5 ms; bez
-svahů by byla ~36 FPS) — naměřeno `_analyza/vlna5-chuze.gd`; zbývající záseky
-jsou **10 z 496 framů** (přestavba seznamu 45,8 ms každé 4 kroky, viz V3).
+14. session: vlna pohybu DOKONČENA — V2, V4, V5; `walk`/`movement`/
+`player_controller`/`world_view` = 41/41 mutací;
+**15. session: M9 HOTOVÁ — `render.chunk_mesh` (dávka), `app.config`, `app.metrics`;
+`chunk_mesh`/`config`/`metrics`/`world_view` = 30/30 mutací**, celý harness
+**174 vzorů** (`mutace-tests.py`), plán **56 měřeně hotových, 0 rozporů**).
+**Hra jede 0,25 ms/frame (stoj) a 0,26 ms (chůze) se 4 draw cally** — naměřeno
+`_analyza/m9-vykon-po.gd` (3 s stoj + 6 s chůze, čeká se nástěnnými hodinami);
+zbývající záseky jsou **jedna přestavba dávky 53,8 ms každé 4 kroky** (max frame
+149,8 ms) — to je otevřená věc 4b v „Co čeká na tebe“.
 
 **⚠ CI NAD COMMITTY TÉTO SESSION (14.) JE ZELENÝ — `#52` nad `5a42887`
 (kód + testy + smlouvy + HANDOFF/LESSONS) = `success`**, **17 kroků (+ 3 post
@@ -1030,26 +1079,26 @@ a barva kůže.** Statiky nesou barvu ze záznamu mapy, ale **nikdo ji nepouží
 
 ## Předletová kontrola (5 minut, než začneš psát)
 
-| Co | Jak | Očekáváno (2026-10-07, **14. session**) |
+| Co | Jak | Očekáváno (2026-10-08, **15. session**) |
 |---|---|---|
 | Strom je čistý | `git status --porcelain -uall` | **prázdné** po commitu této session |
-| Je před GitHubem | `git rev-list --count origin/main..HEAD` | **`0`** — 14. session pushla (trvalé povolení uživatele z 2026-10-07) |
+| Je před GitHubem | `git rev-list --count origin/main..HEAD` | **`0`** — 15. session pushla (trvalé povolení uživatele z 2026-10-07) |
 | **Běží CI?** | `node _analyza/ci-beh-stav.mjs` (bez tokenu je limitovaný — viz past v `LESSONS`) · anotace: `node _analyza/ci-anotace.mjs` | **viz odstavec „CI" v BLOKÁTORECH níž** (vyplněno po pushi této session); sha rozhoduje, ne „poslední běh" |
 | **Obsah kroků CI (logy)** | **s PAT:** `$env:GH_TOKEN = (Get-Content 'E:\Workspaces\forge-orchestra\.secrets\github_pat.txt' -Raw).Trim()` a pak `node _analyza/ci-hledej.mjs <cislo_behu> ["vzor"...]` (hledá v logu podle vzorů) · `ci-log.mjs <id>` (posledních 60 řádků + „podezřelé“) — **bez PAT** → `ci-log.mjs` **HTTP 403**, `ci-artefakt.mjs` **401** | S PAT je ověřený **i obsah**: `#52` dal `932 kontrol, 0 selhání` (krok 7), `měřeno 9, čeká 2, chyb 0` (krok 8), **`149 z 149 mutaci chyceno`** (krok 9), `53 hotových, 0 rozporů` (krok 15). Bez PAT je ověřený jen **vznik a výsledek** běhu (a i ten jen mimo rate-limit okno: neautentizované API vrací **403**) |
 | Repo je veřejné | API bez tokenu | `visibility: public` |
 | **Oprávnění** | `whoami /groups \| Select-String Mandatory` | **⚠ 14. session začala v `Low`** (`workspace-write`): brány hlásily **2 falešné vady** (G3 `sim.world_loop` save a `render.textures`, protože podproces nesměl zapsat do `.cache`) a sada **9 selhání**; po přepnutí na **plný přístup** (`danger-full-access`, přepnul uživatel) je vše zelené. **Měř vždy pod plným přístupem** (`LESSONS` 14. session) |
-| Testy | `$env:APPDATA="$PWD\.cache\godot-appdata"` pak `godot --headless --path . --script res://tests/run_tests.gd` | **999 kontrol, 0 selhání**, **38 case souborů** (`case souboru spusteno: 38 z 38`), **`$LASTEXITCODE` = 0** (`_analyza/t14-testy6.txt`). ⚠ exit kód ber z `$LASTEXITCODE` hned po Godotu — `exit code` celého `pwsh` s rourou je kód posledního příkazu v rouře |
-| **FPS** | `& .cache\godot\...console.exe --path . --rendering-driver opengl3 --script res://_analyza/vlna5-chuze.gd` (+ `--kroku=0` = ve stoji) | **NEMĚŘENO 14. session** (kód V2 přidává jen výpočet offsetu, ale číslo není změřené) — platí **12. session**: ve stoji 34,5 ms (29 FPS), v chůzi 34,6 ms median / p90 39,6 / max 141 ms; **bez ořezu** 46,6 ms, **bez svahů** 28,0 ms |
+| Testy | `$env:APPDATA="$PWD\.cache\godot-appdata"` pak `godot --headless --path . --script res://tests/run_tests.gd` | **1 055 kontrol, 0 selhání**, **41 case souborů** (`case souboru spusteno: 41 z 41`), **`$LASTEXITCODE` = 0**. ⚠ exit kód ber z `$LASTEXITCODE` hned po Godotu — `exit code` celého `pwsh` s rourou je kód posledního příkazu v rouře |
+| **FPS (M9 hotová)** | `& .cache\godot\...console.exe --path . --rendering-driver opengl3 --resolution 1280x720 --script res://_analyza/m9-vykon-po.gd` (3 s stoj + 6 s chůze, čeká se **nástěnnými hodinami**) | **4 draw cally, frame 0,25 ms (stoj) / 0,26 ms (chůze), p90 0,33/0,34, Engine FPS 3 724/2 593**; přestavba dávky 53,8 ms, split 0,66 ms. **Před M9** (14. session / `m9-vykon-pred.gd`): 1 324 draw callů, 48,75 ms, 24 FPS. ⚠ `Performance.TIME_PROCESS` je klouzavý průměr — po 2s stavbě hlásí stará čísla; měř `delta` |
 | Brány | `python tools/gates/run-all.py` | **11 měřeno / 0 NEMĚŘENO / 0 vad**, `exit 0` (`_analyza/zaver14-brany.txt`) |
 | Self-testy | `python tools/gates/run-all.py --self-test` | **21 celkem (10 bran + 11 extrakčních nástrojů), 0 chyb**, `exit 0` |
-| Mutační důkaz | `python tools/gates/mutace-tests.py --only walk,movement,player_controller,world_view` | **41 z 41 chyceno**, smlouvy vstupů OK (`_analyza/vlna14-mutace.txt` = `walk`+`movement`+`player_controller`+`world_view` v prvním běhu 38/41 → doplněny 2 slepé kontroly a 1 mrtvý vzor → `_analyza/vlna14-mutace2.txt` 30/30 pro `walk,movement`); plný běh dělá CI |
+| Mutační důkaz | `python tools/gates/mutace-tests.py --only chunk_mesh,config,metrics` (nové moduly) · `--only world_view,...` · plný běh dělá CI | **25 z 25 chyceno** (`chunk_mesh` 10 + `config` 7 + `metrics` 6) a **30 z 30** s `world_view`; smlouvy vstupů OK. **Plný harness 174 vzorů** (14. session: 149). ⚠ Cestou spadlo na 22/25, protože optimalizace zabila 3 vzory — viz `LESSONS` |
 | Fixture | `python tests/fixtures/{world,hues,anim}/make_fixture.py --check` | **3× OK**, `exit 0` |
 | Animace / Barvy / Texmapy | `anim.py` / `hues.py` / `texmaps.py --verify` | `35 / 5 / 4 116` kontrol a texmap, 0 chyb (v self-testech bran) |
-| **Snímek je z běhu** | `Get-Item .cache/render/snapshot.png` | G10 prošla (`_analyza/zaver14-brany.txt`); **nové snímky** této session: `_analyza/frames14/montaz-krok.png` + `frame00000024/42.png` (V2) |
+| **Snímek je z běhu** | `Get-Item .cache/render/snapshot.png` | G10 prošla (**`kuze_pixelu 9101`**, `barev 3767`) — snímek vygenerovala 15. session (`_analyza/m9-snimek.gd`); **parita obrazu** (dávka vs. původní cesta, 3 scény, stejný hash) je v `_analyza/m9-parita.gd` + `m9-parita.py` |
 | Godot běží | `& .cache\godot\...console.exe --headless --version` | `4.7.2.stable.official.ed1daf0bf` |
 | Instalace UO na místě | `Test-Path 'D:\Games\...\tiledata.mul'` | `True` |
 | Kontroly zadání | `check-docs-refs.py`, `check-zadani.py`, `roadmap-gen.py --check` | `exit 0` (všechny tři, 14. session) |
-| Stav plánu | `python tools/plan-status.py` | `111 granul`, **`53` měřeně hotových**, **0 rozporů** — **stejné číslo jako před session** (session nepřidala granuli; opravovala existující) |
+| Stav plánu | `python tools/plan-status.py` | `111 granul`, **`56` měřeně hotových**, **0 rozporů**; **`M9  3 / 0 / 0`** (14. session: 53 a M9 se v přehledu vůbec nezobrazoval — chyběl v `MILNIKY`) |
 | **Sandbox** | `whoami /groups \| Select-String Mandatory` | **musí být `Medium`** (plný přístup); `Low` = `workspace-write` → falešné vady (viz „Oprávnění" výš a `LESSONS`) |
 
 ## Otevřené věci a co je potřeba dodělat

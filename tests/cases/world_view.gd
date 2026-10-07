@@ -62,9 +62,14 @@ class FakeMap:
 
 class FakeTextures:
 	# Jen to, co `render.chunk` a `app.world_view` od textur chteji:
-	# `offset(art_id)` a `texmap(texmap_id)` (textura svahu).
+	# `offset(art_id)` a `texmap(texmap_id)` (textura svahu). `texture()` vraci
+	# null = vsechny arty chybi, takze je `render.chunk_mesh` nakresli jako diry
+	# (a i to je meritelne: pocet kvadru musi sedet na seznam).
 	var offsets: Dictionary = {}
 	var texmapy: Dictionary = {}      # texmap_id -> Texture2D (nebo cokoliv neprazdneho)
+
+	func texture(_art_id: int) -> Texture2D:
+		return null
 
 	func offset(art_id: int) -> Vector2i:
 		var v: Vector2i = offsets.get(art_id, Vector2i.ZERO)
@@ -369,7 +374,25 @@ func run(t) -> void:
 		+ "(namEReno %s/%s/%s/%s)" % [str(view.is_slope(svah_obj)), str(view.is_slope(rovny_obj)),
 			str(view.is_slope(bez_texmapu)), str(view.is_slope(bez_textury))])
 
-	# 12) uvolneni uzlu: `free()` (ne queue_free) - zbyly uzel shodi cely beh
+	# 12) M9 (2026-10-08): DAVKA JE ZAPOJENA, ne mrtvy kód. `_priprav_mesh()`
+	#     postavi `render.chunk_mesh` z TOHO SAMEHO seznamu a `mesh_stats()` to
+	#     rekne cislem; kdyby se stavba preskocila, zustane prazdny slovnik.
+	#     (Kresleni `_draw()` se v headless testu volat NEDÁ - Godot dovoli
+	#     `draw_*` jen v NOTIFICATION_DRAW, takze se meri priprava dávky.)
+	view.look_at_tile(Vector2i(1495, 1630), 0)
+	view.call("_priprav_mesh")
+	view.call("_priprav_mesh")
+	view.call("_priprav_mesh")
+	var davka: Dictionary = view.mesh_stats()
+	t._check(not davka.is_empty() and int(davka.get("kvadru", 0)) > 0,
+		"app.world_view: M9 dávka se postavi (_priprav_mesh) a ma kvadry "
+		+ "(namEReno %s kvadru z %s objektu seznamu)"
+			% [str(davka.get("kvadru")), str(view.visible_count())])
+	t._check(int(davka.get("kvadru", -1)) == view.visible_count(),
+		"app.world_view: dávka ma kvadr na KAZDY objekt seznamu (%s vs %s)"
+			% [str(davka.get("kvadru")), str(view.visible_count())])
+
+	# 13) uvolneni uzlu: `free()` (ne queue_free) - zbyly uzel shodi cely beh
 	view.free()
 	t._check(not is_instance_valid(view),
 		"app.world_view: uzel je po testu uvolneny (is_instance_valid == false)")

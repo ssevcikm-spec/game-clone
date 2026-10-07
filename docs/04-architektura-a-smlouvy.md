@@ -125,6 +125,7 @@ v `.forge/roadmap.json`.
 | `render.hue` | `render/hue_cache.gd` | `(art_id, hue)` → textura (index 0 = použij hue); u `AtlasTexture` se bere **okno `region`**, ne celá stránka (opraveno 2026-10-07 — jinak se kreslily všechny framy animace) |
 | `render.sort` | `render/sort.gd` | **jediná** funkce řazení (land → statics podle `priority_z` → mobilové podle z); `priority_z(obj)->int` = **pořadová výška** (ClassicUO `PriorityZ`, `Chunk.cs:246-272`): `obj["priority_z"]`, jinak `obj["z"]` (chování před 2026-10-07); dále `sort_key(obj)->int`, `draw_order(objects:Array)->Array` |
 | `render.chunk` | `render/chunk_renderer.gd` | sestavení kreslicího seznamu pro viditelné bloky, cache; **land nese navíc `texmap` (TexID) a `z_corners` `[horní, pravý, levý, dolní]`** = výšky rohů ze sousedů (2026-10-07, pro svahy); **statik nese navíc `priority_z`** = `z − 1` za `IsBackground` (flag `0x1`) `+ 1` za `Height != 0` (bez tiledata = `z`) — proto se plocha mostu kreslí před jeho zábradlím (2026-10-07, vada V6) |
+| `render.chunk_mesh` | `render/chunk_mesh.gd` | **M9, 2026-10-08:** celý viditelný seznam jako **jeden mesh** (1–2 draw cally místo 1324). `build(objects, diagonal_hrace)->bool`, `split(diagonal)`, `draw_before(view)`/`draw_after(view)`, `hranice()`, `missing_art_ids()`, `stats()`, `hold()`/`tick_hold()`, `invalidate()`; statické `slope_polygon`/`slope_uv`/**`je_svah`** (odtud je bere `app.world_view`, aby se pravidlo svahu neopisovalo); runtime atlas 2048² skládaný **na GPU** (`SubViewport`), `pretek()` hlásí, že se nevešel (pak se kreslí původní cestou) |
 | `render.anim` | `render/anim_player.gd` | `play(serial:int, action:int, dir:int, now_ms:int = -1)->Dictionary` → `{ok, texture, frame, count, anchor, mirror, mirror_x, sprite_dir}` (chybějící sprite = `ok:false` + `texture:null`); **číslo těla se bere z registru** — `body_of(serial)->int` (`-1`, když serial v registru není; bez registru je `serial` sám tělem, starší chování), registr jde předat konstruktorem `_init(manifest_path, registry)`; framy těl a worn artu podle `animdata`, časování 80 ms; zrcadlení 8 → 5 směrů a `mirror_x` viz §4.2.1 |
 | `render.names` | `render/name_plates.gd` | jména a HP pruhy nad mobily (jen na dosah/po kliku) |
 | `render.light` | `render/light_layer.gd` | úroveň světla z `world.time`, světelné zdroje (louče, okna) |
@@ -139,6 +140,8 @@ v `.forge/roadmap.json`.
 | `app.input` | `app/input_map.gd` | mapování kláves a myši na `Command` (jediné místo s `Input`); `poll(player, camera_offset, z=0, mouse_position=Vector2.ZERO, now_ms=-1)` — **držení kroky opakuje** (prodleva `step_delay_ms` = 400/200 ms), `walk_to` = držené pravé tlačítko: **směr je z pozice kurzoru vůči hráči na obrazovce** (`direction_from_screen(center, mouse)`, prahy `|dy| ≤ 0,4|dx|` a `|dy| ≥ 2,5|dx|` z ClassicUO `GameCursor.cs:670-754`; kurzor na hráči = `-1` a **prodleva se neSpotřebuje**), `run` podle `mouse_run()` = 190 px od středu okna; `player_screen_position(player, camera_offset, z)` je opačný převod k `click_at`; `now_ms` a `view_size` jsou vstupy kvůli měřitelnosti (2026-10-07) |
 | `app.menu` | `app/menu.gd` | hlavní menu, výběr postavy, uložit/načíst |
 | `app.char_create` | `app/char_create.gd` | tvorba postavy: profese, staty, skilly, jméno, barvy |
+| `app.config` | `app/config.gd` | **M9, 2026-10-08:** typovaná konfigurace nad `data/balance.json` — `SCHEMA` (klíč + typ + default + rozsah/`values`), `value(key, default)`, `known_keys()`, `check()->Array chyb`, `all()` (surová data pro `SimWorld`), `values()`, `source(key)`, `stats()`. **Pozor: metoda se jmenuje `value`, ne `get`** (viz §4.2.1) |
+| `app.metrics` | `app/metrics.gd` | **M9, 2026-10-08:** `tick(frame_ms, drawn, textury, davka)`, `fps()`, `frame_ms()`, `drawn_objects()`, `report()`, `text()`, `set_window(n)`, `samples()`, `reset()` — čísla z **měřeného** frame času (ne z `Performance`), okno 120 framů |
 
 ### 4.2.1 Co registry dosud nepinovaly (DOPLNĚNO 2026-10-06)
 
@@ -382,6 +385,39 @@ změnil, je tu i **původní znění** — historie se nepřepisuje, jen doplňu
     se **stejným serialem** (obnovení u klienta); a seznam gumpů v §4.4 **nemá
     `paperdoll`**, přesto ho `context_action` posílá. Obě věci patří do rozhodnutí,
     ne do tichého rozšíření smlouvy.
+
+- **⚠ M9 „modernizace“ — tři granule, a jedna ODCHYLKA od `provides` (2026-10-08,
+  15. session).** Milník M9 (`docs/07 §7.2`, vlna W11) je „modernizace nesmí ubrat
+  žádné měření“; hotové jsou `app.config`, `app.metrics` a `render.chunk_mesh`.
+  - **⚠ `app.config` NEMÁ metodu `get`, ale `value`.** `provides` v roadmapě říká
+    `get(key, default)`, jenže `Object` má `get(StringName)` a GDScript to hlásí
+    jako **chybu parseru** („The method get() overrides a method from native class
+    Object“) — soubor se pak **vůbec nenačte**. Je to táž rodina jako `set_position`
+    u `ui.hud` (HANDOFF, věc N7). Smlouva se proto plní jako
+    **`value(key, default)`**; kdo hledá `get`, ať ví, že jde o tohle.
+  - **`app.config` je typovaná konfigurace nad `data/balance.json`:** `SCHEMA`
+    (klíč + `type` + `default` + `min`/`max` nebo `values`) a `check()`, který
+    hlásí **chybějící klíč, špatný typ, hodnotu mimo rozsah, hodnotu mimo výčet
+    a neznámý klíč v datech**. Dokumentační klíče (`_popis`, `note`, `sources.*`)
+    se za neznámé **nepovažují** — jinak by se u správných dat hlásilo 16
+    falešných „překlepů“ (naměřeno).
+  - **⚠ `JSON.parse_string` vrací VŠECHNA čísla jako FLOAT** (naměřeno 2026-10-08:
+    `7000` z `data/balance.json` je `7000.0`), takže každý klíč typu `TYPE_INT`
+    hlásil „špatný typ“ a **přeskočila se i kontrola rozsahu**. `app.config` proto
+    celá čísla **normalizuje na `int`** (a jen když jsou skutečně celá).
+  - **`render.chunk_mesh` je výchozí cesta kreslení** a `app.world_view` si drží
+    i **původní** cestu jako fallback pro případ `pretek()` (runtime atlas se
+    nevešel). Rozhraní: `build`, `split(diagonal)`, `draw_before/draw_after`,
+    `hranice()`, `stats()`, `hold()/tick_hold()`. **`hold()` je součást smlouvy:**
+    atlas se skládá na GPU (`SubViewport`, `UPDATE_ONCE`), takže po změně stranky
+    se `HOLD_FRAMU = 2` framy **nesmí** kreslit dávkou (četla by prázdnou texturu).
+  - **Parita obrazu je měřená dvakrát:** geometrie v `tests/cases/chunk_mesh.gd`
+    (rohy, pořadí, UV, díry, svahy, hranice, split, přetečení) a **obraz** v
+    `_analyza/m9-parita.gd` + `m9-parita.py` (tři scény — stojí, uprostřed kroku,
+    po chůzi — mají **stejný hash** jako původní cesta).
+  - **Svah se od M9 rozhoduje v `render.chunk_mesh.je_svah(obj, textures)`**;
+    `app.world_view.is_slope` i `slope_polygon`/`slope_uv` to jen předávají dál,
+    aby pravidlo nebylo na dvou místech (testy i smlouva zůstávají na stejném místě).
 
 ## 4.3 Příkazy klient → simulace
 
