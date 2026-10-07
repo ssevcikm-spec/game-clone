@@ -24,6 +24,73 @@ Typy: `chyba` (moje vada) · `past-nástroje` (prostředí/nástroj, ne logika) 
 
 ---
 
+### 2026-10-07 — Zelený test měřil JINOU konvenci id, než má reálná mapa (chyba)
+**Co se stalo:** `world.walk` četl u statiků `world.tiledata`, ale **jiným id
+prostorem**: `world.map.statics_at` vydává `tile` v prostoru **tiledata id
+předmětu** (0..0x3FFF, stejně jako `map0.statics.bin`), kdežto `world.tiledata`
+klíčuje předměty jako **art id** (`tile >= 0x4000`) — a stejný posun dělá
+`render/chunk_renderer.gd`. Walk tedy u každého statiku přečetl řádek tabulky
+**LAND**. Test `tests/cases/walk.gd` byl přitom zelený, protože jeho **fake
+tabulka i fake statiky používaly art-id prostor** (`ZED = 0x4001`) — tedy
+**měřil jinou konvenci, než jaká je v datech**.
+**Doklad:** naměřeno 2026-10-07 v Británii (80×80 kolem 1495,1630):
+`tiledata.flags(1717)` → `grass`/`0x00000000`, správně `wooden door`/`0x20006050`;
+statiků s `Impassable` bylo **2 743** (správná tabulka) vs **1 044** (syrová),
+a `can_step` **pustil 1 325** kroků do dlaždice s `Impassable` statikem; po
+opravě (`ITEM_OFFSET`) **0 z 6 750**. Malý důkaz, který to mohl chytit hned:
+`tiledata.height(1849)` vracelo `0`, ale `tiles.json` má u téhož artu `5`.
+**Ponaučení:** **test nad fake daty musí používat TUTÉŽ konvenci jako reálný
+zdroj** — jinak je zelený a nic neříká. Konkrétně: fake statiky piš s **malými**
+id a flagy/výšky dávej až na `id + 0x4000`; pak zapomenutý posun shodí sadu.
+A obecně: když dvě komponenty sdílejí číslo, **označ v obou, ve kterém prostoru
+to číslo je** (tady je to nově konstanta `ITEM_OFFSET` a komentář v obou).
+
+### 2026-10-07 — Sonda, která si vyrobila falešné měření: statikem indexovala tabulku LAND (chyba)
+**Co se stalo:** první verze sondy `.cache/analysis/sonda-dvere-schody.py` četla
+`assets/uo/tiles.json` „podle oka" — hledala klíč `statics`/`items` a jako
+záskok vzala `land`. `land` je ale seznam `[flags, texture, name]` indexovaný
+**land** id, takže `land[1721]` vrátilo `flags 0` a **`height` = 1721** (samo id).
+Výstup vypadal jako tabulka měření (a poslal mě hledat „dveře bez `Door` flagu").
+**Doklad:** správný tvar je v souboru samotném: `layout.item_fields = ["flags",
+"weight", "layer", "count", "anim_id", "hue", "light", "height", "name"]` a data
+jsou pod klíčem `item` (seznam 65 536 záznamů). Po opravě: dveře `1717` i `1718`
+= `0x20006050` (`Impassable+Wall+Door`), schody `1849` = `Surface`, `height 5`.
+**Ponaučení:** **tvar dat si přečti z `layout` (nebo z hlavičky souboru), ne
+odhaduj podle jmen klíčů** — a když číslo vyjde „divně známé" (tady height == id),
+je to příznak, že se indexuje špatná tabulka.
+
+### 2026-10-07 — Dvě měření se rozcházejí: rozhodnutí se PŘEDÁVÁ, ne „opravuje" (postup)
+**Co se stalo:** Úkol 3 zněl „stav dveří drží `world.doors`", a `world.doors`
+tvrdí (hlavička, „rozhodnuto obrázkem" 2026-10-02), že **kusy 5–8 z `doors.txt`
+jsou otevřené arty**. Při měření se ukázalo, že to **nesedí** s tiledata
+(`layer` je u dveří **po dvojicích**: 1717/1718 = 0, 1719/1720 = 1, … 1731/1732 = 7)
+ani s RunUO/ServUO (`closed = base + 2f`, `open = closed + 1`). Přesto se
+**`world.doors` needitoval** — `walk` se ptá `is_open`, takže je na konvenci
+nezávislý, a rozhodnutí dostalo **vlastní otevřenou věc (62) a cíl 7. session**.
+**Doklad:** zrcadlová metrika (`d(art, zrcadlo(art'))` přes
+`.cache/analysis/dvere-zrcadleni.py`) dala u **obou** hypotéz čísla blízko šumu
+(13,9–24,4), takže **sama nerozhoduje**; „důkaz" je jen montáž k pohledu
+(`dvere-pary.png`) — a ta se dá přečíst špatně (přesně to se stalo 2026-10-02).
+**Ponaučení:** když se měření a dřívější rozhodnutí rozcházejí a **měření není
+jednoznačné**, je správný výstup **pojmenovaná otevřená věc s čísly a s tím, co
+zbývá změřit** — ne tichá oprava. A když je konvence sporná, **piš kód tak, aby
+na ní nezávisel** (ptej se `is_open`, ne „je art sudý").
+
+### 2026-10-07 — `grep` tool tiše přeskočí i `_src/` (je v `.gitignore`) (past-nástroje)
+**Co se stalo:** hledal jsem `Stair`/`Door` v referenčních klonech přes `grep`
+tool a dostal **0 nálezů** v `_src/runuo/...` — přitom soubory existují a řádky
+tam jsou. Příčina: `_src/` je v `.gitignore` a `grep` (ripgrep) **gitignorované
+soubory přeskakuje**. Není to tedy jen o skrytých složkách (`.forge`, `.github`).
+**Doklad:** Python walk nad `_src/runuo` našel `Server/Movement.cs:36`,
+`Server/TileData.cs:196` (`StairBack = 0x40000000`) a
+`Scripts/Engines/Pathing/Movement.cs:275`; totéž přes `Select-String` na
+**konkrétní soubor** funguje (přeskakování je jen u rekurzivního hledání).
+**Ponaučení:** **na `_src/`, `assets/uo/`, `.cache/` a `_analyza/` nikdy `grep`
+tool** — použij Python walk (plošné skeny) nebo `Select-String` na konkrétní
+soubor. Do `dsh-prostredi` patří formulace: grep tool **respektuje `.gitignore`**.
+
+---
+
 ### 2026-10-07 — Dvě vady viditelné jen POHLEDEM: testy 520/0 a brány zelené (chyba)
 **Co se stalo:** uživatel poslal dva snímky hry — (A) při pohybu je vidět „stopa"
 všech framů postavy, (B) v místě změny výšky mapy je **šedá plocha** a břeh je

@@ -48,7 +48,7 @@ v `.forge/roadmap.json`.
 |---|---|---|---|
 | `world.tiledata` | `sim/world/tiledata.gd` | `flags(tile:int)->int`, `height(tile:int)->int`, `layer(tile:int)->int`, `weight(item:int)->int`, `value(item:int)->int`, `name(tile:int)->String`, `is_land(tile:int)->bool`; data z `assets/uo/manifest.json` + `data/tiles.json` | závisí na vyřešení §3.3.1 |
 | `world.map` | `sim/world/map.gd` | `_init(prefix:String = "res://assets/uo/world/map0")` — **cesty jsou vstup, ne konstanta** (`assets/uo` je v `.gitignore`, takže v CI nejsou); `land_at(x:int,y:int)->int`, `z_at(x:int,y:int)->int`, `statics_at(x:int,y:int)->Array[Dictionary]` — vrací **celý blok 8×8**, každý záznam `{tile,x,y,z,hue}` s **lokálním** `x`,`y` (0..7), světová dlaždice je `(bx*8+x, by*8+y)`; `load_block(bx:int,by:int)->void`, `is_loaded(bx:int,by:int)->bool` | čte `.land`/`.statics` po blocích; **není to „statiky na dlaždici"** — filtr na dlaždici si dělá volající (`world.walk`, `render.chunk`); viz §4.2.1 |
-| `world.walk` | `sim/world/walk.gd` | `_init(map = null, tiledata = null, stairs = null)` — **závislosti konstruktorem, ne konstantou** (jinak by `can_step` nešel změřit bez `assets/uo`); `can_step(from:Vector3i, dir:int, height:int = PERSON_HEIGHT, is_player:bool = true)->Dictionary` → `{ok:bool, z:int, reason:String}`; `surface_z(x:int,y:int)->int` | **jádro věrnosti pohybu**, algoritmus v §5.1; viz §4.2.1 |
+| `world.walk` | `sim/world/walk.gd` | `_init(map = null, tiledata = null, stairs = null, doors = null)` — **závislosti konstruktorem, ne konstantou** (jinak by `can_step` nešel změřit bez `assets/uo`); `can_step(from:Vector3i, dir:int, height:int = PERSON_HEIGHT, is_player:bool = true)->Dictionary` → `{ok:bool, z:int, reason:String}`; `surface_z(x:int,y:int)->int` | **jádro věrnosti pohybu**, algoritmus v §5.1; dveře rozhoduje `world.doors.is_open` (oba stavy mají v `tiledata` `Impassable`), statiky se ptají `tiledata` s `+0x4000`; viz §4.2.1 |
 | `world.doors` | `sim/world/doors.gd` | `is_door(tile:int)->bool`, `toggle(tile:int)->int` (vrátí nový tile), `category(tile:int)->int`, `open_tile(cat:int, orient:int)->int` | data z `doors.txt` |
 | `world.teleport` | `sim/world/teleport.gd` | `teleport_target(x:int,y:int,z:int)->Variant` (`{x,y,z}` nebo `null`) | data z `teleprts.txt` + moongates z `data/moongates.json` |
 | `world.stairs` | `sim/world/stairs.gd` | `is_stair(tile:int)->bool`, `stair_group(tile:int)->Dictionary` | data z `stairs.txt` |
@@ -173,6 +173,33 @@ změnil, je tu i **původní znění** — historie se nepřepisuje, jen doplňu
   výchozích hodnot a bez konstruktoru. Kdyby závislosti byly konstanty, `can_step`
   by se nedal změřit bez `assets/uo` — a ta jsou v `.gitignore`, takže v CI nejsou.
   Stejný vzor jako `world.map._init(prefix)`.
+- **`world.walk` má od 2026-10-07 ČTVRTÝ argument `doors`** (`world.doors`), protože
+  **dveře mají `Impassable` v obou stavech** (naměřeno: `1717` i `1718` =
+  `0x20006050`, výška 20) — stav se tedy **čte z `world.doors.is_open`**, ne z flagů.
+  Kdo `doors` nepředá, dostane reálný `world.doors` (stejný vzor jako `stairs`).
+- **`world.walk` čte statiky s `+0x4000` (2026-10-07, naměřená vada).**
+  `world.map.statics_at` vrací `tile` v prostoru **tiledata id předmětu** (0..0x3FFF),
+  ale `world.tiledata` klíčuje předměty jako **art id** (`tile >= 0x4000`); stejný
+  posun dělá `render/chunk_renderer.gd`. Bez posunu `tiledata` vrátí u statiku řádek
+  tabulky **LAND** (`flags(1717)` → `grass`/`0x00000000` místo `wooden door`/
+  `0x20006050`) — v Británii to znamenalo, že `can_step` pustil **1 325 kroků** do
+  dlaždice s `Impassable` statikem. Rozšíření smlouvy (nová konstanta `ITEM_OFFSET`).
+- **`world.walk`: blokující statik platí jen ve svém výškovém pásmu** (docs/05
+  §5.1.2 bod 2). Pásmo statiku je `[z, z + max(výška, 1))` — výška `0` se bere jako
+  `1`, protože **645 druhů `Impassable` artů má v `tiledata` výšku 0** a prázdný
+  interval by z nich udělal průchozí. Naměřeno v Británii: ze **6 750** kroků do
+  dlaždice s překrývajícím se statikem jich kód před opravou pustil **1 173** (po
+  opravě **0**); naopak ze **654** kroků, kde statik pásmo postavy neprotíná, jich
+  před opravou **502** zbytečně blokoval.
+- **`world.walk`: schody zvyšují povolený krok** (2026-10-07). Schod je statik
+  s `Surface` a výškou 5 nebo 10 (**9 z 9** druhů schodů v Británii) a skok mezi
+  sousedními schody je **přesně jeho výška** (histogram skoku povrchu v okolí
+  180×180: `0× 436`, `±5 68+68`, `±1 2+2`). Krok nahoru se proto na dlaždici se
+  schodem povoluje do výšky toho schodu (`world.stairs.is_stair`), ne jen
+  `STEP_HEIGHT`. **Referenční spor:** RunUO/ServUO `Movement.Check` zná jen
+  `startTop + StepHeight`, což by v reálné mapě znamenalo, že se po schodech nedá
+  jít vůbec; Sphere má na schody **zvláštní** pravidlo (`CAN_I_CLIMB`,
+  `m_zClimbHeight`, `zHeight/2` v `src/common/CServerMap.cpp:221`).
 - **`sim.movement`: kde bere mobily.** Smlouva uváděla jen `request_step(m, ...)`
   a neříkala, odkud systém `m` vezme. Dnes si je drží **sám** (`register(mobile)`,
   `mobile(serial)`) a `SimWorld` dostane systém z integračního místa (`app/main.gd`).
