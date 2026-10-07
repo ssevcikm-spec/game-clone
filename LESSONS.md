@@ -189,6 +189,16 @@ klidně za minutu; (b) na stav CI použij **jeden** dotaz s hlavičkou
 (c) když dá GitHub 403, **není to „CI neběží"**, ale limit — a tvrzení o stavu
 se pak musí označit jako neměřené, ne hádat.
 
+**DOPLNĚNO (naměřeno tentýž den):** po zásahu do credential helperu (`git
+credential fill`, který se zasekl) **přestal `git push` nacházet uložené heslo**
+(`fatal: Cannot prompt because user interactivity has been disabled` /
+`unable to get password from user`) — do té doby pushy v téže session procházely.
+**Řešení, které token nedostane do historie příkazů ani na disk:** přečíst ho
+přes `CredRead` a poslat ho **přes stdin** do `git credential approve`
+(`("protocol=https`nhost=github.com`nusername=<login>`npassword=" + $tok + "`n`n")
+| git credential approve`), pak `git push` zase projde. **Nezapisuj token do
+příkazové řádky ani do dočasného skriptu** — obojí je historie.
+
 ---
 
 ### 2026-10-07 — Dvě vady viditelné jen POHLEDEM: testy 520/0 a brány zelené (chyba)
