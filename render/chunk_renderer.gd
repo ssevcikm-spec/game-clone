@@ -18,17 +18,27 @@ extends RefCounted
 #    "art_id": int, "offset": Vector2i}
 # `offset` je posun z manifestu (`ox`,`oy`), ktery se odecte od dlazdice.
 #
+# LAND NAVIC (2026-10-07, svahy): `texmap` (TexID z tiledata) a `z_corners`
+# [horni, pravy, levy, dolni] = vysky rohu dlazdice. Roh pouziva vysku
+# SOUSEDNI dlazdice (vychodni pro pravy, jizni pro levy, jihovychodni pro
+# dolni) - presne jako ClassicUO (`Land.cs:113-121` `ApplyStretch`). Kresleni
+# z toho pozna, ze dlazdice lezi na SVAHU, a natáhne pres ni texmap; rovna
+# plocha se kresli dal land artem. Bez toho zustavala v prechodu vysky seda
+# dira (uzivatel: "kde je svah, tam neni tile").
+#
 # Pouziti:
-#   var chunk = Chunk.new(map, textures)
+#   var chunk = Chunk.new(map, textures)          # bez tiledata: texmap = 0
 #   for obj in chunk.visible(center, 64, 48): ...
 
 const Sort = preload("res://render/sort.gd")
 const Iso = preload("res://core/iso.gd")
 const Const = preload("res://core/const.gd")
+const TiledataScript = preload("res://sim/world/tiledata.gd")
 const ITEM_OFFSET: int = 0x4000
 
 var _map = null
 var _textures = null
+var _tiledata = null               # muze byt null: pak se texmap nedava
 var _iso
 var _sort
 var _list: Array = []
@@ -37,9 +47,10 @@ var _built: bool = false
 var _counts: Dictionary = {"land": 0, "static": 0}
 
 
-func _init(map, textures) -> void:
+func _init(map, textures, tiledata = null) -> void:
 	_map = map
 	_textures = textures
+	_tiledata = tiledata
 	_iso = Iso.new()
 	_sort = Sort.new()
 
@@ -82,13 +93,20 @@ func visible(center: Vector2i, tiles_x: int, tiles_y: int) -> Array:
 func _build(area: Rect2i) -> Array:
 	var objects: Array = []
 	var counts := {"land": 0, "static": 0}
+	var zrohy: PackedInt32Array = _z_grid(area)
+	var sirka: int = area.size.x + 1
 	for y in range(area.position.y, area.end.y):
 		for x in range(area.position.x, area.end.x):
 			var land: int = _map.land_at(x, y)
 			if land < 0:
 				continue
-			objects.append({"kind": "land", "x": x, "y": y, "z": _map.z_at(x, y),
-				"art_id": land, "offset": Vector2i.ZERO})
+			var radek: int = (y - area.position.y) * sirka + (x - area.position.x)
+			var z: int = zrohy[radek]
+			objects.append({"kind": "land", "x": x, "y": y, "z": z,
+				"art_id": land, "offset": Vector2i.ZERO,
+				"texmap": _tiledata.texture(land) if _tiledata != null else 0,
+				"z_corners": [z, zrohy[radek + 1], zrohy[radek + sirka],
+					zrohy[radek + sirka + 1]]})
 			counts["land"] += 1
 	var first: Vector2i = _iso.block_of(area.position.x, area.position.y)
 	var last: Vector2i = _iso.block_of(area.end.x - 1, area.end.y - 1)
@@ -108,3 +126,19 @@ func _build(area: Rect2i) -> Array:
 				counts["static"] += 1
 	_counts = counts
 	return _sort.draw_order(objects)
+
+
+func _z_grid(area: Rect2i) -> PackedInt32Array:
+	# Vysky ROHU oblasti: (sirka+1) x (vyska+1) hodnot. Sousede se ctou JEDNOU
+	# na cely pohled, ne ctyrikrat na kazdou dlazdici - pri 3 000 dlazdicich by
+	# to bylo 12 000 dotazu do mapy pri kazdem prestavem seznamu (a ten se
+	# prekresluje pri kazdem kroku chuze).
+	# Mrizka ma o 1 radek/sloupec vic, aby mela kazda dlazdice i sve prave/dolni
+	# rohy (ty patri sousedovi).
+	var sirka: int = area.size.x + 1
+	var out := PackedInt32Array()
+	out.resize(sirka * (area.size.y + 1))
+	for y in range(area.position.y, area.end.y + 1):
+		for x in range(area.position.x, area.end.x + 1):
+			out[(y - area.position.y) * sirka + (x - area.position.x)] = int(_map.z_at(x, y))
+	return out

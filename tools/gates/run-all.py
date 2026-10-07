@@ -172,7 +172,11 @@ def main() -> int:
     return worst
 
 
-EXTRACTOR_SELFTESTS = ["uop", "art", "gump", "worldmap", "cliloc", "tiledata", "hues", "textdata", "anim"]
+# `atlas` a `texmaps` pribyly 2026-10-07 (12. session): jejich self-testy
+# existovaly, ale nikdo je nespoustel - prave proto v nich mohla byt vada
+# (atlas mel 46 kontrol a pritom se land klicoval spatnym id prostorem).
+EXTRACTOR_SELFTESTS = ["uop", "art", "atlas", "gump", "worldmap", "cliloc", "tiledata",
+                       "hues", "texmaps", "textdata", "anim"]
 
 
 def selftest_all(root: Path) -> int:

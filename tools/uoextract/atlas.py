@@ -2,15 +2,37 @@
 """atlas.py - shelf-pack do 2048x2048 + manifest.json (granule assets.atlas).
 
 ROZSAH (MERENO 2026-10-05 na instalaci 1.25.35, ne odhadnuto):
-  land = TexID z tiledata (`tiles.json` land.pole `texture`), NE id dlazdice:
-         pokryti artem je pri TexID 16 055/16 384 dlazdic (97 %), pri id dlazdice
-         jen 4 244 (25 %) - mereni: `.cache/analysis/mereni-land-index.py`.
-         3 732 TexID z 4 012 ma v archivu zaznam; tech 280 se nedostane do
-         manifestu a vypsou se do `report`.
-  item = staticky art z archivu, ktery ma v tiledata neprazdne jmeno
-         (36 179 z 39 516; 3 337 prazdnych slotu = art ID, ktere tiledata nezná,
-         ty se podle docs/03 §3.5.3 bod 2 do manifestu nedostanou).
+  land = LAND TILE ID z mapy (0..16383), NE pole `texture` z tiledata.
+         ⚠ OPRAVA 2026-10-07 (12. session): do 11. session tu stalo, ze land art
+         je indexovany polem `texture` ("TexID") - a bylo to VYVRACENO merenim:
+           * `render.chunk` kresli land s `art_id = land tile id` (ClassicUO
+             `LandView.cs:96` `Arts.GetLand(Graphic)`, kde `Graphic` je id z mapy),
+           * art[0] je grafika s textem "UNUSED", kdezto `texture[168] = 0` -
+             kdyby platil TexID, kreslila by se voda (id 168) jako "UNUSED",
+           * prumerna barva art[id] sedi na texmap[texture] u 76 druhů dlaždic,
+             art[texture] jen u 2 (váženo počtem dlaždic 934 504 : 738),
+           * v atlase stavěném podle TexID CHYBĚLO 512 land artů, které v archivu
+             jsou - a to práve ty, které mapa používá (např. 77..100: písek, hlína
+             a svahové dlaždice u pobřeží; uživatel to viděl jako "kde je svah,
+             tam není tile").
+         Mereni: `_analyza/vlna1-land-index.py` (+ montáž `vlna1-land-montaz.png`).
+         Land ID s payloadem je 4 244 z 16 384; zbytek se do manifestu nedostane
+         a je to v `report` (ne v tichu).
+  item = staticky art z archivu: bere se CELY rozsah 0..65535 (art ID =
+         tiledata id + 0x4000). ⚠ OPRAVA 2026-10-07 (12. session): do 11. session
+         se vynechavaly arty s PRAZDNYM JMENEM v tiledata (36 222 z 65 536) -
+         ale mapa je pouziva a klient je kresli (jmeno kresleni nepotrebuje).
+         NamEReno (`_analyza/vlna6-statiky-bez-jmena.py`): 232 druhu statiku
+         (14 199 zaznamu) ma art v archivu a prazdne jmeno; statiku, ktere by art
+         v archivu nemely, je 0. Co v archivu opravdu neni, se pocita do `report`.
   gump = vsechny gumpy v gumpartLegacyMUL.uop.
+  texmap = textury TERENU pro SVAHY (`texmaps.mul`, `tools/uoextract/texmaps.py`).
+         UO kresli rovnou plochu land ARTEM a svah TEXMAPEM natazenym pres
+         ctyrrohy dlazdice (ClassicUO `LandView.cs:58-96`, `Land.cs:96-161`) -
+         bez toho zustava v miste prechodu vysky SEDA DIRA (vada uzivatele
+         2026-10-07: "kde je svah, tam neni tile"). Klicem je `TexID` z tiledata
+         (land pole `texture`); VODA (`TexID == 0 && Wet`) se kresli artem
+         (ClassicUO `Land.cs:48`) a proto texmap 0 nema.
   Plne pruhledny sprite se do manifestu nedostane (G6 by ho hlasil jako chybu a
   spravne by udelala); jeho pocet je v `report`, ne v tichu.
 
@@ -38,7 +60,7 @@ DETERMINISM: razeni `(-h, w, kind, id)`, zadne casove znacky, sort_keys=True.
 Priimaci kriterium granule: dva behy daji shodny SHA-256 manifestu.
 
 Pouziti:
-  python tools/uoextract/atlas.py --out assets/uo [--only land,item,gump]
+  python tools/uoextract/atlas.py --out assets/uo [--only land,item,gump,texmap]
   python tools/uoextract/atlas.py --verify --out assets/uo
   python tools/uoextract/atlas.py --self-test
 """
@@ -59,12 +81,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from art import (DEFAULT_INSTALL, LAND_BYTES, LAND_SIZE, MAX_LAND,  # noqa: E402
                  STATIC_BASE, ArtArchive, to_image)
 from gump import GumpArchive  # noqa: E402
+from texmaps import MAX_TEXMAP, TexmapArchive  # noqa: E402
 
 PAGE = 2048
 PAD = 1                      # 1 px pruhledneho okraje: filtr v GPU by nasal souseda
 # docs/03 §3.5.3 bod 1: 6 znamych art ID, ktera se maji poznat pohledem
 KNOWN = ((3921, "item"), (3936, "item"), (5118, "item"),
-         (7609, "item"), (2482, "item"), (3, "land"))
+         (7609, "item"), (2482, "item"), (3, "land"), (3, "texmap"))
 
 
 def rozmiar(kind: str, payload: bytes | None) -> tuple[int, int] | None:
@@ -88,6 +111,11 @@ def rozmiar(kind: str, payload: bytes | None) -> tuple[int, int] | None:
         return None
     if kind == "land":
         return (LAND_SIZE, LAND_SIZE) if len(payload) >= LAND_BYTES else None
+    if kind == "texmap":
+        # Delka rozhoduje o rozmeru: 0x2000 = 64x64, 0x8000 = 128x128
+        # (`texmaps.py`, portovane z ClassicUO TexmapsLoader.cs:79).
+        return (64, 64) if len(payload) == 0x2000 else (
+            (128, 128) if len(payload) == 0x8000 else None)
     if kind == "item":
         _flags, w, h = struct.unpack_from("<Ihh", payload, 0)   # [u32][i16][i16]
     else:
@@ -97,7 +125,9 @@ def rozmiar(kind: str, payload: bytes | None) -> tuple[int, int] | None:
 
 def ofsahy(kind: str, w: int, h: int) -> tuple[int, int]:
     """(ox, oy) = posun, ktery se odecte od baseX/baseY dlazdice (ChunkMesh.cs)."""
-    return (0, 0) if kind == "land" else ((w >> 1) - 22, h - 44)
+    if kind in ("land", "texmap"):
+        return (0, 0)
+    return ((w >> 1) - 22, h - 44)
 
 
 def rozloz(rady: list[tuple], page: int = PAGE, pad: int = PAD) -> list[tuple]:
@@ -120,12 +150,24 @@ def rozloz(rady: list[tuple], page: int = PAGE, pad: int = PAD) -> list[tuple]:
     return out
 
 
-def rozsah(tiles: dict) -> tuple[set, set]:
-    """(land TexID, item id) z extrahovaného tiledata + pravidla docs/03 §3.5.3."""
-    pole = tiles["layout"]["land_fields"].index("texture")
-    jmeno = tiles["layout"]["item_fields"].index("name")
-    return ({r[pole] for r in tiles["land"]},
-            {i for i, r in enumerate(tiles["item"]) if r[jmeno]})
+def rozsah(tiles: dict) -> tuple[set, set, set]:
+    """(land art id, item art id, texmap id) - vsechny prostore se berou CELE,
+    rozhoduje archiv.
+
+    LAND: art ID je LAND TILE ID z mapy (ne `texture` z tiledata) - viz hlavicka
+    a `_analyza/vlna1-land-index.py`.
+    ITEM: art ID je `tiledata id + 0x4000` (docs/03 §3.5.4) a bere se CELY
+    rozsah 0..65535. Do 12. session se vynechavaly arty s PRAZDNYM JMENEM
+    v tiledata (36 222 z 65 536) - jenze mapa je pouziva: namEReno
+    (`_analyza/vlna6-statiky-bez-jmena.py`) 232 druhu statiku / 14 199 zaznamu
+    ma art v archivu, ale prazdne jmeno - a klient kresli art podle ID, jmeno
+    k tomu nepotrebuje. Statiku BEZ artu v archivu je 0, takze po teto oprave
+    nema byt v mape zadna dira.
+    TEXMAP: textura terenu pro SVAHY (`texmaps.py`); klic je `TexID` z tiledata
+    (land pole `texture`), ktery kresleni bere z `world.tiledata.texture()`.
+    Co v archivu NENI (payload chybi), preskoci `rozmiar()` a je to v `report`.
+    """
+    return (set(range(MAX_LAND)), set(range(0x10000)), set(range(MAX_TEXMAP)))
 
 
 def sha256(cesta: Path) -> str:
@@ -138,8 +180,11 @@ def sha256(cesta: Path) -> str:
 
 def rozbal(archiv, kind: str, ident: int):
     """Dekodovany sprite (w, h, pixely) nebo None."""
-    return archiv.land_art(ident) if kind == "land" else (
-        archiv.art(ident) if kind == "item" else archiv.gump(ident))
+    if kind == "land":
+        return archiv.land_art(ident)
+    if kind == "texmap":
+        return archiv.texmap(ident)
+    return archiv.art(ident) if kind == "item" else archiv.gump(ident)
 
 
 def sestav(install: str, out: Path, tiles_path: Path, only: set[str]) -> dict:
@@ -147,22 +192,24 @@ def sestav(install: str, out: Path, tiles_path: Path, only: set[str]) -> dict:
     from PIL import Image
 
     tiles = json.loads(tiles_path.read_text(encoding="utf-8"))
-    land_ids, item_ids = rozsah(tiles)
+    land_ids, item_ids, texmap_ids = rozsah(tiles)
     art, gumpy = ArtArchive(install), GumpArchive(install)
+    texmapy = TexmapArchive(install)
     report: dict[str, int] = {}
     sprites: list[dict] = []
     stranky: list[str] = []
 
-    for kind in ("land", "item", "gump"):
+    for kind in ("land", "item", "gump", "texmap"):
         if kind not in only:
             continue
-        archiv = gumpy if kind == "gump" else art
+        archiv = {"gump": gumpy, "texmap": texmapy}.get(kind, art)
         ids = (sorted(land_ids) if kind == "land" else sorted(item_ids) if kind == "item"
+               else sorted(texmap_ids) if kind == "texmap"
                else [i for i in range(len(gumpy.entries) + 2048) if gumpy.payload(i) is not None])
         rady, chybi = [], 0
         for ident in ids:
             if kind == "land" and not 0 <= ident < MAX_LAND:
-                chybi += 1                 # TexID mimo land casti archivu (mereno: 21 333)
+                chybi += 1                 # obrana: rozsah land je dany (viz `rozsah`)
                 continue
             rozm = rozmiar(kind, archiv.payload(ident + STATIC_BASE if kind == "item" else ident))
             if rozm is None:                  # art ID, ktery v archivu neni (report, ne ticho)
@@ -198,6 +245,8 @@ def sestav(install: str, out: Path, tiles_path: Path, only: set[str]) -> dict:
               f"{sum(1 for s in sprites if s['kind'] == kind)} vlozeno, {prazdnych} preskoceno")
 
     (out / "atlas").mkdir(parents=True, exist_ok=True)
+    zdroje = [Path(install) / "artLegacyMUL.uop", Path(install) / "gumpartLegacyMUL.uop",
+              Path(install) / "texmaps.mul", Path(install) / "texidx.mul", tiles_path]
     manifest = {
         "version": 1,
         "generator": "tools/uoextract/atlas.py",
@@ -206,9 +255,7 @@ def sestav(install: str, out: Path, tiles_path: Path, only: set[str]) -> dict:
         "source": {
             "install": str(install),
             "client_version": tiles.get("source", {}).get("install_version"),
-            "sha256": {p.name: sha256(p) for p in
-                       (Path(install) / "artLegacyMUL.uop",
-                        Path(install) / "gumpartLegacyMUL.uop", tiles_path)},
+            "sha256": {p.name: sha256(p) for p in zdroje if p.exists()},
         },
         "pages": [{"file": f"atlas/{n}", "w": PAGE, "h": PAGE,
                    "count": sum(1 for s in sprites if s["page"] == f"atlas/{n}")}
@@ -230,7 +277,7 @@ def sestav(install: str, out: Path, tiles_path: Path, only: set[str]) -> dict:
     # a lezi v `atlas/`; nic jineho se nedotyka.
     # POZOR: u castecneho behu (`--only item`) by uklid smazal stranky ostatnich
     # druhu, ktere tento manifest nezna - proto se uklizi jen pri plnem behu.
-    if set(only) >= {"land", "item", "gump"}:
+    if set(only) >= {"land", "item", "gump", "texmap"}:
         platne = {Path(p["file"]).name for p in manifest["pages"]}
         uklizeno = 0
         for stara in (out / "atlas").glob("*.png"):
@@ -407,6 +454,14 @@ def self_test() -> int:
              "sprite vetsi nez stranka se odmita, bežny projde")
     kontrola(ofsahy("land", 44, 44) == (0, 0), "land ma ox = oy = 0")
     kontrola(ofsahy("item", 45, 114) == (0, 70), "item ox = (w>>1)-22, oy = h-44")
+    # TEXMAP: o rozmeru rozhoduje DELKA zaznamu (64x64 = 0x2000, 128x128 = 0x8000)
+    kontrola(rozmiar("texmap", b"\x00" * 0x2000) == (64, 64),
+             "texmap: delka 0x2000 = 64x64")
+    kontrola(rozmiar("texmap", b"\x00" * 0x8000) == (128, 128),
+             "texmap: delka 0x8000 = 128x128")
+    kontrola(rozmiar("texmap", b"\x00" * 0x1000) is None,
+             "texmap: jina delka nez 0x2000/0x8000 se odmita")
+    kontrola(ofsahy("texmap", 64, 64) == (0, 0), "texmap ma ox = oy = 0")
 
     # --- TVAR HLAVICE: presne offsety poli (tady byla vada, ktera udelala 117 prekryvu) ---
     # item: [u32 flags][i16 width][i16 height]. Kdo cte "<Hxxh", precte `flags`
@@ -489,7 +544,7 @@ def main() -> int:
     ap.add_argument("--install", default=DEFAULT_INSTALL)
     ap.add_argument("--out", default="assets/uo")
     ap.add_argument("--tiles", default="assets/uo/tiles.json")
-    ap.add_argument("--only", default="land,item,gump")
+    ap.add_argument("--only", default="land,item,gump,texmap")
     ap.add_argument("--verify", action="store_true", help="jen premer hotovy manifest")
     ap.add_argument("--preview", default=".cache/analysis/atlas-preview.png")
     ap.add_argument("--self-test", action="store_true")

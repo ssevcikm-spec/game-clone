@@ -312,14 +312,48 @@ Rozsah extrakce se i tak **zúží na těla, která obsah skutečně potřebuje*
 - **Hue varianty se negenerují dopředu** — dělá je až `render/hue_cache.gd`
   (`(art_id, hue)` → `ImageTexture`, LRU se stropem, viz §2.7).
 
+> **OPRAVA 2026-10-07 (12. session, měřeno) — co je v atlase za klíč.**
+> Do téhle session platilo (v hlavičce `atlas.py`), že **land art se v manifestu
+> klíčuje polem `texture` (TexID) z tiledata**. **Měřením vyvráceno:**
+>
+> | Signál | Výsledek |
+> |---|---|
+> | referenční klient | `LandView.cs:96` kreslí `Arts.GetLand(Graphic)`, kde `Graphic` = **land tile id z mapy** (větev „nestretched"); TexID se používá jen pro `Texmaps` |
+> | art index 0 | je grafika s textem `UNUSED`, kdežto `texture[168] = 0` — kdyby platil TexID, kreslila by se voda (168) jako „UNUSED" |
+> | barva vs. texmap | průměrná barva `art[id]` sedí na `texmap[texture]` u **76** druhů dlaždic, `art[texture]` jen u **2** (váženo počtem dlaždic na mapě 934 504 : 738) |
+> | důsledek dosavadního klíče | v atlase **chybělo 512** land artů, které v archivu jsou (např. písek a svahové dlaždice 77–100 u pobřeží Britannie) — uživatel to viděl jako „kde je svah, tam není tile" |
+>
+> **Platí tedy:** `land` v manifestu = **land tile id z mapy**, `item` =
+> `tiledata id + 0x4000`, a nově i `texmap` = **TexID** (id + `0x10000` v prostoru
+> `render.textures`). Item arty se berou **celé** (dřív se vynechávaly ty
+> s prázdným jménem v tiledata — naměřeno 232 druhů / 14 199 statiků na mapě,
+> které klient kreslí, protože jméno kreslení nepotřebuje).
+> Měření: `_analyza/vlna1-land-index.py`, `_analyza/vlna6-statiky-bez-jmena.py`,
+> `_analyza/vlna3-diry-map.py`; kód: `tools/uoextract/atlas.py`, `texmaps.py`.
+
+> **SVAHY (2026-10-07, měřeno):** tam, kde se liší výška sousedních dlaždic,
+> UO nekreslí rovný diamant, ale **texmap natažený přes čtyřrohy dlaždice**
+> (`Land.cs:96-161` `ApplyStretch`, `Batcher2D.cs:241` `DrawStretchedLand`).
+> Bez toho zůstává v přechodu výšky **šedá díra** — naměřeno na snímku:
+> mezi úrovní `z = 20` a `z = -15` je pruh pozadí široký ~140 px
+> (`_analyza/snimky/teren.png` kreslí terén obarvený podle `z`).
+> Výška rohu se bere ze **sousední** dlaždice: pravý = východní, levý = jižní,
+> dolní = jihovýchodní. Voda (`TexID == 0` a `Wet`) se kreslí artem
+> (`Land.cs:48`), plochy bez texmapu taky (`Land.cs:98`).
+> **Co je zjednodušené:** per-corner normals pro světlo (`CalculateNormal`)
+> se nepočítají — `render.light` v projektu ještě není (`docs/07`, M9).
+
 ### 3.5.3 Přijímací kritéria extraktoru (tvrdá)
 
 1. **Obrázek, který něco znamená:** extrahuj 6 známých art ID (zbraň, zbroj,
    strom/rostlina, land dlaždice, mince, lektvar), ulož PNG a **podívej se na
    ně** (`read_image`). Musí to být poznat. Čísla nestačí — „nenulová alfa"
    projde i u šumu.
-2. **Neshoda s tiledata:** art ID, které tiledata nezná, se do manifestu
-   nedostane (a extraktor to vypíše).
+2. **Neshoda s ARCHIVEM, ne s tiledata (opraveno 2026-10-07):** do manifestu se
+   dostane to, co má v archivu payload — **ne** to, co má v tiledata neprázdné
+   jméno. Jméno je pro kreslení irelevantní a filtr podle něj vypustil 232 druhů
+   statiků, které mapa používá (`_analyza/vlna6-statiky-bez-jmena.py`); u landu
+   se bere celý rozsah `0..16383` a chybějící payload se **vypíše** do `report`.
 3. **Offsety sedí:** postava (tělo 400, muž) položená na dlaždici musí stát
    **nohama na dlaždici** — ověř snímkem, ne výpočtem.
 4. **Opakovatelnost:** dva běhy extrakce dají **shodné SHA-256** manifestu

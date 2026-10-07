@@ -558,3 +558,35 @@ func run(t) -> void:
 					json_chyby += " hue%d/uroven%d: %s != %s" % [h, i, str(je), str(cekana)]
 	t._check(json_ok, "render.hue: hue_color() sedi na JSON u vsech %d sad x %d urovni (chyby:%s)"
 		% [sady.size(), COLORS, json_chyby])
+
+	# 18) OKNO (AtlasTexture): `hued()` musi obarvit a vratit POUZE `region`,
+	#     ne celou stranku. Vada ze snimku (uzivatel, 2026-10-07): pri chuzi se
+	#     "vedle postavy zobrazily vsechny animacni snimky" - frame animace je
+	#     `AtlasTexture` do stranky, ktera ma vsech 10 framu vedle sebe, a
+	#     `_obrazek()` bral CELY atlas.
+	#     Test meri dve veci: ROZMER vysledku (16x16, ne 48x16) a BARVU, ktera
+	#     musi odpovidat DRUHEMU framu (kdyby se vzal prvni, vysla by jina
+	#     uroven - kde je R == 8, tady 16).
+	var stranka := Image.create(48, 16, false, Image.FORMAT_RGBA8)
+	stranka.fill(Color(0, 0, 0, 0))
+	for idx in 3:
+		for y in 16:
+			for x in 16:
+				var siva: int = 8 + idx * 8         # 8 / 16 / 24 = urovne 1 / 2 / 3
+				stranka.set_pixel(idx * 16 + x, y, Color8(siva, siva, siva, 255))
+	var okno := AtlasTexture.new()
+	okno.atlas = ImageTexture.create_from_image(stranka)
+	okno.region = Rect2(16, 0, 16, 16)
+	var obarvene_okno: Texture2D = barvy.hued(okno, hue)
+	t._check(obarvene_okno.get_width() == 16 and obarvene_okno.get_height() == 16,
+		"render.hue: hued(AtlasTexture) vraci OKNO 16x16, ne stranku (vyslo %dx%d)"
+		% [obarvene_okno.get_width(), obarvene_okno.get_height()])
+	t._check(_pixel(obarvene_okno, 0).is_equal_approx(barvy.hue_color(hue, 2)),
+		"render.hue: obarvene okno odpovida DRUHÉMU framu (uroven 2 = %s, vyslo %s)"
+		% [str(barvy.hue_color(hue, 2)), str(_pixel(obarvene_okno, 0))])
+	# A jiny region tehoz atlasu musi dat JINY vysledek (ne prvni fram)
+	okno.region = Rect2(32, 0, 16, 16)
+	var treti: Texture2D = barvy.hued(okno, hue)
+	t._check(_pixel(treti, 0).is_equal_approx(barvy.hue_color(hue, 3)),
+		"render.hue: jiny region = jiny frame (uroven 3 = %s, vyslo %s)"
+		% [str(barvy.hue_color(hue, 3)), str(_pixel(treti, 0))])

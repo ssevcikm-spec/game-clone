@@ -71,8 +71,9 @@ MODULY = {
             ("diagonala x-y",
              'int(obj.get("x", 0)) + int(obj.get("y", 0))',
              'int(obj.get("x", 0)) - int(obj.get("y", 0))'),
-            ("nestabilni razeni (rovna se vraci false)",
-             "return a[1] < b[1]", "return false"),
+            ("nestabilni razeni (poradi vstupu se do klice neda)",
+             "klice[i] = (sort_key(obj) << shift) | i",
+             "klice[i] = sort_key(obj) << shift"),
             ("spatny radix vrstev (LAYERS 3 -> 2)",
              "const LAYERS: int = 3", "const LAYERS: int = 2"),
         ],
@@ -452,6 +453,54 @@ MODULY = {
         "mutace": [
             ("art_id bez posunu 0x4000 (dva id prostory)",
              "const ITEM_OFFSET: int = 0x4000", "const ITEM_OFFSET: int = 0"),
+            # SVAHY (2026-10-07): bez `texmap` a `z_corners` se svah kresli jako
+            # rovna plocha - presne vada, kterou uzivatel videl jako diru.
+            ("texmap se do seznamu nedava",
+             '"texmap": _tiledata.texture(land) if _tiledata != null else 0,',
+             '"texmap": 0,'),
+            ("z_corners berou vlastni vysku misto sousedu",
+             '"z_corners": [z, zrohy[radek + 1], zrohy[radek + sirka],\n'
+             "\t\t\t\t\tzrohy[radek + sirka + 1]]}",
+             '"z_corners": [z, z, z, z]}'),
+        ],
+    },
+    # CHUZE DRZENIM (12. session, rozhodnuti uzivatele 2026-10-07). Testy meri
+    # presny interval (`now_ms` je vstup), takze se kazda z techto vad pozna.
+    "input": {
+        "soubor": ROOT / "app" / "input_map.gd",
+        "prefix": "app.input",
+        "prepinac": "--input-script",
+        "mutace": [
+            ("drzeni se neopakuje (pta se jen na just_pressed)",
+             "if not Input.is_action_pressed(input_action):",
+             "if not Input.is_action_just_pressed(input_action):"),
+            ("krok se vyda pri kazdem pollu (prodleva se ignoruje)",
+             "if now_ms - minule < prodleva:",
+             "if false:"),
+            ("pusteni nevynuluje prodlevu (prvni krok po pusteni se ztrati)",
+             "\t\t\t_krok_ms.erase(action)\n",
+             ""),
+            ("drzene prave tlacitko ignoruje vzdalenost kurzoru",
+             "return (mouse_position - view_size / 2.0).length() >= MOUSE_RUN_PX",
+             "return always_run"),
+            ("hranice behu je ostre vetsi (na 190 px se jde krokem)",
+             ".length() >= MOUSE_RUN_PX",
+             ".length() > MOUSE_RUN_PX"),
+            ("jednorazove akce se drzenim opakuji (war kazdy poll)",
+             'if str(command.get("t", "")) != "move":\n\t\treturn {}',
+             "if false:\n\t\treturn {}"),
+        ],
+    },
+    "player_controller": {
+        "soubor": ROOT / "app" / "player_controller.gd",
+        "prefix": "player_controller",
+        "prepinac": "--controller-script",
+        "mutace": [
+            ("vazba na drzene prave tlacitko chybi (mys nechodi)",
+             '"walk_to": "walk_to_cursor",\n', ""),
+            ("prave tlacitko se zaregistruje jako klavesa",
+             "var klik := InputEventMouseButton.new()\n\t\tklik.button_index = MOUSE[action]",
+             "var klik := InputEventKey.new()\n\t\tklik.keycode = KEY_F1"),
         ],
     },
     "world_view": {
@@ -461,6 +510,19 @@ MODULY = {
         "mutace": [
             ("kamera ignoruje vysku (z = 0)",
              "to_screen(tile.x, tile.y, z)", "to_screen(tile.x, tile.y, 0)"),
+            # SVAH (2026-10-07): bez rozhodnuti o svahu se svah kresli jako rovna
+            # plocha (dira v terenu), a s prohozenymi rohy se nakloni na spatnou stranu.
+            ("svah se nikdy nevyhodnoti jako svah (dira)",
+             "func is_slope(obj: Dictionary) -> bool:",
+             "func is_slope(obj: Dictionary) -> bool:\n\treturn false"),
+            ("rohy svahu prohozene (pravy za levy)",
+             "pos + Vector2(2.0 * krok, krok + float(z - z_pravy) * zs)",
+             "pos + Vector2(2.0 * krok, krok + float(z - z_levy) * zs)"),
+            # ODDALENA PRESTAVBA (2026-10-07): s prestavbou pri kazdem kroku
+            # prichazi 44 ms seknuti 2,5x za sekundu.
+            ("seznam se prestavuje pri kazdem kroku",
+             "or absi(center_tile.y - _list_center.y) >= RECENTER_TILES:",
+             "or absi(center_tile.y - _list_center.y) >= 1:"),
         ],
     },
     # DATA se mutuji po bajtech: mutant je kopie JSON s priponou `.gd`
@@ -507,7 +569,8 @@ def main() -> int:
     ap = argparse.ArgumentParser(description="Mutacni dukaz testu")
     ap.add_argument("--only", default=None,
                     help="sort, map, walk, doors, movement, registry, pathfind, textures, "
-                         "item, container, interaction, skill_gain (nebo vic carkami)")
+                         "item, container, interaction, skill_gain, hud, status_bar, "
+                         "chunk_renderer, world_view, input, player_controller (nebo vic carkami)")
     args = ap.parse_args()
     if godot_bin() is None:
         print("CHYBA: Godot nenalezen (nastav $GODOT) - mutace by nic nemerily")

@@ -61,12 +61,17 @@ class FakeMap:
 
 
 class FakeTextures:
-	# Jen to, co `render.chunk` od textur chce: `offset(art_id)`.
+	# Jen to, co `render.chunk` a `app.world_view` od textur chteji:
+	# `offset(art_id)` a `texmap(texmap_id)` (textura svahu).
 	var offsets: Dictionary = {}
+	var texmapy: Dictionary = {}      # texmap_id -> Texture2D (nebo cokoliv neprazdneho)
 
 	func offset(art_id: int) -> Vector2i:
 		var v: Vector2i = offsets.get(art_id, Vector2i.ZERO)
 		return v
+
+	func texmap(texmap_id: int) -> Texture2D:
+		return texmapy.get(texmap_id)
 
 
 class FakeMobile:
@@ -161,19 +166,47 @@ func run(t) -> void:
 		"app.world_view: VIEW_TILES_X/Y je 64x48 (namEReno %sx%s)"
 			% [str(view_consts.get("VIEW_TILES_X")), str(view_consts.get("VIEW_TILES_Y"))])
 
-	# 3) setup() postavi seznam: 3072 land + 1 statik v oblasti (2 mimo)
+	# 3) setup() postavi seznam: (64 + 2*RECENTER) x (48 + 2*RECENTER) land
+	#    + 1 statik v oblasti (2 mimo). Vetsi okno je ZAMERNE: seznam se
+	#    prestavuje az po `RECENTER_TILES` krocich (namEReno 44 ms na prestavbu,
+	#    viz hlavicka modulu), takze musi pokryt i to, kam hrac muze odjit.
+	var recenter: int = int(view_consts.get("RECENTER_TILES", 0))
+	var sirka: int = int(view_consts.get("VIEW_TILES_X", 0)) + 2 * recenter
+	var vyska: int = int(view_consts.get("VIEW_TILES_Y", 0)) + 2 * recenter
 	view.setup(map, textures)
 	var objekty: int = view.visible_count()
 	var counts: Dictionary = view.counts()
-	t._check(objekty == 3073 and int(counts.get("land", -1)) == 3072
+	t._check(sirka > 0 and objekty == sirka * vyska + 1
+		and int(counts.get("land", -1)) == sirka * vyska
 		and int(counts.get("static", -1)) == 1,
-		"app.world_view: pohled 64x48 = 3072 land + 1 statik v oblasti "
-		+ "(namEReno %d objektu, land %s, static %s)"
-			% [objekty, str(counts.get("land")), str(counts.get("static"))])
+		"app.world_view: pohled %dx%d = %d land + 1 statik v oblasti "
+		% [sirka, vyska, sirka * vyska]
+		+ "(namEReno %d objektu, land %s, static %s, RECENTER %d)"
+			% [objekty, str(counts.get("land")), str(counts.get("static")), recenter])
 	t._check(counts.size() == 2 and counts.has("land") and counts.has("static"),
 		"app.world_view: counts() ma prave land a static (namEReno %s)" % str(counts.keys()))
 	t._check(view.center_tile == Vector2i(1495, 1630),
 		"app.world_view: stred po setup() je BRITAIN (namEReno %s)" % str(view.center_tile))
+
+	# 3b) ODDALENA PRESTAVBA (2026-10-07): posun o mene nez RECENTER_TILES
+	#     kroku vraci TUTEZ instanci seznamu (neprestavuje se), vzdaleni posun
+	#     prestavi. Bez toho se seznam stavel pri kazdem kroku - 44 ms x 2,5/s.
+	#     Meri se v OSE X i Y (jinak by prošla vada, ktera hlida jen jednu osu).
+	if recenter >= 1:
+		var seznam_pred: Array = view.call("_list")
+		view.look_at_tile(Vector2i(1495 + recenter - 1, 1630), 0)
+		var seznam_x: Array = view.call("_list")
+		view.look_at_tile(Vector2i(1495, 1630 + recenter - 1), 0)
+		var seznam_y: Array = view.call("_list")
+		view.look_at_tile(Vector2i(1495 + recenter, 1630), 0)
+		var seznam_daleko: Array = view.call("_list")
+		t._check(is_same(seznam_pred, seznam_x) and is_same(seznam_pred, seznam_y)
+			and not is_same(seznam_pred, seznam_daleko),
+			"app.world_view: seznam se prestavi az po %d dlazdicich (x stejna %s, y stejna %s, "
+			% [recenter, str(is_same(seznam_pred, seznam_x)), str(is_same(seznam_pred, seznam_y))]
+			+ "vzdaleny novy seznam %s)" % str(not is_same(seznam_pred, seznam_daleko)))
+		view.look_at_tile(Vector2i(1495, 1630), 0)
+		view.call("_list")
 
 	# 4) kamera stoji presne podle `core.iso` a `core.const` (z = 0)
 	var stred := Vector2i(1495, 1630)
@@ -274,7 +307,52 @@ func run(t) -> void:
 		t._check(obarvene != null and is_same(obarvene, zaklad),
 			"app.world_view: bez hues.json zustane pri hue != 0 zaklad (namEReno seda)")
 
-	# 11) uvolneni uzlu: `free()` (ne queue_free) - zbyly uzel shodi cely beh
+	# 11) SVAH (2026-10-07): `slope_polygon()` — rovna plocha vraci prazdno
+	# (kresli se land art), svah vraci 4 rohy ve vyskach SOUSEDU. Vada
+	# uzivatele: "kde je svah, tam neni tile" - bez teto vetve zustava
+	# v prechodu vysky seda dira (`render.chunk` dava `z_corners`).
+	# Cisla se pocitaji z `core/const.gd` (ISO_STEP, Z_SCALE), ne opisuji.
+	var krok: float = float(consts["ISO_STEP"])
+	var zs: float = float(consts["Z_SCALE"])
+	var rovna := {"kind": "land", "x": 10, "y": 10, "z": 20,
+		"z_corners": [20, 20, 20, 20]}
+	t._check(script.slope_polygon(rovna, Vector2.ZERO).is_empty(),
+		"app.world_view: rovna plocha nema svahovy polygon (%s)"
+			% str(script.slope_polygon(rovna, Vector2.ZERO)))
+	# Soused na vychode je o 4 nizsi -> PRAVY roh se posune o 4 * Z_SCALE dolu
+	var svah := {"kind": "land", "x": 10, "y": 10, "z": 20,
+		"z_corners": [20, 16, 20, 20]}
+	var body: PackedVector2Array = script.slope_polygon(svah, Vector2.ZERO)
+	t._check(body.size() == 4 and body[0] == Vector2(krok, 0.0)
+		and body[1] == Vector2(2.0 * krok, krok + 4.0 * zs)
+		and body[2] == Vector2(krok, 2.0 * krok)
+		and body[3] == Vector2(0.0, krok),
+		"app.world_view: svah ma 4 rohy a pravy roh klesne o 4*Z_SCALE (namEReno %s)"
+			% str(body))
+	# UV musi mit 4 body a sedet na rohy (jinak se textura rozjede)
+	var uv: PackedVector2Array = script.slope_uv()
+	t._check(uv.size() == 4 and uv[0] == Vector2(0.5, 0.0) and uv[1] == Vector2(1.0, 0.5)
+		and uv[2] == Vector2(0.5, 1.0) and uv[3] == Vector2(0.0, 0.5),
+		"app.world_view: slope_uv() ma rohy diamantu v texture (namEReno %s)" % str(uv))
+	# Rozhodnuti `is_slope()`: svah ano, rovna plocha ne, bez textury ne.
+	# Tohle je vetev, ktera rozhoduje, zda v terenu zustane dira.
+	var obrazek2 := Image.create(4, 4, false, Image.FORMAT_RGBA8)
+	textures.texmapy[76] = ImageTexture.create_from_image(obrazek2)
+	var svah_obj := {"kind": "land", "x": 10, "y": 10, "z": 20, "texmap": 76,
+		"z_corners": [20, 16, 20, 20]}
+	var rovny_obj := {"kind": "land", "x": 10, "y": 10, "z": 20, "texmap": 76,
+		"z_corners": [20, 20, 20, 20]}
+	var bez_texmapu := {"kind": "land", "x": 10, "y": 10, "z": 20, "texmap": 0,
+		"z_corners": [20, 16, 20, 20]}
+	var bez_textury := {"kind": "land", "x": 10, "y": 10, "z": 20, "texmap": 999,
+		"z_corners": [20, 16, 20, 20]}
+	t._check(view.is_slope(svah_obj) and not view.is_slope(rovny_obj)
+		and not view.is_slope(bez_texmapu) and not view.is_slope(bez_textury),
+		"app.world_view: is_slope() = svah ano, rovna/bez texmapu/bez textury ne "
+		+ "(namEReno %s/%s/%s/%s)" % [str(view.is_slope(svah_obj)), str(view.is_slope(rovny_obj)),
+			str(view.is_slope(bez_texmapu)), str(view.is_slope(bez_textury))])
+
+	# 12) uvolneni uzlu: `free()` (ne queue_free) - zbyly uzel shodi cely beh
 	view.free()
 	t._check(not is_instance_valid(view),
 		"app.world_view: uzel je po testu uvolneny (is_instance_valid == false)")

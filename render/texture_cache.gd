@@ -4,6 +4,8 @@ extends RefCounted
 # ART ID je prostor, ktery pouziva `world.tiledata` a `tools/uoextract/art.py`:
 #   art_id <  0x4000 ... land (v manifestu `kind` "land", `id` = art_id)
 #   art_id >= 0x4000 ... item (v manifestu `kind` "item", `id` = art_id - 0x4000)
+#   art_id >= 0x10000 .. TEXMAP (`kind` "texmap", `id` = art_id - 0x10000) - textura
+#                         terenu pro svahy; pristup je pres `texmap(texmap_id)`
 # `world.map.statics_at` vraci `tile` v prostoru ITEM art id (bez +0x4000, tak
 # to namERil HANDOFF 2026-10-06: hodnoty 37..4758) - pro statiky se tedy vola
 # `texture(tile + 0x4000)`.
@@ -42,6 +44,10 @@ extends RefCounted
 # realny manifest. `null`/prazdny znaci "cesty z manifestu jsou uz kompletni".
 
 const ITEM_OFFSET: int = 0x4000
+# TEXMAPY (textury terenu pro SVAHY) jsou treti prostor v manifestu: kind
+# "texmap", art_id = id + 0x10000. Je to NAD itemy (0x4000..0xFFFF), takze se
+# prostore nepotkaji a `texture()` muze zustat jedina funkce pro vsechny.
+const TEXMAP_OFFSET: int = 0x10000
 const MANIFEST_PATH := "res://assets/uo/manifest.json"
 const ATLAS_PREFIX := "res://assets/uo/"
 const MAX_BYTES: int = 402653184   # 384 MB
@@ -107,6 +113,14 @@ func offset(art_id: int) -> Vector2i:
 	return entry["offset"] if entry != null else Vector2i.ZERO
 
 
+func texmap(texmap_id: int) -> Texture2D:
+	# Textura terenu pro SVAH (ClassicUO `TexmapsLoader.GetTexmap`). Vraci null,
+	# kdyz zaznam neni - kresleni pak zustane u land artu (ClassicUO `Land.cs:98`).
+	if texmap_id <= 0:
+		return null
+	return texture(texmap_id + TEXMAP_OFFSET)
+
+
 func stats() -> Dictionary:
 	# `loaded` je pocet stranek V PAMETI, `bytes` jejich skutecna velikost.
 	# `wrapped` je pocet hotovych oken do stranek - po nabehu se ustali a pak uz
@@ -122,7 +136,8 @@ func stats() -> Dictionary:
 func _index(sprite) -> void:
 	var kind := str(sprite.get("kind", ""))
 	var id := int(sprite.get("id", -1))
-	var art_id: int = id if kind == "land" else (id + ITEM_OFFSET if kind == "item" else -1)
+	var art_id: int = id if kind == "land" else (id + ITEM_OFFSET if kind == "item"
+		else (id + TEXMAP_OFFSET if kind == "texmap" else -1))
 	var width := int(sprite.get("w", 0))
 	var height := int(sprite.get("h", 0))
 	if art_id < 0 or width <= 0 or height <= 0 or _sprites.has(art_id):

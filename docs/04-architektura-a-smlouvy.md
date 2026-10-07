@@ -46,7 +46,7 @@ v `.forge/roadmap.json`.
 
 | id | soubor | provides | poznámka |
 |---|---|---|---|
-| `world.tiledata` | `sim/world/tiledata.gd` | `flags(tile:int)->int`, `height(tile:int)->int`, `layer(tile:int)->int`, `weight(item:int)->int`, `value(item:int)->int`, `name(tile:int)->String`, `is_land(tile:int)->bool`; data z `assets/uo/manifest.json` + `data/tiles.json` | závisí na vyřešení §3.3.1 |
+| `world.tiledata` | `sim/world/tiledata.gd` | `flags(tile:int)->int`, `height(tile:int)->int`, `layer(tile:int)->int`, `weight(item:int)->int`, `value(item:int)->int`, `name(tile:int)->String`, `is_land(tile:int)->bool`, **`texture(tile:int)->int`** (TexID z land záznamu = index do `texmaps.mul`; u předmětů 0) — doplněno 2026-10-07 pro svahy; data z `assets/uo/manifest.json` + `data/tiles.json` | závisí na vyřešení §3.3.1 |
 | `world.map` | `sim/world/map.gd` | `_init(prefix:String = "res://assets/uo/world/map0")` — **cesty jsou vstup, ne konstanta** (`assets/uo` je v `.gitignore`, takže v CI nejsou); `land_at(x:int,y:int)->int`, `z_at(x:int,y:int)->int`, `statics_at(x:int,y:int)->Array[Dictionary]` — vrací **celý blok 8×8**, každý záznam `{tile,x,y,z,hue}` s **lokálním** `x`,`y` (0..7), světová dlaždice je `(bx*8+x, by*8+y)`; `load_block(bx:int,by:int)->void`, `is_loaded(bx:int,by:int)->bool` | čte `.land`/`.statics` po blocích; **není to „statiky na dlaždici"** — filtr na dlaždici si dělá volající (`world.walk`, `render.chunk`); viz §4.2.1 |
 | `world.walk` | `sim/world/walk.gd` | `_init(map = null, tiledata = null, stairs = null, doors = null)` — **závislosti konstruktorem, ne konstantou** (jinak by `can_step` nešel změřit bez `assets/uo`); `can_step(from:Vector3i, dir:int, height:int = PERSON_HEIGHT, is_player:bool = true)->Dictionary` → `{ok:bool, z:int, reason:String}`; `surface_z(x:int,y:int)->int` | **jádro věrnosti pohybu**, algoritmus v §5.1; dveře rozhoduje `world.doors.is_open` (oba stavy mají v `tiledata` `Impassable`), statiky se ptají `tiledata` s `+0x4000`; viz §4.2.1 |
 | `world.doors` | `sim/world/doors.gd` | `is_door(tile:int)->bool` (**i pro otevřený art**), `is_open(tile:int)->bool`, `toggle(tile:int)->int` (`art + 1` / `art - 1`; `0` = není dveře), `category(tile:int)->int`, `orientation(tile:int)->int` (index v `doors.txt`, 0..7), `open_tile(cat:int, index:int)->int` | data z `doors.txt`: **art je zavřený, `art + 1` otevřený** (měřeno 2026-10-07 nad 230 arty; důkazy v hlavičce modulu a docs/03 §3.6) |
@@ -121,10 +121,10 @@ v `.forge/roadmap.json`.
 
 | id | soubor | zodpovědnost |
 |---|---|---|
-| `render.textures` | `render/texture_cache.gd` | načítání z manifestu, LRU, strop paměti |
-| `render.hue` | `render/hue_cache.gd` | `(art_id, hue)` → textura (index 0 = použij hue) |
+| `render.textures` | `render/texture_cache.gd` | načítání z manifestu, LRU, strop paměti; **tři id prostory** (land = id, item = id + `0x4000`, texmap = id + `0x10000`) a `texmap(texmap_id)->Texture2D` pro texturu svahu (doplněno 2026-10-07) |
+| `render.hue` | `render/hue_cache.gd` | `(art_id, hue)` → textura (index 0 = použij hue); u `AtlasTexture` se bere **okno `region`**, ne celá stránka (opraveno 2026-10-07 — jinak se kreslily všechny framy animace) |
 | `render.sort` | `render/sort.gd` | **jediná** funkce řazení (land → statics podle z → mobilové podle z) |
-| `render.chunk` | `render/chunk_renderer.gd` | sestavení kreslicího seznamu pro viditelné bloky, cache |
+| `render.chunk` | `render/chunk_renderer.gd` | sestavení kreslicího seznamu pro viditelné bloky, cache; **land nese navíc `texmap` (TexID) a `z_corners` `[horní, pravý, levý, dolní]`** = výšky rohů ze sousedů (2026-10-07, pro svahy) |
 | `render.anim` | `render/anim_player.gd` | `play(serial:int, action:int, dir:int, now_ms:int = -1)->Dictionary` → `{ok, texture, frame, count, anchor, mirror, mirror_x, sprite_dir}` (chybějící sprite = `ok:false` + `texture:null`); **číslo těla se bere z registru** — `body_of(serial)->int` (`-1`, když serial v registru není; bez registru je `serial` sám tělem, starší chování), registr jde předat konstruktorem `_init(manifest_path, registry)`; framy těl a worn artu podle `animdata`, časování 80 ms; zrcadlení 8 → 5 směrů a `mirror_x` viz §4.2.1 |
 | `render.names` | `render/name_plates.gd` | jména a HP pruhy nad mobily (jen na dosah/po kliku) |
 | `render.light` | `render/light_layer.gd` | úroveň světla z `world.time`, světelné zdroje (louče, okna) |
@@ -136,7 +136,7 @@ v `.forge/roadmap.json`.
 |---|---|---|
 | `app.main` | `app/main.gd` | scéna, kostra, načtení dat, spuštění smyčky |
 | `app.loop` | `app/loop.gd` | pumpuje `sim.tick(50)`, překládá vstup na `Command`, předává události UI |
-| `app.input` | `app/input_map.gd` | mapování kláves a myši na `Command` (jediné místo s `Input`) |
+| `app.input` | `app/input_map.gd` | mapování kláves a myši na `Command` (jediné místo s `Input`); `poll(player, camera_offset, z=0, mouse_position=Vector2.ZERO, now_ms=-1)` — **držení kroky opakuje** (prodleva `step_delay_ms` = 400/200 ms), `walk_to` = držené pravé tlačítko (směr z kurzoru, `run` podle `mouse_run()` = 190 px od středu okna); `now_ms` a `view_size` jsou vstupy kvůli měřitelnosti (2026-10-07) |
 | `app.menu` | `app/menu.gd` | hlavní menu, výběr postavy, uložit/načíst |
 | `app.char_create` | `app/char_create.gd` | tvorba postavy: profese, staty, skilly, jméno, barvy |
 

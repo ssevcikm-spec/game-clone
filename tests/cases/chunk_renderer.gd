@@ -68,6 +68,14 @@ class FakeTextures:
 		return v
 
 
+class FakeTiledata:
+	# Jen to, co `render.chunk` vola: `texture(tile)` = TexID pro texturu svahu.
+	# Vraci `tile + 100`, aby se poznalo, ze se opravdu pouzil VYSLEDEK tiledata
+	# (kdyby se do seznamu dala konstanta 0, test by to nerozlisil).
+	func texture(tile: int) -> int:
+		return tile + 100
+
+
 func _arg(name: String, fallback: String) -> String:
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--" + name + "="):
@@ -180,6 +188,46 @@ func run(t) -> void:
 			% [offset_spatne, z_spatne])
 	t._check(int(consts.get("ITEM_OFFSET", 0)) == ITEM_OFFSET,
 		"render.chunk: ITEM_OFFSET je 0x4000 (namEReno %s)" % str(consts.get("ITEM_OFFSET")))
+
+	# --- 3b) SVAH: texmap a vysky rohu (2026-10-07) ---------------------------
+	# Kresleni pozna svah z `z_corners`: roh dlazdice ma vysku SOUSEDNI dlazdice
+	# (vychodni = pravy, jizni = levy, jihovychodni = dolni; ClassicUO
+	# `Land.cs:113-121`). Test to meri na stubu, kde `z_at` je vzorec
+	# `(x + y) % 7 - 3` - kazdy roh se tedy da spocitat NEZAVISLE.
+	var se_texmapem = script.new(map, textures, FakeTiledata.new())
+	var seznam_tm: Array = se_texmapem.visible(center, 8, 8)
+	var rohy_ok := 0
+	var rohy_spatne := 0
+	var texmap_ok := 0
+	var landu := 0
+	for obj in seznam_tm:
+		if str(obj["kind"]) != "land":
+			continue
+		landu += 1
+		var lx: int = int(obj["x"])
+		var ly: int = int(obj["y"])
+		var cekane := [map.z_at(lx, ly), map.z_at(lx + 1, ly),
+			map.z_at(lx, ly + 1), map.z_at(lx + 1, ly + 1)]
+		if obj.get("z_corners", []) == cekane and int(obj["z"]) == int(cekane[0]):
+			rohy_ok += 1
+		else:
+			rohy_spatne += 1
+		if int(obj.get("texmap", 0)) == map.land_tile + 100:
+			texmap_ok += 1
+	t._check(landu == 9 and rohy_ok == 9 and rohy_spatne == 0,
+		"render.chunk: z_corners = [vlastni, vychodni, jizni, jihovychodni] vyska dlazdice "
+		+ "(%d z %d OK, %d spatne)" % [rohy_ok, landu, rohy_spatne])
+	t._check(texmap_ok == 9,
+		"render.chunk: texmap je TexID z tiledata (%d z %d)" % [texmap_ok, landu])
+	# Bez tiledata (starsi volani) se texmap nedava - kresli se land art.
+	var bez_tiledata = script.new(map, textures)
+	var bez_tm: Array = bez_tiledata.visible(center, 8, 8)
+	var bez_texmapu := 0
+	for obj in bez_tm:
+		if str(obj["kind"]) == "land" and int(obj.get("texmap", -1)) == 0:
+			bez_texmapu += 1
+	t._check(bez_texmapu == 9,
+		"render.chunk: bez tiledata je texmap 0 (%d z 9) - kresli se land art" % bez_texmapu)
 
 	# --- 4) screen_position je iso - offset -----------------------------------
 	var geometrie := 0

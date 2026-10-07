@@ -135,6 +135,19 @@ MUTACE: list[tuple[str, str, str, object]] = [
      '\t\tfor zaznam in parsed.get("sets", []):\n\t\t\t_sets.append(_barvy(zaznam))',
      '\t\tfor zaznam in parsed.get("sets", []).slice(0, 1):\n\t\t\t_sets.append(_barvy(zaznam))',
      lambda t: 'parsed.get("sets", []):' not in t),
+    # ⚠ VADA ZE SNIMKU (uzivatel 2026-10-07): frame animace je OKNO
+    # (`AtlasTexture.region`) do stranky, ktera ma vsech 10 framu vedle sebe.
+    # Kdo oreze CELOU stranku, vykresli "vsechny animacni snimky" vedle postavy.
+    ("cely_atlas_misto_okna",
+     "\tif region.size.x > 0 and region.size.y > 0 and obrazek.get_size() != Vector2i(region.size):",
+     "\tif false:",
+     lambda t: "obrazek.get_size() != Vector2i(region.size)" not in t),
+    # ...a kdo oreze SPRAVNE misto, ale z pocatku stranky, vykresli jiny frame
+    # (vada by prosla kontrolou rozmeru, ale ne kontrolou barvy).
+    ("okno_vzdy_z_pocatku_stranky",
+     "\t\tobrazek = obrazek.get_region(region)",
+     "\t\tobrazek = obrazek.get_region(Rect2i(Vector2i.ZERO, region.size))",
+     lambda t: "obrazek.get_region(region)" not in t),
 ]
 
 

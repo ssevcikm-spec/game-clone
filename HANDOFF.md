@@ -1,25 +1,59 @@
-# Předání — UO-klon (první UI + `sim.skill_gain`; 2026-10-07, 11. session)
+# Předání — UO-klon (VLNA OPRAV ze snímků; 2026-10-07, 12. session)
 
 > **Co je tenhle soubor:** **stav projektu** pro další session agenta. Přepisuje
 > se celý; historie je v `git log`. **Současný stav se bere odtud** — a ověřuje
 > se živě (je tu k tomu sekce „Předletová kontrola").
 > **Zadání pro další vývoj je `ZADANI-DALSI-VYVOJ-2.md`** (etapa 2, Úkoly 1–9);
 > **Úkoly 1–4 jsou HOTOVÉ** a z Úkolu 6 jsou hotové `entity.item`,
-> `entity.container` — **další je `entity.equipment`**. Tato (11.) session šla
-> jinou tratí: **rozhodnutí uživatele** (éra AoS, stupnice kvality dle UO, zvuk
-> vlastní trať) + **první UI v projektu** + **`sim.skill_gain`** (společný
-> předek řemesla i souboje) + **odemknutí měření** (`render.chunk`,
-> `app.player_view`, `data.recipes`). Předchozí etapa je v `ZADANI-DALSI-VYVOJ.md`.
+> `entity.container` — **další je `entity.equipment`**. Tato (12.) session šla
+> **vlnou oprav podle snímků od uživatele** (chybějící dlaždice na svazích,
+> chůze držením, stopa animačních framů, sekání) — plánovaný cíl
+> (`sim.harvest` + `sim.craft` + `ui.journal`) se tím **posunul na 13. session**.
+> Předchozí etapa je v `ZADANI-DALSI-VYVOJ.md`.
 > **Naměřený stav plánu je v `REVIZE-PLANU-2026-10-06.md`** a **stav granul
 > měří** `python tools/plan-status.py`.
 > **Kam pro co v referenčních zdrojích je `research/REJSTRIK-REFERENCI.md`**.
-> **Datum:** 2026-10-07 (11. session). **Poslední změna kódu:** tato session
-> (**`sim/systems/skill_gain.gd`**, **`ui/hud.gd`**, **`ui/status_bar.gd`**,
-> `app/main.gd` (zapojení UI + registrace `skill_gain`), `sim/entity/item.gd`
-> (stupnice kvality), `data/balance.json` (éra AoS), `tools/roadmap-gen.py`
-> + `docs/07` (zvuk vlastní trať), tři nové case soubory a **6 nových mutačních
-> modulů**). Push ověřen: `origin/main = HEAD = 135e175`, `ahead 0`.
-> Předchozí commit `df2d81b` = HANDOFF 10. session (CI #43 i #44 zelené).
+> **Datum:** 2026-10-07 (12. session). **Poslední změna kódu:** tato session
+> (`tools/uoextract/atlas.py` + **nový `texmaps.py`**, `render/chunk_renderer.gd`,
+> `render/texture_cache.gd`, `render/hue_cache.gd`, `render/sort.gd`,
+> `sim/world/tiledata.gd`, `app/input_map.gd`, `app/player_controller.gd`,
+> `app/world_view.gd`, `tests/cases/{input,player_controller,chunk_renderer,world_view,render_hue,tiledata}.gd`,
+> `tools/gates/{mutace-tests,mutace-render-hue,run-all}.py`, `docs/03`, `docs/04`).
+
+## ✅ CO JE NOVÉHO (12. session) — VLNA OPRAV: svahy, držení vstupu, stopa framů, sekání
+
+**Zadání uživatele (doslova):** „Chybí výškové assety (kde je svah, tam není tile
+a nejde jít), chůze držením klávesy (včetně pravého tlačítka myši), společně
+s animací chůze se vedle postavy zobrazí všechny animační snímky, pohyb je teď
+jen na zmáčknutí tlačítka (ne držení), takže můj dojem není jistý, ale hra se
+asi seká a není plynulá." **Všechny čtyři věci jsou opravené a změřené.**
+
+| Co | Doklad (naměřeno dnes) |
+|---|---|
+| **1) Svah: chyběl PŘEKLAD i TEXTURA** | Dvě nezávislé vady. **(a)** atlas klíčoval land art polem `texture` (TexID) místo **land tile id** → v atlase chybělo **512** artů, které v archivu jsou (přesně ty u pobřeží: 77–100); **(b)** i po opravě atlasu zůstal u svahu **šedý pás ~140 px** — UO kreslí rovnou plochu land artem a **svah texmapem nataženým přes čtyřrohy** (`LandView.cs:58-96`, `Batcher2D.cs:241`), což u nás neexistovalo. Dnes: `texmaps.py` (4 116 textur), `world.tiledata.texture()`, `render.chunk` dává `texmap` + `z_corners`, `app.world_view.is_slope()`/`slope_polygon()` kreslí svah. **Snímek `.cache/render/…` → `_analyza/snimky/svah-1519-1657.png`**: šedý pás je pryč, svah je texturovaný a voda je u něj |
+| **2) Chůze držením (klávesa i pravé tlačítko)** | `app/input_map.poll()` se ptá na `is_action_pressed` a krok vydává po `step_delay_ms` (400/200 ms z `core/const.gd`); puštění prodlevu vynuluje. **Pravé tlačítko** = `walk_to`: směr z kurzoru, `run` podle `mouse_run()` = **190 px** od středu okna (ClassicUO `GameSceneInputHandler.cs:66`). Ověřeno **v běhu hry** (`_analyza/vlna7-drzeni.gd`): držení klávesy 2,5 s → **4 kroky**, krátký stisk 100 ms → **1 krok**, držené pravé tlačítko 2 s → **8 kroků a −4 stamina** (běh!) |
+| **3) Stopa animačních framů** | `render.hue._obrazek()` bral **celý atlas** (stránka animace = všech 10 framů vedle sebe) a `hued()` vracel texturu CELÉ STRÁNKY → `_draw_player` ji kreslil na pozici postavy. Opraveno na **okno `region`**. Naměřeno: barvení 1 framu **35,7 ms → 4,1 ms** (8,7×) a kreslí se **jeden** frame (test v `tests/cases/render_hue.gd` sekce 18 + 2 mutace) |
+| **4) Sekání: tři měřené příčiny** | **(a)** `render.sort.draw_order()` stavěl `[klic, i, objekt]` a řadil `sort_custom` (GDScript) → **85,7 ms**; dnes klic+pořadí v jednom `int64` a built-in `sort()` → **45,8 ms** celé přestavby; **(b)** přestavba seznamu se dělala při KAŽDÉM kroku → dnes až po `RECENTER_TILES = 4` dlaždicích (**39 → 10 záseků** za 40 kroků) a kreslí se jen to, co je na obrazovce (`CULL_MARGIN = 256 px`) — **46,6 → 34,5 ms** ve stoji (21 → 29 FPS); **(c)** barvení framu animace (viz 3). Chůze: **median 34,6 ms (29 FPS)**, p90 39,6 ms |
+| **5) Chybějící art už není ticho (věc 61)** | `app.world_view._draw()` kreslí u chybějícího artu **magenta** diamant/čtverec, počítá `holes` a **jednou na art id** to hlásí (`push_warning`); land id ≤ 2 se nekreslí vůbec (ClassicUO `Land.Create: AllowedToDraw = graphic > 2`) a počítá se jako `nodraw` |
+| **6) Atlas: dvě další vady měřením** | **(a)** item arty se vynechávaly podle **prázdného jména** v tiledata — naměřeno `_analyza/vlna6-statiky-bez-jmena.py`: **232 druhů / 14 199 statiků** na mapě má art, ale prázdné jméno (a statiků bez artu je **0**); **(b)** land v atlase = **4 244** (bylo 3 732), item 39 326, texmap 4 116 → manifest **49 705 spritů / 77 stranek, 0 chyb** (`atlas.py --verify`) |
+| **7) Smlouvy a dokumentace** | `docs/03 §3.5.2`: blok „OPRAVA 2026-10-07" s tabulkou důkazů (art[0] = „UNUSED" vs `texture[168] = 0`; barva art[id] vs texmap **76:2**; váženo dlaždicemi **934 504 : 738**) + blok o svazích; `docs/03 §3.5.3` bod 2 přepsán (rozhoduje archiv, ne jméno); `docs/04 §4.2`: `world.tiledata.texture`, `render.textures.texmap`, `render.chunk` (`texmap`/`z_corners`), `app.input` (držení) |
+| **8) Mutační důkaz** | `mutace-tests.py`: nové moduly **`input` (6), `player_controller` (2)** a rozšířené `chunk_renderer` (3), `world_view` (4), `sort` (10/10 po přepsání na nový kód) — **`--only input,player_controller,chunk_renderer,world_view` 13/13**, `--only sort` 10/10; `mutace-render-hue.py` **13/13** (2 nové na okno `region`); **21 self-testů** (přibyl `atlas.py` a `texmaps.py` — jejich self-testy existovaly, ale **nikdo je nespouštěl**) |
+| **9) Integrační čísla** | testy **954 kontrol / 0 selhání** (exit 0), brány **11 měřeno / 0 NEMĚŘENO / 0 vad**, self-testy **21 / 0 chyb**, `check-docs-refs`/`check-zadani`/`roadmap-gen --check` **OK**, G9 replaye **beze změny hashů**, G10 po obnovení snímku `kuze_pixelu 9100` (paleta sady 1002) |
+| **10) Co se NEMĚNILO** | `sim.harvest`/`sim.craft`/`ui.journal` (plán 13. session), `entity.equipment`, M9 (`render.chunk_mesh`), souboj, `data/*.json`, `project.godot` ani `app/main.tscn` (bootstrap) |
+
+**Nálezy z 12. session, které zůstávají otevřené (měřené, neopravené):**
+
+| # | Nález | Doklad |
+|---|---|---|
+| V1 | **Svah se kreslí BEZ osvětlení rohů** — ClassicUO počítá `CalculateNormal` a stínuje (`Land.cs:164-...`); my kreslíme rovnoměrnou barvu. Bez toho je svah „plošší" než v klientu | `app/world_view._draw_slope()` (komentář), čeká na `render.light` |
+| V2 | **`texmaps.mul` má 4 116 z 16 384 indexů** a my je máme všechny; ale **`TexTerr.def` remap** (284 řádků) aplikujeme — měřeno v `texmaps.py` | `tools/uoextract/texmaps.py` |
+| V3 | **Přestavba seznamu je 45,8 ms** (6 000 objektů) — pořád dost na to, aby to bylo cítit každé 4 kroky. Zbytky: `_z_grid` 6,7 ms, `draw_order` 12,5 ms, zbytek tvorba slovníků | `_analyza/vlna5-cena.gd` |
+| V4 | **`demo-hue.gd` (řidič důkazu G10) má slabý heuristický test kůže** (`R-B > 20`): po opravě svahů mu „kůže" vyjde na **191 754 px** (hnědé texmapy terénu). **Brána G10 to neohrožuje** (měří přesnou shodu s paletou) — ale výpis řidiče už nic neříká | `.cache/analysis/demo-hue.gd`, G10 `kuze_pixelu 9100` |
+| V5 | **`tiledata.mul`: první land záznam je posunutý o 4 B** (skupinová hlavička je až za ním): `land[0]` vychází `flags 0x4E55…, texture 21333, jméno "ED"`, správně je `UNUSED`. Naměřeno podle offsetů jmen (`UNUSED` na 10, `VOID!!!!!!` na 44, `NODRAW` na 74 → od záznamu 1 sedí 30 B i jméno na +10). **Týká se jen záznamu 0** (mapa ho nepoužívá: 0 dlaždic) | `_analyza/vlna2-offsety-jmen.py` |
+| V6 | **Barva „void" (pozadí) je šedá 77,77,77** — v UO je pozadí tmavé; u NODRAW oblastí (727 dlaždic na mapě) je to vidět jako šedá plocha. Rozhodnutí patří uživateli (`project.godot` je bootstrap) | `_analyza/vlna8-seda-plocha.py` |
+
+
+
 
 ## ✅ CO JE NOVÉHO (11. session) — PRVNÍ UI, `sim.skill_gain` a odemknutí měření
 
@@ -418,7 +452,15 @@ ho celý." Každá session tedy **není „krok"**, ale **jeden celek s cílem**
    v pořádku.
 4. **Nedělat v jedné session víc cílů**, aniž by první byl uzavřený a ověřený.
 
-**⚠ CÍL TÉTO (12.) SESSION — až ho dokončíš, přepiš tuhle větu na další cíl:**
+**⚠ CÍL TÉTO (12.) SESSION — SPLNĚN, ať ho další session přepíše:**
+> **Vlna oprav ze snímků od uživatele (2026-10-07):** (1) chybějící výškové
+> assety na svazích, (2) chůze držením klávesy i pravého tlačítka myši,
+> (3) „stopa" všech animačních framů vedle postavy, (4) sekání. **Všechny čtyři
+> splněné a změřené** — doklady v „CO JE NOVÉHO (12. session)". Uživatel zároveň
+> svým zadáním **posunul plánovaný cíl** (`sim.harvest` + `sim.craft` +
+> `ui.journal`) na **13. session**.
+
+**🎯 CÍL 13. SESSION (přejatý plán, nezměněný):**
 
 > **Dokončit `sim.harvest` + `sim.craft` + `ui.journal` (BIG WIN č. 1: „umět
 > pracovat“).** Uživatel 11. session zvolil priority: **nejdřív řemeslo, souboj
@@ -437,11 +479,9 @@ ho celý." Každá session tedy **není „krok"**, ale **jeden celek s cílem**
 > textový žurnál s barvami podle typu (`docs/05 §5.4`), napojený na událost
 > `message`; **hlášky vlastními anglickými řetězci** (klilocy až po změření
 > `assets.cliloc`, `docs/03 §3.5`).
-> **Navíc (malé, uživatelem schválené):** **chůze držením** — pravé tlačítko myši
-> i klávesa (UO umí obojí: `GameSceneInputHandler.cs:41` a `_flags[4]`, řádky
-> 1277-1279/1404-1406); soubory `app/input_map.gd` (granule `app.input`) +
-> `ui/hotkeys.gd` + `app/player_controller.gd` — **uživatel do cizí granule svolil
-> (věc 27 je tím vyřešená)**.
+> **⚠ Držení vstupu je od 12. session HOTOVÉ** (bylo to „navíc" v tomto cíli) —
+> `app/input_map.poll()` opakuje krok při držení klávesy i pravého tlačítka,
+> ověřeno v běhu (`_analyza/vlna7-drzeni.gd`).
 > **Přijímací kritérium:** testy `tests/cases/harvest.gd`, `craft.gd`, `journal.gd`
 > (cesta jako VSTUP přes `--<…>-script=`, jako u ostatních), **čtyři výsledky
 > měřené se seedem** (fail / low / normal / exceptional), materiál se opravdu
@@ -519,6 +559,21 @@ zavřenými i otevřenými dveřmi, test kroku na schod nahoru/dolů, obojí s m
 
 ## Co čeká na tebe
 
+**Dvě rozhodnutí z 12. session (obojí vizuální, obojí má cestu zpět):**
+
+| # | Na co se čeká | Co to blokuje | Cena / cesta zpět |
+|---|---|---|---|
+| 1 | **Barva „void" (pozadí světa) je šedá `77,77,77`** — v UO je pozadí tmavé. Je to vidět u oblastí, které mapa označuje jako NODRAW (727 dlaždic z 29,4 M) a u budoucích děr | věrnost obrazu (docs/01 V4) | Jedno číslo v `project.godot` (`rendering/environment/defaults/default_clear_color`), ale **`project.godot` je bootstrap granule** → patří tobě. Vratné jedním řádkem |
+| 2 | **Svahy se kreslí BEZ osvětlení rohů** (`CalculateNormal` v ClassicUO) — plocha je rovnoměrně barevná, v klientu je svah stínovaný | „vypadá to jako UO" | Patří k `render.light` (docs/07, M9+); dnes zapsané v kódu i v `docs/03`. Vratné (je to jen `draw_polygon` s bílou barvou) |
+
+**Z plánu 13. session (nezměněné, čeká se jen na provedení):** `sim.harvest` +
+`sim.craft` + `ui.journal` (viz „CÍL 13. SESSION").
+
+**Ostatní otevřené (měřené, neopravené — detaily v tabulce V1–V6 výš):**
+`V3` přestavba seznamu 45,8 ms každé 4 kroky (M9 `render.chunk_mesh`),
+`V4` slabý heuristický test kůže v řidiči důkazu G10, `V5` posunutý první land
+záznam v `tiledata.mul` (týká se jen id 0), `V2` `TexTerr.def` remap (aplikován).
+
 **Na dnešní cíl nečeká nic** — 10. session se rozhodla měřením (`TARGET_ROLES`
 z dat, oba id prostory) a cíl je hotový. **Ale čtyři rozhodnutí z
 `ZADANI-DALSI-VYVOJ-2.md` §5 (`Otázky k rozhodnutí`) pořád čekají** — každé
@@ -567,15 +622,17 @@ a viděl něco jiného, je to **nový nález**, ne oprava — ozvi se s ním.
 ## ⚠⚠ BLOKÁTORY
 
 **Žádný otevřený blokátor v kódu.** „Demo chodí, postava je barevná a **vlevo nahoře je stavový pruh**" je naměřené
-(viz tabulky výš), brány jsou zelené (11/0/0), testy **928/0** (s assety; bez
-`assets/uo` část kontrol hlásí NEMĚŘENO — viz „Předletová kontrola") a **průchodnost
+(viz tabulky výš), brány jsou zelené (**11/0/0**), testy **954/0** (s assety) a **průchodnost
 i konvence dveří jsou opravené** (6. session: statiky se čtou správnou tabulkou,
 schody svou výškou; 8. session: `world.doors` páruje `art` ↔ `art + 1`;
 9. session: `entity.item` + `entity.container` hotové, **20/20 mutací**;
 10. session: `sim.interaction` hotový, **13/13 mutací** a routing z dat;
 11. session: `sim.skill_gain` + první UI, **15/15 nových mutací**, plán
-**50 měřeně hotových**).
-**Hra jede 40–45 FPS** (bylo 1–2 FPS) — viz sekce VÝKON.
+**50 měřeně hotových**; 12. session: **vlna oprav ze snímků** — svahy (atlas +
+texmapy), držení vstupu, stopa framů, sekání; **20 nových/rozšířených mutací**).
+**Hra jede 29 FPS PŘI CHUZI** (34,6 ms median; ve stoji 29 FPS/34,5 ms; bez
+svahů by byla ~36 FPS) — naměřeno `_analyza/vlna5-chuze.gd`; zbývající záseky
+jsou **10 z 496 framů** (přestavba seznamu 45,8 ms každé 4 kroky, viz V3).
 
 **⚠ CI NAD COMMITTY 10. SESSION JE ZELENÝ — `#43` nad `200fdc6` (kód, smlouvy,
 HANDOFF/LESSONS) a `#44` nad `4d0715c` (dokumentační dotyk + `cursor()` uvnitř
@@ -801,23 +858,24 @@ a barva kůže.** Statiky nesou barvu ze záznamu mapy, ale **nikdo ji nepouží
 | **Co v CI NEJDE ověřit bez tokenu** | `node _analyza/ci-log.mjs` → **HTTP 403**; `ci-artefakt.mjs` → **HTTP 401** | Kdo nemá token, **vidí jen stav kroků**, ne jejich obsah — takže „krok s mutacemi prošel" je naměřené, ale **počet chycených mutací v CI je neověřený** (naměřeno je **lokálně**). Nezapisuj do předání „CI má 81/81", když to nevidíš |
 | Repo je veřejné | API bez tokenu | `visibility: public` |
 | **Oprávnění** | `whoami /groups \| Select-String Mandatory` | **`Medium`** = plný přístup. `Low` = sandbox → **falešná selhání testů i bran** (9. session naměřila v `Low` **583/9** místo **584/0** na téže sadě — 8× `render.textures` + 1× `sim.world_loop` save, viz `LESSONS`) a `.uid` nevzniknou. **Dnešní sada je 806/0 (s assety) a 748/0 (bez) — v `Low` by čísla byla zase jiná; měř ji znovu, neopisuj** |
-| Testy | testy s `APPDATA` ve workspace (`Low`: dej ho do `.tmp`) | **806 kontrol, 0 selhání** (s assety), **31 case souborů**; **bez `assets/uo` (stav jako v CI) `748/0`** — měřeno 10. session tak, že se `assets/uo` **dočasně přesunul do `.cache`** a po běhu vrátil (ověřeno: `tiles.json` zpět, strom čistý). Souhrn vypisuje `case souboru spusteno: N z M` — když je M < 31, něco se ne načetlo |
-| **FPS (nové)** | `& .cache\godot\...console.exe --path . --rendering-driver opengl3 --script res://.cache/analysis/sonda-fps.gd` | **40–45 FPS** (22–25 ms/frame), 5 767 objektů, 1 516 draw callů; cache se po nabehu nemění (27 načtení, 0 změn) |
+| Testy | testy s `APPDATA` ve workspace | **954 kontrol, 0 selhání** (s assety), **38 case souborů** (`case souboru spusteno: 38 z 38`), `exit 0` — měřeno 12. session pod **plným přístupem**; v `workspace-write` (Low) hlásí sada **8 falešných selhání** (`render.textures` si staví fixture v `.cache`, `sim.world_loop` ukládá do `user://`) — viz `LESSONS` |
+| **FPS (nové, 12. session)** | `& .cache\godot\...console.exe --path . --rendering-driver opengl3 --script res://_analyza/vlna5-chuze.gd` (+ `--kroku=0` = ve stoji) | **ve stoji 34,5 ms (29 FPS)**, 4 314 kreslených objektů, 1 673 draw callů; **v chůzi 34,6 ms median / p90 39,6 / max 141 ms (29 FPS)**, 10 framů nad 2× median z 496; **bez ořezu** 46,6 ms (21 FPS), **bez svahů** 28,0 ms (36 FPS) |
 | Brány | `python tools/gates/run-all.py` | **11 měřeno / 0 NEMĚŘENO / 0 vad**, `exit 0` |
-| Self-testy | `python tools/gates/run-all.py --self-test` | **19, 0 chyb**, `exit 0` |
-| Mutační důkaz | `mutace-tests.py` (+ `--only doors` / `--only item,container` / `--only interaction`) + `mutace-skills.py` + `mutace-render-hue.py` + `mutace-render-anim.py` + `mutace-anim.py` | `94/94` (81 + **13 `interaction`**), `8/8`, `12/12`, `11/11`, `8/8` (= **133/133**); **první čtyři běží v CI**, poslední taky (bez instalace UO měří jen self-test a řekne to) |
+| Self-testy | `python tools/gates/run-all.py --self-test` | **21, 0 chyb**, `exit 0` (přibyl `atlas.py` 46 kontrol a **nový `texmaps.py`** 5 kontrol) |
+| Mutační důkaz | `mutace-tests.py --only sort` / `--only chunk_renderer,world_view` / `--only input,player_controller` + `mutace-render-hue.py` | `sort` **10/10**, `chunk_renderer+world_view` **7/7**, `input+player_controller` **8/8** (v dřívějším širším běhu 19/20 — ta jedna byla **neopravitelná mutace ve starém kódu `sort`**, dnes přepsaná), `mutace-render-hue` **13/13** (2 nové na okno `region`); smlouvy vstupů OK. **Plný běh dělá CI** |
 | Fixture (nové) | `python tests/fixtures/{world,hues,anim}/make_fixture.py --check` | **3× OK**, `exit 0`; v CI je hlídá krok „Fixture sedí na generátor" |
-| Vzory mutací | `python _analyza/mutace-vzory.py` (gitignore) | `mutace-tests: 94 vzorů` (10. session: +13 `interaction`) + `mutace-render-anim: 11` = **105 celkem**, `OK`, `exit 0`; **nové moduly `item`, `container` i `interaction` mají všechny vzory 1×** |
 | Animace | `python tools/uoextract/anim.py --self-test` | `35 kontrol, 0 chyb` |
 | Barvy | `python tools/uoextract/hues.py --self-test` | `5 kontrol, 0 chyb` |
+| **Texmapy (nové)** | `python tools/uoextract/texmaps.py --verify` | **4 116 texmap** z 16 384, remap z `TexTerr.def` 284; `--dump` dá 64x64 trávu a 128x128 hlínu (pohledem ověřeno) |
+| **Atlas (nové)** | `python tools/uoextract/atlas.py --verify --out assets/uo` | **49 705 spritů / 77 stranek, 0 chyb** (land 4 244, item 39 326, gump 2 019, texmap 4 116) |
 | Data skillů | `python tools/gates/gen-content.py --only skills --check` | `OK skills.json: shoda` |
 | Fixture sedí na generátor | `python tests/fixtures/world/make_fixture.py --check` | `4× OK`, `exit 0` |
-| **Snímek je z běhu** | `Get-Item .cache/render/snapshot.png \| % LastWriteTime` | **dnešní** (frame z `demo-hue.gd`) |
+| **Snímek je z běhu** | `Get-Item .cache/render/snapshot.png \| % LastWriteTime` | **dnešní** (frame z `demo-hue.gd`); G10 z něj měří `kuze_pixelu 9100`, barva `R52 G42 B42` |
 | Godot běží | `& .cache\godot\...console.exe --headless --version` | `4.7.2.stable.official.ed1daf0bf` |
 | Instalace UO na místě | `Test-Path 'D:\Games\...\tiledata.mul'` | `True` |
 | Kontroly zadání | `check-docs-refs.py`, `check-zadani.py`, `roadmap-gen.py --check` | `exit 0` |
-| Stav plánu | `python tools/plan-status.py` | `111 granul`, **`45` měřeně hotových** (po commitu), 0 rozporů, `M2 15 / 1 / 16` |
-| **Sandbox** | `whoami /groups \| Select-String Mandatory` | **`Medium`** = plný přístup (v `Low` jsou čísla testů **583/9** místo **640/0** — viz `LESSONS`) |
+| Stav plánu | `python tools/plan-status.py` | `111 granul`, **`45` měřeně hotových**, 0 rozporů (12. session neměnila `roadmap.json`) |
+| **Sandbox** | `whoami /groups \| Select-String Mandatory` | **12. session běžela pod plným přístupem** (`danger-full-access`); v `workspace-write` (Low) **nejde zapsat do `.cache`, `tools/` ani `assets/uo`** → sada hlásí 8 falešných selhání a atlas se nedá přegenerovat (viz `LESSONS`) |
 
 ## Otevřené věci a co je potřeba dodělat
 
@@ -889,10 +947,13 @@ a barva kůže.** Statiky nesou barvu ze záznamu mapy, ale **nikdo ji nepouží
 25. **`run-all.py` u G3 nevypíše, co naměřila** — **PLATÍ DÁL**.
 26. **Když krok CI spadne, navazující kroky se PŘESKOČÍ** — **PLATÍ DÁL**
     (řešení `if: always()`; rozhodnout, zda to chceme).
-27. **NOVÉ: držení klávesy neopakuje krok.** `app/input_map.gd` čte jen
-    `is_action_just_pressed`, takže chůze je „jedno zmáčknutí = jeden krok".
-    Držení (jak to dělá UO) patří do `app.input` — **granule `app.input`, agent ji
-    needituje bez rozhodnutí uživatele**.
+27. ~~**NOVÉ: držení klávesy neopakuje krok.**~~ — **VYŘEŠENO 12. session**
+    (ávodní text se nemaže): `app/input_map.gd` čte `is_action_pressed` a krok
+    vydává po `step_delay_ms` (400/200 ms); puštění prodlevu vynuluje. Navíc
+    **držené pravé tlačítko** (`walk_to`): směr z kurzoru, `run` podle 190 px od
+    středu okna (ClassicUO `GameSceneInputHandler.cs:41,66`). Ověřeno v běhu hry
+    (`_analyza/vlna7-drzeni.gd`): 2,5 s držení klávesy → 4 kroky, 100 ms stisk →
+    1 krok, 2 s držení pravého tlačítka → 8 kroků a −4 stamina.
 28. **NOVÉ: `render.anim` neumí vrstvy výbavy.** Prompt granule žádá „skládej
     vrstvy výbavy podle layerů" — bez `entity.equipment` a `render.hue` to nejde;
     dnes se kreslí jen tělo.
@@ -910,9 +971,13 @@ a barva kůže.** Statiky nesou barvu ze záznamu mapy, ale **nikdo ji nepouží
     pásmu. **Cestou se našla větší vada** (statiky se čtou správnou tabulkou
     tiledata) — viz sekce „CO JE NOVÉHO (6. session)". Co zůstalo: **konvence
     dveří** (věc 62).
-32. **NOVÉ: řidič dema je v `.cache/` (gitignore).**
-    Důkaz chůze (`demo-chuze.gd`) se v čistém klonu nespustí. Kdyby měl být
-    reprodukovatelný z gitu, patří do `tools/gates/` (rozhodnutí uživatele).
+32. **NOVÉ: řidič dema je v `.cache/` (gitignore).** — **PLATÍ DÁL a rozšířeno
+    12. session:** všechny sondy téhle session (`_analyza/vlna*.gd`, `vlna*.py`)
+    jsou taky v gitignore, takže **v čistém klonu nejsou**. Kdo je bude
+    potřebovat, najde v `LESSONS` (12. session), co měřily a jaké daly číslo;
+    reprodukovat je znamená napsat je znovu (jsou popsané v hlavičkách).
+    Důkaz chůze (`demo-chuze.gd`) se v čistém klonu nespustí. Kdyby měly být
+    reprodukovatelné z gitu, patří do `tools/gates/` (rozhodnutí uživatele).
 33. **NOVÉ: `render.anim` nemá LRU/strop pameti.** Stránku spritu drží jednou na
     soubor (frame je `AtlasTexture`; změřeno 1,27 MB vs 12,2 MB při kopii na
     frame), ale `render.textures` strop má a tohle ne. Kandidát na později.
@@ -1055,8 +1120,9 @@ a barva kůže.** Statiky nesou barvu ze záznamu mapy, ale **nikdo ji nepouží
     40–45 FPS). **Chůze** (přestavba chunku, vstup do nových dlaždic, možné
     načtení dalších stránek) změřená není — a je to právě stav, kdy se může
     sekat. Kdo bude dělat M9, ať měří i chůzi, ne jen postoj.
-59. **NOVÉ (5. session): ŠEDÁ PLOCHA v místě změny výšky — chybí překlad land
-    tile id → art id.** `world.map` vydává land **tile id**, ale atlas
+59. ~~**NOVÉ (5. session): ŠEDÁ PLOCHA v místě změny výšky — chybí překlad land
+    tile id → art id.**~~ — **VYŘEŠENO 12. session** (původní znění se nemaže):
+    `world.map` vydává land **tile id**, ale atlas
     i `render.textures` pracují s **art id z pole `texture`** v tiledata; kde se
     liší, `texture()` vrátí `null`, `_draw()` udělá `continue` a vznikne **díra**
     (vidět jako šedé pozadí). Naměřeno v okolí `(1519,1657)`: chybí arty
@@ -1064,18 +1130,32 @@ a barva kůže.** Statiky nesou barvu ze záznamu mapy, ale **nikdo ji nepouží
     `texture = 76`; atlas má **3 732 z 16 384** land artů (chybí 12 652).
     **`sim/world/tiledata.gd` neumí `texture`** — to je ta chybějící znalost.
     Detail, snímky a návrh: **`REVIZE-VADY-ZE-SNIMKU-2026-10-07.md` §Vada B**.
-    **Neopravovat teď** (rozhodnutí uživatele: až bude čas a bude to relevantní).
-60. **NOVÉ (5. session): „stopa" animačních framů při pohybu (vada A).**
-    Uživatel vidí na snímku několik postav v různých fázích chůze. **Co to NENÍ
-    (naměřeno):** animace v čase funguje (`0->f0 80->f1 160->f2 … 480->f6`)
+    **Jak to dopadlo (12. session, měřeno):** hypotéza z revize byla **obráceně** —
+    správný klíč land artu je **land tile id**, ne TexID (důkazy: art index 0 je
+    „UNUSED" a `texture[168] = 0`, barva `art[id]` sedí na texmap u 76 druhů vs.
+    2 u `art[texture]`, ClassicUO `LandView.cs:96`). Atlas se **přegeneroval**
+    (land 4 244, item 39 326, texmap 4 116) a **`world.tiledata.texture()`**
+    (TexID) vznikl pro **texturu svahu** — bez ní zůstával po opravě atlasu
+    v přechodu výšky stejně šedý pás ~140 px.
+60. ~~**NOVÉ (5. session): „stopa" animačních framů při pohybu (vada A).**~~ —
+    **VYŘEŠENO 12. session** (původní text se nemaže): uživatel vidí na snímku
+    několik postav v různých fázích chůze. **Co to NENÍ (naměřeno):** animace
+    v čase funguje (`0->f0 80->f1 160->f2 … 480->f6`)
     a reset při změně klíče taky; past je, že `play(1, …)` měří jinou věc —
-    serial 1 není v registru, takže `body_of` vrátí `-1`. **Nedořešeno** —
-    hypotézy a způsob ověření (dva framy do PNG a porovnat) jsou v
-    **`REVIZE-VADY-ZE-SNIMKU-2026-10-07.md` §Vada A**. Neopravovat teď.
-61. **NOVÉ (5. session): chybějící art se kreslí jako TICHO.** `render.textures`
-    vrátí `null` a `world_view._draw` udělá `continue` — díra v mapě tedy nemá
-    jak být vidět. Patří tam viditelný placeholdr (magenta/šrafování) a vizuální
-    kontrola úplnosti land artu (dnes ji nemá nikdo; G10 měří jen barvu postavy).
+    serial 1 není v registru, takže `body_of` vrátí `-1`.
+    **Příčina (12. session):** `render.hue._obrazek()` bral u `AtlasTexture`
+    **celý atlas** (stránka animace = všech 10 framů vedle sebe), takže `hued()`
+    vracel texturu CELÉ STRÁNKY a `world_view._draw_player()` ji kreslil na
+    pozici postavy. Opraveno na okno `region`; test v `tests/cases/render_hue.gd`
+    (sekce 18) + 2 mutace. Barvení jednoho framu tím zrychlilo **8,7×**
+    (35,7 → 4,1 ms).
+61. ~~**NOVÉ (5. session): chybějící art se kreslí jako TICHO.**~~ — **VYŘEŠENO
+    12. session** (původní text se nemaže): `render.textures` vrátí `null`
+    a `world_view._draw` udělá `continue` — díra v mapě tedy nemá
+    jak být vidět. Dnes se kreslí **magenta** placeholdr (diamant u landu, čtverec
+    u statiku), `world_view.holes` je počítadlo a první výskyt každého art id se
+    **hlásí** (`push_warning`); land id ≤ 2 (VOID/NODRAW) se nekreslí vůbec
+    a počítá se jako `nodraw` (ClassicUO `Land.Create: AllowedToDraw = graphic > 2`).
 62. **VYŘEŠENO 8. session — konvence dveří je opravená** (viz „CO JE NOVÉHO
     (8. session)" a `sim/world/doors.gd`: `toggle` = `art ± 1`, `is_open` =
     členství v `doors.txt`, 8 mutací to hlídá). **Znění, jak bylo otevřené
@@ -1317,8 +1397,10 @@ a barva kůže.** Statiky nesou barvu ze záznamu mapy, ale **nikdo ji nepouží
 11. **Voják pro `sim.pathfind`** (věc 54): click-to-move přes `sim.commands`
     (klik do světa → `next_step` → `Command{t:"move"}`), ať cesta není mrtvý kód.
 12. **Statiky s barvou** (věc 40): `render.chunk` + `hued_art()` — dveře a cedule.
-13. **Držení klávesy = chůze** (`app.input`, věc 27, Úkol 7) — bez toho se demo
-    ovládá „klikatě“ (čeká na rozhodnutí uživatele, „Co čeká na tebe“ bod 4).
+13. ~~**Držení klávesy = chůze** (`app.input`, věc 27, Úkol 7)~~ — **HOTOVO
+    12. session**: drží klávesa i pravé tlačítko myši (`walk_to`), ověřeno
+    v běhu hry (`_analyza/vlna7-drzeni.gd`) i testy (`tests/cases/input.gd`
+    sekce 7/7b/8) + 6 mutací.
 14. Pak M2 zbytek: `entity.notoriety`, `world.teleport`, `world.regions`.
 15. (nepovinné) `if: always()` u diagnostických kroků CI (věc 26); časový strop
     v `mutace-tests.py` (věc 53) — **velikost už změřená**: 61 mutací se vešlo do

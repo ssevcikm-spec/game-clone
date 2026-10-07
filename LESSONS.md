@@ -1988,3 +1988,114 @@ podezření je **vlastní nástroj**, ne měřený kód.
 | `_analyza/over-ci-godot.py` (gitignore) | kontrola syntaxe `ci-godot.sh` přes `sh -n` **kalibrovaná na syntaktickou vadu** (neukončené `if`) | **2 ze 2**; s běhovou vadou (`[ 1 -eq ;`) by kalibrace lhala |
 | `_analyza/blob-vs-disk.py` (gitignore) | porovná blob v `HEAD` s bajty na disku (autorita je blob) | po opravě CRLF→LF **10 z 10** shod |
 | `_analyza/radky.py`, `normalizuj-lf.py` (gitignore) | počty řádků pro tabulku stavu; normalizace konců řádků na LF | `tools/gates 18/3 495`, `tests 19/1 602`; replaye 543/545 B = velikost blobu |
+
+---
+
+# 12. session (2026-10-07) — VLNA OPRAV ze snímků (svahy, držení, stopa framů, sekání)
+
+## Pasti, které mě dnes chytily (a co z nich platí dál)
+
+1. **⚠ „Měřené rozhodnutí" může být OBRÁCENĚ — a stejnou metrikou to nepoznáš.**
+   5. session naměřila, že atlas má klíčovat land art polem `texture` (TexID)
+   z tiledata, a zdůvodnila to **pokrytím** („při TexID 16 055/16 384, při id
+   dlaždice jen 4 244"). Dnes se ukázalo, že **správně je id dlaždice** a že
+   pokrytí bylo **špatná metrika** (měřilo, kolik id má v archivu záznam, ne
+   které id klient kreslí). Rozhodly **tři nezávislé signály**:
+   * art index 0 je grafika s textem **`UNUSED`**, kdežto `texture[168] = 0` —
+     kdyby platil TexID, kreslila by se **voda (168) jako „UNUSED"**,
+   * průměrná barva `art[id]` sedí na `texmap[texture]` u **76** druhů dlaždic,
+     `art[texture]` jen u **2** (váženo počtem dlaždic **934 504 : 738**),
+   * `LandView.cs:96` kreslí `Arts.GetLand(Graphic)`, kde `Graphic` je id z mapy.
+   **Pravidlo:** u id prostoru se neptej „kolik toho pokrývá", ale
+   **„ukazuje na stejnou věc?"** — a hledej přímý důkaz (barva, text v grafice,
+   referenční kód). Následek chyby byl navíc dvojí: **512 artů chybělo**
+   (přesně ty u pobřeží, kde je uživatel viděl jako díru).
+
+2. **⚠ Dvě vady se stejným příznakem se nedají opravit jednou.** Uživatel
+   hlásil „kde je svah, tam není tile". Byly to **dvě různé vady**: (a) chybějící
+   art (viz 1) a (b) **nevykreslená plocha svahu** — UO kreslí rovnou dlaždici
+   land artem a svah **texmapem nataženým přes čtyřrohy** (`LandView.cs:58-96`).
+   Po opravě atlasu byl snímek **bajtově shodný** s tím před ní (`sha256
+   e0a1f58a…`) — což byl nejcennější signál dne: „oprava nic nezměnila" znamená
+   „hledej druhou příčinu", ne „vada byla jinde". Teprve sonda, která kreslila
+   terén **obarvený podle `z`** (`_analyza/vlna9-teren.gd`), ukázala pruh pozadí
+   mezi úrovněmi (`z = 20` a `z = -15`, ~140 px).
+
+3. **⚠ Vlastní sonda umí lhát stejně jako kód — a je to horší, protože jí věříš.**
+   První měření ceny `render.hue` dalo „98,9 ms na klíč" a vypadalo to jako
+   katastrofa. Ve skutečnosti se v měřené smyčce zakládal **nový `Hue.new()`**
+   (čte `hues.json`, 672 kB → ~60 ms). Po přesunu konstrukce ven: **35,7 ms**
+   (celá stránka) vs **4,1 ms** (okno `region`). **Pravidlo:** než číslo pošleš
+   do dokumentu, řekni si, co všechno ta smyčka dělá.
+
+4. **Výkon se musí měřit po ČÁSTECH, ne jako „je to pomalé".** „Hra se seče" se
+   rozpadlo na tři měřené příčiny: `render.sort.draw_order` **85,7 ms** (původní
+   `sort_custom` s GDScript porovnávačem), přestavba seznamu při **každém** kroku
+   (44 ms × 2,5/s) a barvení framu animace **35,7 ms** každých 80 ms. Po opravách:
+   seznam **45,8 ms** a jen po 4 krocích (záseků **39 → 10** z ~500 framů),
+   barvení **4,1 ms**. **A/B měření mutací** je na to nejlepší nástroj: „bez
+   svahů 28,0 ms, se svahy 46,6 ms, se svahy + ořezem 34,5 ms" je tvrzení, které
+   se dá opakovat.
+
+5. **`draw_polygon` láme dávkování — a je to vidět jen na draw callech.**
+   Svahová dlaždice se kreslí `draw_polygon` (4 rohy v různých výškách);
+   402 takových dlaždic zvedlo draw cally z **1 755 na 2 291** a frame z 28 na
+   46 ms. Netexturovaný polygon stál stejně (45,1 ms) → **není to textura, je to
+   přerušení dávky**. Řešení dnes: kreslit jen to, co je na obrazovce
+   (`CULL_MARGIN = 256 px`) → 34,5 ms. Zbytek patří M9 (`render.chunk_mesh`).
+
+6. **⚠ Mutace umí „zplesnivět": po přepsání kódu zmizí vzor a harness to řekne
+   jen jednou větou.** Po přepsání `render.sort.draw_order()` na `PackedInt64Array`
+   přestala existovat věta `return a[1] < b[1]`, kterou mutace „nestabilní
+   řazení" nahrazovala → běh hlásil **19 z 20 chyceno** s poznámkou
+   „PATRANA VETA SE VE ZDROJI NENASLA". Kdo čte jen poslední řádek, myslí si, že
+   je test slepý. **Pravidlo: přepíšeš-li kód, přepiš i jeho mutace** (dnes:
+   `klice[i] = sort_key(obj) << shift` → 10/10).
+
+7. **⚠ Řidič důkazu může ztratit rozlišovací schopnost, když se obraz změní.**
+   `demo-hue.gd` poznává kůži podle `R − B > 20`. Dokud byla mapa tmavě šedá,
+   fungovalo to; po opravě svahů (hnědé texmapy) hlásí **191 754 px „kůže"**
+   (dřív 8 634) — tedy i kdyby postava zešedla, řidič by to nepoznal.
+   **Brána G10 to neohrožuje** (měří přesnou shodu s paletou sady 1002 a ta dala
+   `kuze_pixelu 9100`) — ale je to přesně rodina „brána, která nemá jak selhat".
+   Zapsáno jako otevřená věc V4.
+
+8. **Sandbox `workspace-write` (Low) má tři různé stromy, ne dva.** Naměřeno
+   v této session: zápis podprocesem prošel do **kořene**, `.tmp/` a `_analyza/`,
+   ale **ne** do `.cache/`, `tools/` a `assets/uo/` (i `assets/uo/diag.txt`
+   skončil `PermissionError`). Důsledek, který vypadá jako vada kódu: sada hlásí
+   **8 falešných selhání** (`render.textures` si staví fixture v `.cache`),
+   atlas se **nedá přegenerovat** a brány by hlásily vady. Po přepnutí session na
+   plný přístup: **954 kontrol / 0 selhání**, brány **11/0/0**. **Není to vada
+   kódu ani testu** — je to oprávnění (a `START-TADY.md` to říká předem).
+
+9. **Sonda se stavovým automatem se umí zaseknout a tvářit se jako běžící.**
+   První verze `vlna7-drzeni.gd` posouvala fázi **dvěma** přírůstky (`_ukonci`
+   i `_zacni`) a uvízla na fázi, kterou `match` neznal — proces běžel dál, výstup
+   skončil po druhém kroku. **Pravidlo: sonda musí mít časový strop** (`_f > 900`)
+   a fáze se mají brát ze seznamu, ne počítat dvěma místy.
+
+10. **`tiledata.mul`: první land záznam je posunutý o 4 bajty.** Sonda na
+    offsety jmen to ukázala jednoznačně: `UNUSED` je na offsetu **10** (což
+    odpovídá záznamu na 0), ale `VOID!!!!!!` na **44**, `NODRAW` na **74**,
+    `grass` na **104** — tedy záznamy 1+ sedí na 30 B se jménem na `+10`
+    (skupinová hlavička je **mezi** záznamem 0 a 1). Náš extraktor čte
+    `[4 B hlavička][32 záznamů]`, takže **jen `land[0]`** vychází jako
+    `flags 0x4E55…, texture 21333, jméno "ED"`. Mapa id 0 nepoužívá (0 dlaždic)
+    → **důsledek nulový**, ale je to zapsané (V5), aby to někdo nehledal znovu.
+
+## Vytvořené nástroje (12. session)
+
+| Nástroj | K čemu | Ověření |
+|---|---|---|
+| `tools/uoextract/texmaps.py` (**nový**) | `texmap(id)` z `texmaps.mul` + `texidx.mul` (+ remap `TexTerr.def`, 284 řádků) — **textura terénu pro svahy** | `--self-test` **5 kontrol**; `--verify` **4 116 texmap**, 0 chyb; `--dump` (64×64 tráva, 128×128 hlína) ověřeno **pohledem**; zařazen do `run-all.py --self-test` (do té doby tam **nebyl**) |
+| `tools/uoextract/atlas.py` (rozšířen) | land = **id dlaždice**, item = **celý rozsah** (dřív filtr podle jména), nově i `texmap`; `--verify` **49 705 spritů / 77 stranek / 0 chyb** | `--self-test` **46 kontrol** (4 nové na texmap); `run-all.py --self-test` ho nově pouští (self-test existoval, ale **nikdo ho nespouštěl**) |
+| `_analyza/vlna1-land-index.py` | rozhodující test id prostoru land artu (art[id] vs art[texture] vs texmap) + montáž `vlna1-land-montaz.png` | 4 244 land id s payloadem; **76 : 2** ve prospěch id (váženě 934 504 : 738) |
+| `_analyza/vlna2-offsety-jmen.py`, `vlna2-land-flag.py` | kde přesně jsou jména v `tiledata.mul`; je land flag u32, nebo u64? | jména na 10/44/74/104 → **30 B záznam se jménem na +10 od záznamu 1** (V5); velikost souboru rozhodla 30 B/u64 |
+| `_analyza/vlna3-diry-map.py` | kolik dlaždic na mapě nemá art **vůbec** (po opravě index space) | **7 druhů / 43 dlaždic z 29,4 M** (0,00 %); land id ≤ 2 má 736 dlaždic |
+| `_analyza/vlna6-statiky-bez-jmena.py` | kolik statiků má art, ale prázdné jméno v tiledata (a atlas je vynechával) | **232 druhů / 14 199 záznamů**; statiků bez artu: **0** |
+| `_analyza/vlna5-cena.gd` | cena po částech: `visible()` studený/teplý, `_z_grid`, `draw_order`, hue celá stránka vs okno | studený **45,8 ms** (bylo 85,7), `_z_grid` 6,7, `draw_order` 12,5, hue **35,7 → 4,1 ms** |
+| `_analyza/vlna5-chuze.gd` | frame časy **PŘI CHŮZI** (reálnou cestou `sim.movement.request_step`) + `--kroku=0` pro stoj | chůze median **34,6 ms**, p90 39,6, záseků **10 z 496**; stoj 34,5 ms; bez ořezu 46,6 |
+| `_analyza/vlna7-drzeni.gd` | **end-to-end** držení: programový stisk → reálná smyčka → počet kroků | držení 2,5 s → **4 kroky**, stisk 100 ms → **1 krok**, držené pravé tlačítko 2 s → **8 kroků, −4 stamina** |
+| `_analyza/vlna8-seda-plocha.py`, `vlna9-teren.gd` | kde je „šedá plocha" (barva 77,77,77) a jak vypadá terén obarvený podle `z` | šedá = **pozadí**, ne chybějící art; pruh ~140 px mezi `z = 20` a `z = -15` |
+| `_analyza/vlna1-snimek.gd`, `vlna4-input-sonda.gd` | snímky hry na zadaných dlaždicích; ověření, že `Input.action_press` funguje v headless | snímky `pred-`/`po-`/`svah-`; `action_press` v headless **funguje** (testy držení na tom stojí) |

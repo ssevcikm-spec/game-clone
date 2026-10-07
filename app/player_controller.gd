@@ -42,6 +42,15 @@ const KEYS := {
 	"move_se": [KEY_KP_3],
 }
 
+# MYS: akce v InputMap -> tlacitko. DRZENE PRAVE TLACITKO = chuze kursoru
+# (uzivatel 2026-10-07: "chůze držením klávesy (včetně pravého tlačítka myši)");
+# UO to ma v `GameSceneInputHandler.cs:41`. LEVY klik tady ZAMERNE neni:
+# klik-to-move patri `sim.pathfind` + jeho vojákovi (HANDOFF "Další kroky" 11),
+# a levy klik bude potrebovat i UI (vyber predmetu).
+const MOUSE := {
+	"walk_to_cursor": MOUSE_BUTTON_RIGHT,
+}
+
 var sim = null
 var input_map = null
 var movement = null
@@ -59,15 +68,17 @@ var _walk_until_ms: int = 0
 static func default_bindings() -> Dictionary:
 	# Logicky smer (docs/04 §4.3) -> akce v InputMap. Klic `east`..`se` je to,
 	# co `app/input_map.gd` preklada na `Command{t:"move", dir}`.
+	# `walk_to` je DRZENE PRAVE TLACITKO (chuze kursoru) - viz hlavicka.
 	return {
 		"east": "move_east", "ne": "move_ne", "north": "move_north", "nw": "move_nw",
 		"west": "move_west", "sw": "move_sw", "south": "move_south", "se": "move_se",
+		"walk_to": "walk_to_cursor",
 	}
 
 
 static func register_actions() -> int:
-	# Vraci pocet PRIDANYCH klavesovych vazeb (0 znamena, ze uz vsechny byly) -
-	# cislo se hodi do logu, aby "nic se nedeje" nebylo tiche.
+	# Vraci pocet PRIDANYCH vazeb (0 znamena, ze uz vsechny byly) - cislo se
+	# hodi do logu, aby "nic se nedeje" nebylo tiche. Klavesy i mys.
 	var added: int = 0
 	for action in KEYS.keys():
 		if not InputMap.has_action(action):
@@ -78,6 +89,14 @@ static func register_actions() -> int:
 			if not InputMap.action_has_event(action, event):
 				InputMap.action_add_event(action, event)
 				added += 1
+	for action in MOUSE.keys():
+		if not InputMap.has_action(action):
+			InputMap.add_action(action)
+		var klik := InputEventMouseButton.new()
+		klik.button_index = MOUSE[action]
+		if not InputMap.action_has_event(action, klik):
+			InputMap.action_add_event(action, klik)
+			added += 1
 	return added
 
 
@@ -109,6 +128,11 @@ func player_tile() -> Vector2i:
 func _process(_delta: float) -> void:
 	if player == null:
 		return
+	# Velikost okna pro DRZENE PRAVE TLACITKO: `app.input` pocita `run` ze
+	# vzdalenosti kurzoru od STREDU obrazovky (ClassicUO 190 px) a viewport
+	# sam nezna (je to RefCounted). Kdyz se okno zmeni, hodnota se obnovi.
+	if input_map != null:
+		input_map.view_size = get_viewport().get_visible_rect().size
 	# Kamera se posune jen kdyz se zmeni DLAZDICE (diskretni krok), ale kresli
 	# se kazdy frame - bezi animace (80 ms na frame, docs/05 §5.1.1).
 	var tile := player_tile()

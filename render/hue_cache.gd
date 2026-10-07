@@ -200,12 +200,29 @@ func _z_int(rgb: int) -> Color:
 
 
 func _obrazek(base: Texture2D) -> Image:
+	# ⚠ VADA ZE SNIMKU (opraveno 2026-10-07, 12. session): dokud se tady bral
+	# CELY ATLAS (stranka animace = vsechny framy v jednom pruhu), vracel
+	# `hued()` texturu CELÉ STRANKY - a `app/world_view._draw_player()` ji
+	# kreslil na pozici postavy. Uzivatel to videl jako "vedle postavy se
+	# objevi vsechny animacni snimky" (stopa framu). Zmereno: frame chuze ma
+	# 24x64 px, stranka `anim-400-0-0.png` ma vsech 10 framu vedle sebe.
+	# Spravne se tedy bere OKNO (`region`), ne stranka.
+	# Postup je robustni vuci tomu, co Godot v `get_image()` vrati: kdyz uz
+	# vrati region (velikost sedi), nic se neorezava.
 	var textura := base
+	var region := Rect2i()
 	if base is AtlasTexture:
-		textura = (base as AtlasTexture).atlas
+		var atlas := base as AtlasTexture
+		region = Rect2i(atlas.region)
+		textura = atlas.atlas
 	if textura == null:
 		return null
-	return textura.get_image()
+	var obrazek: Image = textura.get_image()
+	if obrazek == null:
+		return null
+	if region.size.x > 0 and region.size.y > 0 and obrazek.get_size() != Vector2i(region.size):
+		obrazek = obrazek.get_region(region)
+	return obrazek
 
 
 func _klic_zdroje(base: Texture2D) -> String:

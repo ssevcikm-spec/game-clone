@@ -37,24 +37,34 @@ func sort_key(obj: Dictionary) -> int:
 
 
 func draw_order(objects: Array) -> Array:
-	# Deterministicke a STABILNI (docs/02 §2.3): `sort_custom` stabilni neni, proto
+	# Deterministicke a STABILNI (docs/02 §2.3): `sort()` stabilni neni, proto
 	# poradi vstupu vleze do klicu. Stejne klic = poradi vstupu; tak to dela i UO.
-	var rows: Array = []
+	#
+	# ⚠ VYKON (namEReno 2026-10-07, sonda `_analyza/vlna5-cena.gd`): puvodni
+	# verze stavela `[klic, i, objekt]` a radila `sort_custom(_lower)` - porovnani
+	# je GDScript a pri 6 095 objektech to je ~76 000 volani, dohromady
+	# **85,7 ms** na prestavbu seznamu. A seznam se prestavuje pri KAZDEM kroku
+	# chuze (`look_at_tile` -> `invalidate`) - uzivatel to vidi jako seknuti.
+	# Dnes se klic a poradi vstupu sliji do JEDNOHO int64 a radi se built-in
+	# `sort()` (C++): stejne poradi, zlomek casu.
+	var n: int = objects.size()
+	var shift: int = 1
+	while (1 << shift) < n:
+		shift += 1
+	var mask: int = (1 << shift) - 1
+	var klice := PackedInt64Array()
+	klice.resize(n)
 	var neznamych: int = 0
-	for i in objects.size():
-		neznamych += 0 if KIND_LAYER.has(str(objects[i].get("kind", ""))) else 1
-		rows.append([sort_key(objects[i]), i, objects[i]])
-	rows.sort_custom(_lower)
+	for i in n:
+		var obj: Dictionary = objects[i]
+		neznamych += 0 if KIND_LAYER.has(str(obj.get("kind", ""))) else 1
+		klice[i] = (sort_key(obj) << shift) | i
 	if neznamych > 0 and not _warned:
 		_warned = true
 		push_warning("render.sort: %d objektu neznamy `kind` - kresli se jako mobilni" % neznamych)
+	klice.sort()
 	var out: Array = []
-	for row in rows:
-		out.append(row[2])
+	out.resize(n)
+	for i in n:
+		out[i] = objects[int(klice[i] & mask)]
 	return out
-
-
-func _lower(a: Array, b: Array) -> bool:
-	if a[0] != b[0]:
-		return a[0] < b[0]
-	return a[1] < b[1]

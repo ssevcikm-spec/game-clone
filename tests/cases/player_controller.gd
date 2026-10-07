@@ -13,9 +13,19 @@ extends RefCounted
 
 const Lib = preload("res://tests/lib.gd")
 
+# Cesta k modulu je VSTUP - mutacni harness pousti test nad mutantem.
+const CONTROLLER_SCRIPT := "res://app/player_controller.gd"
+
+
+func _arg(name: String, fallback: String) -> String:
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--" + name + "="):
+			return arg.substr(name.length() + 3)
+	return fallback
+
 
 func run(t) -> void:
-	var script = Lib.script_at("res://app/player_controller.gd")
+	var script = Lib.script_at(_arg("controller-script", CONTROLLER_SCRIPT))
 	if script == null:
 		t._pending("app/player_controller NENI HOTOV: app/player_controller.gd chybi")
 		return
@@ -25,15 +35,22 @@ func run(t) -> void:
 		return
 	var consts: Dictionary = Lib.consts_at("res://core/const.gd")
 	var bindings: Dictionary = script.default_bindings()
+	const SMERY := ["east", "ne", "north", "nw", "west", "sw", "south", "se"]
 
-	t._check(bindings.size() == 8,
-		"player_controller: vazeb je 8 smeru (namEReno %d)" % bindings.size())
-	for smer in ["east", "ne", "north", "nw", "west", "sw", "south", "se"]:
+	t._check(bindings.size() == 9,
+		"player_controller: vazeb je 8 smeru + drzene prave tlacitko (namEReno %d)" % bindings.size())
+	for smer in SMERY:
 		t._check(bindings.has(smer), "player_controller: vazba pro smer '%s' existuje" % smer)
+	# DRZENE PRAVE TLACITKO (uzivatel 2026-10-07: "chůze držením klávesy (včetně
+	# pravého tlačítka myši)") - `app/input_map.poll()` ho zpracuje vetví
+	# "walk_to"; kdyz vazba chybi, mys nikdy nechodi.
+	t._check(str(bindings.get("walk_to", "")) == "walk_to_cursor",
+		"player_controller: vazba 'walk_to' -> 'walk_to_cursor' (namEReno '%s')"
+		% str(bindings.get("walk_to", "")))
 
 	# 2) akce se zakladaji ZA BEHU (project.godot vlastni jina granule)
 	var added: int = script.register_actions()
-	t._check(added >= 8, "player_controller: register_actions pridal vazby (namEReno %d)" % added)
+	t._check(added >= 9, "player_controller: register_actions pridal vazby (namEReno %d)" % added)
 	t._check(script.register_actions() == 0,
 		"player_controller: druhe volani uz nic nepridava (idempotentni)")
 	var bez_klavesy: Array = []
@@ -46,12 +63,20 @@ func run(t) -> void:
 			bez_klavesy.append(akce)
 	t._check(bez_klavesy.is_empty(),
 		"player_controller: kazda akce ma klavesu (bez klavesy: %s)" % str(bez_klavesy))
+	# ...a ta prave-tlacitkova musi byt opravdu PRAVE tlacitko (ne klavesa)
+	var ma_prave: bool = false
+	for event in InputMap.action_get_events("walk_to_cursor"):
+		if event is InputEventMouseButton \
+				and (event as InputEventMouseButton).button_index == MOUSE_BUTTON_RIGHT:
+			ma_prave = true
+	t._check(ma_prave,
+		"player_controller: 'walk_to_cursor' ma v InputMap prave tlacitko mysi")
 
 	# 3) smer z vazby musi dat stejne cislo jako `core/const.gd` a `input_map`
 	var mapper = mapper_script.new(bindings)
 	var dir_dx: Array = consts.get("DIR_DX", [])
 	t._check(dir_dx.size() == 8, "player_controller: DIR_DX ma 8 směru (namEReno %d)" % dir_dx.size())
-	for smer in bindings.keys():
+	for smer in SMERY:
 		var command: Dictionary = mapper.key_command(str(smer))
 		var dir: int = int(command.get("dir", -1))
 		var ok: bool = str(command.get("t", "")) == "move" and dir >= 0 and dir < 8 \

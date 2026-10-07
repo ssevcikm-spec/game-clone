@@ -16,6 +16,7 @@ const ITEM_OFFSET: int = 0x4000
 
 # Poradi poli je schema souboru - viz `layout` v tiles.json.
 const LAND_NAME := 2
+const LAND_TEXTURE := 1        # index do texmaps.mul (kresleni svahu)
 const ITEM_WEIGHT := 1
 const ITEM_LAYER := 2
 const ITEM_HEIGHT := 7
@@ -76,6 +77,17 @@ func flags(tile: int) -> int:
 
 func height(tile: int) -> int:
 	return 0 if is_land(tile) else _num(tile, ITEM_HEIGHT)
+
+
+func texture(tile: int) -> int:
+	# `texture` (TexID) z LAND zaznamu = index do `texmaps.mul`. Kresleni ho
+	# pouziva pro SVAHY: rovna plocha se kresli land artem, svah TEXMAPEM
+	# natazenym pres ctyrrohy dlazdice (ClassicUO `Land.cs:96-161`,
+	# `LandView.cs:58-96`). Bez toho zustava v prechodu vysky seda dira.
+	# U predmetu vyznam nema (item zaznam tohle pole nema) - proto 0.
+	if not is_land(tile):
+		return 0
+	return _num(tile, LAND_TEXTURE)
 
 
 func layer(tile: int) -> int:
