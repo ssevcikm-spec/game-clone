@@ -89,6 +89,25 @@ soubory přeskakuje**. Není to tedy jen o skrytých složkách (`.forge`, `.git
 tool** — použij Python walk (plošné skeny) nebo `Select-String` na konkrétní
 soubor. Do `dsh-prostredi` patří formulace: grep tool **respektuje `.gitignore`**.
 
+### 2026-10-07 — CI stav bez tokenu narazí na limit a `git credential fill` se zasekne (past-nástroje)
+**Co se stalo:** po pushi jsem chtěl ověřit běh nad **svým** commitem a polloval
+jsem `node _analyza/ci-beh-stav.mjs` ve smyčce. Po ~35 dotazech začalo API vracet
+**HTTP 403 „API rate limit exceeded for <IP>"** (bez autentizace je limit
+**60 dotazů/hodinu na IP**) — a to i s `GH_TOKEN` v prostředí, protože
+`ci-beh-stav.mjs` hlavičku `Authorization` **neposílá**. Cesta přes
+`git credential fill` **zablokovala terminál** (credential helper `manager` čeká
+na interakci), takže se musela zabít.
+**Doklad:** týž dotaz s ručně přiloženou hlavičkou vrátil `HTTP 200` a
+`30 f243ba2 completed success` (a `/jobs` dal 13/13 kroků `success`); token
+z Windows Credential Manageru (target `git:https://github.com`, 40 znaků) jsem
+přečetl přes `CredRead` v PowerShellu a **nikdy ho nevypisoval** (jen délku).
+**Ponaučení:** (a) **nepollovat API ve smyčce** — jeden dotaz po pushi, pak
+klidně za minutu; (b) na stav CI použij **jeden** dotaz s hlavičkou
+`Authorization: Bearer $env:GH_TOKEN` (token z Credential Manageru přes
+`CredRead`, ne přes `git credential fill` — ten je interaktivní);
+(c) když dá GitHub 403, **není to „CI neběží"**, ale limit — a tvrzení o stavu
+se pak musí označit jako neměřené, ne hádat.
+
 ---
 
 ### 2026-10-07 — Dvě vady viditelné jen POHLEDEM: testy 520/0 a brány zelené (chyba)

@@ -305,17 +305,17 @@ opravená** (6. session: statiky se čtou správnou tabulkou, dveře rozhoduje
 `world.doors`, schody svou výškou). **Hra jede 40–45 FPS** (bylo 1–2 FPS) — viz
 sekce VÝKON.
 
-**⚠ CI: BĚHY NAD COMMITY 5. SESSION BYLY ZELENÉ.** Ověřeno živě
-(`node _analyza/ci-beh-stav.mjs`): **#23 nad `e6ff22e` = `success`, 13/13 kroků**
-a **#24 nad `88b4747` = `success`** (krok 9 = mutační důkaz testů prošel). Starší
-běh #22 (`137da89`) bylo taky `success`. **Běh nad commity 6. session je
-v „Předletové kontrole"** (doplněn po pushi). **Pozor na hranici toho tvrzení:**
-logy ani artefakty nejdou bez tokenu stáhnout (`ci-log.mjs` → 403,
-`ci-artefakt.mjs` → 401), takže **obsah kroků v CI ověřený není** — mutace jsou
-naměřené **lokálně** a v CI je ověřeno jen to, že krok nespadl. **A pozor na
-počet běhů:** série pushů pustí víc běhů; „poslední běh" tedy nemusí být ten,
-který člověk myslí — **sha v odpovědi API je to, co rozhoduje.** Předchozí běhy
-#16, #17 a #19 mají poučení:
+**⚠ CI: BĚH NAD COMMITEM 6. SESSION JE ZELENÝ — `#30` nad `f243ba2` = `success`,
+13/13 kroků** (ověřeno živě `node _analyza/ci-beh-stav.mjs`; krok 9 = mutační
+důkaz testů, tedy **53 mutací se vešlo do `timeout-minutes: 30`** — to je
+naměřená odpověď na část otevřené věci 53). Předtím: **#23 nad `e6ff22e` =
+`success`, #24 nad `88b4747` = `success`**, #29 nad `702dac2` = `success`.
+**Pozor na hranici toho tvrzení:** logy ani artefakty nejdou bez tokenu stáhnout
+(`ci-log.mjs` → 403, `ci-artefakt.mjs` → 401), takže **obsah kroků v CI ověřený
+není** — mutace jsou naměřené **lokálně** (92/92) a v CI je ověřeno jen to, že
+krok nespadl. **A pozor na počet běhů:** série pushů pustí víc běhů; „poslední
+běh" tedy nemusí být ten, který člověk myslí — **sha v odpovědi API je to, co
+rozhoduje.** Předchozí běhy #16, #17 a #19 mají poučení:
 
 | běh | commit | spadl v | příčina | oprava |
 |---|---|---|---|---|
@@ -460,7 +460,7 @@ a barva kůže.** Statiky nesou barvu ze záznamu mapy, ale **nikdo ji nepouží
 |---|---|---|
 | Strom je čistý | `git status --porcelain -uall` | **prázdné** po commitu této session |
 | Je před GitHubem | `git rev-list --count origin/main..HEAD` | **`0`** — **6. session pushla** (uživatel 2026-10-07 povolil commit i push po každé session) |
-| **Běží CI?** | `node _analyza/ci-beh-stav.mjs` (funguje i bez tokenu) · anotace: `node _analyza/ci-anotace.mjs` | běh nad commitem 6. session (viz „BLOKÁTORY"); předtím **#23 nad `e6ff22e` = `success`** a **#24 nad `88b4747` = `success`**; série pushů pustí **víc běhů** — **sha rozhoduje**, ne „poslední běh" |
+| **Běží CI?** | `node _analyza/ci-beh-stav.mjs` (funguje i bez tokenu) · anotace: `node _analyza/ci-anotace.mjs` | **#30 nad `f243ba2` (6. session) = `success`, 13/13 kroků**; předtím #29 nad `702dac2`, #23 nad `e6ff22e`, #24 nad `88b4747` — všechny `success`. **Pozor:** bez tokenu je API limitovaný (HTTP 403) a `ci-beh-stav.mjs` hlavičku neposílá; s tokenem z Windows Credential Manageru funguje (postup v `LESSONS`) — a **sha rozhoduje**, ne „poslední běh" |
 | **Co v CI NEJDE ověřit bez tokenu** | `node _analyza/ci-log.mjs` → **HTTP 403**; `ci-artefakt.mjs` → **HTTP 401** | Kdo nemá token, **vidí jen stav kroků**, ne jejich obsah — takže „krok 9 prošel" je naměřené, ale **počet chycených mutací v CI je neověřený** (naměřeno je 53/53 **lokálně**). Nezapisuj do předání „CI má 53/53", když to nevidíš |
 | Repo je veřejné | API bez tokenu | `visibility: public` |
 | **Oprávnění** | `whoami /groups \| Select-String Mandatory` | **`Medium`** = plný přístup. `Low` = sandbox → brány hlásí **falešné vady**, `.uid` nevzniknou a `run-all.py` spadne na `summary.json` (5. session to naměřila: G7 „VADA save/load", G11 NEMĚŘENO, self-test 9 chyb — **všechno byl sandbox**) |
