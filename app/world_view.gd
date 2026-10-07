@@ -25,6 +25,10 @@ const Anim = preload("res://render/anim_player.gd")
 const Hue = preload("res://render/hue_cache.gd")
 const Sort = preload("res://render/sort.gd")
 const TiledataScript = preload("res://sim/world/tiledata.gd")
+# M9 (15. session): davkove kresleni - cely pohled jako JEDEN mesh (1-2 draw
+# cally misto tisice). Kdyz se runtime atlas naplni, `_mesh` to NAHLASI a kresli
+# se puvodni cestou (ticha degradace by byla horsi nez pomale kresleni).
+const MeshScript = preload("res://render/chunk_mesh.gd")
 
 const VIEW_TILES_X: int = 64
 const VIEW_TILES_Y: int = 48
@@ -74,6 +78,15 @@ var _hue_last_hued: Texture2D = null
 var _hlasene_diry: Dictionary = {} # art id, o kterych uz bylo hlaseno, ze chybi
 var _list_center: Vector2i = Vector2i(-99999, -99999)   # stred postaveneho seznamu
 var _player_offset: Vector2 = Vector2.ZERO  # posun postavy mezi dlazdicemi (V2)
+var _mesh = null                   # render.chunk_mesh (M9) - null = puvodni cesta
+var _mesh_seznam: Array = []       # seznam, pro ktery je mesh postaveny
+var _mesh_diagonala: int = -2147483647
+var _mesh_stats: Dictionary = {}
+var _mesh_pretek_hlasen: bool = false
+# VYCHOZI CESTA JE MESH (M9). Vypina se jen pro mereni parity a pro pripad, ze
+# se runtime atlas naplni - obe cesty musi umet to same (docs/08: modernizace
+# nesmi ubrat zadne mereni).
+var mesh_enabled: bool = true
 
 
 func _ready() -> void:
@@ -99,6 +112,10 @@ func setup(map, textures) -> void:
 	# svah kreslil jako rovna plocha a zustala by v nem dira.
 	_tiledata = TiledataScript.new()
 	_chunk = Chunk.new(map, textures, _tiledata)
+	# M9: davka se stavi nad HOTOVYM seznamem z `render.chunk` (stejna data,
+	# stejne poradi) - `look_at_tile` ho necha postavit. `self` je rodic pro
+	# `SubViewport`, ve kterem se sklada runtime atlas (na GPU, bez kopii).
+	_mesh = MeshScript.new(_chunk, textures, MeshScript.PAGE_SIZE, self)
 	look_at_tile(center_tile)
 
 
@@ -209,6 +226,15 @@ func _list() -> Array:
 func _draw() -> void:
 	if _textures == null:
 		return
+	# M9: nejdriv se zkusi davka (1-2 draw cally). Kdyz neni postavena (runtime
+	# atlas se naplnil), kresli se puvodni cestou - obraz musi byt spravny vzdy.
+	if mesh_enabled and _mesh != null and _priprav_mesh():
+		_kresli_mesh()
+		return
+	_draw_puvodni()
+
+
+func _draw_puvodni() -> void:
 	drawn = 0
 	slopes = 0
 	holes = 0
@@ -279,23 +305,114 @@ func _obrazovka(margin: float) -> Rect2:
 
 func missing_art_ids() -> Array:
 	# Ktere art id se v tomto pohledu nekreslily (pro branu/test, ne pro kresleni).
+	if _mesh != null and _mesh.is_built():
+		return _mesh.missing_art_ids()
 	var out: Array = _hlasene_diry.keys()
 	out.sort()
 	return out
 
 
 func is_slope(obj: Dictionary) -> bool:
-	# ROZHODNUTI o svahu (bez kresleni - proto se da merit testem): dlazdice ma
-	# texmap, jeho textura existuje a nektery roh ma jinou vysku nez dlazdice.
-	# Presne tak rozhoduje klient (`IsStretched`, ClassicUO `Land.cs:98-161`);
-	# rovna plocha se kresli land artem.
-	var texmap_id: int = int(obj.get("texmap", 0))
-	if texmap_id <= 0:
+	# ROZHODNUTI o svahu (bez kresleni - proto se da merit testem): pravidlo je
+	# od M9 v `render.chunk_mesh.je_svah` (jedno misto pro kresleni i pro dávku,
+	# aby se nemohla rozejit). Tady se jen predava dal.
+	return MeshScript.je_svah(obj, _textures)
+
+
+func _diagonala_hrace() -> int:
+	if _player == null:
+		return -2147483647
+	return int(_player.pos.x) + int(_player.pos.y)
+
+
+func _priprav_mesh() -> bool:
+	# Postavi (nebo prekraji) davku pro AKTUALNI seznam a diagonalу hrace.
+	# Stavi se jen kdyz se seznam vymenil (`render.chunk` vraci porad TUTEZ
+	# instanci, dokud se neprestavi) - ne kazdy frame.
+	var seznam: Array = _list()
+	var diagonala: int = _diagonala_hrace()
+	if _mesh.hold() > 0:
+		# Runtime atlas se prave prekresluje na GPU (`UPDATE_ONCE`): do te doby
+		# by davka cetla prazdnou texturu, takze se kresli puvodni cestou.
+		_mesh.tick_hold()
+		_nacti_mesh_stats()
 		return false
-	var body: PackedVector2Array = slope_polygon(obj, Vector2.ZERO)
-	if body.is_empty():
-		return false                       # rovna plocha -> land art
-	return _textures.texmap(texmap_id) != null
+	if not is_same(seznam, _mesh_seznam):
+		_mesh_seznam = seznam
+		if not _mesh.build(seznam, diagonala):
+			# Runtime atlas se naplnil: NEMLCET a kreslit puvodni cestou.
+			if not _mesh_pretek_hlasen:
+				_mesh_pretek_hlasen = true
+				push_warning("app.world_view: render.chunk_mesh se nevesel do atlasu ("
+					+ str(_mesh.stats()) + ") - kresli se puvodni cestou")
+			_nacti_mesh_stats()
+			return false
+		_mesh_diagonala = diagonala
+		_mesh.split(diagonala)
+		_nacti_mesh_stats()
+		return true
+	if diagonala != _mesh_diagonala:
+		_mesh_diagonala = diagonala
+		_mesh.split(diagonala)
+		_nacti_mesh_stats()
+	return true
+
+
+func _nacti_mesh_stats() -> void:
+	# Pocitadla se berou z POSTAVENE davky - jinak by `drawn`/`holes`/`nodraw`
+	# tvrdily neco jineho, nez co je na obrazovce (docs/08 §8.6).
+	_mesh_stats = _mesh.stats()
+	slopes = int(_mesh_stats.get("svahu", 0))
+	holes = int(_mesh_stats.get("der", 0))
+	nodraw = int(_mesh_stats.get("nodraw", 0))
+	drawn = int(_mesh_stats.get("kvadru", 0)) - holes + int(_mesh_stats.get("hranic", 0))
+	for art_id in _mesh.missing_art_ids():
+		if not _hlasene_diry.has(art_id):
+			_hlasene_diry[art_id] = true
+			push_warning("app.world_view: art %d neni v atlase - kresli se magenta" % art_id)
+
+
+func _kresli_mesh() -> void:
+	# PORADI: (1) vse s `x + y <=` diagonala hrace, (2) objekty na TEZE
+	# diagonale a hrac podle `sort_key`, (3) vse s vetsi diagonalou. Presne
+	# to dela puvodni smycka - jen s 1-2 prikazy misto tisice.
+	player_drawn = false
+	player_missing = false
+	var klic_hrace: int = 0
+	var hranice: Array = _mesh.hranice()
+	var ma_hranici: bool = hranice.size() > 0
+	if _player != null or ma_hranici:
+		klic_hrace = _sort_key_of_player() if _player != null else 0
+	_mesh.draw_before(self)
+	if ma_hranici:
+		hranice.sort_custom(func(a, b): return int(a["klic"]) < int(b["klic"]))
+		for item in hranice:
+			if _player != null and not player_drawn and int(item["klic"]) > klic_hrace:
+				_draw_player()
+			_kresli_hranicni(item)
+	_mesh.draw_after(self)
+	if _player != null and not player_drawn:
+		_draw_player()
+
+
+func _kresli_hranicni(item: Dictionary) -> void:
+	# Objekt na diagonale hrace, ktery se do davky nedal (rozhoduje `sort_key`,
+	# ne diagonala) - kresli se jednotlive, protoze je ve vztahu k hraci
+	# "pred/po" pokazde jinak.
+	var obj: Dictionary = item["obj"]
+	var pozice: Vector2 = item["pozice"]
+	var art_id: int = int(obj["art_id"])
+	var tex: Texture2D = _textures.texture(art_id)
+	if tex == null:
+		_draw_hole(obj, pozice)
+		return
+	draw_texture(tex, pozice)
+
+
+func mesh_stats() -> Dictionary:
+	# Mereni pro `app.metrics` (M9): kolik kvadru je v dávce a jak draha byla
+	# stavba. Prazdny slovnik = dávka se nepouziva (a je to videt).
+	return _mesh_stats.duplicate()
 
 
 func _draw_slope(obj: Dictionary, pozice: Vector2) -> bool:
@@ -314,34 +431,15 @@ func _draw_slope(obj: Dictionary, pozice: Vector2) -> bool:
 
 
 static func slope_polygon(obj: Dictionary, pos: Vector2) -> PackedVector2Array:
-	# Ctyrrohy SVAHU v poradi horni, pravy, dolni, levy (konvexni poradi -
-	# dulezite pro triangulaci v `draw_polygon`). Vyska kazdeho rohu je vyska
-	# SOUSEDNI dlazdice: pravy = vychodni, levy = jizni, dolni = jihovychodni
-	# (ClassicUO `Land.cs:113-121`). Rovna plocha vraci PRAZDNE pole - kresleni
-	# pak zustane u land artu, presne jako `IsStretched == false` v klientu.
-	var rohy: Array = obj.get("z_corners", [])
-	if rohy.size() != 4:
-		return PackedVector2Array()
-	var z: int = int(obj["z"])
-	var z_pravy: int = int(rohy[1])
-	var z_levy: int = int(rohy[2])
-	var z_dolni: int = int(rohy[3])
-	if z == z_pravy and z == z_levy and z == z_dolni:
-		return PackedVector2Array()
-	var krok: float = float(Const.ISO_STEP)
-	var zs: float = float(Const.Z_SCALE)
-	return PackedVector2Array([
-		pos + Vector2(krok, 0.0),
-		pos + Vector2(2.0 * krok, krok + float(z - z_pravy) * zs),
-		pos + Vector2(krok, 2.0 * krok + float(z - z_dolni) * zs),
-		pos + Vector2(0.0, krok + float(z - z_levy) * zs)])
+	# Geometrie svahu je od M9 v `render.chunk_mesh` (potrebuje ji i dávka);
+	# tady se jen predava dal, aby zustala smlouva i testy na tom samem miste.
+	return MeshScript.slope_polygon(obj, pos)
 
 
 static func slope_uv() -> PackedVector2Array:
 	# UV rohu v texture (0..1): horni (0.5, 0), pravy (1, 0.5), dolni (0.5, 1),
 	# levy (0, 0.5) - stejne jako `_cornerOffsetX/Y` v ClassicUO (`Batcher2D.cs:263`).
-	return PackedVector2Array([
-		Vector2(0.5, 0.0), Vector2(1.0, 0.5), Vector2(0.5, 1.0), Vector2(0.0, 0.5)])
+	return MeshScript.slope_uv()
 
 
 func _draw_hole(obj: Dictionary, pozice: Vector2) -> void:

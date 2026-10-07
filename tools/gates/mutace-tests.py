@@ -616,9 +616,11 @@ MODULY = {
             ("svah se nikdy nevyhodnoti jako svah (dira)",
              "func is_slope(obj: Dictionary) -> bool:",
              "func is_slope(obj: Dictionary) -> bool:\n\treturn false"),
-            ("rohy svahu prohozene (pravy za levy)",
-             "pos + Vector2(2.0 * krok, krok + float(z - z_pravy) * zs)",
-             "pos + Vector2(2.0 * krok, krok + float(z - z_levy) * zs)"),
+            # ⚠ "rohy svahu prohozene" tady BYLA do M9 - geometrie svahu se
+            # 15. session presunula do `render/chunk_mesh.gd` (potrebuje ji i
+            # dávka), takze mutace je odtud PRYC a je v modulu `chunk_mesh`
+            # (`slope_polygon`). Nechat ji tady by znamenalo "neprovedenou
+            # mutaci", ktera se tvari jako hotova kontrola.
             # ODDALENA PRESTAVBA (2026-10-07): s prestavbou pri kazdem kroku
             # prichazi 44 ms seknuti 2,5x za sekundu.
             ("seznam se prestavuje pri kazdem kroku",
@@ -628,6 +630,97 @@ MODULY = {
             ("posun kroku se do kresleni postavy neprida (V2)",
              "+ Vector2(Const.ISO_STEP, Const.TILE_H / 2) + _player_offset",
              "+ Vector2(Const.ISO_STEP, Const.TILE_H / 2)"),
+            # M9 (15. session): priprava davky se NESMI preskocit.
+            ("davka se nikdy nepripravi (mesh se nepouzije)",
+             "if mesh_enabled and _mesh != null and _priprav_mesh():",
+             "if false:"),
+        ],
+    },
+    # M9 (15. session): davkove kresleni. Mutace miri na GEOMETRII, PORADI
+    # a KOPII SPRITU - na tech stoji "stejny obraz" (podminka milniku M9).
+    "chunk_mesh": {
+        "soubor": ROOT / "render" / "chunk_mesh.gd",
+        "prefix": "render.chunk_mesh",
+        "prepinac": "--chunk-mesh-script",
+        "mutace": [
+            ("land s art_id <= 2 se kresli (nodraw se ignoruje)",
+             "if kind == \"land\" and art_id <= VOID_LAND_MAX:",
+             "if kind == \"land\" and art_id <= 0:"),
+            ("svah se kresli jako rovna plocha (dira v terenu)",
+             "if kind == \"land\" and je_svah(obj, _textures):",
+             "if false:"),
+            ("rohy svahu prohozene (pravy za levy)",
+             "pos + Vector2(2.0 * krok, krok + float(z - z_pravy) * zs)",
+             "pos + Vector2(2.0 * krok, krok + float(z - z_levy) * zs)"),
+            ("dira dostane bilou barvu misto magenta (zmizi)",
+             "barva = HOLE_COLOR", "barva = Color.WHITE"),
+            ("druhy trojuhelnik kvadru je spatne (geometrie se rozsype)",
+             "const TROJUHELNIKY := [[0, 1, 2], [2, 3, 0]]",
+             "const TROJUHELNIKY := [[0, 1, 2], [2, 3, 1]]"),
+            ("UV se pocitaji bez posunu ve spritu (rozsypany atlas)",
+             "(float(slot.position.x) + lokalni.x * float(slot.size.x)) / float(_velikost)",
+             "float(slot.position.x) / float(_velikost)"),
+            ("sprite se do runtime atlasu nekresli (jen UV)",
+             "\"pos\": Vector2(r.position), \"tex\": tex,",
+             "\"pos\": Vector2(r.position), \"tex\": null,"),
+            ("po zmene stranky se dávka pouzije hned (prazdna textura)",
+             "_hold = HOLD_FRAMU", "_hold = 0"),
+            ("mobil na diagonale hrace se do hranice nedava (rozbite poradi)",
+             "if vrstva == Sort.LAYER_MOBILE and diagonala == diagonal_hrace:",
+             "if vrstva == Sort.LAYER_MOBILE:"),
+            ("split radi podle spatne hranice (hrac je jinde)",
+             "if _diag[stred] <= diagonal:", "if _diag[stred] < diagonal:"),
+            ("pretek stranky se nehlasi (ticha degradace)",
+             "if _y + vyska > _velikost:", "if _y + vyska > _velikost * 1000:"),
+            ("do `_diag` se zapise nula (split prestane fungovat)",
+             "_diag[q] = diagonala", "_diag[q] = 0"),
+        ],
+    },
+    # M9 (15. session): typovana konfigurace. Mutace miri na to, co ma byt
+    # VIDET: neznamy klic, spatny typ, rozsah, normalizace cisel z JSONu.
+    "config": {
+        "soubor": ROOT / "app" / "config.gd",
+        "prefix": "app.config",
+        "prepinac": "--config-script",
+        "mutace": [
+            ("neznamy klic v datech se nehlasi (preklep projde)",
+             "if not SCHEMA.has(klic) and not _je_dokumentacni(str(klic)):",
+             "if false:"),
+            ("spatny typ se nehlasi",
+             "if typeof(hodnota) != typ:", "if false:"),
+            ("hodnota mimo rozsah se nehlasi",
+             "if int(hodnota) < mini_ or int(hodnota) > maxi_:", "if false:"),
+            ("neznamy klic vrati null misto predaneho defaultu",
+             "return default", "return null"),
+            ("cela cisla z JSONu zustanou float (kazdy int klic hlasi typ)",
+             "return int(roundf(float(hodnota)))", "return hodnota"),
+            ("known_keys() se neradi",
+             "\tvar out: Array = SCHEMA.keys()\n\tout.sort()",
+             "\tvar out: Array = SCHEMA.keys()"),
+            ("dokumentacni klice se hlasí jako preklepy",
+             "for cast in casti:", "for cast in []:"),
+        ],
+    },
+    # M9 (15. session): mereni vykonu. Mutace miri na to, aby cisla nebyla
+    # "nula a prazdno" a aby se meritelne menila oknem.
+    "metrics": {
+        "soubor": ROOT / "app" / "metrics.gd",
+        "prefix": "app.metrics",
+        "prepinac": "--metrics-script",
+        "mutace": [
+            ("prazdny modul hlasi 1 ms misto NEMERENO",
+             "if _casy.is_empty():\n\t\treturn 0.0", "if _casy.is_empty():\n\t\treturn 1.0"),
+            ("fps vraci frame_ms (neprepocitane)",
+             "return 0.0 if ms <= 0.0 else 1000.0 / ms", "return ms"),
+            ("okno se v ticku neuplatnuje (pocita se i stare)",
+             "while _casy.size() > _okno:\n\t\t_casy.remove_at(0)\n\t_drawn = drawn",
+             "_drawn = drawn"),
+            ("drawn_objects vraci neco jineho nez posledni tick",
+             "_drawn = drawn", "_drawn = drawn + 1"),
+            ("report() hlasi nula vzorku i po mereni",
+             '"vzorku": _casy.size(),', '"vzorku": 0,'),
+            ("reset() nevymaze vzorky",
+             "\n\t_casy = PackedFloat32Array()", "\n\t_casy = _casy"),
         ],
     },
     # DATA se mutuji po bajtech: mutant je kopie JSON s priponou `.gd`

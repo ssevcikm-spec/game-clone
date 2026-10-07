@@ -25,6 +25,11 @@ const StatusBarScript = preload("res://ui/status_bar.gd")
 # Rust skillu a statu (granule `sim.skill_gain`, 11. session). Registruje se
 # s RNG ze `SimWorld` - vlastni RNG by rozbil determinismus a `state_hash`.
 const SkillGainScript = preload("res://sim/systems/skill_gain.gd")
+# M9 (15. session): typovana konfigurace a mereni vykonu. Config se ptá na
+# `data/balance.json` (kontrola typu/rozsahu), metrics sbira frame cas, pocet
+# kreslenych objektu, textury a stavbu davky.
+const ConfigScript = preload("res://app/config.gd")
+const MetricsScript = preload("res://app/metrics.gd")
 
 const DEFAULT_SEED: int = 1234
 const BRITAIN := Vector2i(1495, 1630)   # namesti Britainu (docs/01 §1.4)
@@ -45,11 +50,17 @@ var map = null
 var controller = null
 var hud = null
 var status_bar = null
+var config = null
+var metrics = null
+var world_view = null            # `app.world_view` (pro metriky)
+var textures = null              # `render.textures` (pro metriky)
 var _last_status_text: String = ""
+var _metrics_s: float = 0.0
 
 
 func _ready() -> void:
 	var data: Dictionary = _load_data()
+	metrics = MetricsScript.new()
 	sim = SimScript.new(DEFAULT_SEED, data)
 	loop = Loop.new()
 	loop.sim = sim
@@ -61,6 +72,18 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
+	# MERENI VYKONU (M9) jde PRVNI - nesmi vypadnout, kdyz jeste neni UI.
+	# Cisla se berou z toho, co uz hra zna: `app.world_view.drawn`,
+	# `render.textures.stats()` a `render.chunk_mesh.stats()`.
+	if metrics != null:
+		var davka: Dictionary = world_view.mesh_stats() if world_view != null else {}
+		var textury: Dictionary = textures.stats() if textures != null else {}
+		metrics.tick(_delta * 1000.0, world_view.drawn if world_view != null else 0,
+			textury, davka)
+		_metrics_s += _delta
+		if _metrics_s >= 1.0:
+			_metrics_s = 0.0
+			print("[metrics] ", metrics.text())
 	# Stavovy pruh se aktualizuje JEN kdyz se text zmeni (ne kazdy frame).
 	# Hodnoty jdou z `entity.mobile` - `max_hp`/`max_stam`/`max_mana` plni
 	# `Mobile._init` ze statu (`entity.stats`), takze nejsou opsane cisla.
@@ -102,8 +125,9 @@ func _setup_world() -> void:
 	if view == null:
 		push_warning("app.main: ve scene chybi uzel WorldView - mapa se nevykresli")
 		return
+	world_view = view
 	map = MapScript.new()
-	var textures = TextureCache.new()
+	textures = TextureCache.new()
 	view.setup(map, textures)
 	print("[main] svet: ", view.visible_count(), " objektu (", view.counts(), "), textury ",
 		textures.stats())
@@ -161,9 +185,23 @@ func _setup_player(view) -> void:
 
 
 func _load_data() -> Dictionary:
+	# `balance` jde pres `app.config` (M9): jedna typovana tabulka a kontrola,
+	# co v datech nesedi. Chyby se HLASI - ticha nahrada defaultem by znamenala,
+	# ze se hra chova jinak, nez data rikaji.
 	var out: Dictionary = {}
 	for key in DATA_FILES.keys():
 		var path: String = DATA_FILES[key]
+		if key == "balance":
+			config = ConfigScript.new(path)
+			var chyby: Array = config.check()
+			for chyba in chyby:
+				push_warning("app.main: app.config: " + str(chyba))
+			print("[main] config: ", config.known_keys().size(), " klicu, chyb ", chyby.size(),
+				", stat_gain.delay_ms ", config.value("stat_gain.delay_ms", 0),
+				" (", config.source("stat_gain.delay_ms"), ")")
+			if not config.all().is_empty():
+				out[key] = config.all()
+			continue
 		if not FileAccess.file_exists(path):
 			push_warning("app.main: chybi datovy soubor " + path)
 			continue
