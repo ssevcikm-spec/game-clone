@@ -726,6 +726,19 @@ V4 (výška z rohů) a V5 (most nad vodou); `pos.z` se zapisuje; `walk`/`movemen
 svahů by byla ~36 FPS) — naměřeno `_analyza/vlna5-chuze.gd`; zbývající záseky
 jsou **10 z 496 framů** (přestavba seznamu 45,8 ms každé 4 kroky, viz V3).
 
+**⚠ CI NAD COMMITTY TÉTO SESSION (14.) JE ZELENÝ — `#52` nad `5a42887`
+(kód + testy + smlouvy + HANDOFF/LESSONS) = `success`**, **17 kroků (+ 3 post
+kroky), job 5:21 min** (21:51:03 → 21:56:24 UTC; ověřeno živě přes API včetně
+výpisu všech kroků: 6 self-testy, **7 testy bez `assets/uo`**, 8 brány,
+**9 plný mutační důkaz**, 10–13 ostatní harnessy, 14 fixture, 15 stav plánu,
+16 souhrn, 17 artefakty). `sha` rozhoduje, ne „poslední běh" — v okamžiku
+kontroly byl `HEAD` = `5a42887` a `origin/main..HEAD` = `0`. Předchozí běh
+`#51` nad `116f87c` (13. session) = `success` (20:58 → 21:03, 5:08 min).
+**Hranice tvrzení zůstává:** logy ani artefakty nejdou bez tokenu stáhnout
+(`ci-log.mjs` → 403, `ci-artefakt.mjs` → 401), takže **čísla, která CI vypsala,
+nejsou ověřená** — ověřený je **návratový kód** kroků (a ten u kroku 9 není
+slabý: `mutace-tests.py` vrací 1, když mutace projde nebo selže smlouva vstupu).
+
 **⚠ CI NAD COMMITTY 10. SESSION JE ZELENÝ — `#43` nad `200fdc6` (kód, smlouvy,
 HANDOFF/LESSONS) a `#44` nad `4d0715c` (dokumentační dotyk + `cursor()` uvnitř
 modulu) = oba `success`**, **17 kroků (+ 3 post kroky), job 2:56 a 3:09 min**
