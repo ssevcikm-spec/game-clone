@@ -738,6 +738,13 @@ kontroly byl `HEAD` = `5a42887` a `origin/main..HEAD` = `0`. Předchozí běh
 (`ci-log.mjs` → 403, `ci-artefakt.mjs` → 401), takže **čísla, která CI vypsala,
 nejsou ověřená** — ověřený je **návratový kód** kroků (a ten u kroku 9 není
 slabý: `mutace-tests.py` vrací 1, když mutace projde nebo selže smlouva vstupu).
+**⚠ Co ověřené NENÍ (napsáno, ne zamlčeno):** navazující **dokumentační commit
+`46848a0`** (jen `HANDOFF.md`) byl pushnutý (`origin/main..HEAD = 0`), ale jeho
+běh CI **nešel vypsat** — neautentizovaná GitHub API začala po sérii dotazů
+vracet **HTTP 403 (rate limit)** a v této workspace **není soubor s PAT**
+(`ci-beh-stav.mjs` i nový `ci-behy10.mjs` skončily 403). Takže u `46848a0`
+**není změřené ani „běh vznikl"**; platí jen to, co je ověřené výš (`#52` nad
+`5a42887` = `success`). Kdo má token, ať se na `46848a0` podívá.
 
 **⚠ CI NAD COMMITTY 10. SESSION JE ZELENÝ — `#43` nad `200fdc6` (kód, smlouvy,
 HANDOFF/LESSONS) a `#44` nad `4d0715c` (dokumentační dotyk + `cursor()` uvnitř
