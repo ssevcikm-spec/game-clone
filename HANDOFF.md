@@ -98,12 +98,13 @@ ve `world.doors`." **Splněno — ale ne tak, jak znělo přijímací kritérium
 | **Reference (ne dohad)** | `base(closedID, openedID)` s **`openedID = closedID + 1`**: ServUO `Scripts/Items/Functional/Doors.cs:138` (`0x675 + 2*facing` → `0x676 + 2*facing`), ModernUO `Items/Construction/Doors/HouseDoors.cs:48–49`; `doors.txt` dodává právě `closedID` (dveře se do světa staví zavřené) |
 | **⚠ PARITA ANI `layer` NEJSOU KRITÉRIUM** | Kusů je **120 lichých a 110 sudých** a **16 kategorií má všechny kusy sudé** (7, 9–14, 19, 23, 27, 28, 30, 32–34, 36) — parita sleduje `base` (`MetalDoor` 0x675 lichý, `IronGate` 0x824 sudý). `layer` se liší u **39 z 230** párů (u bloku 1717..1732 sedí, jinde ne). Kdo stav pozná z parity nebo z vrstvy, rozhodne u těch kategorií **opačně** |
 | **Starý omyl (2026-10-02) je pojmenovaný, ne smazaný** | Hlavička `doors.gd` tvrdila „kusy 1–4 zavřené, 5–8 tytéž otevřené" a `toggle` pároval `index` s `index + 4`; byl to **jiný směr téhož stavu** (`1721 → 1725`), ne otevřeno. Zůstává v hlavičce jako záznam i s následkem (Úkol 4 by otvíral na špatnou stranu) |
-| **Oprava modulu** | `sim/world/doors.gd` (**142 řádků**, deklarace `<= 60` — překročeno, viz věc 2): `is_door` platí pro **oba** členy dvojice, `is_open(t) = not has(t) and has(t-1)`, `toggle(t) = t + 1` (zavřený) / `t - 1` (otevřený), `category`/`orientation` berou zavřeného dvojčete, `orientation` je **index v `doors.txt` (0..7)**, ne `index % 4`; `open_tile(cat, i) = tiles[i] + 1` |
+| **Oprava modulu** | `sim/world/doors.gd` (**142 řádků**, deklarace `<= 60` — překročeno, viz věc 2): `is_door` platí pro **oba** členy dvojice, `is_open(t) = not has(t) and has(t-1)`, `toggle(t) = t + 1` (zavřený) / `t - 1` (otevřený), `category`/`orientation` berou zavřené dvojče, `orientation` je **index v `doors.txt` (0..7)**, ne `index % 4`; `open_tile(cat, i) = tiles[i] + 1` |
 | **Test granule (přepsaný)** | `tests/cases/doors.gd` (**102 řádků**, **25 kontrol**): literály pro kat. 4 (`1721` zavřený, `1722` otevřený, `toggle` oběma směry, `1733` není dveře, `orientation(1725) == 4`), **sudá kategorie 7** (`2084` zavřený / `2085` otevřený — tím padá „parita"), a **smyčka přes všech 230 artů** (`is_open`, `toggle`, `is_door`, `category`, `orientation`, „partner není v datech"; počty: 230 projitých, 110 sudých zavřených). Cesta k souboru je **vstup** (`-- --doors-script=…`) |
 | **`tests/cases/walk.gd` zůstal zelený** | Sekce 8c hledala dvojici přes `is_open(piece) != is_open(piece1)` (stará konvence) → přepsáno na `not is_open(piece) and is_open(piece + 1)`; `walk` je na konvenci nezávislý (ptá se `is_open`) |
 | **Mutační důkaz (nový modul `doors`)** | `python tools/gates/mutace-tests.py --only doors` → **8 z 8 chyceno**, smlouva vstupu OK: (1) `toggle` = starý omyl `index + 4`, (2) `otevřeno = sudý art`, (3) `is_open` hledá `+1`, (4) vratná cesta vrací `+1`, (5) `is_door` jen pro zavřený art, (6) `category`/`orientation` otevřeného artu nenajde, (7) `orientation` zpět na `% 4`, (8) `open_tile` zapomene `+1` |
 | **Testy a brány** | s assety **584 kontrol / 0 selhání** (bylo 574; +10), **bez `assets/uo` 529 / 0** (bylo 519; +10 — doors test měří `data/doors.json`, ta v gitu jsou), 28/28 case souborů, `exit 0`; brány **11 měřeno / 0 NEMĚŘENO / 0 vad**; self-testy **19 / 0**; `check-docs-refs.py`, `check-zadani.py`, `roadmap-gen.py --check` **exit 0** |
 | **Dokumentace doplněna (ne přepsána)** | `docs/03 §3.6`: řádek `doors.txt` opraven na měřený stav + datovaná oprava pod příkladem (i s tím, že parita kritérium není); `docs/04 §4.2`: smlouva `world.doors` má `is_open`, `orientation` a význam `art + 1`; `docs/05 §5.2.2`: „přepni art na `art + 1` a zpět"; hlavička `sim/world/walk.gd` už neříká „konvence je otevřená věc" |
+| **CI** | `node _analyza/ci-beh-stav.mjs`: **#38 nad `98542a3` = `success`, 17 kroků, job 1:33 min** (i krok 9 s **61 mutacemi**); run #37 (7. session) taky `success` |
 | **Co se NEMĚNILO** | `sim/interaction` (Úkol 4) se nedělal, vady ze snímků (věci 59–61) taky ne; `data/doors.json` ani `tools/uoextract/textdata.py` se nedotkly; `tools/roadmap-gen.py` se neměnil (`provides` zůstaly stejné, `.forge/roadmap.json` je aktuální) |
 
 **Dopad na obrazovku je dnes nulový** (v okolí startu není ani jeden statik
@@ -327,8 +328,10 @@ ho celý." Každá session tedy **není „krok"**, ale **jeden celek s cílem**
 > ze `ZADANI-DALSI-VYVOJ-2.md`) — hotové a měřené.
 > **Proč zrovna tohle:** Úkol 4 (`sim.interaction`) je v roadmapě
 > **závislý na `entity.container` a `entity.equipment`** (`depends_on`), takže
-> bez nich se `use_on` na kontejner nedá ani změřit; a `docs/04 §4.5` má v tvaru
-> dat známé rozpory (vada ZADÁNÍ 8), které se při té příležitosti mají opravit.
+> bez nich se `use_on` na kontejner nedá ani změřit; a `docs/04 §4.5` má tvar dat
+> **neověřený** — u mobila jsou v něm známé rozpory (vada ZADÁNÍ 8), takže tvar
+> `Item`/`Container` se musí ověřit proti `docs/04 §4.5` **i proti referenci**
+> (invariant „právě jeden rodič“).
 > **Přijímací kritérium:** `sim/entity/item.gd` (tvar podle `docs/04 §4.5`,
 > invariant „**právě jeden rodič**" — ServUO `Server/Item.cs:759`) a
 > `sim/entity/container.gd` (`can_add(c, item) -> {ok, reason}`, `add`, `remove`,
@@ -360,8 +363,8 @@ zavřenými i otevřenými dveřmi, test kroku na schod nahoru/dolů, obojí s m
 
 ## Co čeká na tebe
 
-**Nic nečeká — obě rozhodnutí z 6. session jsi 7. session odsouhlasil a jsou
-hotová:**
+**Nic nečeká — 8. session nepotřebovala tvůj verdikt** (konvence dveří se
+rozhodla měřením) a obě rozhodnutí z 6. session jsou hotová:
 
 1. ~~**Zavřít slepé místo v `tests/run_tests.gd`**~~ — **HOTOVO 7. session**:
    `can_instantiate()` před `new()`, `script_at()` vrací `null` i pro
@@ -399,12 +402,13 @@ i konvence dveří jsou opravené** (6. session: statiky se čtou správnou tabu
 schody svou výškou; 8. session: `world.doors` páruje `art` ↔ `art + 1`).
 **Hra jede 40–45 FPS** (bylo 1–2 FPS) — viz sekce VÝKON.
 
-**⚠ CI: BĚH NAD COMMITEM 7. SESSION JE ZELENÝ — `#34` nad `4259091` = `success`,
-17 kroků** (ověřeno živě přes API s tokenem z Credential Manageru; `ci-beh-stav.mjs`
-bez tokenu je limitovaný, viz past v `LESSONS`). **Nové kroky 11–14 prošly:**
-`Mutační důkaz render.hue`, `Mutační důkaz render.anim`, `Mutační důkaz dekodéru
-animací` a `Fixture sedí na generátor`. Předtím: **#30 nad `f243ba2` = `success`
-(13 kroků; krok 9 = 53 mutací se vešlo do `timeout-minutes: 30`)**, #31 nad
+**⚠ CI: BĚH NAD COMMITEM 8. SESSION JE ZELENÝ — `#38` nad `98542a3` = `success`,
+17 kroků, job 1:33 min** (ověřeno živě přes API; krok 9 „Mutační důkaz testů"
+prošel i s **61 mutacemi** — lokálně celý `mutace-tests.py` trvá 3 min 27 s, takže
+`timeout-minutes: 30` je s rezervou). **Předtím** #37 nad `ce0c38e` = `success`
+(7. session push), #36 nad `073583b` = `success`; #34 nad `4259091` = `success`
+(17 kroků, včetně nových 11–14 z 7. session); #30 nad `f243ba2` = `success`
+(13 kroků; krok 9 = 53 mutací se vešlo do `timeout-minutes: 30`), #31 nad
 `062f419`, #29 nad `702dac2`, #23 nad `e6ff22e`, #24 nad `88b4747` — vše `success`.
 **Pozor na hranici toho tvrzení:** logy ani artefakty nejdou bez tokenu stáhnout
 (`ci-log.mjs` → 403, `ci-artefakt.mjs` → 401), takže **obsah kroků v CI ověřený
@@ -577,7 +581,7 @@ a barva kůže.** Statiky nesou barvu ze záznamu mapy, ale **nikdo ji nepouží
 |---|---|---|
 | Strom je čistý | `git status --porcelain -uall` | **prázdné** po commitu této session |
 | Je před GitHubem | `git rev-list --count origin/main..HEAD` | **`0`** — **8. session pushla** (uživatel 2026-10-07 povolil commit i push po každé session) |
-| **Běží CI?** | `node _analyza/ci-beh-stav.mjs` (bez tokenu je limitovaný — viz past v `LESSONS`) · anotace: `node _analyza/ci-anotace.mjs` | **běh nad commitem 8. session = `success`, 17 kroků** (viz „BLOKÁTORY"); předtím #34 nad `4259091` (7. session) = `success`. **sha rozhoduje**, ne „poslední běh" |
+| **Běží CI?** | `node _analyza/ci-beh-stav.mjs` (bez tokenu je limitovaný — viz past v `LESSONS`) · anotace: `node _analyza/ci-anotace.mjs` | **#38 nad `98542a3` (8. session) = `success`, 17 kroků** (i krok 9 s **61 mutacemi**); předtím #37 nad `ce0c38e` a #34 nad `4259091` (7. session) = `success`. **sha rozhoduje**, ne „poslední běh" |
 | **Co v CI NEJDE ověřit bez tokenu** | `node _analyza/ci-log.mjs` → **HTTP 403**; `ci-artefakt.mjs` → **HTTP 401** | Kdo nemá token, **vidí jen stav kroků**, ne jejich obsah — takže „krok s mutacemi prošel" je naměřené, ale **počet chycených mutací v CI je neověřený** (naměřeno je **lokálně**). Nezapisuj do předání „CI má 61/61", když to nevidíš |
 | Repo je veřejné | API bez tokenu | `visibility: public` |
 | **Oprávnění** | `whoami /groups \| Select-String Mandatory` | **`Medium`** = plný přístup. `Low` = sandbox → brány hlásí **falešné vady**, `.uid` nevzniknou a `run-all.py` spadne na `summary.json` (5. session to naměřila: G7 „VADA save/load", G11 NEMĚŘENO, self-test 9 chyb — **všechno byl sandbox**) |
