@@ -35,6 +35,11 @@ const Iso = preload("res://core/iso.gd")
 const Const = preload("res://core/const.gd")
 const TiledataScript = preload("res://sim/world/tiledata.gd")
 const ITEM_OFFSET: int = 0x4000
+# `IsBackground` v tiledata: dlazdice je PODLAHA, ne prekazka. ClassicUO ji
+# v `PriorityZ` odecita 1 (`Chunk.cs:246-272`), takze plocha mostu jde PRED
+# jeho zabradli - bez toho se na molu u Britannie kreslilo zabradli pod
+# dlazdicemi (namEReno 2026-10-07).
+const F_BACKGROUND: int = 0x00000001
 
 var _map = null
 var _textures = null
@@ -120,12 +125,29 @@ func _build(area: Rect2i) -> Array:
 				if not area.has_point(Vector2i(sx, sy)):
 					continue
 				var art_id: int = int(record["tile"]) + ITEM_OFFSET
+				var z_statiku: int = int(record["z"])
 				objects.append({"kind": "static", "x": sx, "y": sy,
-					"z": int(record["z"]), "art_id": art_id,
+					"z": z_statiku, "art_id": art_id,
+					"priority_z": _priorita(art_id, z_statiku),
 					"offset": _textures.offset(art_id)})
 				counts["static"] += 1
 	_counts = counts
 	return _sort.draw_order(objects)
+
+
+func _priorita(art_id: int, z: int) -> int:
+	# Poradova vyska pro RAZENI, ne pro kresleni (ClassicUO `PriorityZ`,
+	# `Chunk.cs:246-272`): podlaha (`IsBackground`) -1, statik s vyskou +1.
+	# Bez tiledata (konstruktor ji smi dostat `null`) se vrati `z` - razeni pak
+	# zustane na chovani pred 2026-10-07, jen se o nem vi.
+	if _tiledata == null:
+		return z
+	var v: int = z
+	if _tiledata.flags(art_id) & F_BACKGROUND != 0:
+		v -= 1
+	if _tiledata.height(art_id) != 0:
+		v += 1
+	return v
 
 
 func _z_grid(area: Rect2i) -> PackedInt32Array:

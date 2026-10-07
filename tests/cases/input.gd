@@ -5,6 +5,7 @@ extends RefCounted
 # samotny tvar by jinak mohl "vypadat spravne" a sim by ho zahodil.
 
 const Lib = preload("res://tests/lib.gd")
+const Iso = preload("res://core/iso.gd")
 
 # Cesta k modulu je VSTUP (jako u ostatnich case souboru): mutacni harness
 # (`tools/gates/mutace-tests.py`) pousti test nad mutantem a bez prepinace by
@@ -144,3 +145,64 @@ func run(t) -> void:
 		"app.input: DRZENE PRAVE TLACITKO - daleko od hrace = BEH (namEReno %s)" % str(daleko))
 	t._check(blizko.size() == 1 and blizko[0].get("run") == false,
 		"app.input: DRZENE PRAVE TLACITKO - blizko stredu = CHUZE (namEReno %s)" % str(blizko))
+
+	# 9) SMER Z MYSI JE OBRAZKOVY (vada V3 z `REVIZE-POHYB-2026-10-07.md` §2.3).
+	#    Tabulka nize je PREKLAD vsech 16 vetvi `hashf` z ClassicUO
+	#    (`GameCursor.GetMouseDirection`, `GameCursor.cs:670-754`) do naseho
+	#    cislovani smeru. Misto `signi` na rozdilu dlazdic se porovnava
+	#    |dy| <= 0,4|dx| (rovina vodorovna) a |dy| >= 2,5|dx| (rovina svisla).
+	#    Hranice se testuji na OBOU stranach (presna rovnost patri do roviny) -
+	#    jinak by proslo i "<" vs "<=".
+	var stred_mysi := Vector2(640.0, 360.0)
+	var tabulka := [
+		[Vector2(0, 0), -1, "kurzor na hraci = zadny smer"],
+		[Vector2(400, 0), 1, "vpravo = NE (ClassicUO 320)"],
+		[Vector2(-400, 0), 5, "vlevo = SW (ClassicUO 120)"],
+		[Vector2(0, 400), 7, "dolu = SE (ClassicUO 230)"],
+		[Vector2(0, -400), 3, "nahoru = NW (ClassicUO 210)"],
+		[Vector2(400, 160), 1, "vpravo, |dy| = 0,4|dx| presne = jeste rovina"],
+		[Vector2(400, 161), 0, "vpravo, |dy| o 1 vic = uz uhlopricka (E)"],
+		[Vector2(400, -200), 2, "vpravo nahoru = N (ClassicUO 312)"],
+		[Vector2(100, 400), 7, "dolu, |dy| = 4|dx| = rovina svisla (SE)"],
+		[Vector2(200, 400), 0, "dolu, |dy| = 2|dx| = jeste uhlopricka (E)"],
+		[Vector2(200, 500), 7, "dolu, |dy| = 2,5|dx| presne = uz rovina svisla"],
+		[Vector2(-400, 200), 6, "vlevo dolu = S (ClassicUO 132)"],
+		[Vector2(-400, -200), 4, "vlevo nahoru = W (ClassicUO 112)"],
+		[Vector2(-100, -400), 3, "nahoru, |dy| = 4|dx| = rovina svisla (NW)"],
+	]
+	var spatne: Array = []
+	for radek in tabulka:
+		var smer: int = drzeny.direction_from_screen(stred_mysi, stred_mysi + radek[0])
+		if smer != int(radek[1]):
+			spatne.append("%s -> %d (cekano %d)" % [str(radek[0]), smer, int(radek[1])])
+	t._check(spatne.is_empty(),
+		"app.input: obrazkovy smer z mysi sedi na tabulku ClassicUO (16 vetvi; chyby %s)"
+		% str(spatne))
+
+	# 9b) STRED VYCHOZI BOD JE HRAC NA OBRAZOVCE, ne stred okna: `world_view`
+	#     kresli hrace na `to_screen(dlazdice) + (ISO_STEP, TILE_H/2)` a kamera
+	#     ho drzi uprostred. Kdyby se pocitalo z `view_size/2`, byl by smer
+	#     posunuty, jakmile by hrac nebyl presne ve stredu.
+	var pozice: Vector2 = drzeny.player_screen_position(Vector2i(10, 10), Vector2.ZERO, 0)
+	var iso_proj = Iso.new()
+	var ocekavana: Vector2 = iso_proj.to_screen(10, 10, 0) + Vector2(float(consts["ISO_STEP"]),
+		float(consts["TILE_H"]) / 2.0)
+	t._check(pozice == ocekavana,
+		"app.input: stred pro smer z mysi je pozice hrace (%s vs %s)" % [str(pozice), str(ocekavana)])
+	t._check(drzeny.player_screen_position(Vector2i(10, 10), Vector2(100.0, 0.0), 0)
+			== ocekavana - Vector2(100.0, 0.0),
+		"app.input: odecteni kamery posune stred hrace (kamera - offset)")
+	# 9c) krok z `walk_to` se stavi ze SMERU, a kdyz je kurzor na hraci, prodleva
+	#     se NESPOTREBUJE (jinak by "nic" spalilo 400 ms - vada V1).
+	#     Oba pokusy jsou ve STEJNEM case: kdyby prvni (kurzor na hraci)
+	#     prodlevu spotreboval, druhy by nevratil zadny prikaz.
+	Input.action_press("test_drzeni_mys")
+	var na_hraci: Array = drzeny.poll(Vector2i(10, 10), Vector2.ZERO, 0, pozice, walk_ms * 10)
+	var mimo: Array = drzeny.poll(Vector2i(10, 10), Vector2.ZERO, 0, pozice + Vector2(400.0, 0.0),
+		walk_ms * 10)
+	Input.action_release("test_drzeni_mys")
+	t._check(na_hraci.is_empty(),
+		"app.input: kurzor na hraci = zadny krok (namEReno %d)" % na_hraci.size())
+	t._check(mimo.size() == 1 and int(mimo[0].get("dir")) == 1,
+		"app.input: kurzor na hraci nespotreboval prodlevu a smer je z obrazovky"
+		+ " (namEReno %s)" % str(mimo))

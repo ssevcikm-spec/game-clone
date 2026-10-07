@@ -75,11 +75,20 @@ func tick(ms: int) -> void:
 	_clock.advance(ms)
 	var batch: Array[Dictionary] = _queue
 	_queue = []
-	for command in batch:
-		_commands.dispatch(self, command)
+	# ⚠ PORADI JE PRAVIDLO, NE DETAIL (namEReno 2026-10-07, vada V1 z
+	# `REVIZE-POHYB-2026-10-07.md` §2.1): systemy se tickuji PRED prikazy.
+	# Kdyz se prikazy dispatchovaly prvni, krok, ktery je v tomto ticku na rade
+	# (`due_ms <= now`), se jeste neaplikoval - a `sim.movement.request_step`
+	# ho videl jako `busy`. Klient ale svuj 400ms casovac opakovani spotreboval
+	# uz pri VYDANI prikazu, takze dalsi pokus prisel az za dalsich 400 ms ->
+	# namERENA kadence byla **718 ms (a 530 ms) misto 400** a byla nepravidelna.
+	# Cas v ticku plyne takto: nejdriv svet (timery), pak cizi zamery - stejne
+	# jako server, ktery nejdriv zpracuje frontu timeru a teprve pak packet.
 	for name in SYSTEM_ORDER:
 		if systems.has(name):
 			_tick_system(systems[name], ms)
+	for command in batch:
+		_commands.dispatch(self, command)
 
 
 func snapshot() -> Dictionary:

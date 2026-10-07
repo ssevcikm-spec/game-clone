@@ -33,6 +33,15 @@ const ACTION_DIR := {
 # pouziva `sim.movement`, ktery krok navic zahodi jako "busy", kdyz jeste bezi.
 const MOUSE_RUN_PX: float = 190.0   # ClassicUO GameSceneInputHandler.cs:66
 
+# PRAHY SMERU Z MYSI (namEReno 2026-10-07, vada V3 z `REVIZE-POHYB-2026-10-07.md`
+# §2.3). Smer se NEPOCITA z rozdilu dlazdic (`signi`), ale z pozice kurzoru na
+# OBRAZOVCE - presne jako ClassicUO `GameCursor.GetMouseDirection`
+# (`GameCursor.cs:670-754`): hranice rovina/uhlopricka jsou |dy| <= 0,4|dx|
+# a |dy| >= 2,5|dx|, tedy celociselne `ay * 5 <= ax * 2` a `ay * 2 >= ax * 5`.
+# Cisla jsou z reference, ne vymyslena.
+const MOUSE_RATIO_NUM: int = 2
+const MOUSE_RATIO_DEN: int = 5
+
 var bindings: Dictionary = {}
 var always_run: bool = false
 # Velikost herniho okna v px - potrebuje ji prave tlacitko (`run` podle
@@ -86,6 +95,10 @@ func hold_command(action: String, now_ms: int, run: bool = false) -> Dictionary:
 
 func direction_between(from: Vector2i, to: Vector2i) -> int:
 	# Vraci cislo smeru 0..7, nebo -1 kdyz jsme na miste (neni kam krocit).
+	# POZOR: tohle je pravidlo pro KLIK NA DLAZDICI (`click_at`), ne pro smer
+	# z mysi pri drzeni praveho tlacitka - tam plati `direction_from_screen`
+	# (nize). Rozdil je namEReny: `signi` na rozdilu dlazdic udela uhlopricku
+	# z kazdeho kliku, ktery neni presne na ose nebo presne na 45 stupnich.
 	if from == to:
 		return -1
 	var dx: int = signi(to.x - from.x)
@@ -94,6 +107,39 @@ func direction_between(from: Vector2i, to: Vector2i) -> int:
 		if Const.DIR_DX[dir] == dx and Const.DIR_DY[dir] == dy:
 			return dir
 	return -1
+
+
+func player_screen_position(player: Vector2i, camera_offset: Vector2, z: int = 0) -> Vector2:
+	# Kde je HRAC na obrazovce: kamera ho drzi ve stredu, takze stred obrazovky
+	# je jeho dlazdice. `click_at` pouziva opacny prevod (`world = screen + offset`).
+	var stred_sveta: Vector2 = _iso.to_screen(player.x, player.y, z) \
+		+ Vector2(Const.ISO_STEP, Const.TILE_H / 2)
+	return stred_sveta - camera_offset
+
+
+func direction_from_screen(center: Vector2, mouse: Vector2) -> int:
+	# Smer 0..7 z pozice kurzoru VULCI HRACI NA OBRAZOVCE (ClassicUO
+	# `GameCursor.GetMouseDirection`, `GameCursor.cs:670-754`; prevod jeho
+	# vysledku do naseho cislovani je odvozeny preklad tabulky `hashf`).
+	# Vraci -1, kdyz kurzor stoji presne na hraci - "neni kam krocit" je
+	# pozadavek, ktery se NEMA tise zmenit na krok nejakym smerem.
+	var dx: float = mouse.x - center.x
+	var dy: float = mouse.y - center.y
+	if dx == 0.0 and dy == 0.0:
+		return -1
+	if dx == 0.0:
+		return 7 if dy > 0.0 else 3          # dolu = SE, nahoru = NW
+	if dy == 0.0:
+		return 1 if dx > 0.0 else 5          # vpravo = NE, vlevo = SW
+	var ax: float = absf(dx)
+	var ay: float = absf(dy)
+	if ay * float(MOUSE_RATIO_DEN) <= ax * float(MOUSE_RATIO_NUM):
+		return 1 if dx > 0.0 else 5          # rovina vodorovna
+	if ay * float(MOUSE_RATIO_NUM) >= ax * float(MOUSE_RATIO_DEN):
+		return 7 if dy > 0.0 else 3          # rovina svisla
+	if dx > 0.0:
+		return 0 if dy > 0.0 else 2          # vpravo dolu = E, vpravo nahoru = N
+	return 6 if dy > 0.0 else 4              # vlevo dolu = S, vlevo nahoru = W
 
 
 func step_command(from: Vector2i, to: Vector2i) -> Dictionary:
@@ -162,16 +208,20 @@ func poll(player: Vector2i, camera_offset: Vector2, z: int = 0,
 			continue
 		if str(action) == "walk_to":
 			# DRZENE PRAVE TLACITKO = chuze kursoru (ClassicUO
-			# `MoveCharacterByMouseInput`). Smer je z pozice kurzoru, `run`
+			# `MoveCharacterByMouseInput`). Smer je z pozice kurzoru VULCI
+			# HRACI NA OBRAZOVCE (`direction_from_screen`, vada V3), `run`
 			# z jeho vzdalenosti od stredu obrazovky.
+			# Kurzor presne na hraci NENI krok - a prodleva se u nej
+			# NESPOTREBUJE (jinak by "nic" spálilo 400 ms, presne vada V1).
+			var smer: int = direction_from_screen(
+				player_screen_position(player, camera_offset, z), mouse_position)
+			if smer < 0:
+				continue
 			var bez: bool = mouse_run(mouse_position)
 			if not _smi_krokovat(action, cas, bez):
 				continue
-			var k_mysi: Dictionary = click_at(player, mouse_position, camera_offset, z)
-			if k_mysi.is_empty():
-				continue
-			k_mysi["run"] = bez or always_run
-			out.append(k_mysi)
+			out.append({"t": "move", "dir": smer, "run": bez or always_run,
+				"seq": next_seq()})
 			continue
 		if not ACTION_DIR.has(str(action)):
 			# Jednorazove akce (war/peace/cancel_target/use) se NEOPAKUJI.

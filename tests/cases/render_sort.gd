@@ -68,6 +68,35 @@ func run(t) -> void:
 		"render.sort: dva statiky na jedne dlazdici, nizsi z prvni (namEReno %s)"
 		% str(_tags(sort.draw_order(dva))))
 
+	# 1b) `priority_z` je PORADOVA vyska (ClassicUO `PriorityZ`, `Chunk.cs:246-272`):
+	#     plocha dlazdice mostu (podlaha, -1) se kresli PRED zabradlim (+1), i kdyz
+	#     maji STEJNE `z`. NamEReno 2026-10-07 na molu u Britannie: prkno i zabradli
+	#     maji z=10, dnes je z toho remiza -> rozhoduje poradi v souboru mapy a
+	#     prkno zabradli prekryje (30 dlazdic mola).
+	var most := [
+		{"kind": "static", "x": 10, "y": 10, "z": 10, "priority_z": 11, "tag": "zabradli"},
+		{"kind": "static", "x": 10, "y": 10, "z": 10, "priority_z": 10, "tag": "plocha"},
+	]
+	t._check(_tags(sort.draw_order(most)) == ["plocha", "zabradli"],
+		"render.sort: priority_z rozhoduje na stejne dlazdici (%s)"
+		% str(_tags(sort.draw_order(most))))
+
+	# 1c) bez `priority_z` plati `z` - vstup {kind,x,y,z} se chova jako predtim
+	var bez_priority := [_tag("static", 10, 10, 5), _tag("static", 10, 10, 2)]
+	t._check(_tags(sort.draw_order(bez_priority)) == ["static@10,10,2", "static@10,10,5"],
+		"render.sort: bez priority_z se radi podle z (%s)"
+		% str(_tags(sort.draw_order(bez_priority))))
+
+	# 1d) `priority_z` mimo rozsah `z` se SVERUJE - jinak by objekt preskocil
+	#     o cely diagonaly (stejna past jako u `z` v hlavicce modulu)
+	var sveru := [
+		{"kind": "static", "x": 6, "y": 6, "z": 0, "priority_z": 5000, "tag": "druha_diagonala"},
+		{"kind": "static", "x": 5, "y": 6, "z": 0, "priority_z": -5000, "tag": "prvni_diagonala"},
+	]
+	t._check(_tags(sort.draw_order(sveru)) == ["prvni_diagonala", "druha_diagonala"],
+		"render.sort: priority_z mimo rozsah nepreskoci diagonalou (%s)"
+		% str(_tags(sort.draw_order(sveru))))
+
 	# 2) jedna dlazdice: land -> statiky podle z -> mobilove podle z
 	var smes := [_tag("mobile", 4, 4, 0), _tag("static", 4, 4, 5), _tag("land", 4, 4, 0),
 		_tag("mobile", 4, 4, -3), _tag("static", 4, 4, -1)]

@@ -90,8 +90,13 @@ serialu, seřazené klíče vlastností, žádné floaty).
 
 **Řazení (occlusion) — musí být jedna funkce, ne rozházené `z_index`:**
 kreslí se po dlaždicích ve směru rostoucího `x + y`; v rámci jedné dlaždice
-nejdřív land, pak statics **podle `z` vzestupně**, pak mobilové podle `z`
+nejdřív land, pak statics **podle `priority_z` vzestupně**, pak mobilové podle `z`
 vzestupně. Statiky s `Surface` flagem tvoří „povrch" pro postavení.
+**`priority_z` NENÍ `z` z mapy** (opraveno 2026-10-07): statik s výškou jde `+1`,
+podlaha (`IsBackground`, flag `0x1`) `−1` — stejně jako `PriorityZ` v ClassicUO
+(`Chunk.cs:246-272`). Bez toho měly plocha mostu a jeho zábradlí stejný klíč a
+rozhodovalo pořadí v souboru mapy (naměřeno: 11 271 shod `z`, z toho 6 401
+s vadou, 71 nad vodou — `REVIZE-POHYB-2026-10-07.md` §2.6).
 Konkrétní klíč řazení je v `render/sort.gd` a je **pokrytý testem** (dva
 objekty na stejné dlaždici různého `z` → pořadí; viz §8, brána render).
 

@@ -69,8 +69,19 @@ v simulaci; UI drží „predikovanou" pozici, dokud nedorazí událost.
 | Regenerace | podle DEX a hladu (`sim.regen`) | čísla z `research/01` §1.4 |
 | Váha (encumbrance) | nad nosnost se pohyb zpomalí/znemožní | `research/01` §1.5 |
 
-**Zákaz:** „pohyb je plynulý" (lerp mezi dlaždicemi jako moderní hry).
-Pohyb je **diskrétní krok** — to je poznávací znamení UO.
+**Pravidlo (PŘEPSÁNO 2026-10-07 — dřív tu byl zákaz, naměřeno jako věcně
+nesprávný):** pohyb je **diskrétní krok 400 ms (běh 200 ms)** — to je pravidlo
+**simulace** a nemění se. **Klient ale SMÍ vykreslit posun mezi dlaždicemi
+plynule:** referenční klient to přesně tak dělá (ClassicUO `Mobile.cs:776-782`
+a `MovementSpeed.GetPixelOffset` — dlaždici potvrdí až na **konci** kroku, do té
+doby kreslí postavu posunutou o pixely, a **týž 80ms clock řídí i framy
+animace**). Původní zákaz („lerp mezi dlaždicemi jako moderní hry") vycházel
+z omylu o tom, co UO dělá, a jeho důsledkem bylo, že animace chůze byla
+**v protifázi s pohybem** (doklad: `REVIZE-POHYB-2026-10-07.md` §2.2).
+
+**Co zůstává zakázané:** měnit kvůli dojmu z plynulosti **pravidla** — prodlevu
+kroku, průchodnost, dosah ani spotřebu staminy. Plynulost je věc **vykreslení**,
+ne mechaniky.
 
 ## 5.2 Interakce mezi objekty (§ V3)
 

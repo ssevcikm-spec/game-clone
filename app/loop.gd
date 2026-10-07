@@ -29,7 +29,14 @@ func _process(delta: float) -> void:
 	var done: int = 0
 	while _accumulator_ms >= float(Const.TICK_MS) and done < MAX_CATCHUP_TICKS:
 		if input_map != null:
-			for command in input_map.poll(player_tile, camera_offset, 0, get_viewport().get_mouse_position()):
+			# ⚠ CAS VSTUPU JE CAS SIMULACE, ne nastenny (namEReno 2026-10-07,
+			# vada V1 z `REVIZE-POHYB-2026-10-07.md` §2.1). Prodleva kroku
+			# (400/200 ms) je pravidlo SIMULACE; kdyz se merila nastenami
+			# hodinami vzorkovanymi po framech (27 FPS = 37 ms), vychazela
+			# kadence 430 ms misto 400 a byla rozhozene. `sim.world_time()`
+			# tiká presne po 50 ms, takze krok vychazi na 8 tiku presne.
+			for command in input_map.poll(player_tile, camera_offset, 0,
+					get_viewport().get_mouse_position(), sim.world_time()):
 				sim.enqueue(command)
 		sim.tick(Const.TICK_MS)
 		_accumulator_ms -= float(Const.TICK_MS)

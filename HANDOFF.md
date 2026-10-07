@@ -20,6 +20,24 @@
 > `app/world_view.gd`, `tests/cases/{input,player_controller,chunk_renderer,world_view,render_hue,tiledata}.gd`,
 > `tools/gates/{mutace-tests,mutace-render-hue,run-all}.py`, `docs/03`, `docs/04`).
 
+## ✅ CO JE NOVÉHO (13. session) — OPRAVY A, D, E Z VLNY POHYBU
+
+**Zadání uživatele (doslova):** „Souhlasím se všemi tvými návrhy… Implementuj
+všechny své návrhy, souhlasím s nimi." Celé měření je v
+**[`REVIZE-POHYB-2026-10-07.md`](REVIZE-POHYB-2026-10-07.md)** (§2 příčiny,
+§7 co se provedlo); analýza směru projektu v
+**[`REVIZE-SMER-2026-10-07.md`](REVIZE-SMER-2026-10-07.md)**.
+
+| Co | Doklad (naměřeno dnes) |
+|---|---|
+| **A) Kadence kroku byla 718/530 ms místo 400** | Dvě příčiny, dvě malé opravy: (1) `sim/sim_world.gd:tick` tickuje **systémy PŘED dispatchem příkazů** (jinak krok, který je v tomto ticku na řadě, vrací `busy`), (2) `app/loop.gd` dává vstupu **čas simulace** (`poll(..., sim.world_time())`), ne nástěnné hodiny vzorkované po framech. **Před: 7–9 kroků za 5 s (530–718 ms). Po: 12 kroků, median 404 ms, 11 z 12 prodlev u 400 ms, 0 dvojnásobných** (`_analyza/vada-kadence-po-A2.txt`) |
+| **D) Směr z myši** | `app/input_map.direction_from_screen()` — obrazové prahy `|dy| ≤ 0,4|dx|` / `≥ 2,5|dx|` z ClassicUO `GameCursor.cs:670-754`; kurzor na hráči = žádný krok a **prodleva se nespálí**; test měří **16 větví tabulky + obě hranice**; mutace `input` **10/10** |
+| **E) Zábradlí pod dlaždicemi mostu** | `render/sort.priority_z()` + `render/chunk_renderer._priorita()`: `z − 1` za `IsBackground`, `+ 1` za `Height != 0` (ClassicUO `PriorityZ`). **Vizuálně doloženo** `_analyza/snimky/mol-{pred,po}.png` (zábradlí pod prkny → nad prkny; rozdíl 1 736 px přesně na zábradlí) a **determinismus snímku ověřen hashem** (dva běhy = stejný soubor) |
+| **Brány** | testy **969 kontrol / 0 selhání**; `run-all.py` **11 měřeno / 0 vad**; mutace `input`+`world_loop` **11/11**, `sort`+`chunk_renderer` **19/19**; `check-docs-refs`/`check-zadani`/`roadmap-gen --check` exit 0; replaye **beze změny hashů** |
+| **Zadání (docs) přepsáno** | `docs/05 §5.1.4` — **zákaz plynulého pohybu ZRUŠEN** (naměřeno, že reference pohyb plynule vykresluje); krok zůstává diskrétní, plynulost je věc vykreslení. `docs/02 §2.4` (řazení podle `priority_z`), `docs/04 §4.2` (5 smluv) |
+| **Co ZŮSTÁVÁ z vlny pohybu** | **B** interpolace + animace v jedné fázi (V2), **C** pravidla chůze (V4 svahy, V5 most), **F/M9** `render.chunk_mesh` (1 516 draw callů, 27 FPS při chůzi). Zdůvodnění a čísla: `REVIZE-POHYB` §5 |
+| **Co se NEMĚNILO** | `data/*.json`, `sim/world/walk.gd` (V4/V5 zůstávají), `app/world_view.gd`, `render/anim_player.gd`, `project.godot`, `app/main.tscn` |
+
 ## ✅ CO JE NOVÉHO (12. session) — VLNA OPRAV: svahy, držení vstupu, stopa framů, sekání
 
 **Zadání uživatele (doslova):** „Chybí výškové assety (kde je svah, tam není tile
@@ -559,6 +577,31 @@ zavřenými i otevřenými dveřmi, test kroku na schod nahoru/dolů, obojí s m
 (`--only walk` **12/12**), `run_tests.gd` **537/0**, `run-all.py` **0 vad**.
 
 ## Co čeká na tebe
+
+**⚠ NOVÉ (13. session, k rozhodnutí): šest vad pohybu od uživatele + dvě
+rozhodnutí, která z nich plynou.** Celé měření (citace z ClassicUO/ServUO/Sphere
+i sondy) je v **[`REVIZE-POHYB-2026-10-07.md`](REVIZE-POHYB-2026-10-07.md)**;
+tady je jen to, co čeká na tebe (obojí vratné, obojí doložené měřením):
+
+| # | Na co se čeká | Co to blokuje | Cena / cesta zpět |
+|---|---|---|---|
+| 1 | **Smím přepsat `docs/05 §5.1.4`** — zákaz „pohybu plynulého (lerp mezi dlaždicemi jako moderní hry)"? Referenční klient pohyb **plynule vykresluje** (ClassicUO `Mobile.cs:776-782` + `MovementSpeed.GetPixelOffset`: dlaždici commitne až na konci kroku, do té doby kreslí `Offset` v pixelech) — zákaz je tedy věcně nesprávné tvrzení o UO. Navržená formulace: krok zůstává **diskrétní 400/200 ms**, klient **smí** vykreslit posun mezi dlaždicemi plynule | vadu **V2** („postava se posune dřív, než se objeví animace") **nelze opravit**, dokud zákaz platí | Přepsat 2 řádky v `docs/05`; vratné |
+| 2 | **Předsunout `render.chunk_mesh` (M9) před obsah M3+?** Dnes naměřeno: 1 516 draw callů na frame a **27 FPS při chůzi**, kritérium `docs/01 §1.6` (≤ 16 ms / 60 FPS) nedodržené | plynulost hry; každá další práce na klientu se dělá nad provizoriem | Granule v roadmapě **už je** (M9, `size_lines <= 150`); jde jen o pořadí. Vratné |
+
+**Šest vad je naměřených (ne odhadnutých):** kadence kroku **718 / 530 ms místo
+400** (dva běhy téhož kódu, 7 a 9 kroků za 5 s místo 13), 2,4 % kroků do kopce
+blokujeme i když UO povolí, most nad vodou je neprůchodný (kontrola `WET` je
+před statiky), a zábradlí je pod dlaždicemi na **6 401** dlaždici mapy
+(z toho 71 nad vodou). Detaily a opravy: `REVIZE-POHYB-2026-10-07.md` §2 a §5.
+
+**⚠ TAKÉ NOVÉ (13. session, k rozhodnutí): směr projektu — singleplayer vs.
+cizí shardy vs. vlastní server.** Uživatel se zeptal na hodnotu tří variant
+(a) singleplayer, (b) custom klient na cizí UO shardy, (c) klient + vlastní
+server, a k tomu na NPC/AI a „živý svět", moderní organizaci objektů (ECS)
+a QoL. **Celá analýza s čísly je v
+[`REVIZE-SMER-2026-10-07.md`](REVIZE-SMER-2026-10-07.md)**; doporučení je
+**(a) teď, (c) jako držená opce, (b) jako samostatný produkt** — a pět ze šesti
+oprav pohybu má cenu ve všech třech variantách, takže práce může začít hned.
 
 **Dvě rozhodnutí z 12. session (obojí vizuální, obojí má cestu zpět):**
 

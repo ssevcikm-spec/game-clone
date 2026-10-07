@@ -72,8 +72,21 @@ class FakeTiledata:
 	# Jen to, co `render.chunk` vola: `texture(tile)` = TexID pro texturu svahu.
 	# Vraci `tile + 100`, aby se poznalo, ze se opravdu pouzil VYSLEDEK tiledata
 	# (kdyby se do seznamu dala konstanta 0, test by to nerozlisil).
+	# `flags`/`height` potrebuje `priority_z` statiku (vada V6): test si pres
+	# ne nastavi PODLAHU (background) a statik s vyskou, aby se dalo merit, ze
+	# se poradova vyska pocita z tiledata a ne z `z`.
+	var background: int = 0x00000001
+	var vysky: Dictionary = {}          # art_id -> vyska
+	var podlahy: Array = []             # art_id, ktere jsou podlaha
+
 	func texture(tile: int) -> int:
 		return tile + 100
+
+	func flags(art_id: int) -> int:
+		return background if podlahy.has(art_id) else 0
+
+	func height(art_id: int) -> int:
+		return int(vysky.get(art_id, 0))
 
 
 func _arg(name: String, fallback: String) -> String:
@@ -155,6 +168,49 @@ func run(t) -> void:
 			if not chunk.cover().has_point(svet):
 				mimo += 1
 	t._check(mimo == 0, "render.chunk: statik mimo oblast se neprida (namEReno %d mimo)" % mimo)
+
+	# --- 2b) `priority_z` statiku (vada V6) -----------------------------------
+	# Podlaha (`IsBackground`) jde -1 a statik s vyskou +1 (ClassicUO `PriorityZ`,
+	# `Chunk.cs:246-272`). Proto se plocha dlazdice mostu kresli PRED zabradlim,
+	# i kdyz maji STEJNE `z` - a to i kdyz je v souboru mapy zabradli prvni
+	# (presne to namERilo 2026-10-07 na molu u Britannie: 30 dlazdic, kde prkno
+	# prekrylo zabradli).
+	var td := FakeTiledata.new()
+	td.podlahy = [500 + ITEM_OFFSET]
+	td.vysky = {501 + ITEM_OFFSET: 20}
+	var map2 := FakeMap.new()
+	map2.land_rect = Rect2i(6, 6, 3, 3)
+	map2.statics[Vector2i(0, 0)] = [
+		{"tile": 501, "x": 7, "y": 7, "z": 10, "hue": 0},   # zabradli: z 10 + 1 = 11
+		{"tile": 500, "x": 7, "y": 7, "z": 10, "hue": 0},   # podlaha:  z 10 - 1 = 9
+		{"tile": 502, "x": 6, "y": 6, "z": 10, "hue": 0},   # ani jedno: z 10
+	]
+	var chunk2 = script.new(map2, textures, td)
+	var list2: Array = chunk2.visible(center, 8, 8)
+	var priority := {}
+	var poradi: Array = []
+	for obj in list2:
+		if str(obj["kind"]) == "static":
+			priority[int(obj["art_id"])] = int(obj["priority_z"])
+			poradi.append(int(obj["art_id"]) - ITEM_OFFSET)
+	t._check(priority.get(500 + ITEM_OFFSET, 0) == 9
+			and priority.get(501 + ITEM_OFFSET, 0) == 11
+			and priority.get(502 + ITEM_OFFSET, 0) == 10,
+		"render.chunk: priority_z = z, -1 za podlahu, +1 za vysku (namEReno %s)"
+		% str(priority))
+	t._check(poradi.find(500) < poradi.find(501),
+		"render.chunk: podlaha mostu se kresli PRED zabradlim na teze dlazdici"
+		+ " (namEReno poradi %s)" % str(poradi))
+	# bez tiledata (konstruktor ji smi dostat null) zustava razeni podle `z`
+	var chunk3 = script.new(map2, textures)
+	var list3: Array = chunk3.visible(center, 8, 8)
+	var priority3 := {}
+	for obj in list3:
+		if str(obj["kind"]) == "static":
+			priority3[int(obj["art_id"])] = int(obj["priority_z"])
+	t._check(priority3.get(500 + ITEM_OFFSET, 0) == 10
+			and priority3.get(501 + ITEM_OFFSET, 0) == 10,
+		"render.chunk: bez tiledata je priority_z = z (namEReno %s)" % str(priority3))
 
 	# --- 3) tvar prvku a preklad TILEDATA -> ART id ---------------------------
 	var chybi: Array = []

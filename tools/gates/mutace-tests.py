@@ -66,8 +66,17 @@ MODULY = {
             ("z vraceno, ne z",
              "(z - Const.Z_MIN)", "(z + Const.Z_MIN)"),
             ("z se nesveruje",
-             'clampi(int(obj.get("z", 0)), Const.Z_MIN, Const.Z_MAX)',
-             'int(obj.get("z", 0))'),
+             "clampi(priority_z(obj), Const.Z_MIN, Const.Z_MAX)",
+             "priority_z(obj)"),
+            # PRIORITY_Z (vada V6, `REVIZE-POHYB-2026-10-07.md` §2.6): poradova
+            # vyska statiku. Kdyz se ignoruje, plocha mostu a jeho zabradli maji
+            # stejny klic a rozhoduje poradi v souboru mapy.
+            ("priority_z se ignoruje (radi se podle holeho z)",
+             "clampi(priority_z(obj), Const.Z_MIN, Const.Z_MAX)",
+             'clampi(int(obj.get("z", 0)), Const.Z_MIN, Const.Z_MAX)'),
+            ("priority_z vraci vzdy nulu",
+             'return int(obj.get("priority_z", obj.get("z", 0)))',
+             "return 0"),
             ("diagonala x-y",
              'int(obj.get("x", 0)) + int(obj.get("y", 0))',
              'int(obj.get("x", 0)) - int(obj.get("y", 0))'),
@@ -462,6 +471,22 @@ MODULY = {
              '"z_corners": [z, zrohy[radek + 1], zrohy[radek + sirka],\n'
              "\t\t\t\t\tzrohy[radek + sirka + 1]]}",
              '"z_corners": [z, z, z, z]}'),
+            # PRIORITY_Z (vada V6, `REVIZE-POHYB-2026-10-07.md` §2.6): plocha
+            # mostu (podlaha) musi jit PRED jeho zabradlim. Kdyz se podlaha
+            # neodečte nebo vyska nepricte, na molu u Britannie vyjde poradi
+            # opacne (namEReno: 30 dlazdic).
+            ("podlaha nedostane -1 (zabradli zustane pod dlazdici)",
+             "if _tiledata.flags(art_id) & F_BACKGROUND != 0:\n\t\tv -= 1",
+             "if false:\n\t\tv -= 1"),
+            ("statik s vyskou nedostane +1",
+             "if _tiledata.height(art_id) != 0:\n\t\tv += 1",
+             "if false:\n\t\tv += 1"),
+            ("priority_z se do seznamu vubec nedava",
+             '"priority_z": _priorita(art_id, z_statiku),',
+             '"priority_z": z_statiku,'),
+            ("podlaha se pozna podle spatneho flagu",
+             "const F_BACKGROUND: int = 0x00000001",
+             "const F_BACKGROUND: int = 0x00000004"),
         ],
     },
     # CHUZE DRZENIM (12. session, rozhodnuti uzivatele 2026-10-07). Testy meri
@@ -489,6 +514,33 @@ MODULY = {
             ("jednorazove akce se drzenim opakuji (war kazdy poll)",
              'if str(command.get("t", "")) != "move":\n\t\treturn {}',
              "if false:\n\t\treturn {}"),
+            # SMER Z MYSI JE OBRAZKOVY (vada V3, `REVIZE-POHYB-2026-10-07.md` §2.3)
+            ("rovina vodorovna se nikdy nevybere (vse je uhlopricka)",
+             "if ay * float(MOUSE_RATIO_DEN) <= ax * float(MOUSE_RATIO_NUM):",
+             "if false:"),
+            ("rovina svisla se nikdy nevybere (vse je uhlopricka)",
+             "if ay * float(MOUSE_RATIO_NUM) >= ax * float(MOUSE_RATIO_DEN):",
+             "if false:"),
+            ("stred pro smer je stred okna, ne hrac na obrazovce",
+             "player_screen_position(player, camera_offset, z), mouse_position)",
+             "view_size / 2.0, mouse_position)"),
+            ("kurzor na hraci se posle jako krok (a spali prodlevu)",
+             "if smer < 0:\n\t\t\t\tcontinue\n",
+             ""),
+        ],
+    },
+    # PORADI V TICKU (vada V1, `REVIZE-POHYB-2026-10-07.md` §2.1). Modul je tu
+    # proto, ze se mutuje JINY soubor nez `sim.movement` - a kadence kroku
+    # vzniká prave timto poradim. Test je v `tests/cases/movement.gd` (sekce 12)
+    # a cestu k SimWorld bere z `--sim-script`.
+    "world_loop": {
+        "soubor": ROOT / "sim" / "sim_world.gd",
+        "prefix": "sim.world_loop",
+        "prepinac": "--sim-script",
+        "mutace": [
+            ("prikazy se dispatchuji PRED systemy (krok v tomto ticku vraci 'busy')",
+             "\tfor name in SYSTEM_ORDER:\n\t\tif systems.has(name):\n\t\t\t_tick_system(systems[name], ms)\n\tfor command in batch:\n\t\t_commands.dispatch(self, command)",
+             "\tfor command in batch:\n\t\t_commands.dispatch(self, command)\n\tfor name in SYSTEM_ORDER:\n\t\tif systems.has(name):\n\t\t\t_tick_system(systems[name], ms)"),
         ],
     },
     "player_controller": {

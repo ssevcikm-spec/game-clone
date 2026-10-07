@@ -25,6 +25,17 @@ const KIND_LAYER := {"land": LAYER_LAND, "static": LAYER_STATIC,
 var _warned: bool = false
 
 
+func priority_z(obj: Dictionary) -> int:
+	# PORADOVA VYSKA pro razeni (ClassicUO `PriorityZ`, `Chunk.cs:246-272`) -
+	# NENI to `z` z mapy. Statik s vyskou jde +1, podlaha (`IsBackground`) -1;
+	# tim se zabradli mostu kresli AZ PO plose dlazdice, i kdyz maji v datech
+	# stejne `z` (namEReno 2026-10-07: na molu u Britannie je na 30 dlazdicich
+	# prkno i zabradli a prkno melo stejny klic -> prekreslilo ho).
+	# Kdo rozdil zná (`render.chunk` cte flagy a vysku z tiledata), posle hotovou
+	# hodnotu v `priority_z`; kdo ne, radi se podle `z` jako pred 2026-10-07.
+	return int(obj.get("priority_z", obj.get("z", 0)))
+
+
 func sort_key(obj: Dictionary) -> int:
 	# Jedno cislo NA POROVNAVANi - ne pro `z_index`: klic neni male cislo a Godot
 	# bere z_index jen -4096..4096. `z` jde do Z_MIN..Z_MAX, protoze mimo rozsahu
@@ -32,7 +43,7 @@ func sort_key(obj: Dictionary) -> int:
 	var kind := str(obj.get("kind", ""))
 	var layer: int = int(KIND_LAYER[kind]) if KIND_LAYER.has(kind) else LAYER_MOBILE
 	var diagonal: int = int(obj.get("x", 0)) + int(obj.get("y", 0))
-	var z: int = clampi(int(obj.get("z", 0)), Const.Z_MIN, Const.Z_MAX)
+	var z: int = clampi(priority_z(obj), Const.Z_MIN, Const.Z_MAX)
 	return (diagonal * LAYERS + layer) * Z_SPAN + (z - Const.Z_MIN)
 
 

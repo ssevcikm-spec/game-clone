@@ -21,6 +21,8 @@ const ClockScript = preload("res://core/clock.gd")
 const EventsScript = preload("res://core/events.gd")
 const MobileScript = preload("res://sim/entity/mobile.gd")
 const RegistryScript = preload("res://sim/entity/registry.gd")
+# Cesta k SimWorld je VSTUP pro tutez sondu (mutacni test modulu `world_loop`).
+const SIM_SCRIPT := "res://sim/sim_world.gd"
 
 const MOVEMENT_SCRIPT := "res://sim/systems/movement.gd"
 
@@ -205,3 +207,46 @@ func run(t) -> void:
 			"sim.movement: register() zapisuje do registru, ne do vlastniho slovniku")
 		t._check(mv3s.mobile(0x40009999) == null,
 			"sim.movement: nezaregistrovany serial vraci pres mobile() null")
+
+	# 12) PORADI V TICKU (vada V1 z `REVIZE-POHYB-2026-10-07.md` §2.1): prikaz
+	#     podany v TOM SAMEM ticku, kdy je krok na rade, nesmi dostat 'busy'.
+	#     Cas v ticku plyne "nejdriv svet (timery), pak cizi zamery" - kdyby to
+	#     bylo obracene, krok se jeste neaplikoval, druhy prikaz se zahodil jako
+	#     'busy' a klient (jehoz 400ms casovac se spotreboval uz pri VYDANI)
+	#     by krok opakoval az za dalsich 400 ms. NamERena kadence pred opravou
+	#     byla 718 ms (a 530 ms) misto 400 - 7 az 9 kroku za 5 s misto 13.
+	#     Test jede pres `SimWorld`, aby se meritlo PORADI v nem, ne jen system;
+	#     cesta k nemu je VSTUP (`--sim-script`), aby to chytil mutacni harness.
+	#     Hlasky maji prefix `sim.world_loop` - to je modul, ktery se tu testuje.
+	var sim_cesta: String = _arg("sim-script", SIM_SCRIPT)
+	var sim_script = Lib.script_at(sim_cesta)
+	if sim_script == null:
+		t._pending("sim.world_loop NENI HOTOVA: " + sim_cesta + " chybi")
+		return
+	var sim = sim_script.new(1, {})
+	var walk2 = FakeWalk.new()
+	var events2 = EventsScript.new()
+	var reg2 = RegistryScript.new()
+	var mob2 = MobileScript.new(0x40000041, 400, Vector3i(5, 5, 0))
+	reg2.register(mob2)
+	var mv2 = Lib.script_at(_arg("movement-script", MOVEMENT_SCRIPT)).new(
+		walk2, sim.clock(), events2, "run_only", reg2)
+	sim.player_serial = mob2.serial
+	sim.systems["movement"] = mv2
+	sim.enqueue({"t": "move", "dir": 0, "run": false, "seq": 1})
+	for i in 8:
+		sim.tick(Const.TICK_MS)
+	t._check(mob2.pos.x == 5,
+		"sim.world_loop: po 8 ticcich (400 ms) se jeste stoji (pos %s)" % str(mob2.pos))
+	# Prikaz se dispatchuje az po systmech, takze prvni krok je na rade
+	# v 9. ticku (cas 450 ms) - to je ta jedna polovina tiku, kterou poradi stoji.
+	sim.enqueue({"t": "move", "dir": 0, "run": false, "seq": 2})
+	sim.tick(Const.TICK_MS)
+	t._check(mob2.pos.x == 6,
+		"sim.world_loop: prvni krok se provedl v 9. ticku (pos %s)" % str(mob2.pos))
+	for i in 8:
+		sim.tick(Const.TICK_MS)
+	t._check(mob2.pos.x == 7,
+		"sim.world_loop: druhy prikaz ve stejnem ticku NEDOSTAL 'busy' (pos %s)" % str(mob2.pos))
+	t._check(int(sim.world_time()) == 17 * Const.TICK_MS,
+		"sim.world_loop: hodiny simulace sly o 17 tiku (cas %d)" % int(sim.world_time()))

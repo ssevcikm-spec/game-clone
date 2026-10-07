@@ -93,7 +93,7 @@ v `.forge/roadmap.json`.
 | id | soubor | provides |
 |---|---|---|
 | `sim.commands` | `sim/commands.gd` | `parse(d:Dictionary)->Dictionary`, `validate(c:Dictionary)->Dictionary` (`{ok, reason}`), `dispatch(sim, c:Dictionary)->void` |
-| `sim.world_loop` | `sim/sim_world.gd` | `new(seed:int, data:Dictionary)`, `enqueue(c:Dictionary)->void`, `tick(ms:int)->void`, `snapshot()->Dictionary` (read-only pro UI), `state_hash()->String`, `save(path:String)->bool`, `load(path:String)->bool` |
+| `sim.world_loop` | `sim/sim_world.gd` | `new(seed:int, data:Dictionary)`, `enqueue(c:Dictionary)->void`, `tick(ms:int)->void`, `snapshot()->Dictionary` (read-only pro UI), `state_hash()->String`, `save(path:String)->bool`, `load(path:String)->bool`; **pořadí v `tick` je pravidlo: hodiny → systémové ticky → dispatch příkazů** (2026-10-07) — kdyby se příkazy dispatchovaly první, krok, který je v tomto ticku na řadě, vrací `busy` a kadence kroku se zdvojnásobí (`REVIZE-POHYB` §2.1) |
 
 ### ui (klient) — kompaktně
 
@@ -123,8 +123,8 @@ v `.forge/roadmap.json`.
 |---|---|---|
 | `render.textures` | `render/texture_cache.gd` | načítání z manifestu, LRU, strop paměti; **tři id prostory** (land = id, item = id + `0x4000`, texmap = id + `0x10000`) a `texmap(texmap_id)->Texture2D` pro texturu svahu (doplněno 2026-10-07) |
 | `render.hue` | `render/hue_cache.gd` | `(art_id, hue)` → textura (index 0 = použij hue); u `AtlasTexture` se bere **okno `region`**, ne celá stránka (opraveno 2026-10-07 — jinak se kreslily všechny framy animace) |
-| `render.sort` | `render/sort.gd` | **jediná** funkce řazení (land → statics podle z → mobilové podle z) |
-| `render.chunk` | `render/chunk_renderer.gd` | sestavení kreslicího seznamu pro viditelné bloky, cache; **land nese navíc `texmap` (TexID) a `z_corners` `[horní, pravý, levý, dolní]`** = výšky rohů ze sousedů (2026-10-07, pro svahy) |
+| `render.sort` | `render/sort.gd` | **jediná** funkce řazení (land → statics podle `priority_z` → mobilové podle z); `priority_z(obj)->int` = **pořadová výška** (ClassicUO `PriorityZ`, `Chunk.cs:246-272`): `obj["priority_z"]`, jinak `obj["z"]` (chování před 2026-10-07); dále `sort_key(obj)->int`, `draw_order(objects:Array)->Array` |
+| `render.chunk` | `render/chunk_renderer.gd` | sestavení kreslicího seznamu pro viditelné bloky, cache; **land nese navíc `texmap` (TexID) a `z_corners` `[horní, pravý, levý, dolní]`** = výšky rohů ze sousedů (2026-10-07, pro svahy); **statik nese navíc `priority_z`** = `z − 1` za `IsBackground` (flag `0x1`) `+ 1` za `Height != 0` (bez tiledata = `z`) — proto se plocha mostu kreslí před jeho zábradlím (2026-10-07, vada V6) |
 | `render.anim` | `render/anim_player.gd` | `play(serial:int, action:int, dir:int, now_ms:int = -1)->Dictionary` → `{ok, texture, frame, count, anchor, mirror, mirror_x, sprite_dir}` (chybějící sprite = `ok:false` + `texture:null`); **číslo těla se bere z registru** — `body_of(serial)->int` (`-1`, když serial v registru není; bez registru je `serial` sám tělem, starší chování), registr jde předat konstruktorem `_init(manifest_path, registry)`; framy těl a worn artu podle `animdata`, časování 80 ms; zrcadlení 8 → 5 směrů a `mirror_x` viz §4.2.1 |
 | `render.names` | `render/name_plates.gd` | jména a HP pruhy nad mobily (jen na dosah/po kliku) |
 | `render.light` | `render/light_layer.gd` | úroveň světla z `world.time`, světelné zdroje (louče, okna) |
@@ -135,8 +135,8 @@ v `.forge/roadmap.json`.
 | id | soubor | zodpovědnost |
 |---|---|---|
 | `app.main` | `app/main.gd` | scéna, kostra, načtení dat, spuštění smyčky |
-| `app.loop` | `app/loop.gd` | pumpuje `sim.tick(50)`, překládá vstup na `Command`, předává události UI |
-| `app.input` | `app/input_map.gd` | mapování kláves a myši na `Command` (jediné místo s `Input`); `poll(player, camera_offset, z=0, mouse_position=Vector2.ZERO, now_ms=-1)` — **držení kroky opakuje** (prodleva `step_delay_ms` = 400/200 ms), `walk_to` = držené pravé tlačítko (směr z kurzoru, `run` podle `mouse_run()` = 190 px od středu okna); `now_ms` a `view_size` jsou vstupy kvůli měřitelnosti (2026-10-07) |
+| `app.loop` | `app/loop.gd` | pumpuje `sim.tick(50)`, překládá vstup na `Command`, předává události UI; **čas vstupu je čas simulace** (`poll(..., sim.world_time())`, 2026-10-07) — prodleva kroku je pravidlo sim, ne nástěnných hodin (`REVIZE-POHYB` §2.1) |
+| `app.input` | `app/input_map.gd` | mapování kláves a myši na `Command` (jediné místo s `Input`); `poll(player, camera_offset, z=0, mouse_position=Vector2.ZERO, now_ms=-1)` — **držení kroky opakuje** (prodleva `step_delay_ms` = 400/200 ms), `walk_to` = držené pravé tlačítko: **směr je z pozice kurzoru vůči hráči na obrazovce** (`direction_from_screen(center, mouse)`, prahy `|dy| ≤ 0,4|dx|` a `|dy| ≥ 2,5|dx|` z ClassicUO `GameCursor.cs:670-754`; kurzor na hráči = `-1` a **prodleva se neSpotřebuje**), `run` podle `mouse_run()` = 190 px od středu okna; `player_screen_position(player, camera_offset, z)` je opačný převod k `click_at`; `now_ms` a `view_size` jsou vstupy kvůli měřitelnosti (2026-10-07) |
 | `app.menu` | `app/menu.gd` | hlavní menu, výběr postavy, uložit/načíst |
 | `app.char_create` | `app/char_create.gd` | tvorba postavy: profese, staty, skilly, jméno, barvy |
 
