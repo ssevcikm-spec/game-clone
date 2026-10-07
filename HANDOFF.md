@@ -295,16 +295,22 @@ ho celý." Každá session tedy **není „krok"**, ale **jeden celek s cílem**
 **⚠ CÍL TÉTO (8.) SESSION — až ho dokončíš, přepiš tuhle větu na další cíl:**
 
 > **Rozhodnout a opravit konvenci dveří ve `world.doors`** (otevřená věc 62).
-> `doors.gd` dnes tvrdí „kusy 1–4 zavřené, 5–8 otevřené". **Nová evidence
-> (naměřeno 6.–7. session, je v věci 62):** `tiledata` má u 1717..1732 `layer`
-> po **dvojicích** (8 hodnot = 4 směry zdi × 2 strany pantu), `doors.txt` uvádí
-> z každé dvojice **jeden** art, RunUO/ServUO párují `closed = base+2f`,
-> `open = closed+1`, a **všech 16 artů bloku musí obsahovat oba stavy** —
-> otevřené tedy nemůže být „5–8" (to je zrcadlová strana pantu téhož zavřeného
-> stavu). **Přijímací kritérium:** `world.doors` (`is_open`/`toggle`/`open_tile`)
-> opravený podle měření, `tests/cases/doors.gd` to měří, mutace v `mutace-tests.py`
-> to chytí a `tests/cases/walk.gd` zůstane zelený. **Co do cíle NEPATŘÍ:**
-> `sim.interaction` (Úkol 4), vady ze snímků (věci 59–61).
+> `doors.gd` dnes tvrdí „kusy 1–4 zavřené, 5–8 otevřené" a `toggle` páruje
+> `kus` s `kusem + 4` — což je **jiný směr stěny**, ne stav. **Evidence je
+> hotová** (věc 62): blok 1717..1732 = **8 × 2** podle `layer`, `doors.txt`
+> uvádí z dvojice **jeden** art, RunUO/ServUO párují `closed = base+2f`,
+> `open = closed+1`, sudé arty **nejsou v `doors.json`** (0 z 8), a uživatelův
+> model („otevření = křídlo pootočené o 90°, ne jiné dveře") je s tím ve shodě
+> (jen kresba **není** tatáž otočená — IoU 0,05).
+> **Přijímací kritérium:** `toggle(tile) = tile ± 1`, `is_open(tile)` = sudý
+> člen dvojice, `is_door(tile)` platí **i pro pootočený art**; hlavička
+> `doors.gd` řekne **nový popis i důvod** (dveře se staví kresbou z `doors.txt`
+> = „ve stěně"; stav se proto pozná z artu) a **starý omyl zůstane pojmenovaný**
+> (historický záznam se needituje, doplňuje se); `tests/cases/doors.gd` to měří
+> (`is_open`/`toggle`/`is_door` u obou členů dvojice), mutace v `mutace-tests.py`
+> (nový modul `doors` nebo stávající) to chytí a `tests/cases/walk.gd` zůstane
+> zelený. **Co do cíle NEPATŘÍ:** `sim.interaction` (Úkol 4), vady ze snímků
+> (věci 59–61), přepis `docs/03` (stačí doplnit, co je měřené).
 
 **Předchozí cíl (7. session), splněný:** rozhodnutí uživatele „zavřít slepé místo
 v `tests/run_tests.gd` + přidat zbývající tři mutační harnessy podle návrhu" —
@@ -811,23 +817,44 @@ a barva kůže.** Statiky nesou barvu ze záznamu mapy, ale **nikdo ji nepouží
     (MediumWoodDoor = 0x6B5: zavřené 1717/1719/1721/1723, otevřené 1718/1720/1722/1724);
     (c) **rozhodující úvaha:** celý blok 1717..1732 je **16 artů = 8 × 2**, tedy
     „8 hodnot `layer` krát dva arty". Osm hodnot odpovídá **4 směrům zdi × 2
-    stranám pantu** (zrcadlové dvojice) a `doors.txt` uvádí z každé dvojice
-    **jeden** art — takže **otevřené arty nemohou být „kusy 5–8"** (to je druhá
-    strana pantu téhož zavřeného stavu). Otevřený stav musí být druhý člen
-    dvojice (`+1`), jinak by v datech žádný otevřený art nebyl;
+    stranám pantu** a `doors.txt` uvádí z každé dvojice **jeden** art — takže
+    **otevřené arty nemohou být „kusy 5–8"** (to je druhá strana pantu téhož
+    zavřeného stavu). Otevřený stav musí být druhý člen dvojice (`+1`);
     (d) **nezávislý signál:** 4 arty ze 16 **nemají `Impassable`** (1714, 1730,
     1732, 1666) a **všechny čtyři jsou sudé** = „partneři +1" (otevřené dveře
     jsou ty průchozí); při náhodném stavu je to šance 1/16;
-    (e) **co měření NEŘEKLO:** zrcadlová metrika (`d(art, zrcadlo(art'))`) je
-    u obou hypotéz blízko šumu (13,9–24,4), a **pouhý pohled na montáž je
-    zavádějící** — v 3. session se přesně tak „rozhodlo obrázkem" špatně
-    (zrcadlovou stranu pantu si člověk splete s otevřeným křídlem). Nová montáž
-    dvojic pro nezávislou kontrolu pohledem: `.cache/analysis/dvere-par-pohled.png`
-    (skript `dvere-par-pohled.py`; dále `dvere-zrcadleni.py`, `dvere-orientace.py`,
-    `sonda-dvere-schody.py`; vše gitignore).
+    (e) **DOPLNĚNO 7. session — model uživatele (2026-10-07):** „otevřené dveře
+    nejsou jiné dveře, jen se křídlo pootočí o 90°, takže vizuálně neblokuje
+    cestu; otevřené dveře jsou tytéž dveře z nového směru." **Konceptuálně to
+    sedí** (pootočené křídlo leží podél kolmé osy, proto ta záměna) a je to
+    lepší popis dat než „stav": dvojice je **tentýž (směr × pant) ve dvou
+    kresbách**. **Co měření vyvrátilo:** že jde o **tutéž kresbu otočenou** —
+    IoU siluety po izometrickém otočení `(sx,sy) → (−2·sy, sx/2)` je **0,05**
+    (tj. žádná shoda; skript `.cache/analysis/dvere-rotace.py`). Jsou to **dva
+    ručně kreslené sprity** (1997), ne otočený jeden.
+    **(f) co měření NEŘEKLO (a je to past na metriku):** zrcadlová metrika je
+    **nasycená** — IoU(zrcadlo(A), B) je **0,96–1,00** pro správné dvojice, ale
+    **0,81 i pro dvojice nesprávné** a matice je plná 0,99 (1717 se „shoduje"
+    s 1731, 1727 i 1718; skript `.cache/analysis/dvere-zrcadlo-matice.py`).
+    **Tou metrikou se párování rozhodnout NEDÁ**; kdo ji použije samotnou,
+    „potvrdí" si obojí.
+    **(g) strukturní kontrola, která rozhoduje (a je levná):** `data/doors.json`
+    má 230 artů a **ani jeden ze sudých osmi** z bloku 1717..1732 v něm není
+    (`0 z 8`) — nejsou to tedy „zavřené dveře jiného směru", které by šlo někam
+    postavit. Jediné, co se s nimi dá dělat, je druhá kresba téhož (směr × pant)
+    = otevřeno.
+    **Co z toho pro kód (návrh pro cíl 8):** `toggle(tile) = tile ± 1`;
+    `is_open(tile)` = art je **sudý člen** dvojice; `is_door(tile)` ať platí
+    **i pro pootočený art** (pootočené dveře jsou pořád dveře). Do hlavičky
+    patří i to, co plyne z modelu uživatele: **dveře se vždy staví kresbou
+    z `doors.txt`** (ta je „ve stěně"), a jen proto se dá stav poznat z artu.
     **Dopad je dnes nulový** (v okolí startu 80×80 **není ani jeden statik
     dveří**) a `walk` je na konvenci nezávislý (ptá se `is_open`) — ale
     **Úkol 4 (`sim.interaction`) na tom stát bude**.
+    **Montáž pro nezávislou kontrolu pohledem** (gitignore):
+    `.cache/analysis/dvere-par-pohled.png` + skripty `dvere-par-pohled.py`,
+    `dvere-rotace.py`, `dvere-zrcadlo-matice.py`, `dvere-zrcadleni.py`,
+    `dvere-orientace.py`, `sonda-dvere-schody.py`.
 63. **NOVÉ (6. session): pravidlo kroku na schod je ROZHODNUTÍ, ne opsaná
     reference.** `walk` dnes povoluje krok nahoru do **výšky schodu**
     (`world.stairs.is_stair` + `tiledata.height`), protože naměřené skoky mezi

@@ -89,6 +89,26 @@ soubory přeskakuje**. Není to tedy jen o skrytých složkách (`.forge`, `.git
 tool** — použij Python walk (plošné skeny) nebo `Select-String` na konkrétní
 soubor. Do `dsh-prostredi` patří formulace: grep tool **respektuje `.gitignore`**.
 
+### 2026-10-07 — Nasycená metrika „potvrdí" obojí: zrcadlová IoU 0,99 i pro nesprávné páry (chyba)
+**Co se stalo:** rozhodoval jsem, která polovina dvojice dveří je otevřená.
+Postavil jsem metriku „IoU masky A po zrcadlení proti masce B" a dostal
+**0,96–1,00** pro dvojice `(2k, 2k+1)` — vypadalo to jako důkaz. **Kalibrace na
+nesprávných dvojicích to shodila:** tytéž hodnoty vycházely i pro dvojice
+vzájemně nesouvisející (průměr **0,81**) a plná matice je plná 0,99
+(`1717` se „shoduje" s `1731`, `1727` i `1718`). Metrika tedy **nerozhoduje** —
+silueta dveřního křídla je natolik jednoduchá, že se po zrcadlení a vycentrování
+shodne skoro cokoli.
+**Doklad:** `.cache/analysis/dvere-zrcadlo-matice.py` (top-3 partneři pro každý
+art z 1717..1732) a `dvere-rotace.py` (tentýž postup pro **otočení o 90°**:
+IoU **0,05**, tj. hypotéza „je to tatáž kresba otočená" je vyvrácená).
+Rozhodující bylo nakonec **něco jiného a levnějšího**: `data/doors.json` nemá
+**ani jeden** ze sudých osmi artů bloku (0 z 8) → nejsou to „zavřené dveře
+jiného směru", které by šlo postavit.
+**Ponaučení:** **každou metriku kalibruj na NESPRÁVNÉM páru, ne jen na správném** —
+bez toho číslo 0,99 nic neznamená. A když je metrika nasycená, hledej **jinou
+otázku** (tady: „je ten art vůbec někde použitý jako zavřené dveře?"), ne
+jemnější prahy.
+
 ### 2026-10-07 — Fixture, která čte očekávání ze sebe sama, sabotáž nepřežije (chyba)
 **Co se stalo:** při stavbě fixture pro `render.hue` a `render.anim` (aby testy
 měřily i v CI) vznikly první verze tak, že test **počítal očekávané hodnoty
