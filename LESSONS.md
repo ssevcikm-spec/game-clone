@@ -24,6 +24,53 @@ Typy: `chyba` (moje vada) · `past-nástroje` (prostředí/nástroj, ne logika) 
 
 ---
 
+### 2026-10-07 — 655 ms na frame: `AtlasTexture` se vyráběl pro každý objekt každý frame (chyba)
+**Co se stalo:** uživatel se zeptal, jestli „obcházení assetů" (extrakce do
+`.gitignore`) způsobuje, že se hra nesmírně seká. **Nezpůsobuje** — extrakce se
+do běhu nepromítá. Příčina byla v kódu: `render/texture_cache.gd:texture()`
+vyráběl **nový `AtlasTexture` při každém volání** a kreslicí smyčka ho volá pro
+**každý objekt každý frame** (5 767 objektů v Británii).
+**Doklad:** sonda `.cache/analysis/sonda-fps.gd` (vsync vypnutý): **před**
+`prumer 655,13 ms (2 FPS)`; `texture()` samo **0,118 ms/objekt** = 683 ms/frame
+(sonda `.cache/analysis/sonda-vykon.gd`); **po** zavedení cache oken
+`prumer 22,31 ms (45 FPS)`. Na vině nebyl ani streaming stránek: počítadlo
+`nacteni_stranek` ukázalo **27 načtení za celý běh** (a cache se neměnila,
+0 změn z 15 vzorků). Nový test `tests/cases/render_textures.gd` hlídá identitu
+instance (`is_same()`) a **3 mutace** v modulu `textures` to dokazují.
+**Ponaučení:** **vada výkonu se hledá měřením po částech, ne dojmem** — a musí se
+měřit **i to, co se nezdá** (tady: alokace jednoho malého objektu). U GPU scény
+platí: nejdřív změř **CPU část** (co dělá náš kód na frame), teprve pak sáhej na
+draw cally. A pozor na **falešný viník**: „assety nejsou v gitu" je organizační
+věc, která běh neovlivňuje — kdybych to uvěřil, opravoval bych licenci místo kódu.
+
+### 2026-10-07 — Má „správná" oprava stropu paměti přinesla thrashing (chyba)
+**Co se stalo:** po opravě výkonu jsem si všiml, že hotová okna drží referenci na
+stránku, takže je LRU nemůže uvolnit a strop `MAX_BYTES` by byl jen dekorace.
+„Opravil" jsem to mazáním oken vyhozené stránky — a hra spadla na
+**1 230 ms/frame (1 FPS)**: britanská scéna potřebuje 27 stránek, strop dovolí
+24, takže se 3 stránky **vyhazovaly a znovu načítaly každý frame**.
+**Doklad:** sonda `sonda-fps.gd`: s mazáním `prumer 1230,63 ms`, `wrapped` klesal
+(240 → 229); po vrácení mazání `prumer 22,69 ms`, `wrapped 260`, `nacteni_stranek 27`.
+Kompromis je teď **popsaný v kódu** (strop platí pro stránky v cache, ne pro
+celkovou paměť).
+**Ponaučení:** **teoreticky správná oprava může být v praxi horší než vada, kterou
+řeší** — a rozhoduje o tom jedině měření. U cache platí: **než začneš uvolňovat
+paměť, zjisti pracovní sadu** (tady 27 stránek = 432 MB) a podle ní nastav strop;
+uvolňovat pod pracovní sadu znamená thrashing, ne úsporu.
+
+### 2026-10-07 — `SceneTree._process` má návratový typ `bool` (past-nástroje)
+**Co se stalo:** sonda pro měření FPS zdědila `SceneTree` a definovala
+`func _process(delta: float) -> void`. Godot to odmítl jako **parse error**:
+`The function signature doesn't match the parent. Parent signature is
+"_process(float) -> bool"` — sonda tedy neměřila nic. Je to stejná past jako
+u `get(serial)` v registru (jméno i signatura jsou součást kontraktu jazyka).
+**Doklad:** `SCRIPT ERROR: Parse Error: The function signature doesn't match the
+parent. Parent signature is "_process(float) -> bool".`; po opravě na `-> bool`
+sonda vypsala `framu mereno 270 | prumer 22,31 ms (45 FPS)`.
+**Ponaučení:** **než napíšeš sondu, ověř signaturu zděděné metody** — a všimni si,
+že „skript se načetl" a „sonda běží" nejsou totéž (tady se kvůli parse erroru
+nepustilo vůbec nic a výstup byl prázdný, ne chybový).
+
 ### 2026-10-07 — `.cmd`: neescapovaná závorka v `echo` uvnitř bloku shodí celý skript (past-nástroje)
 **Co se stalo:** psal jsem spouštěč `HRA.cmd` a do nápovědy dal českou větu
 s **závorkou uvnitř `echo`, které bylo uvnitř bloku `if (`**. `cmd.exe` kvůli ní

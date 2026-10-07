@@ -50,6 +50,34 @@ otevřená věc 27).
 **výbava na postavě** (postava je nahá), jiné postavy (NPC), mount, pathfinding,
 zvuk. Barva kůže od této session **je** (věc 1 → vyřešeno, viz nová tabulka).
 
+## ⚡ VÝKON: hra jela na 1–2 FPS a bylo to v KÓDU, ne v assetech (5. session)
+
+**Otázka uživatele:** „může za sekání to, že nám assety nepatří?" **Odpověď
+změřená: ne.** Assety se používají lokálně (extraktor je čte z instalace UO do
+`assets/uo/`), hra z nich běží a `.gitignore` jen zabraňuje tomu je **rozdávat
+dál** — do běhu nezasahuje. Příčina byla v `render/texture_cache.gd`.
+
+| Co | Před | Po |
+|---|---|---|
+| frame (1280×720, vsync vypnutý) | **655 ms (1–2 FPS)** | **22–25 ms (40–45 FPS)** |
+| `texture(art_id)` na objekt | 0,118 ms × 5 767 objektů = **683 ms/frame** | ~0 (hotová okna) |
+| načtení atlasové stránky za běh | 3 stránky se načítaly **každý frame** | **27 celkem**, pak 0 |
+
+**Vada:** `texture()` vyráběl **nový `AtlasTexture` při každém volání** a kreslicí
+smyčka ho volá pro každý objekt každý frame. **Oprava:** hotová „okna" se drží
+v `_wrapped` a vrací se **tatáž instance** (`tests/cases/render_textures.gd` to
+hlídá přes `is_same()` a **3 mutace** to dokazují).
+
+**⚠ Co se NESMÍ zatajit (naměřeno):** okna drží referenci na stránku, takže
+**strop `MAX_BYTES` (384 MB) platí pro stránky V CACHE, ne pro celkovou pamet** —
+britanská scéna potřebuje 27 stránek = 432 MB. Když jsem okna při vyhození mazal,
+přišel **thrashing: 1 230 ms/frame (1 FPS)**. Je to zapsané v kódu i tady, ať to
+nikdo ne„opraví" znovu.
+
+**Co zbývá (není to vada téhle granule):** zbytek je GPU — **1 516 draw callů**
+a 11 534 primitiv na frame při 5 767 spritech. To je práce pro **M9
+(`render.chunk_mesh`, dávkové kreslení)**; 40 FPS je dnes hratelných.
+
 ## ✅ CO JE NOVÉHO (5. session) — a čím je to doložené
 
 **Granule `sim.pathfind` (Úkol 2 ze `ZADANI-DALSI-VYVOJ-2.md`) je hotová**:
@@ -64,8 +92,11 @@ hra umí odpovědět „kudy z A do B" — A* nad dlaždicemi, který se na prů
 | **Heuristika je octilová (diagonala 141, zbytek 100)** | Test to měří na **4 vzorcích cesty**: odhad nikde nepřekročí skutečnou cenu (přípustnost) a u žádné hrany neklesne víc, než hrana stojí (konzistence) |
 | **⚠ FALEŠNÝ POPLACH, korekce 5. session** | Nejprve jsem (podle chybně zapsaného očekávání v testu) tvrdil, že předchozí heuristika `maxi(dx,dy)*100` byla vada. **Nebyla.** Sonda porovnala obě na **256 cílech** (`.cache/analysis/sonda-srovnani.gd`): `rozdilnych 0, stara drazsi 0, nova drazsi 0, uzlu stara 19207 / nova 16673` → octil je **úspora 13 % uzlů**, ne oprava. V kódu je to tak i popsané (+ „ať se to neopravuje znovu") a `LESSONS.md` to má jako záznam o mé chybě |
 | **Test granule** | `tests/cases/pathfind.gd` (**27 kontrol**): přímka, souvislost kroků, diagonála, obcházení dírou v překážce, neexistující cesta → prázdno, start == cíl, `next_step` na obě strany, rozpočet uzlů, cena cesty (ortogonala/diagonala), přípustnost + konzistence heuristiky, cíl mimo mapu, `nodes_visited` a **reálná mapa** (když jsou `assets/uo/world`) |
-| Testy hry | **507 kontrol, 0 selhání** (bylo 480; +27), `exit 0`; case souborů **27** |
-| **Mutační důkaz** | `mutace-tests.py` **44/44** (bylo 38/38, +6 za `sim.pathfind`), smlouva vstupu OK; `mutace-render-anim.py` 11/11, `mutace-render-hue.py` 12/12, `mutace-skills.py` 8/8, `mutace-anim.py` 8/8 → **celkem 83/83** |
+| **⚠ Vada, kterou jsem málem nechal být: `texture()` alokoval každý frame** | `render/texture_cache.gd` — měřeno sondou `.cache/analysis/sonda-fps.gd`: **655 ms/frame → 22–25 ms**; identitu instance hlídá `tests/cases/render_textures.gd` a **3 mutace** v modulu `textures` |
+| **Test `render.textures` (nový)** | `tests/cases/render_textures.gd` (13 kontrol): identita instance, region/offset z manifestu, `missing`, **400 dotazů bez dalšího načtení stránky**, `stats()` má všechny složky, chybějící manifest, reálná data navíc. Vyrábí si **vlastní atlas** v `.cache/test-textures/` (v CI nejsou `assets/uo/`) |
+| **Dva nové vstupy `render.textures`** | `_init(manifest, max_bytes, page_prefix)` (prefix cest ke stránkám — kvůli testu mimo `assets/uo/`) a `stats()` navíc `wrapped` + `nacteni_stranek`. **Patří do `docs/04 §4.2`** (věc 57) |
+| Testy hry | **520 kontrol, 0 selhání** (bylo 507; +13), `exit 0`; case souborů **28** |
+| **Mutační důkaz** | `mutace-tests.py` **47/47** (bylo 44/44; +3 `textures`), smlouva vstupu OK; `mutace-render-anim.py` 11/11, `mutace-render-hue.py` 12/12, `mutace-skills.py` 8/8, `mutace-anim.py` 8/8 → **celkem 86/86** |
 | **Dvě slepá místa, která mutace odhalily** | (a) mutant „diagonala za 200" **prošel všemi kontrolami na počet kroků** — test měřil jen počet kroků, ne cenu; doplněno `cost_last()` a kontroly ceny. (b) mutant „předchůdce se přepíše i pro rozbalený uzel" **nedoběhl** (exit 124 = timeout) — harness to hlásí jako „sada vůbec neproběhla"; mutace vyřazena a **zapsána jako otevřená věc 53** (harness neumí rozeznat zaseknutí od pomalého běhu) |
 
 **Co pathfind ZATÍM NEUMÍ (otevřené, hlasím):** dveře a schody (`world.walk` je
@@ -236,9 +267,9 @@ ho celý." Každá session tedy **není „krok"**, ale **jeden celek s cílem**
 ## ⚠⚠ BLOKÁTORY
 
 **Žádný otevřený blokátor v kódu.** „Demo chodí a postava je barevná" je naměřené
-(viz tabulky výš), brány jsou zelené (11/0/0), testy **507/0** (s assety; v čistém
+(viz tabulky výš), brány jsou zelené (11/0/0), testy **520/0** (s assety; v čistém
 klonu je kontrol méně, protože část měří data z `assets/uo/`) a mutační důkaz je
-**83/83** (44+8+8+11+12).
+**86/86** (47+8+8+11+12). **Hra jede 40–45 FPS** (bylo 1–2 FPS) — viz sekce VÝKON.
 
 **⚠ CI: BĚHY NAD COMMITY 5. SESSION JSOU ZELENÉ — a je to poprvé, co je zelený
 i běh s novými mutacemi.** Ověřeno živě (`node _analyza/ci-beh-stav.mjs`):
@@ -319,10 +350,10 @@ Dvě věci, které blokátor **nejsou**, ale je dobře je vědět:
 | složka | souborů (kód) | řádků kódu | poznámka |
 |---|---|---|---|
 | `core/` | 7 | 339 | hotové a otestované |
-| `sim/` | **14** | **1 737** | nově **`world/pathfind.gd`** (5. session, 173 řádků); `entity/registry.gd`, `entity/skills.gd`, `entity/mobile.gd`, `world/walk.gd`, `systems/movement.gd` |
-| `render/` | 5 | 722 | `sort.gd`, `texture_cache.gd`, `chunk_renderer.gd`, `anim_player.gd`, `hue_cache.gd`; `ui/` pořád neexistuje |
+| `sim/` | **14** | **1 740** | nově **`world/pathfind.gd`** (5. session, 173 řádků); `entity/registry.gd`, `entity/skills.gd`, `entity/mobile.gd`, `world/walk.gd`, `systems/movement.gd` |
+| `render/` | 5 | **770** | `sort.gd`, **`texture_cache.gd`** (+48: cache oken a počítadlo načtení), `chunk_renderer.gd`, `anim_player.gd`, `hue_cache.gd`; `ui/` pořád neexistuje |
 | `app/` | 6 (5 kód) | 651 | `main.gd`, `world_view.gd`, `player_controller.gd` (bez granule) |
-| `tests/` | **37** (30 kód) | **3 495** | **27 case souborů** (+1 za 5. session: `pathfind.gd`) |
+| `tests/` | **38** (31 kód) | **3 627** | **28 case souborů** (+2 za 5. session: `pathfind.gd`, `render_textures.gd`) |
 | `tools/uoextract/` | 38 | 6 278 | `anim.py` umí pixely, `--export`, `--export-check` |
 | `tools/gates/` | 22 | **4 923** | `mutace-tests.py` (+ modul `pathfind`, 6 mutací) |
 
@@ -394,10 +425,11 @@ a barva kůže.** Statiky nesou barvu ze záznamu mapy, ale **nikdo ji nepouží
 | **Co v CI NEJDE ověřit bez tokenu** | `node _analyza/ci-log.mjs` → **HTTP 403**; `ci-artefakt.mjs` → **HTTP 401** | Kdo nemá token, **vidí jen stav kroků**, ne jejich obsah — takže „krok 9 prošel" je naměřené, ale **počet chycených mutací v CI je neověřený** (naměřeno je 44/44 **lokálně**). Nezapisuj do předání „CI má 44/44", když to nevidíš |
 | Repo je veřejné | API bez tokenu | `visibility: public` |
 | **Oprávnění** | `whoami /groups \| Select-String Mandatory` | **`Medium`** = plný přístup. `Low` = sandbox → brány hlásí **falešné vady**, `.uid` nevzniknou a `run-all.py` spadne na `summary.json` (5. session to naměřila znovu: G7 „VADA save/load", G11 NEMĚŘENO, self-test 9 chyb — **všechno byl sandbox**) |
-| Testy | testy s `APPDATA` ve workspace (`Low`: dej ho do `.tmp`) | **507 kontrol, 0 selhání**, 27 case souborů (v čistém klonu je kontrol méně — část měří data z `assets/uo/`) |
+| Testy | testy s `APPDATA` ve workspace (`Low`: dej ho do `.tmp`) | **520 kontrol, 0 selhání**, 28 case souborů (v čistém klonu je kontrol méně — část měří data z `assets/uo/`) |
+| **FPS (nové)** | `& .cache\godot\...console.exe --path . --rendering-driver opengl3 --script res://.cache/analysis/sonda-fps.gd` | **40–45 FPS** (22–25 ms/frame), 5 767 objektů, 1 516 draw callů; cache se po nabehu nemění (27 načtení, 0 změn) |
 | Brány | `python tools/gates/run-all.py` | **11 měřeno / 0 NEMĚŘENO / 0 vad**, `exit 0` |
 | Self-testy | `python tools/gates/run-all.py --self-test` | **19, 0 chyb**, `exit 0` |
-| Mutační důkaz | `mutace-tests.py` + `mutace-anim.py` + `mutace-skills.py` + `mutace-render-anim.py` + `mutace-render-hue.py` | `44/44`, `8/8`, `8/8`, `11/11`, `12/12` (= **83/83**) |
+| Mutační důkaz | `mutace-tests.py` + `mutace-anim.py` + `mutace-skills.py` + `mutace-render-anim.py` + `mutace-render-hue.py` | `47/47`, `8/8`, `8/8`, `11/11`, `12/12` (= **86/86**) |
 | Vzory mutací | `python _analyza/mutace-vzory.py` (gitignore) | `mutace-tests: 44 vzorů` + `mutace-render-anim: 12` = **56 celkem**, `OK`, `exit 0` |
 | Animace | `python tools/uoextract/anim.py --self-test` | `35 kontrol, 0 chyb` |
 | Barvy | `python tools/uoextract/hues.py --self-test` | `5 kontrol, 0 chyb` |
@@ -407,7 +439,7 @@ a barva kůže.** Statiky nesou barvu ze záznamu mapy, ale **nikdo ji nepouží
 | Godot běží | `& .cache\godot\...console.exe --headless --version` | `4.7.2.stable.official.ed1daf0bf` |
 | Instalace UO na místě | `Test-Path 'D:\Games\...\tiledata.mul'` | `True` |
 | Kontroly zadání | `check-docs-refs.py`, `check-zadani.py`, `roadmap-gen.py --check` | `exit 0` |
-| Stav plánu | `python tools/plan-status.py` | `111 granul`, **`41` měřeně hotových**, 0 rozporů (po commitu; před ním `40`) |
+| Stav plánu | `python tools/plan-status.py` | `111 granul`, **`43` měřeně hotových**, 0 rozporů |
 | **Sandbox** | `whoami /groups \| Select-String Mandatory` | **`Medium`** = plný přístup |
 
 ## Otevřené věci a co je potřeba dodělat
@@ -616,8 +648,25 @@ a barva kůže.** Statiky nesou barvu ze záznamu mapy, ale **nikdo ji nepouží
     upravovat, ať je **změří** — a pozor na past: `echo` s **neescapovanou
     závorkou uvnitř bloku `if (`** shodí celý skript hláškou „X was unexpected
     at this time" (namEReno 2026-10-07; v souboru je to i jako komentář).
+57. **NOVÉ (5. session): `render.textures` má víc, než říká smlouva.** `docs/04
+    §4.2` uvádí `texture(art_id)` a `stats()`; implementace má navíc **třetí
+    argument `page_prefix`** (kvůli testu, který si staví vlastní atlas mimo
+    `assets/uo/`) a ve `stats()` navíc **`wrapped`** a **`nacteni_stranek`**
+    (počítadlo načtení stránek — stojí na něm test proti thrashingu). Navíc
+    platí, že **strop `MAX_BYTES` je měkký**: hotová okna drží stránky naživu,
+    takže skutečná paměť může být vyšší (naměřeno 432 MB při stropu 384 MB).
+    To patří do smlouvy — je to chování, na které se dá spolehnout jen takhle.
+58. **NOVÉ (5. session): u výkonu je změřený jen STOJÍCÍ scénář.** Sonda
+    `sonda-fps.gd` měří Británii ve stoje (5 767 objektů, 1 516 draw callů,
+    40–45 FPS). **Chůze** (přestavba chunku, vstup do nových dlaždic, možné
+    načtení dalších stránek) změřená není — a je to právě stav, kdy se může
+    sekat. Kdo bude dělat M9, ať měří i chůzi, ne jen postoj.
 
 ## Už není otevřené (přesunuto, nemaže se)
+
+- **„Výkonnostní dluh: `AtlasTexture` na objekt"** (věc 19 z minula) — **VYŘEŠENO
+  2026-10-07 (5. session)**: hotová okna se cachují, **655 ms → 22–25 ms/frame**.
+  Zbytek (1 516 draw callů) patří M9 a je to otevřená věc 58.
 
 - **„Na obrazovce není nic"** — vyřešeno 2026-10-06 (snímek z běhu, G10 zelená).
 - **„Na obrazovce není postava"** — **vyřešeno 2026-10-06 (2. session)**: postava

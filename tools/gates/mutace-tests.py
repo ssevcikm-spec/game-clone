@@ -181,6 +181,22 @@ MODULY = {
         #     dojde stejnou trasou - chyti ji az kontrola `cost_last()` (a ta tam
         #     je). Kdyby se vyhodila, byla by to slepá kontrola.
     },
+    "textures": {
+        "soubor": ROOT / "render" / "texture_cache.gd",
+        "prefix": "render.textures",
+        "prepinac": "--textures-script",
+        "mutace": [
+            # Tahle mutace vraci VADU, ktera 2026-10-07 shodila hru na 1-2 FPS:
+            # nova `AtlasTexture` na kazde volani (0,118 ms x 5767 objektu).
+            ("texture() vraci novou instanci (ztrata cache oken)",
+             "\t_wrapped[art_id] = out\n\treturn out", "\treturn out"),
+            ("na stranku se nepta cache (nacte ji znovu pokazde)",
+             "	var cached = _pages.get(path)\n	if cached != null:\n		_touch(path)\n		return cached",
+             "	var cached = _pages.get(path)"),
+            ("chybejici art se pocita jako nula (missing se nemeri)",
+             "		_missing += 1\n", ""),
+        ],
+    },
     "movement": {
         "soubor": ROOT / "sim" / "systems" / "movement.gd",
         "prefix": "sim.movement",
@@ -233,7 +249,7 @@ def fail_radky(vystup: str, prefix: str) -> list[str]:
 def main() -> int:
     ap = argparse.ArgumentParser(description="Mutacni dukaz testu")
     ap.add_argument("--only", default=None,
-                    help="sort, map, walk, movement, registry, pathfind (nebo vic carkami)")
+                    help="sort, map, walk, movement, registry, pathfind, textures (nebo vic carkami)")
     args = ap.parse_args()
     if godot_bin() is None:
         print("CHYBA: Godot nenalezen (nastav $GODOT) - mutace by nic nemerily")
