@@ -487,13 +487,15 @@ schody svou výškou; 8. session: `world.doors` páruje `art` ↔ `art + 1`;
 10. session: `sim.interaction` hotový, **13/13 mutací** a routing z dat).
 **Hra jede 40–45 FPS** (bylo 1–2 FPS) — viz sekce VÝKON.
 
-**⚠ CI NAD COMMITTY 10. SESSION JE ZELENÝ — `#43` nad `200fdc6` = `success`**,
-**17 kroků (+ 3 post kroky), job 2:56 min** (13:37:45 → 13:40:41; ověřeno živě
-přes API, výpis všech 17 kroků). Prošel **krok 7** (import + testy, tj. sada
+**⚠ CI NAD COMMITTY 10. SESSION JE ZELENÝ — `#43` nad `200fdc6` (kód, smlouvy,
+HANDOFF/LESSONS) a `#44` nad `4d0715c` (dokumentační dotyk + `cursor()` uvnitř
+modulu) = oba `success`**, **17 kroků (+ 3 post kroky), job 2:56 a 3:09 min**
+(13:37:45 → 13:40:41 a 13:42:52 → 13:45:45; ověřeno živě
+přes API, výpis všech 17 kroků u obou). Prošel **krok 7** (import + testy, tj. sada
 **bez `assets/uo`**, kde lokálně vychází **748/0**), **krok 8** (brány),
 **krok 9 „Mutační důkaz testů" se 94 mutacemi** a kroky 10–13 (`skills` 8,
 `render-hue` 12, `render-anim` 11, `anim` 8 — **dohromady 133**);
-krok 15 „Stav plánu" taky. **Předtím** `#42` nad `2ede2c9` a `#41` nad
+krok 15 „Stav plánu" taky (**po commitu 48 měřeně hotových, 0 rozporů**). **Předtím** `#42` nad `2ede2c9` a `#41` nad
 `adbd2cb` = `success` (9. session), `#40` nad `17ebc04` = `success`,
 **`#39` nad `bcd9128`, `#38` nad `98542a3`,
 17 kroků, job 1:33 min** (krok 9 tehdy s **61 mutacemi** — lokálně celý
@@ -705,7 +707,7 @@ a barva kůže.** Statiky nesou barvu ze záznamu mapy, ale **nikdo ji nepouží
 |---|---|---|
 | Strom je čistý | `git status --porcelain -uall` | **prázdné** po commitu této session (nové `.uid` u `interaction.gd` i `tests/cases/interaction.gd` jsou v commitu — vznikly `--import` pod plným přístupem) |
 | Je před GitHubem | `git rev-list --count origin/main..HEAD` | **`0`** — **10. session pushla** (trvalé povolení uživatele z 2026-10-07) |
-| **Běží CI?** | `node _analyza/ci-beh-stav.mjs` (bez tokenu je limitovaný — viz past v `LESSONS`) · anotace: `node _analyza/ci-anotace.mjs` | **`#43` nad `200fdc6` (kód i dokumentace 10. session) = `success`, 17 kroků (+3 post), job 2:56 min** — ověřeno živě přes API včetně **všech 17 kroků** (7 testy bez assetů, 8 brány, 9 **94 mutací**, 10–13 ostatní harnessy, 15 stav plánu); předtím `#42` nad `2ede2c9` a `#41` nad `adbd2cb` (9. session) = `success`. **sha rozhoduje**, ne „poslední běh" |
+| **Běží CI?** | `node _analyza/ci-beh-stav.mjs` (bez tokenu je limitovaný — viz past v `LESSONS`) · anotace: `node _analyza/ci-anotace.mjs` | **`#43` nad `200fdc6` (kód + smlouvy + HANDOFF/LESSONS) a `#44` nad `4d0715c` (dokumentační dotyk + `cursor()`) = oba `success`, 17 kroků (+3 post), job 2:56 a 3:09 min** — ověřeno živě přes API včetně **všech 17 kroků** (7 testy bez assetů, 8 brány, 9 **94 mutací**, 10–13 ostatní harnessy, 15 stav plánu = **48 hotových, 0 rozporů**); předtím `#42` nad `2ede2c9` a `#41` nad `adbd2cb` (9. session) = `success`. **sha rozhoduje**, ne „poslední běh" |
 | **Co v CI NEJDE ověřit bez tokenu** | `node _analyza/ci-log.mjs` → **HTTP 403**; `ci-artefakt.mjs` → **HTTP 401** | Kdo nemá token, **vidí jen stav kroků**, ne jejich obsah — takže „krok s mutacemi prošel" je naměřené, ale **počet chycených mutací v CI je neověřený** (naměřeno je **lokálně**). Nezapisuj do předání „CI má 81/81", když to nevidíš |
 | Repo je veřejné | API bez tokenu | `visibility: public` |
 | **Oprávnění** | `whoami /groups \| Select-String Mandatory` | **`Medium`** = plný přístup. `Low` = sandbox → **falešná selhání testů i bran** (9. session naměřila v `Low` **583/9** místo **584/0** na téže sadě — 8× `render.textures` + 1× `sim.world_loop` save, viz `LESSONS`) a `.uid` nevzniknou. **Dnešní sada je 806/0 (s assety) a 748/0 (bez) — v `Low` by čísla byla zase jiná; měř ji znovu, neopisuj** |
