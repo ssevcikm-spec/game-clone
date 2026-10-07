@@ -206,10 +206,13 @@ následuje předání**. Proto platí:
 klonu je kontrol méně, protože část měří data z `assets/uo/`) a mutační důkaz je
 **83/83** (44+8+8+11+12).
 
-**⚠ CI: ZELENÉ BĚHY BYLY NAD STARŠÍMI COMMITY.** Naposledy ověřený stav před 5.
-session byl **běh #22 nad `137da89` = `success`, všech 13 kroků**. Commity 4. a 5.
-session byly **5. session pushnuté** — než se podle CI něco tvrdí, ověř, **nad
-kterým commitem** běh byl (`node _analyza/ci-beh-stav.mjs` vypíše i SHA).
+**⚠ CI: BĚH NAD COMMITEM 5. SESSION JE ZELENÝ — a je to poprvé, co je zelený
+i běh s novými mutacemi.** `node _analyza/ci-beh-stav.mjs`: **běh #23 nad
+`e6ff22e` = `success`, všech 13 kroků** (krok 9 = mutační důkaz testů prošel).
+Starší běh #22 (`137da89`) bylo taky `success`. **Pozor na hranici toho tvrzení:**
+logy ani artefakty nejdou bez tokenu stáhnout (`ci-log.mjs` → 403,
+`ci-artefakt.mjs` → 401), takže **obsah kroků v CI ověřený není** — 44/44 mutací
+je naměřeno **lokálně** a v CI je ověřeno jen to, že krok nespadl.
 Předchozí běhy #16, #17 a #19 mají poučení:
 
 | běh | commit | spadl v | příčina | oprava |
@@ -350,7 +353,8 @@ a barva kůže.** Statiky nesou barvu ze záznamu mapy, ale **nikdo ji nepouží
 |---|---|---|
 | Strom je čistý | `git status --porcelain -uall` | **prázdné** po commitu této session |
 | Je před GitHubem | `git rev-list --count origin/main..HEAD` | **`0`** — **5. session pushla** (uživatel 2026-10-07 povolil commit i push po každé session) |
-| **Běží CI?** | `node _analyza/ci-beh-stav.mjs` (funguje i bez tokenu) · anotace: `node _analyza/ci-anotace.mjs` | **běh #22 nad `137da89` = `success`, 13/13 kroků**; 5. session pushla `a439716` + svůj commit → **čekej běh nad novým HEAD** (zkontroluj ho, ne ten starý) |
+| **Běží CI?** | `node _analyza/ci-beh-stav.mjs` (funguje i bez tokenu) · anotace: `node _analyza/ci-anotace.mjs` | **běh #23 nad `e6ff22e` = `success`, 13/13 kroků** (5. session pushla a ověřila; #22 nad `137da89` bylo zelené předtím) |
+| **Co v CI NEJDE ověřit bez tokenu** | `node _analyza/ci-log.mjs` → **HTTP 403**; `ci-artefakt.mjs` → **HTTP 401** | Kdo nemá token, **vidí jen stav kroků**, ne jejich obsah — takže „krok 9 prošel" je naměřené, ale **počet chycených mutací v CI je neověřený** (naměřeno je 44/44 **lokálně**). Nezapisuj do předání „CI má 44/44", když to nevidíš |
 | Repo je veřejné | API bez tokenu | `visibility: public` |
 | **Oprávnění** | `whoami /groups \| Select-String Mandatory` | **`Medium`** = plný přístup. `Low` = sandbox → brány hlásí **falešné vady**, `.uid` nevzniknou a `run-all.py` spadne na `summary.json` (5. session to naměřila znovu: G7 „VADA save/load", G11 NEMĚŘENO, self-test 9 chyb — **všechno byl sandbox**) |
 | Testy | testy s `APPDATA` ve workspace (`Low`: dej ho do `.tmp`) | **507 kontrol, 0 selhání**, 27 case souborů (v čistém klonu je kontrol méně — část měří data z `assets/uo/`) |
