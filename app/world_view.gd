@@ -71,6 +71,14 @@ func setup(map, textures) -> void:
 	look_at_tile(center_tile)
 
 
+func set_registry(registry) -> void:
+	# `render.anim` si z registru bere CISLO TELA pro serial (granule
+	# `sim.entity_registry`); registr zaklada `app.main` (integraci misto).
+	# Do 2026-10-06 bral `play()` `serial` jako telo - dnes je to jen fallback
+	# pro klienta bez registru.
+	_anim = Anim.new(Anim.MANIFEST_PATH, registry)
+
+
 func set_player(mobile) -> void:
 	_player = mobile
 	player_missing = false
@@ -179,7 +187,7 @@ func _draw_player() -> void:
 	if _player == null or _anim == null:
 		return
 	player_drawn = true
-	var clip: Dictionary = _anim.play(int(_player.body), _action, int(_player.dir))
+	var clip: Dictionary = _anim.play(int(_player.serial), _action, int(_player.dir))
 	if not bool(clip.get("ok", false)) or clip.get("texture") == null:
 		player_missing = true
 		return

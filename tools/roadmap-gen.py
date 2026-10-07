@@ -531,7 +531,7 @@ g("app.player_controller", "Kamera a ovládání hráče", ["app/player_controll
   prompt="Kamera se posouvá po dlaždicích (žádný plynulý lerp, docs/05 §5.1.4) a musí respektovat `z` hráče (`iso.to_screen` odečítá `z * Z_SCALE`). Vazby kláves patří do `ui.hotkeys`; než vznikne, drží je tenhle soubor a je to vidět v hlavičce.")
 g("sim.entity_registry", "Registr bytostí", ["sim/entity/registry.gd"],
   deps=["core.serial", "entity.mobile"],
-  provides=["register(m) -> void", "get(serial) -> Mobile|null", "all() -> Array", "remove(serial) -> void"],
+  provides=["register(m) -> void", "get_mobile(serial) -> Mobile|null", "all() -> Array", "remove(serial) -> void"],
   acceptance=["tests"], milestone="M2",
   prompt="Jedno místo, kde se hledá mobil podle serialu. Dnes to obchází `sim.movement` (drží si mobily sám) a `render.anim` (bere `serial` jako číslo těla) - obojí je díra ve smlouvě docs/04 §4.2. Registr ji zavře: `play(serial, ...)` si tělo vyzvedne tady.")
 g("sim.pathfind", "Hledání cesty", ["sim/world/pathfind.gd"],

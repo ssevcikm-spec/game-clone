@@ -16,11 +16,16 @@ extends RefCounted
 # (`stamina_drain_model`): "run_only" (1 bod za krok BEHU, chuze zdarma;
 # vychozi) a "emulator" (1 bod za 16 kroku vcetne chuze).
 #
+# ODKUD MOBILY (do 2026-10-06 to bylo otevrene, dnes ne): z granule
+# `sim.entity_registry` - system si je sam NEDRZI. `register`/`mobile` jsou jen
+# pruchod do registru (kdo ho nezada, dostane vlastni prazdny), takze existuje
+# JEDEN zdroj pravdy; `SimWorld` dostane system z integracniho mista
+# (`app/main.gd`). `sim_world.snapshot()` mobily porad nevraci (`mobiles: []`) -
+# to je otevrena vec granule `sim.world_loop`, ne teto.
+#
 # CO SMLOUVA NEPINUJE (patri do docs/04 §4.2, agent docs/ needituje):
-#   * smlouva rika `request_step(m:int, ...)`, ale NERIKA, kde system mobily
-#     vezme - zadny registr mobilu v projektu neni (`sim_world.snapshot` vraci
-#     `mobiles: []`). System si je proto drzi sam (`register`) a `SimWorld`
-#     dostane systemy z integracniho mista (`app/main.gd`),
+#   * `_init(walk, clock, events, drain_model, registry)` - peti argument (registr)
+#     smlouva neuvadi; bez nej si system zalozi vlastni (testy tim meri obe cesty),
 #   * `player_serial` (kdo je hrac) - rozhoduje o asymetricke diagonele
 #     v `world.walk.can_step(is_player)`,
 #   * drzeni klavesy neopakuje krok: `app/input_map.gd` cte jen
@@ -31,6 +36,7 @@ extends RefCounted
 const Const = preload("res://core/const.gd")
 const WalkScript = preload("res://sim/world/walk.gd")
 const ClockScript = preload("res://core/clock.gd")
+const RegistryScript = preload("res://sim/entity/registry.gd")
 
 const BALANCE_PATH := "res://data/balance.json"
 const ACTION_WALK := 0            # anim akce 0 = walk, 1 = run (mereno v anim.mul)
@@ -42,16 +48,19 @@ var player_serial: int = 0
 var _walk = null
 var _clock = null
 var _events = null
-var _mobiles: Dictionary = {}     # serial -> mobil
+var _registry = null              # sim.entity_registry: JEDINE misto pro mobily
 var _pending: Dictionary = {}     # serial -> {dir, run, due_ms}
 var _carry: Dictionary = {}       # serial -> zbytek kroku pro model "emulator"
 var _drain_model: String = "run_only"
 
 
-func _init(walk = null, clock = null, events = null, drain_model: String = "") -> void:
+func _init(walk = null, clock = null, events = null, drain_model: String = "", registry = null) -> void:
 	_walk = walk if walk != null else WalkScript.new()
 	_clock = clock if clock != null else ClockScript.new()
 	_events = events
+	# Kdo registr nezada, dostane vlastni - `register`/`mobile` pak funguji
+	# stejne, jen si mobil drzi tenhle system (starsi chovani z 2026-10-06).
+	_registry = registry if registry != null else RegistryScript.new()
 	# `drain_model` je vstup pro test (aby se daly zmerit OBA modely staminy);
 	# kdyz je prazdny, rozhoduje `data/balance.json` (docs/05 §5.1.4).
 	_read_balance()
@@ -68,11 +77,11 @@ func _read_balance() -> void:
 
 
 func register(mobile) -> void:
-	_mobiles[mobile.serial] = mobile
+	_registry.register(mobile)
 
 
 func mobile(serial: int):
-	return _mobiles.get(serial)
+	return _registry.get_mobile(serial)
 
 
 func pending_count() -> int:
@@ -80,7 +89,7 @@ func pending_count() -> int:
 
 
 func request_step(m: int, dir: int, run: bool) -> Dictionary:
-	var mob = _mobiles.get(m)
+	var mob = _registry.get_mobile(m)
 	if mob == null:
 		return _no(0, "no_mobile")
 	if _pending.has(m):
@@ -101,7 +110,7 @@ func request_step(m: int, dir: int, run: bool) -> Dictionary:
 
 
 func apply_step(m: int, dir: int) -> void:
-	var mob = _mobiles.get(m)
+	var mob = _registry.get_mobile(m)
 	if mob == null:
 		return
 	var run: bool = false
@@ -118,7 +127,7 @@ func apply_step(m: int, dir: int) -> void:
 
 
 func consume_stamina(m: int, steps: int) -> void:
-	var mob = _mobiles.get(m)
+	var mob = _registry.get_mobile(m)
 	if mob == null or steps <= 0:
 		return
 	if _drain_model == "emulator":

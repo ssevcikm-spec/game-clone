@@ -133,6 +133,22 @@ MODULY = {
              "if true:"),
         ],
     },
+    "registry": {
+        "soubor": ROOT / "sim" / "entity" / "registry.gd",
+        "prefix": "sim.entity_registry",
+        "prepinac": "--registry-script",
+        "mutace": [
+            ("neznamy serial vraci mobil 0",
+             "return _mobily.get(serial)", "return _mobily.get(0)"),
+            ("all() vraci v poradi vlozeni (ne podle serialu)",
+             "var serialy: Array = _mobily.keys()\n\tserialy.sort()",
+             "var serialy: Array = _mobily.keys()"),
+            ("remove maze podle klice 0, ne podle serialu",
+             "_mobily.erase(serial)", "_mobily.erase(0)"),
+            ("registr prijme i mobil bez kladneho serialu",
+             "if m == null or int(m.serial) <= 0:", "if m == null:"),
+        ],
+    },
     "movement": {
         "soubor": ROOT / "sim" / "systems" / "movement.gd",
         "prefix": "sim.movement",
@@ -184,7 +200,8 @@ def fail_radky(vystup: str, prefix: str) -> list[str]:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="Mutacni dukaz testu")
-    ap.add_argument("--only", default=None, help="sort, map nebo oboje (carkami)")
+    ap.add_argument("--only", default=None,
+                    help="sort, map, walk, movement, registry (nebo vic carkami)")
     args = ap.parse_args()
     if godot_bin() is None:
         print("CHYBA: Godot nenalezen (nastav $GODOT) - mutace by nic nemerily")

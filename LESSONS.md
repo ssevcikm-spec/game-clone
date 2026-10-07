@@ -24,6 +24,81 @@ Typy: `chyba` (moje vada) · `past-nástroje` (prostředí/nástroj, ne logika) 
 
 ---
 
+### 2026-10-06 — Smlouva žádala metodu, kterou GDScript NEMŮŽE mít: `get(serial)` (vada-zadani)
+**Co se stalo:** smlouva `docs/04 §4.2` i roadmapa žádaly u `sim.entity_registry`
+metodu `get(serial)->Mobile|null`. Napsal jsem ji přesně tak — a `registry.gd`
+**nesel zparsovat**: `get()` je metoda `Object` (`get(StringName) -> Variant`)
+a jiná signatura je parse error. `movement.gd` (preload registru) spadl s ním.
+**Doklad:** `SCRIPT ERROR: Parse Error: The function signature doesn't match the
+parent. Parent signature is "get(StringName) -> ..."`; `Failed to load script
+"res://sim/entity/registry.gd"`. Opraveno na `get_mobile(serial)` v
+`sim/entity/registry.gd`, `docs/04 §4.2` (+ §4.2.1) a `tools/roadmap-gen.py`
+(rozhodl uživatel 2026-10-06).
+**Ponaučení:** **jméno metody je součást smlouvy a musí se ověřit proti jazyku** —
+`get`, `set`, `call`, `free`, `duplicate`, `connect` jsou jména `Object` a v
+GDScriptu je nelze použít s jinou signaturou. Než začneš psát podle smlouvy,
+zkus ji **zparsovat** (jedna `func` v kopii souboru stačí); je to levnější než
+ladit, proč „testy projdou a nic neměří".
+
+### 2026-10-06 — Sada hlásila „0 selhání" a přitom SPADLA o 22 kontrol (past-nástroje)
+**Co se stalo:** po prvním zápisu registru vypsal `tests/run_tests.gd`
+**438 kontrol, 0 selhání** — tedy zelenou. Ve skutečnosti dva case soubory
+(`registry.gd`, `movement.gd`) měly **parse error** a harness je tiše přeskočil
+(otevřená věc 21). Všiml jsem si jen proto, že baseline předtím měřil
+**460 kontrol**: rozdíl −22 byl jediný viditelný příznak.
+**Doklad:** log běhu (`Failed to load script "res://tests/cases/movement.gd"
+with error "Parse error"`) vs. `[test] 438 kontrol, 0 selhani`; po opravě
+`[test] 480 kontrol, 0 selhani`.
+**Ponaučení:** **počet kontrol je metrika, ne dekorace** — když se mezi dvěma
+běhy změní, něco se přeskočilo i při „0 selhání". Před i po zásahu si napiš
+`N kontrol` a porovnej; u nové session si baseline změř **hned**, ne až po změně.
+
+### 2026-10-06 — `.cache` i `.godot` jsou v sandboxu `workspace-write` needitovatelné (past-nástroje)
+**Co se stalo:** v režimu `workspace-write` (proces je `Mandatory Label\Low`)
+selhal zápis do `.cache` (`Access denied`) i do `.godot`. Důsledky vypadají jako
+vady kódu: brány hlásily **G3 VADA, G7 VADA, G11 NEMĚŘENO** a `run-all.py` spadl
+na `summary.json`; Godot navíc **nezapsal `.gd.uid`** k novým skriptům (protože
+`.godot/uid_cache.bin` je needitovatelný). Testy šly spustit s `APPDATA` v `.tmp`.
+**Doklad:** `Out-File .cache\...` → `UnauthorizedAccessException`; `Out-File
+.godot\...` → totéž; se `danger-full-access` pak `--import` zapsal
+`sim/entity/registry.gd.uid` i `tests/cases/registry.gd.uid` a brány daly
+**11/0/0, exit 0**.
+**Ponaučení:** než označíš bránu za vadnou, **zjisti, pod jakým oprávněním jsi
+měřil** (`whoami /groups | Select-String Mandatory`) — a `APPDATA` pro testy dá
+do `.tmp`, když `.cache` nejde. Nový `.gd` soubor bez `.uid` je **příznak
+sandboxu**, ne chybějící soubor v gitu.
+
+### 2026-10-06 — Sonda na unikátnost mutačních vzorů, ověřená mutací sebe sama (nástroj)
+**Co se stalo:** po zásahu do `render/anim_player.gd` a `registry.gd` jsem
+potřeboval vědět, že každý mutační vzor je ve zdroji **právě jednou** (jinak se
+mutuje něco jiného, než se měří) — a to **před** spuštěním harnessů, které
+v sandboxu nejdou spustit. Vznikl `_analyza/mutace-vzory.py`: načte `MUTACE`
+z obou harnessů, spočítá výskyty a u `mutace-render-anim.py` (který `count == 1`
+vyžaduje) i ověří, že `podminka` **neplatí na originále**.
+**Doklad:** `python _analyza/mutace-vzory.py` → 49 vzorů, `OK`; s vrácenou vadou
+(`lambda t: True` místo podmínky) → `VADY (1)`, `exit 1`; s duplicitním vzorem →
+`3x`/`2x`, `exit 1`. Obě větve jsem viděl spadnout.
+**Ponaučení:** **sonda, která má předpovídat selhání, se musí sama nechat shodit** —
+jinak je to jen výpis. A rozdíl mezi harnessy je podstatný: `mutace-tests.py`
+unikátnost **nevyžaduje** (nahrazuje první výskyt, je to v docstringu), kdežto
+`mutace-render-anim.py` ano — jedna sonda to nesmí míchat.
+
+### 2026-10-06 — Registr entit: `all()` řaď podle serialu, ne podle vložení (postup)
+**Co se stalo:** `sim.entity_registry` (Úkol 1) drží `serial -> mobil` ve
+`Dictionary`, jehož `keys()` je v **pořadí vložení**. Kdyby `all()` vracelo
+tohle pořadí, závisel by na něm stavový hash i replay — dva běhy se **stejným
+stavem** a jinou historií by daly jiný hash. Proto `all()` serialy třídí.
+Zároveň se `register` odmítá pro `serial <= 0`: nula je výchozí hodnota
+`entity.mobile`, takže „mobil na serialu 0" by v `get_mobile(0)` vypadal jako
+platný hráč a `sim.movement` by mu dovolil krok.
+**Doklad:** `sim/entity/registry.gd`; `tests/cases/registry.gd` (11 kontrol);
+`mutace-tests.py --only registry,movement` → **11/11 chyceno**, mj. mutace
+„all() vrací v pořadí vložení" (`FAIL sim.entity_registry: all() je serazene
+podle serialu (vyslo [1073741826, 1073741825])`).
+**Ponaučení:** u každé kolekce, ze které se čte **stav pro hash nebo replay**,
+řeš pořadí explicitně (`sort()` podle klíče, ne „jak to vylezlo"). A invariant
+„nula neznamená platnou entitu" patří do vkládací funkce, ne k volajícím.
+
 ### 2026-10-06 — „RunUO je lepší než ServUO" je otázka na jádro, ne na celek (postup)
 **Co se stalo:** uživatel se ptal, jestli je lepší zkoumat RunUO než ServUO.
 Místo názoru se změřilo: `servuo/Server` obsahuje **123 ze 123** souborů

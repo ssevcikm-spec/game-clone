@@ -20,6 +20,7 @@ const Const = preload("res://core/const.gd")
 const ClockScript = preload("res://core/clock.gd")
 const EventsScript = preload("res://core/events.gd")
 const MobileScript = preload("res://sim/entity/mobile.gd")
+const RegistryScript = preload("res://sim/entity/registry.gd")
 
 const MOVEMENT_SCRIPT := "res://sim/systems/movement.gd"
 
@@ -42,7 +43,7 @@ class FakeWalk:
 		return {"ok": true, "z": 0, "reason": ""}
 
 
-func _sestav(t, drain_model: String) -> Array:
+func _sestav(t, drain_model: String, registry = null) -> Array:
 	var cesta: String = _arg("movement-script", MOVEMENT_SCRIPT)
 	var script = Lib.script_at(cesta)
 	if script == null:
@@ -51,7 +52,7 @@ func _sestav(t, drain_model: String) -> Array:
 	var walk = FakeWalk.new()
 	var clock = ClockScript.new()
 	var events = EventsScript.new()
-	var mv = script.new(walk, clock, events, drain_model)
+	var mv = script.new(walk, clock, events, drain_model, registry)
 	var mob = MobileScript.new(0x40000001, 400, Vector3i(5, 5, 0))
 	mv.player_serial = mob.serial
 	mv.register(mob)
@@ -183,3 +184,24 @@ func run(t) -> void:
 	var bez: Dictionary = mv.request_step(m, 0, true)
 	t._check(bez["ok"] == true and int(bez["delay_ms"]) == Const.WALK_MS,
 		"sim.movement: bez staminy se jde chuzi (400 ms), ne během (namEReno %s)" % str(bez))
+
+	# 11) mobily bere system z REGISTRU (granule `sim.entity_registry`), ne
+	#     z vlastniho slovniku: mobil vlozeny PRIMO do predaneho registru musi
+	#     jit pouzit i bez `mv.register` a `register()` musi zapsat do registru
+	var reg = RegistryScript.new()
+	var cizi2 = MobileScript.new(0x40000031, 400, Vector3i(5, 5, 0))
+	reg.register(cizi2)
+	var mv3 = _sestav(t, "run_only", reg)
+	if not mv3.is_empty():
+		var mv3s = mv3[0]
+		t._check(mv3s.mobile(cizi2.serial) == cizi2,
+			"sim.movement: mobil vlozeny do PREDANEHO registru je viden pres mobile()")
+		var krok: Dictionary = mv3s.request_step(cizi2.serial, 0, false)
+		t._check(bool(krok["ok"]) and int(krok["delay_ms"]) == Const.WALK_MS,
+			"sim.movement: krok mobilu z registru projde (namEReno %s)" % str(krok))
+		var jiny = MobileScript.new(0x40000032, 400, Vector3i(5, 5, 0))
+		mv3s.register(jiny)
+		t._check(reg.get_mobile(jiny.serial) == jiny,
+			"sim.movement: register() zapisuje do registru, ne do vlastniho slovniku")
+		t._check(mv3s.mobile(0x40009999) == null,
+			"sim.movement: nezaregistrovany serial vraci pres mobile() null")

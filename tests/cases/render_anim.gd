@@ -15,6 +15,8 @@ extends RefCounted
 # proto se k tomu overuje jeste to, ze `push_warning` v merenem souboru opravdu je.
 
 const Lib = preload("res://tests/lib.gd")
+const RegistryScript = preload("res://sim/entity/registry.gd")
+const MobileScript = preload("res://sim/entity/mobile.gd")
 const ANIM_SCRIPT := "res://render/anim_player.gd"
 const MANIFEST := "res://assets/uo/anim/anim-sheets.json"
 const CONST_SCRIPT := "res://core/const.gd"
@@ -167,3 +169,30 @@ func run(t) -> void:
 		% str(prazdny.available()))
 	t._check(FileAccess.get_file_as_string(cesta).contains("push_warning"),
 		"render.anim: chybejici data se HLASI (push_warning v merenem souboru)")
+
+	# 13) registr bytosti (granule `sim.entity_registry`): `play(serial, ...)` si
+	#     CISLO TELA vyzvedne z registru. Srovnava se s `play(401, ...)` (starsi
+	#     cesta), takze se cislo tela neopisuje - je to TATAZ textura.
+	var reg = RegistryScript.new()
+	var mob = MobileScript.new(0x40000001, 401, Vector3i.ZERO)
+	reg.register(mob)
+	var s_reg = script.new(MANIFEST, reg)
+	var pres_registr: Dictionary = s_reg.play(mob.serial, 0, 0, 0)
+	var pres_telo: Dictionary = player.play(401, 0, 0, 0)
+	var t_r = pres_registr["texture"]
+	var t_t = pres_telo["texture"]
+	t._check(bool(pres_registr["ok"]) and t_r != null and t_t != null
+		and int(pres_registr["count"]) == int(pres_telo["count"])
+		and t_r.region == t_t.region,
+		"render.anim: registr -> play(serial) kresli telo z registru (framu %d, pres telo %d)"
+		% [int(pres_registr["count"]), int(pres_telo["count"])])
+	t._check(s_reg.body_of(mob.serial) == 401 and s_reg.body_of(0x40009999) == -1,
+		"render.anim: body_of = %d pro mobil v registru a %d pro neznameho (ocekavano 401 a -1)"
+		% [s_reg.body_of(mob.serial), s_reg.body_of(0x40009999)])
+	var nez: Dictionary = s_reg.play(0x40009999, 0, 0, 0)
+	t._check(not bool(nez["ok"]) and nez["texture"] == null and int(nez["count"]) == 0,
+		"render.anim: serial, ktery v registru NENI, vraci ok:false + null (ne telo = serial)")
+	var bez_reg = script.new(MANIFEST)
+	t._check(bez_reg.body_of(400) == 400,
+		"render.anim: bez registru je serial cislo tela (starsi chovani, vyslo %d)"
+		% bez_reg.body_of(400))

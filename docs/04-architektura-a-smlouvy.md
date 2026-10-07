@@ -67,13 +67,13 @@ v `.forge/roadmap.json`.
 | `entity.stats` | `sim/entity/stats.gd` | `str_:int`, `dex:int`, `int_:int` (dřív tu stálo `str/dex/int:int`; `int` je klíčové slovo a `str` by přebilo globální funkci `str()`), `hits_max()->int` (= `50 + STR/2`), `stam_max()->int` (= DEX), `mana_max()->int` (= INT), `stat_total()->int`, `at_cap()->bool` |
 | `entity.skills` | `sim/entity/skills.gd` | `value(skill:int)->int` (desetiny), `set_value(skill:int,v:int)->void`, `cap(skill:int)->int`, `total()->int`, `lock(skill:int)->int`, `set_lock(skill:int,l:int)->void` |
 | `entity.notoriety` | `sim/entity/notoriety.gd` | `level(m:int)->int` (1 innocent … 6 murderer, 7 invulnerable), `is_criminal(m:int)->bool`, `flag_criminal(m:int, ms:int)->void`, `murder_counts(m:int)->int`, `award_fame_karma(m:int, fame:int, karma:int)->void` |
-| `sim.entity_registry` | `sim/entity/registry.gd` | **DOPLNĚNO 2026-10-06 — smlouva pro granuli `sim.entity_registry` (kód ještě není):** drží `serial -> mobil`; `register(m)->void`, `get(serial)->Mobile|null`, `all()->Array`, `remove(serial)->void`. Je to **jediné místo, kde se mobil hledá podle serialu** — dnes tuhle díru obchází `sim.movement` (`register`/`mobile`) i `render.anim` (bere `serial` jako číslo těla). Viz §4.2.1 |
+| `sim.entity_registry` | `sim/entity/registry.gd` | **DOPLNĚNO 2026-10-06 — smlouva pro granuli `sim.entity_registry`:** drží `serial -> mobil`; `register(m)->void`, **`get_mobile(serial)->Mobile|null`**, `all()->Array`, `remove(serial)->void`, navíc `size()->int` (používá jen test). Je to **jediné místo, kde se mobil hledá podle serialu** — `sim.movement` (`register`/`mobile` jsou průchod do registru) i `render.anim` (`body_of(serial)`) ho berou odtud. ⚠ **OPRAVA 2026-10-06 (rozhodl uživatel):** smlouva i roadmapa dřív žádaly `get(serial)`; to GDScript **neumí** — `get()` je metoda `Object` (`get(StringName)`) a jiná signatura je **parse error** (`The function signature doesn't match the parent`), který sada tiše přeskočí (otevřená věc 21). Platí `get_mobile`. Viz §4.2.1 |
 
 ### sim/systems
 
 | id | soubor | provides | acceptance (konkrétní volání) |
 |---|---|---|---|
-| `sim.movement` | `sim/systems/movement.gd` | **odkud bere mobily (dohodnutý tvar, dokud nebude `sim.entity_registry`):** `register(mobile)->void`, `mobile(serial:int)`, `player_serial:int` (rozhoduje o asymetrické diagonále); `request_step(m:int, dir:int, run:bool)->Dictionary` (`{ok, delay_ms, reason}`), `apply_step(m:int, dir:int)->void`, `consume_stamina(m:int, steps:int)->void`, `pending_count()->int`, `delay_ms_for(run:bool)->int` | `request_step(m, 0, false).delay_ms == 400` **pro zaregistrovaný mobil** (jinak `{ok:false, reason:"no_mobile"}`); po `apply_step` se `pos.x += 1`; viz §4.2.1 |
+| `sim.movement` | `sim/systems/movement.gd` | **odkud bere mobily (2026-10-06): z granule `sim.entity_registry`** — `register(mobile)->void` a `mobile(serial)` jsou jen průchod do registru; registr jde předat **konstruktorem** jako pátý argument (`_init(walk, clock, events, drain_model, registry)`), bez něj si systém založí vlastní. Dále `player_serial:int` (rozhoduje o asymetrické diagonále); `request_step(m:int, dir:int, run:bool)->Dictionary` (`{ok, delay_ms, reason}`), `apply_step(m:int, dir:int)->void`, `consume_stamina(m:int, steps:int)->void`, `pending_count()->int`, `delay_ms_for(run:bool)->int` | `request_step(m, 0, false).delay_ms == 400` **pro mobil v registru** (jinak `{ok:false, reason:"no_mobile"}`); po `apply_step` se `pos.x += 1`; viz §4.2.1 |
 | `sim.interaction` | `sim/systems/interaction.gd` | `use(m:int, serial:int)->void`, `use_on(m:int, serial:int, target:Dictionary)->void`, `context_menu(m:int, serial:int)->Array[Dictionary]`, `context_action(m:int, serial:int, entry:int)->void` | `use(m, anvil)` nic neudělá; `use_on(m, ore, {"serial": forge})` spustí tavení |
 | `sim.combat` | `sim/systems/combat.gd` | `set_war(m:int, on:bool)->void`, `attack(m:int, target:int)->void`, `swing_delay_ms(m:int)->int`, `resolve_swing(m:int, t:int)->Dictionary`, `stop_combat(m:int)->void` | `swing_delay_ms` na `dex=100, speed=30` vrátí hodnotu dle vzorce z §5.5 |
 | `sim.magic` | `sim/systems/magic.gd` | `cast(m:int, spell:int)->Dictionary` (`{ok, delay_ms, reagents, reason}`), `interrupt(m:int)->void`, `add_spell(m:int, spell:int)->bool`, `scribe(m:int, scroll:int)->bool` | `cast` bez reagent → `{ok:false, reason:"reagents"}` |
@@ -125,7 +125,7 @@ v `.forge/roadmap.json`.
 | `render.hue` | `render/hue_cache.gd` | `(art_id, hue)` → textura (index 0 = použij hue) |
 | `render.sort` | `render/sort.gd` | **jediná** funkce řazení (land → statics podle z → mobilové podle z) |
 | `render.chunk` | `render/chunk_renderer.gd` | sestavení kreslicího seznamu pro viditelné bloky, cache |
-| `render.anim` | `render/anim_player.gd` | `play(serial:int, action:int, dir:int, now_ms:int = -1)->Dictionary` → `{ok, texture, frame, count, anchor, mirror, mirror_x, sprite_dir}` (chybějící sprite = `ok:false` + `texture:null`); framy těl a worn artu podle `animdata`, časování 80 ms; **`serial` se bere jako číslo těla** (registr entit není — viz `sim.entity_registry`); zrcadlení 8 → 5 směrů a `mirror_x` viz §4.2.1 |
+| `render.anim` | `render/anim_player.gd` | `play(serial:int, action:int, dir:int, now_ms:int = -1)->Dictionary` → `{ok, texture, frame, count, anchor, mirror, mirror_x, sprite_dir}` (chybějící sprite = `ok:false` + `texture:null`); **číslo těla se bere z registru** — `body_of(serial)->int` (`-1`, když serial v registru není; bez registru je `serial` sám tělem, starší chování), registr jde předat konstruktorem `_init(manifest_path, registry)`; framy těl a worn artu podle `animdata`, časování 80 ms; zrcadlení 8 → 5 směrů a `mirror_x` viz §4.2.1 |
 | `render.names` | `render/name_plates.gd` | jména a HP pruhy nad mobily (jen na dosah/po kliku) |
 | `render.light` | `render/light_layer.gd` | úroveň světla z `world.time`, světelné zdroje (louče, okna) |
 | `render.effects` | `render/effects.gd` | kouř, oheň, zásah, smrt, animace kouzel |
@@ -192,6 +192,24 @@ změnil, je tu i **původní znění** — historie se nepřepisuje, jen doplňu
   sim/entity/registry.gd`, `depends_on: core.serial + entity.mobile`), takže řádek
   výš a roadmapa se shodují; kód (`registry.gd`) ještě není. Kdyby se `provides`
   v roadmapě změnilo, platí roadmapa (je to klíč plánu) a smlouva se doplní.
+- **AKTUALIZACE 2026-10-06 (Úkol 1 hotový, kód existuje): obě díry jsou zavřené.**
+  `sim/entity/registry.gd` drží `serial -> mobil`; `sim.movement` z něj mobily
+  bere (`register`/`mobile` jsou průchod do registru, konstruktor ho bere pátým
+  argumentem) a `render.anim` si z něj bere číslo těla (`body_of(serial)`;
+  bez registru platí starší „serial = tělo"). Předchozí znění výš („kód ještě
+  není", „Až vznikne `sim.entity_registry`, patří převod `serial -> body` tam")
+  tím **přestalo platit** — zůstává tu jako záznam. **Otevřené zůstává:**
+  `SimWorld.snapshot()` pořád vrací `mobiles: []` (věc granule `sim.world_loop`,
+  ne registru), a `all()` je seřazené podle serialu (na pořadí vložení nesmí
+  záviset stavový hash).
+- **VADA SMLOUVY OPRAVENA 2026-10-06 (rozhodl uživatel): `get` → `get_mobile`.**
+  Dřív tu stálo `get(serial)->Mobile|null` (a totéž v roadmapě). **GDScript to
+  neumí:** `get()` je metoda `Object` (`get(StringName)`) a jiná signatura je
+  **parse error** (`The function signature doesn't match the parent. Parent
+  signature is "get(StringName) -> Variant"`). Naměřeno 2026-10-06: sada s tím
+  hlásila **438 kontrol, 0 selhání** místo **480** — case soubor s parse errorem
+  se tiše přeskočí (otevřená věc 21). Opraveno v tabulce §4.2 i v
+  `tools/roadmap-gen.py`; `.forge/roadmap.json` se z generátoru přegeneruje.
 
 ## 4.3 Příkazy klient → simulace
 

@@ -2595,7 +2595,7 @@
       ],
       "provides": [
         "register(m) -> void",
-        "get(serial) -> Mobile|null",
+        "get_mobile(serial) -> Mobile|null",
         "all() -> Array",
         "remove(serial) -> void"
       ],

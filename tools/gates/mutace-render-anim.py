@@ -94,6 +94,14 @@ MUTACE: list[tuple[str, str, str, object]] = [
      'return 0 if sheet == null else sheet["frames"].size()',
      "return 0  # mutace: vzdy nula",
      lambda t: 'sheet["frames"].size()' not in t),
+    ("registr bytosti se ignoruje (telo = serial)",
+     "var telo: int = body_of(serial)\n\tif telo < 0:",
+     "var telo: int = serial\n\tif false:",
+     lambda t: "var telo: int = body_of(serial)" not in t),
+    ("neznamy serial se bere jako cislo tela",
+     "if mob == null:\n\t\treturn -1",
+     "if mob == null:\n\t\treturn serial",
+     lambda t: "\t\treturn -1" not in t),
 ]
 
 

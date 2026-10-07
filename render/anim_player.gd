@@ -17,7 +17,10 @@ extends RefCounted
 #     sprite 3 = ctvrtzadni -> svet W (4) a zrcadlene N (2)
 # NALEZ (hlasim, neopravuji): prompt uvadi priklad "smer 4 = zapad je zrcadleny smer 0 = vychod"; NESEDI.
 # CO SMLOUVA NEPINUJE (hlasim, neopravuji): `play(serial, ...)` - ODKUD se pro serial bere
-# cislo tela (registr bytosti jeste neni, proto se `serial` bere jako cislo tela). Zrcadleni
+# cislo tela. Do 2026-10-06 to bylo OTEVRENE a `serial` se bral jako cislo tela; dnes ho
+# vyzvedava `body_of()` z granule `sim.entity_registry` (jedine misto, kde se mobil hleda
+# podle serialu). Kdo registr nezada, dostane STARSI chovani (serial = telo), aby se dala
+# merit obe cesty. Zrcadleni
 # se do deklarovaneho navratu nevejde: `anchor` je presne `Vector2(cx, cy+h)` z manifestu, ale
 # zrcadleny sprite se kresli na `tile_x - (w - cx)` (ClassicUO `MobileView.cs:712`) - navrat
 # proto nese navic `mirror`, `mirror_x` (= w - cx) a `sprite_dir` (0..4). `frame_ms(action)`
@@ -37,10 +40,12 @@ var _textures: Dictionary = {}   # "soubor|rect" -> AtlasTexture, "page|soubor" 
 var _state: Dictionary = {}      # serial -> {key, start} pro casovani
 var _prefix := ""
 var _ok := false
+var _registry = null             # sim.entity_registry (serial -> mobil), muze byt null
 
 
-func _init(manifest_path: String = MANIFEST_PATH) -> void:
+func _init(manifest_path: String = MANIFEST_PATH, registry = null) -> void:
 	_prefix = manifest_path.get_base_dir() + "/"
+	_registry = registry
 	var parsed = null
 	if FileAccess.file_exists(manifest_path):
 		parsed = JSON.parse_string(FileAccess.get_file_as_string(manifest_path))
@@ -63,10 +68,29 @@ func frame_count(body: int, action: int, dir: int) -> int:
 	return 0 if sheet == null else sheet["frames"].size()
 
 
+func body_of(serial: int) -> int:
+	# CISLO TELA pro `play` (granule `sim.entity_registry`): registr je jedine
+	# misto, kde se mobil hleda podle serialu. Vraci -1, kdyz registr serial
+	# NEZNA - "serial jako telo" by u neznamiho mobila vykreslilo CIZI postavu.
+	# Bez registru se `serial` bere jako cislo tela (starsi chovani).
+	if _registry == null:
+		return serial
+	var mob = _registry.get_mobile(serial)
+	if mob == null:
+		return -1
+	return int(mob.body)
+
+
 func play(serial: int, action: int, dir: int, now_ms: int = -1) -> Dictionary:
 	var cas: int = Time.get_ticks_msec() if now_ms < 0 else now_ms
 	var map: Array = DIR_MAP[((dir % 8) + 8) % 8]
-	var key: String = _key(serial, action, dir)
+	var telo: int = body_of(serial)
+	if telo < 0:
+		_state.erase(serial)
+		if _ok:
+			push_warning("render.anim: serial %d neni v registru bytosti" % serial)
+		return _zadny(map)
+	var key: String = _key(telo, action, dir)
 	var sheet = _sheets.get(key)
 	if sheet == null:
 		_state.erase(serial)
