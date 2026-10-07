@@ -8,8 +8,10 @@
 > `entity.container` — **další je `entity.equipment`**. Tato (14.) session
 > **uzavřela vlnu pohybu** z `REVIZE-POHYB-2026-10-07.md`: vady **V2**
 > (posun a animace v jedné fázi), **V4** (svahy — výška z rohů) a **V5** (most nad
-> vodou) jsou **opravené a měřené**; plánovaný cíl (`sim.harvest` + `sim.craft` +
-> `ui.journal`) se tím **posunul na 15. session**.
+> vodou) jsou **opravené a měřené**. **Cíl 15. session je `M9` (modernizace)** —
+> uživatel ho večer 2026-10-07 předsunul („zavolám novou session pro M9“), takže
+> `sim.harvest` + `sim.craft` + `ui.journal` se posouvá na **16. session**
+> (viz „CÍL 15. SESSION“ níž s celým zadáním a kritériem).
 > Předchozí etapa je v `ZADANI-DALSI-VYVOJ.md`.
 > **Naměřený stav plánu je v `REVIZE-PLANU-2026-10-06.md`** a **stav granul
 > měří** `python tools/plan-status.py`.
@@ -509,7 +511,56 @@ ho celý." Každá session tedy **není „krok"**, ale **jeden celek s cílem**
 > svým zadáním **posunul plánovaný cíl** (`sim.harvest` + `sim.craft` +
 > `ui.journal`) na **13. session**.
 
-**🎯 CÍL 15. SESSION (přejatý plán — 13. a 14. session dělaly vlnu pohybu):**
+**🎯 CÍL 15. SESSION — **M9 „MODERNIZACE“** (rozhodl uživatel 2026-10-07 večer:
+„já mezitím zavolám novou session pro M9“). M9 se tím **PŘEDSUBUJE** před obsah
+M3+ a `sim.harvest`/`sim.craft`/`ui.journal` se posouvá na **16. session**.**
+
+> **Co je M9:** poslední milník plánu (dřív „až po M8“) — `docs/07 §7.2` (řádek
+> M9), vlna `docs/07 §7.3` **W11**, zadání granulí `tools/roadmap-gen.py:556-570`,
+> generovaný plán `.forge/roadmap.json`. **Je to totéž jako „Úkol 8“ v
+> `ZADANI-DALSI-VYVOJ-2.md §3`** a jako bod **F** v `REVIZE-POHYB §5`.
+> **Tři granule (změřeno: 0 ze 3 hotových, žádný soubor v repu není):**
+>   1. **`app.config`** (`app/config.gd`, `<= 60`, `any`, deps `data.balance`):
+>      `provides` = `get(key, default) -> Variant`, `known_keys() -> Array`,
+>      `check() -> Array chyb`. Jedna tabulka **klíč + typ + default + rozsah**;
+>      **neznámý klíč se HLÁSÍ** (dnes se `data/balance.json` čte ad hoc na více
+>      místech). Vzor: ModernUO `Projects/Server/Configuration/ServerConfiguration.cs:43`.
+>   2. **`app.metrics`** (`app/metrics.gd`, `<= 60`, `any`, deps `app.loop`,
+>      `app.player_view`): `fps()`, `frame_ms()`, `drawn_objects()`,
+>      `report() -> Dictionary`; sbírá, co už existuje (`render.textures.stats()`,
+>      `app/world_view.drawn`). **Tohle je nástroj, kterým se pak měří M9.**
+>   3. **`render.chunk_mesh`** (`render/chunk_mesh.gd`, `<= 150`, **`strong`**,
+>      deps `render.chunk`, `render.textures` — obě hotové): místo ~1 500 draw
+>      callů na dlaždici **jedna dávka na blok** (land + statiky), rebuild při
+>      invalidaci. Vzor: ClassicUO `src/ClassicUO.Client/Game/Map/ChunkMesh.cs:121`.
+> **Pravidlo M9 (docs/07 §7.2): modernizace NESMÍ ubrat žádné měření** — každá
+> změna má stejnou nebo silnější bránu a **G1–G13 nesmí ubýt**. U meshe je
+> podmínka výslovná: **paritní test + snímek** (že obraz je STEJNÝ), ne tvrzení.
+> **Přijímací kritérium (měřitelné):**
+>   * `tests/cases/{config,metrics,chunk_mesh}.gd` (cesta jako VSTUP přes
+>     `--<…>-script=`, jako u ostatních), moduly v `tools/gates/mutace-tests.py`,
+>   * `app.config`: neznámý klíč se objeví v `check()` (nesmí být ticho);
+>   * `app.metrics`: `report()` dá čísla, která jdou porovnat s `docs/01 §1.6`
+>     (**60 FPS / ≤ 16 ms na frame**; dnes naměřeno **27 FPS při chůzi** a
+>     **1 516 draw callů**, `_analyza/vlna5-chuze.gd`),
+>   * `render.chunk_mesh`: **paritní test** (stejný seznam/obraz jako
+>     `render.chunk`) + **snímek**, a čísla PŘED/PO (draw cally, ms na frame)
+>     v HANDOFF — bez nich modernizace „nesmí ubrat měření“ nesplňuje,
+>   * sada, `run-all.py` (0 vad), self-testy (0 chyb), `check-docs-refs` /
+>     `check-zadani` / `roadmap-gen --check`, `plan-status.py` **bez nových
+>     rozporů** (dnes 53 měřeně hotových; nové granule stav ZVÝŠÍ, nesmí snížit),
+>   * smlouvy do `docs/04 §4.2` (a `§4.5`, pokud se dotkne dat), HANDOFF + LESSONS,
+>     commit + push + **CI ověřené s PAT** (viz odstavec „CI“ níž — logy i obsah
+>     kroků jsou nyní dosažitelné).
+> **Pozor, co M9 může rozbít:** mesh mění cestu vykreslování, na které dnes stojí
+> `PriorityZ` (E, 13. session) i **posun postavy mezi dlaždicemi (V2, 14. session)**
+> — paritní test musí pokrýt i chůzi, ne jen stojící scénu. Nové `.gd` soubory
+> potřebují `--import` pod plným přístupem (jinak nevznikne `.uid`, past 50).
+> **Co do cíle NEPATŘÍ:** `sim.harvest`/`sim.craft`/`ui.journal` (16. session),
+> `entity.equipment`, obsah M3+ až M8, M9 granule `app.config`/`app.metrics`
+> **nejsou** blokované ničím (dají se udělat první a jsou levné).
+
+**⏭ CÍL 16. SESSION (odloženo za M9; text se nemění):**
 
 > **Dokončit `sim.harvest` + `sim.craft` + `ui.journal` (BIG WIN č. 1: „umět
 > pracovat“).** Uživatel 11. session zvolil priority: **nejdřív řemeslo, souboj
@@ -616,7 +667,7 @@ tady je jen to, co čeká na tebe (obojí vratné, obojí doložené měřením)
 | # | Na co se čeká | Co to blokuje | Cena / cesta zpět |
 |---|---|---|---|
 | 1 | ~~Smím přepsat `docs/05 §5.1.4` (zákaz plynulého pohybu)?~~ **✅ VYŘEŠENO 13. session** — zákaz zrušen, `docs/05 §5.1.4` přepsán (doklad v „CO JE NOVÉHO (13. session)"). Dnes je **V2 opravená a měřená** (14. session) | — | — |
-| 2 | **Předsunout `render.chunk_mesh` (M9) před obsah M3+?** **Co je M9:** poslední milník plánu **„Modernizace“** — tři granule: `app.config` (`app/config.gd`, typovaná konfigurace), `app.metrics` (`app/metrics.gd`, fps/frame ms/počet kreslených objektů) a `render.chunk_mesh` (`render/chunk_mesh.gd`, dávkové kreslení bloků místo per-dlaždicových draw callů; vzor ClassicUO `ChunkMesh.cs:121`). **Je to totéž jako „Úkol 8“ v `ZADANI-DALSI-VYVOJ-2.md §3` a jako bod „F“ v `REVIZE-POHYB §5`** — odtud ta potíž s hledáním. Kde je to zapsané: `docs/07 §7.2` (řádek M9), `docs/07 §7.3` (vlna W11), `tools/roadmap-gen.py:556-570` (zadání granulí), `.forge/roadmap.json` (generovaný plán). **Naměřeno:** 1 516 draw callů a 27 FPS při chůzi proti kritériu `docs/01 §1.6` (**60 FPS / ≤ 16 ms**), plus V3 (přestavba seznamu 45,8 ms každé 4 kroky). **Stav: 0 ze 3** granul (změřeno: `app/config.gd`, `app/metrics.gd` ani `render/chunk_mesh.gd` v repu nejsou). `app.config` a `app.metrics` jsou malé (`<= 60`, `any`) a dají se udělat kdykoli; `render.chunk_mesh` je velká (`<= 150`, `strong`) | plynulost hry; každá další práce na klientu se dělá nad provizoriem (V3 zůstává otevřená) | Granule v roadmapě **už je**; jde jen o **pořadí**. Vratné. Podmínka milníku M9: **modernizace nesmí ubrat žádné měření** — u meshe **paritní test + snímek** (že obraz je stejný) |
+| 2 | ~~Předsunout `render.chunk_mesh` (M9) před obsah M3+?~~ **✅ ROZHODNUTO 2026-10-07 večer (uživatel): „já mezitím zavolám novou session pro M9“ — M9 se PŘEDSUBUJE a je to CÍL 15. SESSION** (celé zadání + kritérium viz „CÍL 15. SESSION“). Co je M9 a kde je zapsané: `docs/07 §7.2` (řádek M9), `docs/07 §7.3` (vlna **W11**), `tools/roadmap-gen.py:556-570`, `.forge/roadmap.json`; **je to totéž jako „Úkol 8“ v `ZADANI-DALSI-VYVOJ-2.md §3` a jako bod F v `REVIZE-POHYB §5`** (odtud potíž s hledáním). Tři granule: `app.config`, `app.metrics`, `render.chunk_mesh`; **změřeno 0 ze 3** (žádný z těch souborů v repu není). Naměřeno, proč to řešit: **1 516 draw callů** a **27 FPS při chůzi** proti kritériu `docs/01 §1.6` (**60 FPS / ≤ 16 ms**), plus V3 (přestavba seznamu **45,8 ms** každé 4 kroky) | — | Už rozhodnuto; cesta zpět je jen pořadí (granule v roadmapě existuje, `done` se nepřepisuje ručně) |
 | 3 | **NOVÉ (14. session): mají být „brány na chování v čase" i v CI?** `REVIZE-POHYB` §5 je žádá (kadence a rozestup kroků, ms na frame proti `docs/01 §1.6`, `can_step` na reálné mapě, vizuální kontrola pohybu). Dnes jsou to **sondy v `_analyza/`** (`vlna14-pohyb.gd`, `vlna14-svah-most.gd`), ne krok CI — běží minuty a chtějí `assets/uo` (v CI nejsou) | regrese v časování a ve pravidlech chůze se v CI nepozná | Zavést jako krok CI jen to, co jde bez assetů (fixtures), zbytek nechat jako sondu; vratné |
 
 **Šest vad pohybu je od 14. session VYŘEŠENÝCH (a měřených):** kadence kroku
@@ -734,17 +785,34 @@ výpisu všech kroků: 6 self-testy, **7 testy bez `assets/uo`**, 8 brány,
 16 souhrn, 17 artefakty). `sha` rozhoduje, ne „poslední běh" — v okamžiku
 kontroly byl `HEAD` = `5a42887` a `origin/main..HEAD` = `0`. Předchozí běh
 `#51` nad `116f87c` (13. session) = `success` (20:58 → 21:03, 5:08 min).
-**Hranice tvrzení zůstává:** logy ani artefakty nejdou bez tokenu stáhnout
-(`ci-log.mjs` → 403, `ci-artefakt.mjs` → 401), takže **čísla, která CI vypsala,
-nejsou ověřená** — ověřený je **návratový kód** kroků (a ten u kroku 9 není
-slabý: `mutace-tests.py` vrací 1, když mutace projde nebo selže smlouva vstupu).
-**⚠ Co ověřené NENÍ (napsáno, ne zamlčeno):** navazující **dokumentační commit
-`46848a0`** (jen `HANDOFF.md`) byl pushnutý (`origin/main..HEAD = 0`), ale jeho
-běh CI **nešel vypsat** — neautentizovaná GitHub API začala po sérii dotazů
-vracet **HTTP 403 (rate limit)** a v této workspace **není soubor s PAT**
-(`ci-beh-stav.mjs` i nový `ci-behy10.mjs` skončily 403). Takže u `46848a0`
-**není změřené ani „běh vznikl"**; platí jen to, co je ověřené výš (`#52` nad
-`5a42887` = `success`). Kdo má token, ať se na `46848a0` podívá.
+**Hranice tvrzení bez tokenu:** logy ani artefakty nejdou stáhnout bez PAT
+(`ci-log.mjs` -> 403, `ci-artefakt.mjs` -> 401) - tehdy je ověřený jen
+**návratový kód** kroků.
+**⚠ VYŘEŠENO 2026-10-07 večer (uživatel schválil „schvaluji, že si vezmeš PAT
+z local-deepseek“):** PAT je v **`E:\Workspaces\forge-orchestra\.secrets\github_pat.txt`**
+(mimo repo; do gitu ani do historie příkazů nepatří) a nástroje ho berou
+z **`$env:GH_TOKEN`**. Tím se ověřil **i OBSAH kroků**, což dřív nešlo -
+naměřeno v běhu **`#52` nad `5a42887`** (nástrojem **`_analyza/ci-hledej.mjs`**,
+nový: hledá v logu podle vzorů, protože `ci-log.mjs` tiskne jen posledních
+60 řádků a souhrny v nich nejsou):
+> * **krok 7 (testy bez `assets/uo`): `932 kontrol, 0 selhání`** (sada je v CI
+>   menší, protože assety v CI nejsou - `NEMERENO` se hlásí, nemizí),
+> * **krok 8 (brány): `SOUHRN: měřeno 9, čeká 2, chyb 0`** (`check-assets`
+>   a `check-render` jsou „čeká“ = bez `assets/uo` NEMĚŘENO, a to je povolené),
+> * **krok 9 (mutace): `149 z 149 mutaci chyceno; smlouva vstupu: OK`** - včetně
+>   **mých 41** z této session,
+> * kroky 10-13: `skills` 8/8, `render-hue` 14/14, `render-anim` 11/11, `anim` 8/8
+>   (self-test); **krok 6 self-testy: 21 celkem, 0 chyb**,
+> * **krok 15 (plán): `53 hotových, 4 bez testu, 54 chybí`, `0 rozporů`.**
+> * Dvě řádky `[test] FAIL ... NENI HOTOVA` v logu **nejsou vada**: to jsou
+>   kontroly smlouvy vstupu (harness schválně podá neexistující cestu a test
+>   MUSÍ spadnout).
+**⚠ Co ověřené NENÍ (napsáno, ne zamlčeno):** navazující **dokumentační commity
+`46848a0` (#53) a `b4b7287` (#54)** mají běhy = **`success` (20 kroků,
+0 neúspěšných)**; **`b8e2476` (#55)** v okamžiku zápisu dobíhal. U těch tří jsem
+nečetl **obsah** kroků (jen kód a počty). Věta „běh nad `46848a0` nešel vypsat
+(HTTP 403)“ **platila pro stav bez PAT** a zůstává tu jako záznam - s PAT se běh
+**našel** (`#53`).
 
 **⚠ CI NAD COMMITTY 10. SESSION JE ZELENÝ — `#43` nad `200fdc6` (kód, smlouvy,
 HANDOFF/LESSONS) a `#44` nad `4d0715c` (dokumentační dotyk + `cursor()` uvnitř
@@ -967,7 +1035,7 @@ a barva kůže.** Statiky nesou barvu ze záznamu mapy, ale **nikdo ji nepouží
 | Strom je čistý | `git status --porcelain -uall` | **prázdné** po commitu této session |
 | Je před GitHubem | `git rev-list --count origin/main..HEAD` | **`0`** — 14. session pushla (trvalé povolení uživatele z 2026-10-07) |
 | **Běží CI?** | `node _analyza/ci-beh-stav.mjs` (bez tokenu je limitovaný — viz past v `LESSONS`) · anotace: `node _analyza/ci-anotace.mjs` | **viz odstavec „CI" v BLOKÁTORECH níž** (vyplněno po pushi této session); sha rozhoduje, ne „poslední běh" |
-| **Co v CI NEJDE ověřit bez tokenu** | `node _analyza/ci-log.mjs` → **HTTP 403**; `ci-artefakt.mjs` → **HTTP 401** | Kdo nemá token, **vidí jen stav kroků**, ne jejich obsah — „krok s mutacemi prošel" je naměřené, ale **počet chycených mutací v CI je neověřený** (naměřeno je **lokálně**). Nezapisuj do předání „CI má 41/41", když to nevidíš |
+| **Obsah kroků CI (logy)** | **s PAT:** `$env:GH_TOKEN = (Get-Content 'E:\Workspaces\forge-orchestra\.secrets\github_pat.txt' -Raw).Trim()` a pak `node _analyza/ci-hledej.mjs <cislo_behu> ["vzor"...]` (hledá v logu podle vzorů) · `ci-log.mjs <id>` (posledních 60 řádků + „podezřelé“) — **bez PAT** → `ci-log.mjs` **HTTP 403**, `ci-artefakt.mjs` **401** | S PAT je ověřený **i obsah**: `#52` dal `932 kontrol, 0 selhání` (krok 7), `měřeno 9, čeká 2, chyb 0` (krok 8), **`149 z 149 mutaci chyceno`** (krok 9), `53 hotových, 0 rozporů` (krok 15). Bez PAT je ověřený jen **vznik a výsledek** běhu (a i ten jen mimo rate-limit okno: neautentizované API vrací **403**) |
 | Repo je veřejné | API bez tokenu | `visibility: public` |
 | **Oprávnění** | `whoami /groups \| Select-String Mandatory` | **⚠ 14. session začala v `Low`** (`workspace-write`): brány hlásily **2 falešné vady** (G3 `sim.world_loop` save a `render.textures`, protože podproces nesměl zapsat do `.cache`) a sada **9 selhání**; po přepnutí na **plný přístup** (`danger-full-access`, přepnul uživatel) je vše zelené. **Měř vždy pod plným přístupem** (`LESSONS` 14. session) |
 | Testy | `$env:APPDATA="$PWD\.cache\godot-appdata"` pak `godot --headless --path . --script res://tests/run_tests.gd` | **999 kontrol, 0 selhání**, **38 case souborů** (`case souboru spusteno: 38 z 38`), **`$LASTEXITCODE` = 0** (`_analyza/t14-testy6.txt`). ⚠ exit kód ber z `$LASTEXITCODE` hned po Godotu — `exit code` celého `pwsh` s rourou je kód posledního příkazu v rouře |

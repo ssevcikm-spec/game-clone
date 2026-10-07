@@ -24,6 +24,32 @@ Typy: `chyba` (moje vada) · `past-nástroje` (prostředí/nástroj, ne logika) 
 
 ---
 
+### 2026-10-07 — Bez PAT vypadá CI jako „nedostupné“, ale je to rate limit — a s PAT jde ověřit i OBSAH kroků (past-nástroje)
+**Co se stalo:** po sérii dotazů na GitHub API začalo neautentizované API vracet
+**HTTP 403** — nejen u logů (`ci-log.mjs`, dřív 403) a artefaktů (401), ale i u
+**seznamu běhů** (`/actions/runs`). Vypadalo to, že dokumentační commity **běh
+vůbec nemají** („běh nad `46848a0` nešel vypsat“). S PAT se ukázalo, že běhy
+**existují a jsou zelené** (`#53` nad `46848a0`, `#54` nad `b4b7287` = `success`,
+20 kroků, 0 neúspěšných). A co víc: s PAT jde stáhnout **log**, takže se dá ověřit
+**obsah kroků**, ne jen návratový kód — v `#52` tak vyšlo `932 kontrol, 0 selhání`
+(krok 7, bez `assets/uo`), `SOUHRN: měřeno 9, čeká 2, chyb 0` (krok 8),
+**`149 z 149 mutaci chyceno`** (krok 9) a `53 hotových, 0 rozporů` (krok 15).
+**Druhá polovina téhož:** `ci-log.mjs` tiskne jen **posledních 60 řádků** a řádky
+podle slov jako `selh|CHYBA|kontrol,` — **souhrny** (`N z M mutaci chyceno`,
+`SOUHRN: měřeno`, `MĚŘENĚ HOTOVÉ`) v jeho výstupu **nejsou**, protože žádné z těch
+slov neobsahují. Kdo z jeho výstupu usoudí „CI o mutacích nic netvrdí“, měří nástroj,
+ne běh.
+**Doklad:** `_analyza/ci-s-pat.mjs` (stav běhů + kroky podle sha) a
+`_analyza/ci-hledej.mjs` (hledá v logu podle vzorů); PAT z
+`E:\Workspaces\forge-orchestra\.secrets\github_pat.txt` přes `$env:GH_TOKEN`
+(uživatel schválil 2026-10-07); výstupy v `_analyza/ci-14*.txt`, `_analyza/ci-s-pat*.txt`.
+**Ponaučení:** (1) „nejde ověřit“ má **dva různé důvody** — chybí oprávnění, nebo
+je vyčerpaný limit; napsat je do dokumentace je nutné, ale **nesmí se z toho stát
+trvalé tvrzení** (stačí počkat nebo vzít PAT). (2) Než řekneš „běh neexistuje“,
+ověř, že **vidíš seznam běhů** (HTTP kód), ne že ti vrátil prázdno. (3) Nástroj,
+který tiskne „podezřelé řádky“, **není vyhledávač** — na konkrétní tvrzení si
+napiš hledání podle vzoru.
+
 ### 2026-10-07 — Sonda odhalila vadu v MOJÍ vlastní opravě: číslo bylo HORŠÍ než před ní (chyba)
 **Co se stalo:** oprava V2 (posun postavy mezi dlaždicemi) prošla testy i vypadala
 správně — offset rostl 0 → 4,4 → 8,8 → 13,2 → 17,6 px, animace startovala se
