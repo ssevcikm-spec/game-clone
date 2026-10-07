@@ -501,7 +501,7 @@ Dvě věci, které blokátor **nejsou**, ale je dobře je vědět:
 | **Referenční klony** | `_src/{runuo,servuo,modernuo,classicuo,sphere}` (**pinované**, gitignore, nejsou submoduly). Pozor: `research/_src/{servuo,modernuo}` jsou **druhé checkouty téhož** — pro čtení používej `_src/` |
 | Projekt | `E:\Workspaces\game-clone` (git, `main`) |
 | Generátor obsahu | `python tools/gates/gen-content.py [--check] [--only items\|recipes\|skills]` |
-| Testy | `$env:APPDATA="E:\Workspaces\game-clone\.cache\godot-appdata"` pak `godot --headless --path . --script res://tests/run_tests.gd` → **640 kontrol / 0 selhání** (s assety), **30 case souborů**; číslo **bez `assets/uo`** (stav jako v CI) je v „Předletová kontrola" — měřeno 9. session v `git worktree`. **Bez plného přístupu dej `APPDATA` do `.tmp`** (viz pasti) |
+| Testy | `$env:APPDATA="E:\Workspaces\game-clone\.cache\godot-appdata"` pak `godot --headless --path . --script res://tests/run_tests.gd` → **640 kontrol / 0 selhání** (s assety), **30 case souborů**; **bez `assets/uo` (stav jako v CI) `582/0`** — měřeno 9. session dočasným přesunem `assets/uo` do `.cache` a zpět (viz „Předletová kontrola“). **Bez plného přístupu dej `APPDATA` do `.tmp`** (viz pasti) |
 | Brány | `python tools/gates/run-all.py` → **11 měřeno / 0 NEMĚŘENO / 0 chyb**, `exit 0` |
 | Self-testy bran | `python tools/gates/run-all.py --self-test` → **19 self-testů (10 bran + 9 extrakčních nástrojů), 0 chyb**; **G10 má uvnitř 8 případů** |
 | **Mutační důkaz testů** | `python tools/gates/mutace-tests.py [--only sort\|map\|walk\|doors\|movement\|registry\|pathfind\|textures\|item\|container]` → **81 z 81** (bylo 61; **+5 `item`, +15 `container`**; trvá desítky minut — `walk` má 12 mutací) |
@@ -641,7 +641,7 @@ a barva kůže.** Statiky nesou barvu ze záznamu mapy, ale **nikdo ji nepouží
 | **Co v CI NEJDE ověřit bez tokenu** | `node _analyza/ci-log.mjs` → **HTTP 403**; `ci-artefakt.mjs` → **HTTP 401** | Kdo nemá token, **vidí jen stav kroků**, ne jejich obsah — takže „krok s mutacemi prošel" je naměřené, ale **počet chycených mutací v CI je neověřený** (naměřeno je **lokálně**). Nezapisuj do předání „CI má 81/81", když to nevidíš |
 | Repo je veřejné | API bez tokenu | `visibility: public` |
 | **Oprávnění** | `whoami /groups \| Select-String Mandatory` | **`Medium`** = plný přístup. `Low` = sandbox → **falešná selhání testů i bran** (9. session naměřila v `Low` **583/9** místo **584/0**: 8× `render.textures` + 1× `sim.world_loop` save — viz `LESSONS`) a `.uid` nevzniknou |
-| Testy | testy s `APPDATA` ve workspace (`Low`: dej ho do `.tmp`) | **640 kontrol, 0 selhání** (s assety), **30 case souborů**; **bez `assets/uo` (stav jako v CI) `582/0`** — měřeno 9. session v `git worktree` (viz níže). Souhrn vypisuje `case souboru spusteno: N z M` — když je M < 30, něco se ne načetlo |
+| Testy | testy s `APPDATA` ve workspace (`Low`: dej ho do `.tmp`) | **640 kontrol, 0 selhání** (s assety), **30 case souborů**; **bez `assets/uo` (stav jako v CI) `582/0`** — měřeno 9. session tak, že se `assets/uo` **dočasně přesunul do `.cache`** a po běhu vrátil (ověřeno: `tiles.json` zpět, strom čistý). Souhrn vypisuje `case souboru spusteno: N z M` — když je M < 30, něco se ne načetlo |
 | **FPS (nové)** | `& .cache\godot\...console.exe --path . --rendering-driver opengl3 --script res://.cache/analysis/sonda-fps.gd` | **40–45 FPS** (22–25 ms/frame), 5 767 objektů, 1 516 draw callů; cache se po nabehu nemění (27 načtení, 0 změn) |
 | Brány | `python tools/gates/run-all.py` | **11 měřeno / 0 NEMĚŘENO / 0 vad**, `exit 0` |
 | Self-testy | `python tools/gates/run-all.py --self-test` | **19, 0 chyb**, `exit 0` |
@@ -656,7 +656,7 @@ a barva kůže.** Statiky nesou barvu ze záznamu mapy, ale **nikdo ji nepouží
 | Godot běží | `& .cache\godot\...console.exe --headless --version` | `4.7.2.stable.official.ed1daf0bf` |
 | Instalace UO na místě | `Test-Path 'D:\Games\...\tiledata.mul'` | `True` |
 | Kontroly zadání | `check-docs-refs.py`, `check-zadani.py`, `roadmap-gen.py --check` | `exit 0` |
-| Stav plánu | `python tools/plan-status.py` | `111 granul`, **`45` měřeně hotových** (po commitu), 0 rozporů, `M2 15 / 3 / 14` |
+| Stav plánu | `python tools/plan-status.py` | `111 granul`, **`45` měřeně hotových** (po commitu), 0 rozporů, `M2 15 / 1 / 16` |
 | **Sandbox** | `whoami /groups \| Select-String Mandatory` | **`Medium`** = plný přístup (v `Low` jsou čísla testů **583/9** místo **640/0** — viz `LESSONS`) |
 
 ## Otevřené věci a co je potřeba dodělat

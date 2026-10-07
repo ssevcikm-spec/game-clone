@@ -24,6 +24,22 @@ Typy: `chyba` (moje vada) · `past-nástroje` (prostředí/nástroj, ne logika) 
 
 ---
 
+### 2026-10-07 — Jak lokálně změřit „stav jako v CI“ (bez `assets/uo`) (postup)
+**Co se stalo:** CI `assets/uo/` nevidí (gitignore), takže čísla sady se liší od
+lokálních a z lokálního běhu se nepozná, jestli krok v CI projde. Změřil jsem to
+tak, že se `assets/uo` **dočasně přesunul do `.cache/uo-skryto`**, spustila se
+sada a ve `finally` se vrátil. **Cíl přesunu byl schválně v `.cache`**, ne
+`assets/uo-skryto`: `.gitignore` má `assets/uo/` (s lomítkem), takže
+`assets/uo-skryto` by **ignorovaný nebyl** a zaplavil by `git status`.
+**Doklad:** `.tmp/testy-bez-assets.txt` → `30 z 30` case souborů, **582 kontrol,
+0 selhání**, `exit 0`; sekce nad reálnými daty správně hlásí `REALNA DATA
+NEMERENA (chybi res://assets/uo/tiles.json)`; po vrácení je `tiles.json` na místě
+a `git status` prázdný.
+**Ponaučení:** test, který potřebuje data z instalace, se **nesmí** ptát
+`_pending` (to by v CI shodilo krok s testy) — musí `print` + `NEMERENO`.
+A kdo chce číslo „jako v CI“, ať data schová do **ignorované** složky a přesun
+vždy obalí `try/finally` s ověřením, že se vrátil.
+
 ### 2026-10-07 — Sandbox (Low integrita) vyrobil 9 falešných selhání: 583/9 vs 584/0 (past-nástroje)
 **Co se stalo:** první běh sady v této session dal `583 kontrol, 9 selhání` a nebyla to
 vada kódu: 8× `render.textures` (test si vyrábí vlastní atlas v `.cache/test-textures/`)
