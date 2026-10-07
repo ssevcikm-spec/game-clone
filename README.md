@@ -4,6 +4,10 @@ Tenhle adresář **není hra**. Je to **zadání pro AI**, které má hru postav
 věrný single-player klon Ultima Online nad originálními datovými soubory
 UO Classic, které jsou na této stanici.
 
+> **Stavba už běží — tenhle soubor je zadání, ne stav.** Co je hotové a ověřené,
+> se bere z **[`HANDOFF.md`](HANDOFF.md)** (přepisuje se každou session);
+> ponaučení a pasti z **[`LESSONS.md`](LESSONS.md)**.
+
 ## Co si přečíst
 
 | Když jsi… | Začni tady |
@@ -49,6 +53,13 @@ vyrobit jako svůj první krok, protože obě mají v zadání přesné přijím
 kritérium (`docs/05` §5.10, `docs/03` §3.3.1).
 
 ## Jak to použít
+
+**Zahrát si dnešní stav (hra už existuje):** dvojklik na **`HRA.cmd`** v kořeni
+repozitáře. Otevře herní okno s mapou Britainu a postavou; **šipky** nebo
+**numpad 1–9** = chůze (jedno zmáčknutí = jeden krok), `Esc` = zavřít.
+Skript si sám najde Godot v `.cache\godot\` (když tam není, nabídne stažení),
+přesměruje `user://` do workspace přes `APPDATA` a upozorní, když chybí
+`assets\uo\` — extrahovaná data z instalace UO, která v gitu nejsou.
 
 **Ruční zadání AI (jeden agent):**
 vlož `ZADANI-UO-KLON.md` a nech agenta číst `docs/` v pořadí z §0.

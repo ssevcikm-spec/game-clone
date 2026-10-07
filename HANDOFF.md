@@ -199,6 +199,40 @@ následuje předání**. Proto platí:
    trvale** (viz věta na začátku téhle sekce) a po pushi se **kontroluje CI běh
    nad tím commitem**.
 
+## 🎯 CÍL SESSION (pravidlo uživatele, 2026-10-07)
+
+**Rozhodnutí uživatele:** „Plánuj další sezení tak, aby si určily cíl a dokončily
+ho celý." Každá session tedy **není „krok"**, ale **jeden celek s cílem**:
+
+1. **Hned na začátku session si napiš cíl jednou větou** a k němu **přijímací
+   kritérium, které se dá změřit** (test, brána, snímek). Když cíl nejde změřit,
+   není to cíl, ale přání.
+2. **Velikost cíle se volí tak, aby se do session vešel CELÝ** — radši menší
+   hotový celek než větší rozdělaný. Když je práce větší, rozděl ji na cíle pro
+   **víc session** s jasnou hranicí (co je hotové na konci každé).
+3. **Na konci session je cíl hotový, nebo je vidět, že hotový není** — a pak
+   musí být v předání pojmenované **co zbývá a proč** a co je **nejbližší další
+   krok**. „Rozdělané a zamlčené" je zakázané; „rozdělané a pojmenované" je
+   v pořádku.
+4. **Nedělat v jedné session víc cílů**, aniž by první byl uzavřený a ověřený.
+
+**⚠ CÍL TÉTO (6.) SESSION — až ho dokončíš, přepiš tuhle větu na další cíl:**
+
+> **Úkol 3 ze `ZADANI-DALSI-VYVOJ-2.md`: dveře a schody ve `world.walk`.**
+> Zavřené dveře blokují, otevřené ne (stav drží `world.doors`), a **výška schodů
+> se počítá** (dnes se schody chovají jako `Surface`).
+> **Přijímací kritérium:** test se zavřenými i otevřenými dveřmi, test kroku na
+> schod nahoru/dolů, obojí s **mutací** v `mutace-tests.py` modul `walk`;
+> cíl je hotový, když `run_tests.gd` hlásí 0 selhání, `run-all.py` 0 vad
+> a `mutace-tests.py --only walk` je celé chycené.
+> **Proč zrovna tohle:** odblokuje to `world.doors` (existuje, ale nikdo ho
+> nevolá) a je to poslední díra v průchodnosti, kterou `sim.pathfind` dědí —
+> cesta dnes vede přes zavřené dveře. **A pozor:** po změně `walk` se mění
+> i cesty, proto se po tom mají přeměřit testy `pathfind` (mají vlastní stub,
+> takže by spadnout neměly — ověř to).
+> **Co do cíle NEPATŘÍ** (ať se session nerozteče): click-to-move (věc 54),
+> `sim.ai`, barva statiků (věc 40).
+
 ## ⚠⚠ BLOKÁTORY
 
 **Žádný otevřený blokátor v kódu.** „Demo chodí a postava je barevná" je naměřené
@@ -248,7 +282,7 @@ Dvě věci, které blokátor **nejsou**, ale je dobře je vědět:
 
 | Věc | Cesta / příkaz |
 |---|---|
-| **Demo (hra)** | `& .cache\godot\Godot_v4.7.2-stable_win64_console.exe --path . --rendering-driver opengl3` (s `$env:APPDATA` ve workspace) |
+| **Demo (hra)** | **`HRA.cmd`** v kořeni (dvojklik) — spouštěč řeší Godot, `APPDATA` i chybějící data. Ručně: `& .cache\godot\Godot_v4.7.2-stable_win64_console.exe --path . --rendering-driver opengl3` (s `$env:APPDATA` ve workspace) |
 | **Zadání pro další vývoj** | **`ZADANI-DALSI-VYVOJ-2.md`** (etapa 2, Úkoly 1–9; **Úkol 1 hotový**). Etapa 1 je v `ZADANI-DALSI-VYVOJ.md` |
 | **Ponaučení a nástroje** | **`LESSONS.md`** — čti prvních pár záznamů, ať neopakuješ chyby |
 | **Kam pro co v referencích** | **`research/REJSTRIK-REFERENCI.md`** (rozcestník, ~50 odkazů s měřeným počtem nálezů) — generuje a kontroluje `python tools/refs-index.py [--check\|--srovnej]` |
@@ -573,6 +607,15 @@ a barva kůže.** Statiky nesou barvu ze záznamu mapy, ale **nikdo ji nepouží
     implementace přidává **`nodes_visited()` a `cost_last()`** (nad smlouvu,
     používá je test a budou je chtít `app.metrics`) a **`limit` je rozpočet
     uzlů**, ne délka cesty — to patří do smlouvy.
+56. **NOVÉ (5. session): u `HRA.cmd` je otestovaná jen šťastná cesta.**
+    Naměřeno: `cmd /c "HRA.cmd --quit-after 3"` → hra naběhne (mapa 6095
+    objektů, 12 vazeb kláves, hráč `(1495,1630,10)`) a `%ERRORLEVEL%` je **0**.
+    **Neotestované větve** (proto tu jsou): „Godot nenalezen" (chtělo by
+    dočasně odebrat `.cache\godot`, takže se to netestovalo naostro),
+    stažení Godotu přes PowerShell, a chybějící `assets\uo\`. Kdo je bude
+    upravovat, ať je **změří** — a pozor na past: `echo` s **neescapovanou
+    závorkou uvnitř bloku `if (`** shodí celý skript hláškou „X was unexpected
+    at this time" (namEReno 2026-10-07; v souboru je to i jako komentář).
 
 ## Už není otevřené (přesunuto, nemaže se)
 

@@ -24,6 +24,26 @@ Typy: `chyba` (moje vada) · `past-nástroje` (prostředí/nástroj, ne logika) 
 
 ---
 
+### 2026-10-07 — `.cmd`: neescapovaná závorka v `echo` uvnitř bloku shodí celý skript (past-nástroje)
+**Co se stalo:** psal jsem spouštěč `HRA.cmd` a do nápovědy dal českou větu
+s **závorkou uvnitř `echo`, které bylo uvnitř bloku `if (`**. `cmd.exe` kvůli ní
+shodil **celý soubor** hláškou **„patri was unexpected at this time"** — a ta
+hláška ukazuje na slovo z textu, ne na řádek, kde je chyba, takže to vypadá jako
+vada úplně jiné části skriptu. Podruhé mě to chytilo u dvou dalších `echo`
+(`(konzolova verze pro Windows)`, `(Podrobnosti: …)`).
+**Doklad:** `cmd /c "HRA.cmd --quit-after 3"` → `cmd : patri was unexpected at
+this time.`, `exit 255`; po přepsání textů (bez závorek) a s `^(user://^)` tam,
+kde závorku mít chci: `cmd /c "HRA.cmd --quit-after 3"` → hra naběhne
+(`[main] svet: 6095 objektu`, `[controller] klavesy: 12 novych vazeb`) a
+`%ERRORLEVEL%` = **0**.
+**Ponaučení:** v dávkovém souboru platí **uvnitř bloku `if (` / `for (`**
+escapovat `^(` a `^)` v každém `echo` — a radši texty bez závorek psát.
+Spouštěč se navíc **musí ověřit spuštěním s `--quit-after N`**, ne čtením:
+chybí-li Godot nebo je rozbitá cesta, skript vypadá stejně jako když funguje.
+A „otestováno" znamená **jen to, co jsem opravdu spustil** — u `HRA.cmd` je
+změřená šťastná cesta a tři větve (chybějící Godot, stažení, chybějící assety)
+jsou v `HANDOFF.md` **otevřená věc 56**, ne tichá domněnka.
+
 ### 2026-10-07 — „Poslední běh CI" není to, co člověk myslí, a logy bez tokenu nejsou (past-nástroje)
 **Co se stalo:** po zapnutí trvalého pushu jsem pushl **tři commity za sebou**
 (kód → pravidlo do předání → zápis o CI). Každý push spustil **vlastní běh CI**,
