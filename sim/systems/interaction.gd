@@ -263,8 +263,8 @@ func _run_use(m: int, serial: int, cil: Dictionary, akce: String) -> Dictionary:
 			return _call("vendor", "stock", [serial], akce)
 		"target":
 			_cursor += 1
-			_event("target_request", {"cursor": _cursor, "kind": "object", "allow_ground": true})
-			return {"ok": true, "action": akce, "reason": "", "cursor": _cursor}
+			_event("target_request", {"cursor": cursor(), "kind": "object", "allow_ground": true})
+			return {"ok": true, "action": akce, "reason": "", "cursor": cursor()}
 		"cast_scroll":
 			var spell: int = int(cil["item"].props.get("spell", 0))
 			return _call("magic", "cast", [m, spell], akce)
