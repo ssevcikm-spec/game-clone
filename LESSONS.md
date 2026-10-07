@@ -89,6 +89,70 @@ soubory přeskakuje**. Není to tedy jen o skrytých složkách (`.forge`, `.git
 tool** — použij Python walk (plošné skeny) nebo `Select-String` na konkrétní
 soubor. Do `dsh-prostredi` patří formulace: grep tool **respektuje `.gitignore`**.
 
+### 2026-10-07 — Fixture, která čte očekávání ze sebe sama, sabotáž nepřežije (chyba)
+**Co se stalo:** při stavbě fixture pro `render.hue` a `render.anim` (aby testy
+měřily i v CI) vznikly první verze tak, že test **počítal očekávané hodnoty
+z téhož souboru, který měřil** (`frames.size()`, barvy z JSONu, tabulka
+`EXPAND_5_TO_8` z granule). Kontrola tím byla **kruhová** — a „sabotáž fixture"
+(udělej ve fixture vadu a ukaž, že test spadne) **prošla**: test si spočítal
+i novou „správnou" hodnotu. Oba soubory na to přišly nezávisle na sobě až tím,
+že sabotáž opravdu spustily.
+**Doklad:** naměřeno 2026-10-07: v `render_anim.gd` sabotáž `cx` 4 → 99
+**napoprvé test nezhodila** (`573 kontrol, 0 selhání`, `exit 0`); teprve po
+doplnění invariantů nezávislých na hodnotách (`rect` sedí na `w/h`, `cx` uvnitř
+framu, `cy + h` ve framu) tatáž sabotáž hlásí
+`FAIL render.anim (fixture): … cx 99 neni uvnitr framu 0..16` a `exit 1`.
+V `render_hue.gd` jsou proto očekávané barvy **zapsané literály** a sabotáž
+(`4196 → 4197`) shodí **4 kontroly** `render.hue`.
+**Ponaučení:** **očekávaná hodnota se nesmí počítat ze zdroje, který test měří** —
+patří do testu jako literál (nebo z nezávislé reference). A **sabotáž je povinná
+součást fixture**: bez ní se kruhová kontrola tváří jako měření. Když sabotáž
+„projde", první otázka je „co test vlastně čte?", ne „je kontrola slepá?".
+
+### 2026-10-07 — Parse error v case souboru: `load()` vrátí NENULOVÝ skript a smyčka soubor tiše přeskočí (chyba)
+**Co se stalo:** `tests/run_tests.gd` hlásil `503 kontrol, 0 selhání, exit 0`
+a přitom jeden case soubor měl parse error. Mechanismus (naměřen, ne odhad):
+`load()` na rozbitý soubor vrací **nenulový `GDScript`**, takže `if script == null`
+neprojde; teprve `script.new()` vyhodí **runtime error**, tím se `_init_case`
+**přeruší** a vrátí `null` — a smyčka `if test_case == null: continue` to brala
+jako „už ohlášeno" a soubor **tiše přeskočila**. Chybějící kontroly byly jediný
+viditelný příznak.
+**Doklad:** naměřeno 2026-10-07: před opravou s rozbitým `tests/cases/walk.gd`
+`503 kontrol, 0 selhání, exit 0`; po opravě `FAIL case soubor … nelze nacist
+(parse error?)`, `case souboru spusteno: 27 z 28`, `504 kontrol, 1 selhani`,
+`exit 1`. Dvě další cesty: parse error v **měřené granuli** → tři case soubory
+`FAIL`, `453/3`; v granuli, kterou case **`preloaduje`** → `26 z 28`, `480/3`.
+**Ponaučení:** (a) `load()` **není** validace — ptej se `can_instantiate()`
+*před* `new()`; (b) u smyčky, která „null znamená ohlášeno", musí být vidět
+**rozdíl** mezi „ohlášeno" a „přerušeno" (proto guard `if _failed == pred`);
+(c) **počet kontrol je nejcitlivější ukazatel** — u sad, které mění počet kontrol,
+si baseline změř před zásahem a po něm.
+
+### 2026-10-07 — `mutace-anim.py` bez instalace UO: bud spadl, nebo hlásil „8/8 chyceno" a nic neměřil (chyba)
+**Co se stalo:** harness `tools/gates/mutace-anim.py` má kromě `self_test()`
+i **sondu na reálných datech** (`sonda_realna_data`: čte `anim.mul`
+z instalace UO a ověřuje, že RLE nikdy nezapíše mimo frame). Prohlásil mutaci za
+chycenou, když `chycena_selftestem or bool(real)`. **Sondu ale nikdy nespustil na
+ORIGINÁLE** — a tak:
+  * když instalace UO **chybí** (soubor neexistuje), `MulAnim(...)` vyhodí
+    `FileNotFoundError` → **celý harness spadne** (v CI by byl červený krok,
+    ale z nesprávného důvodu),
+  * když instalace existuje, ale **data jsou prázdná/nečitelná** (naměřeno:
+    `anim.idx` i `anim.mul` prázdné), sonda vrátí **45 chyb pro každou mutaci
+    i pro originál** → `bool(real)` je vždy `True` → harness hlásí
+    **„8/8 chyceno, 0 chyb"** a **nezměřil nic**. Přesně past „brána, která nemá
+    jak selhat".
+**Doklad:** naměřeno 2026-10-07: originál má na reálné sondě **0 chyb**
+(instalace `D:\Games\...` existuje, 15 bloků × 3 kontroly), takže baseline je
+použitelná jako práh; s `--install .tmp\prazdna-instalace` (prázdné soubory)
+stará logika prohlásí všech 8 mutací za chycené, nová hlásí
+`baseline realne sondy ma 45 chyb` a `exit 1`; bez instalace nová hlásí
+`realna sonda: NEMERENA` a `8/8 (JEN self-test)` — tedy **přizná, co neměřila**.
+**Ponaučení:** **každá „sonda na datech" musí mít baseline na ORIGINÁLE** —
+jinak chybějící/rozbitá data vypadají jako chycení mutace. A platí to i obráceně:
+když nástroj spadne na chybějícím vstupu, **není to totéž jako „neměří"** —
+oboje se musí pojmenovat zvlášť (`CHYBA` vs `NEMERENO`).
+
 ### 2026-10-07 — Nový oddíl v předání: kontrola hledala klíč v CELÉM oddílu, ne v bodu (chyba)
 **Co se stalo:** pravidlo uživatele (2026-10-07) žádá v předání oddíl
 `## Co čeká na tebe` a `_analyza/handoff-kontrola.py` ho má hlídat. První verze

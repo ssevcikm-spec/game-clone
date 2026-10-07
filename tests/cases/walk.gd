@@ -279,7 +279,12 @@ func run(t) -> void:
 	# 7b) FIXTURE mapy z gitu (funguje i v CI): `surface_z` musi byt to, co rika
 	#     mapa - kdyz na dlazdici neni statik, walk si zadne z nevymysli.
 	if FileAccess.file_exists("res://tests/fixtures/world/map0.meta.json"):
-		var MapScript = load("res://sim/world/map.gd")
+		# `Lib.script_at` vraci null i pro soubor s parse errorem (jinak by se
+		# case pres `new()` prerusil a zbytek kontrol by tise zmizel).
+		var MapScript = Lib.script_at("res://sim/world/map.gd")
+		if MapScript == null:
+			t._pending("world.walk: sim/world/map.gd se nenacetl (parse error?)")
+			return
 		var fix = MapScript.new("res://tests/fixtures/world/map0")
 		var z_mapy: int = fix.z_at(0, 0)
 		var z_walku: int = _new(script, fix, td).surface_z(0, 0)
@@ -311,7 +316,10 @@ func run(t) -> void:
 
 	# 8b) REALNE SCHODY: `world.stairs` zna art a jeho vyska se pocita do povrchu.
 	#     (Overuje se na dlazdici, ktera v mape opravdu schod ma - hleda se v okoli.)
-	var StairsScript = load("res://sim/world/stairs.gd")
+	var StairsScript = Lib.script_at("res://sim/world/stairs.gd")
+	if StairsScript == null:
+		t._pending("world.walk: sim/world/stairs.gd se nenacetl (parse error?)")
+		return
 	var schody = StairsScript.new()
 	var nasel := -1
 	var ocekavany := 0
@@ -341,7 +349,10 @@ func run(t) -> void:
 	# 8c) REALNE DVERE: stav bere walk z `world.doors` (art z `data/doors.json`).
 	#     Test netvrdi, KTERY art je otevreny (to je vec `world.doors`), jen to,
 	#     ze se walk na stav opravdu ptá: zavreny art blokuje, otevreny ne.
-	var DoorsScript = load("res://sim/world/doors.gd")
+	var DoorsScript = Lib.script_at("res://sim/world/doors.gd")
+	if DoorsScript == null:
+		t._pending("world.walk: sim/world/doors.gd se nenacetl (parse error?)")
+		return
 	var dvere = DoorsScript.new()
 	var kat: int = -1
 	var zavreny := 0

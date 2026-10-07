@@ -1,0 +1,236 @@
+{
+ "version": 1,
+ "decoder": "fixture (tests/fixtures/anim/make_fixture.py) - NENI to export z instalace UO; format je stejny jako `python tools/uoextract/anim.py --export assets/uo/anim`",
+ "anchor": "obrazek se kresli na (tile_x - cx, tile_y - (cy + h)); rect je [levy, horni, pravy, dolni]",
+ "actions": {
+  "0": "walk",
+  "4": "idle"
+ },
+ "sprites": {
+  "400/0/0": {
+   "file": "sheet0.png",
+   "action": "walk",
+   "frames": [
+    {
+     "rect": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "cx": 3,
+     "cy": -8,
+     "w": 16,
+     "h": 16,
+     "pixely_mimo": 0
+    },
+    {
+     "rect": [
+      16,
+      0,
+      32,
+      16
+     ],
+     "cx": 3,
+     "cy": -9,
+     "w": 16,
+     "h": 16,
+     "pixely_mimo": 0
+    }
+   ],
+   "source": "fixture"
+  },
+  "400/0/1": {
+   "file": "sheet0.png",
+   "action": "walk",
+   "frames": [
+    {
+     "rect": [
+      0,
+      16,
+      16,
+      32
+     ],
+     "cx": 4,
+     "cy": -8,
+     "w": 16,
+     "h": 16,
+     "pixely_mimo": 0
+    },
+    {
+     "rect": [
+      16,
+      16,
+      32,
+      32
+     ],
+     "cx": 4,
+     "cy": -9,
+     "w": 16,
+     "h": 16,
+     "pixely_mimo": 0
+    },
+    {
+     "rect": [
+      32,
+      16,
+      48,
+      32
+     ],
+     "cx": 4,
+     "cy": -10,
+     "w": 16,
+     "h": 16,
+     "pixely_mimo": 0
+    }
+   ],
+   "source": "fixture"
+  },
+  "400/0/2": {
+   "file": "sheet0.png",
+   "action": "walk",
+   "frames": [
+    {
+     "rect": [
+      0,
+      32,
+      16,
+      48
+     ],
+     "cx": 5,
+     "cy": -8,
+     "w": 16,
+     "h": 16,
+     "pixely_mimo": 0
+    },
+    {
+     "rect": [
+      16,
+      32,
+      32,
+      48
+     ],
+     "cx": 5,
+     "cy": -9,
+     "w": 16,
+     "h": 16,
+     "pixely_mimo": 0
+    }
+   ],
+   "source": "fixture"
+  },
+  "400/0/3": {
+   "file": "sheet0.png",
+   "action": "walk",
+   "frames": [
+    {
+     "rect": [
+      0,
+      48,
+      16,
+      64
+     ],
+     "cx": 6,
+     "cy": -8,
+     "w": 16,
+     "h": 16,
+     "pixely_mimo": 0
+    },
+    {
+     "rect": [
+      16,
+      48,
+      32,
+      64
+     ],
+     "cx": 6,
+     "cy": -9,
+     "w": 16,
+     "h": 16,
+     "pixely_mimo": 0
+    },
+    {
+     "rect": [
+      32,
+      48,
+      48,
+      64
+     ],
+     "cx": 6,
+     "cy": -10,
+     "w": 16,
+     "h": 16,
+     "pixely_mimo": 0
+    },
+    {
+     "rect": [
+      48,
+      48,
+      64,
+      64
+     ],
+     "cx": 6,
+     "cy": -11,
+     "w": 16,
+     "h": 16,
+     "pixely_mimo": 0
+    }
+   ],
+   "source": "fixture"
+  },
+  "400/0/4": {
+   "file": "sheet0.png",
+   "action": "walk",
+   "frames": [
+    {
+     "rect": [
+      0,
+      64,
+      16,
+      80
+     ],
+     "cx": 7,
+     "cy": -8,
+     "w": 16,
+     "h": 16,
+     "pixely_mimo": 0
+    },
+    {
+     "rect": [
+      16,
+      64,
+      32,
+      80
+     ],
+     "cx": 7,
+     "cy": -9,
+     "w": 16,
+     "h": 16,
+     "pixely_mimo": 0
+    }
+   ],
+   "source": "fixture"
+  },
+  "400/4/1": {
+   "file": "sheet1.png",
+   "action": "idle",
+   "frames": [
+    {
+     "rect": [
+      0,
+      0,
+      16,
+      24
+     ],
+     "cx": 4,
+     "cy": -8,
+     "w": 16,
+     "h": 24,
+     "pixely_mimo": 0
+    }
+   ],
+   "source": "fixture"
+  }
+ },
+ "chyby": []
+}

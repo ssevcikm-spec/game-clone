@@ -1,20 +1,22 @@
-# Předání — UO-klon (průchodnost je opravená; 2026-10-07, 6. session)
+# Předání — UO-klon (testy už nemlčí; 2026-10-07, 7. session)
 
 > **Co je tenhle soubor:** **stav projektu** pro další session agenta. Přepisuje
 > se celý; historie je v `git log`. **Současný stav se bere odtud** — a ověřuje
 > se živě (je tu k tomu sekce „Předletová kontrola").
 > **Zadání pro další vývoj je `ZADANI-DALSI-VYVOJ-2.md`** (etapa 2, Úkoly 1–9);
 > **Úkoly 1, 2 a 3 jsou hotové**, další je **Úkol 4 (`sim.interaction`)** — ale
-> **před ním je potřeba rozhodnout konvenci dveří** (otevřená věc 62).
+> **před ním je potřeba rozhodnout konvenci dveří** (otevřená věc 62, cíl 8. session).
 > Předchozí etapa je v `ZADANI-DALSI-VYVOJ.md`.
 > **Naměřený stav plánu je v `REVIZE-PLANU-2026-10-06.md`** a **stav granul
 > měří** `python tools/plan-status.py`.
 > **Kam pro co v referenčních zdrojích je `research/REJSTRIK-REFERENCI.md`**.
-> **Datum:** 2026-10-07 (6. session). **Poslední změna kódu:** tato session
-> (**Úkol 3: dveře a schody ve `world.walk`** + **naměřená vada id prostoru
-> statiků**; `sim/world/walk.gd`, `tests/cases/walk.gd`, modul `walk`
-> v `mutace-tests.py` 6 → 12 mutací, `docs/04` §4.2/§4.2.1). Předchozí commit
-> `702dac2` = revize dvou vad ze snímků (5. session).
+> **Datum:** 2026-10-07 (7. session). **Poslední změna kódu:** tato session
+> (**slepé místo v `tests/run_tests.gd` zavřené** + **fixture pro `render.hue`
+> a `render.anim`** + **tři mutační harnessy v CI**; `tests/run_tests.gd`,
+> `tests/lib.gd`, `tests/cases/{render_hue,render_anim,walk}.gd`,
+> `tests/fixtures/{hues,anim}/`, `tools/gates/mutace-anim.py`, `.github/workflows/ci.yml`,
+> `docs/04 §4.8.1–4.8.2`). Předchozí commit `2c71911` = oddíl „Co čeká na tebe"
+> v předání (6. session).
 
 ## 🎬 DEMO JE NA SVĚTĚ — mapa Britainu + BAREVNÁ postava, která po ní chodí
 
@@ -105,6 +107,22 @@ hra umí odpovědět „kudy z A do B" — A* nad dlaždicemi, který se na prů
 neřeší — vada F9 / Úkol 3), moby/statiky jako překážky, dosah ani preferenci
 trasy (klient `ClassicUO Pathfinder.cs:868`), a **nikdo ho ještě nevolá** z
 `sim.ai` ani z click-to-move (to je další krok: `app.player_view`/`sim.commands`).
+
+## ✅ CO JE NOVÉHO (7. session) — testy už nemlčí a tři harnessy jsou v CI
+
+**Cíl session (rozhodnutí uživatele 2026-10-07):** „Ano zavřít [slepé místo
+v `tests/run_tests.gd`]. Přidej zbývající tři harnessy podle návrhu."
+
+| Co | Doklad (naměřeno dnes) |
+|---|---|
+| **⚠ SLEPÉ MÍSTO V HARNESSU BYLO VĚTŠÍ, NEŽ SE MYSLILO** | `load()` na case soubor s **parse errorem** vrací **nenulový `GDScript`**, který ale nejde instanciovat; `script.new()` vyhodí runtime error, `_init_case` se **přeruší** a vrátí `null` — a smyčka to brala jako „už ohlášeno" a soubor **tiše přeskočila**. Naměřeno: `503 kontrol, 0 selhání, exit 0` (správně 537). **Oprava:** `can_instantiate()` **před** `new()`, `script_at()` v `tests/lib.gd` vrací `null` i pro neinstanciovatelný skript, a case, který nedodá ani jednu kontrolu, je `FAIL`. |
+| **Tři mutace to dokazují (a jsou to tři RŮZNÉ cesty)** | (1) parse error v **case souboru** → `FAIL case soubor … nelze nacist (parse error?)`, `27 z 28`, `504/1`, `exit 1`; (2) parse error v **měřené granuli** → tři case soubory `FAIL`, `453/3`, `exit 1`; (3) parse error v granuli, kterou case **`preloaduje`** → `26 z 28`, `480/3`, `exit 1`. |
+| **Fixture pro `render.hue`** | `tests/fixtures/hues/` (generátor + `hues.json`, 124 KB, 1003 sad: index 1001 = sada 1002 = `HUE_SKIN`); test `render_hue.gd` má novou **sekci D) FIXTURE** (15 kontrol) a měří ji **VŽDY** — i v CI. Očekávané barvy jsou v testu **zapsané jako literály** (ne čtené z téhož souboru — jinak by kontrola byla kruhová; první verze taková byla a sabotáž ji odhalila). |
+| **Fixture pro `render.anim`** | `tests/fixtures/anim/` (generátor + `anim-sheets.json` 3 177 B + 2 PNG, 6 spritů, framy 2/3/2/4/2 — záměrně jiné než reálných 10); test má **sekci FIXTURE** (22 kontrol) volanou **před** kontrolou `assets/uo`, takže běží vždy. |
+| **Fixture se hlídá** | nový krok CI „Fixture sedí na generátor" pouští `make_fixture.py --check` pro `world`, `hues` i `anim` (drift = ruční editace místo generátoru by tiše změnil, co se měří). |
+| **⚠ `mutace-anim.py` měl falešné zelené** | Sonda na reálných datech se **nikdy nepouštěla na originále**: bez instalace UO buď spadla (`FileNotFoundError`), nebo (instalace existuje, data prázdná) vrátila **45 chyb pro každou mutaci i pro originál** → harness hlásil **8/8 chyceno, 0 chyb** a nic neměřil. **Oprava:** baseline na originále (0 chyb = sonda se počítá), `--install`/`UO_INSTALL`, a když sonda neměří, **řekne to** (`realna sonda: NEMERENA`). |
+| **Tři harnessy v CI** | `mutace-render-hue.py`, `mutace-render-anim.py`, `mutace-anim.py` mají v `ci.yml` vlastní kroky (první dva s `env: GODOT`). **Ověřeno v CI stavu** (bez `assets/uo`, bez instalace UO): `12/12`, `11/11`, `8/8 (JEN self-test – realna sonda NEMERENA)`, všechny `exit 0`. |
+| **Testy a brány** | s assety **574 kontrol / 0 selhání**; **bez assetů 519 / 0** (dřív 483 a harness hlásil `13 kontrol` míň) — fixture tedy v CI měří. `run_tests.gd` navíc vypisuje `case souboru spusteno: N z M`. |
 
 ## ✅ CO JE NOVÉHO (6. session) — Úkol 3: dveře a schody v `world.walk`
 
@@ -274,16 +292,24 @@ ho celý." Každá session tedy **není „krok"**, ale **jeden celek s cílem**
    v pořádku.
 4. **Nedělat v jedné session víc cílů**, aniž by první byl uzavřený a ověřený.
 
-**⚠ CÍL TÉTO (7.) SESSION — až ho dokončíš, přepiš tuhle větu na další cíl:**
+**⚠ CÍL TÉTO (8.) SESSION — až ho dokončíš, přepiš tuhle větu na další cíl:**
 
 > **Rozhodnout a opravit konvenci dveří ve `world.doors`** (otevřená věc 62).
-> `doors.gd` dnes tvrdí „kusy 1–4 zavřené, 5–8 otevřené"; měření (`layer`
-> v tiledata po dvojicích + RunUO/ServUO `closed = base+2f`, `open = +1`) ukazuje
-> na **sousední dvojice**. **Přijímací kritérium:** rozhodnutí je podložené
-> měřením (který art je otevřený, doloženo **pohledem** na montáž i geometrií),
-> `world.doors` (`is_open`/`toggle`/`open_tile`) je podle něj opravený,
-> `tests/cases/doors.gd` to měří, mutace v `mutace-tests.py` (nový modul
-> `doors` nebo stávající) to chytí, a `tests/cases/walk.gd` (dnes stav jen
+> `doors.gd` dnes tvrdí „kusy 1–4 zavřené, 5–8 otevřené". **Nová evidence
+> (naměřeno 6.–7. session, je v věci 62):** `tiledata` má u 1717..1732 `layer`
+> po **dvojicích** (8 hodnot = 4 směry zdi × 2 strany pantu), `doors.txt` uvádí
+> z každé dvojice **jeden** art, RunUO/ServUO párují `closed = base+2f`,
+> `open = closed+1`, a **všech 16 artů bloku musí obsahovat oba stavy** —
+> otevřené tedy nemůže být „5–8" (to je zrcadlová strana pantu téhož zavřeného
+> stavu). **Přijímací kritérium:** `world.doors` (`is_open`/`toggle`/`open_tile`)
+> opravený podle měření, `tests/cases/doors.gd` to měří, mutace v `mutace-tests.py`
+> to chytí a `tests/cases/walk.gd` zůstane zelený. **Co do cíle NEPATŘÍ:**
+> `sim.interaction` (Úkol 4), vady ze snímků (věci 59–61).
+
+**Předchozí cíl (7. session), splněný:** rozhodnutí uživatele „zavřít slepé místo
+v `tests/run_tests.gd` + přidat zbývající tři mutační harnessy podle návrhu" —
+slepé místo zavřené (tři mutace to dokazují), fixture pro `render.hue`
+a `render.anim` v gitu, tři harnessy v CI a ověřené v CI stavu (12/12, 11/11, 8/8).
 > konzumuje) zůstane zelený.
 > **Proč zrovna tohle:** Úkol 4 (`sim.interaction`) má „dveře → otevřít/zavřít"
 > a kdyby konvence zůstala špatná, interakce by přepínala na **jinou orientaci**
@@ -298,36 +324,29 @@ zavřenými i otevřenými dveřmi, test kroku na schod nahoru/dolů, obojí s m
 
 ## Co čeká na tebe
 
-**Dvě věci čekají na tvé rozhodnutí — obojí je o souborech, které agent nesmí
-měnit sám (`boot.*` v roadmapě, tedy „co se smí přidat do CI"). Všechno ostatní
-si 7. session udělá sama** (cíl je výše) a nic od tebe nepotřebuje.
+**Nic nečeká — obě rozhodnutí z 6. session jsi 7. session odsouhlasil a jsou
+hotová:**
 
-### 1. Zavřít slepé místo v `tests/run_tests.gd`?  ⏳ ČEKÁ NA TEBE
-**Co to je:** sada testů **tiše přeskočí** case soubor, který se nedá
-zinstancovat (parse error) — vypíše menší počet kontrol a `0 selhání`, takže
-vypadá zeleně. Naměřeno 2×: 4. session `438 kontrol` místo `480`, 5. session
-`480` místo `507`. Oprava je jednořádková (`script.can_instantiate()` před
-`script.new()`), ale soubor je `boot.tests` → **patří tobě**.
+1. ~~**Zavřít slepé místo v `tests/run_tests.gd`**~~ — **HOTOVO 7. session**:
+   `can_instantiate()` před `new()`, `script_at()` vrací `null` i pro
+   neinstanciovatelný skript, case bez jediné kontroly je `FAIL`. Tři mutace
+   (case soubor / měřená granule / `preload`) to dokazují: `504/1`, `453/3`,
+   `480/3`, všechny `exit 1` (předtím `503/0` a `exit 0`).
+2. ~~**Přidat tři mutační harnessy do `ci.yml`**~~ — **HOTOVO 7. session**:
+   `mutace-render-hue.py`, `mutace-render-anim.py` a `mutace-anim.py` mají
+   vlastní kroky v CI (+ krok „Fixture sedí na generátor"). **Pozor na opravu
+   mého vlastního návrhu:** tvrdil jsem, že `hues.json` „má data v gitu" —
+   **nemá** (je v `assets/uo/`, gitignore); fixture proto musely dostat
+   **všechny tři** a jsou v `tests/fixtures/`.
+   A `mutace-anim.py` cestou dostal opravu: bez instalace UO hlásil
+   **„8/8 chyceno" a nic neměřil** (chybějící baseline sondy) — dnes to řekne
+   a měří aspoň self-test.
 
-**Co to přinese:** když se příště rozbije case soubor, sada to **řekne** místo
-aby ztišila 20 kontrol. Dnes je to jediná známá slepá brána.
-**Co to stojí:** jedno rozhodnutí; práce je na 10 minut i s testem.
-**Doporučuji:** ano — je to nejlevnější zvýšení důvěry v celou sadu.
-**Jak se to vrátí:** `git revert <commit>` (změna je v jednom souboru).
-
-### 2. Přidat zbývající tři mutační harnessy do `ci.yml`?  ⏳ ČEKÁ NA TEBE
-**Co to je:** v CI dnes běží `mutace-tests.py` a `mutace-skills.py`;
-`mutace-anim.py`, `mutace-render-anim.py` a `mutace-render-hue.py` se pouští
-**jen ručně** (dnes naměřeno 8/8, 11/11, 12/12). Do `ci.yml` je smí přidat jen
-`boot.gates`.
-**Co to přinese:** i ty tři granule by měly v CI důkaz, že jejich testy měří.
-**Co to stojí:** delší běh CI (naměřeno dnes: **53 mutací se vešlo do
-`timeout-minutes: 30`**, takže místo je — ale tři harnessy přidají další běhy
-celé sady) a riziko, že dva z nich v CI **nepoběží** (chtějí instalaci UO
-a `assets/uo/anim`, což v CI není) → chtěly by fixture.
-**Doporučuji:** nejdřív **jen `mutace-render-hue.py`** (má data v gitu) a pro
-zbylé dva nejdřív udělat fixture; jinak by v CI tiše neměřily.
-**Jak se to vrátí:** `git revert <commit>` (změna je v `ci.yml`).
+**Co bude následovat (bez tebe):** cíl 8. session = **konvence dveří ve
+`world.doors`** (věc 62). Kdybys chtěl pomoct **očima**, je na to montáž
+`.cache/analysis/dvere-par-pohled.png` (dvojice `1717/1718` … `1731/1732`,
+vlevo art z `doors.txt`) — ale **rozhodnutí je podložené měřením** a nečeká na
+tebe; obrázek je jen nezávislá kontrola.
 
 ## ⚠⚠ BLOKÁTORY
 
@@ -363,18 +382,18 @@ Test granule, který potřebuje data z instalace, se **musí** ptát
 
 Dvě věci, které blokátor **nejsou**, ale je dobře je vědět:
 
-1. **Tři mutační harnessy nejsou v CI.** `mutace-tests.py` a `mutace-skills.py`
-   v CI jsou, ale `mutace-anim.py`, `mutace-render-anim.py` a
-   **`mutace-render-hue.py`** se pouští jen ručně — **a v CI běžet nemohou**:
-   první chce instalaci UO, druhý `assets/uo/anim/*.png`, třetí `hues.json`
-   (a bez nich měří hůř). Chtějí **fixture**; do `ci.yml` je smí přidat jen
-   `boot.gates`.
-2. **`tests/run_tests.gd` pořád tiše přeskočí case soubor s parse errory**
-   (otevřená věc 21 z minula). **4. session to potvrdila znovu a ostřeji:**
-   s rozbitým `registry.gd` (metoda `get`, viz věc 47) sada vypsala
-   **`438 kontrol, 0 selhání`** místo **480** — dva case soubory se přeskočily
-   a jediný viditelný příznak byl **pokles počtu kontrol**. Proto: **baseline
-   `N kontrol` si změř před zásahem a po něm** (postup je v `LESSONS.md`).
+1. ~~**Tři mutační harnessy nejsou v CI.**~~ — **VYŘEŠENO 7. session** (rozhodnutí
+   uživatele): `mutace-anim.py`, `mutace-render-anim.py` a `mutace-render-hue.py`
+   mají v `ci.yml` vlastní kroky a **data berou z fixture v gitu**
+   (`tests/fixtures/{hues,anim}/`), takže v CI opravdu měří — naměřeno v CI
+   stavu (bez `assets/uo`, bez instalace UO): `12/12`, `11/11`, `8/8`.
+   **Pozor:** můj původní návrh tvrdil, že `hues.json` „má data v gitu" — nemá;
+   fixture musely dostat všechny tři.
+2. ~~**`tests/run_tests.gd` tiše přeskočí case soubor s parse errory**~~ —
+   **VYŘEŠENO 7. session** (věc 21): `can_instantiate()` před `new()`, `script_at()`
+   v `tests/lib.gd` vrací `null` i pro neinstanciovatelný skript, case bez jediné
+   kontroly je `FAIL`. **Baseline `N kontrol` si přesto měř před zásahem
+   a po něm** — je to nejcitlivější ukazatel (postup v `LESSONS.md`).
 
 ## Kde co je
 
@@ -392,10 +411,10 @@ Dvě věci, které blokátor **nejsou**, ale je dobře je vědět:
 | Brány | `python tools/gates/run-all.py` → **11 měřeno / 0 NEMĚŘENO / 0 chyb**, `exit 0` |
 | Self-testy bran | `python tools/gates/run-all.py --self-test` → **19 self-testů (10 bran + 9 extrakčních nástrojů), 0 chyb**; **G10 má uvnitř 8 případů** |
 | **Mutační důkaz testů** | `python tools/gates/mutace-tests.py [--only sort\|map\|walk\|movement\|registry\|pathfind\|textures]` → **53 z 53** (trvá desítky minut; `walk` má 12 mutací) |
-| **Mutační důkaz dekodéru animací** | `python tools/gates/mutace-anim.py` → **8 z 8** |
+| **Mutační důkaz dekodéru animací** | `python tools/gates/mutace-anim.py [--install <UO>]` → **8 z 8** (bez instalace UO měří jen self-test a **řekne to**: `realna sonda: NEMERENA`; proměnná `UO_INSTALL`) |
 | **Mutační důkaz `data.skills`** | `python tools/gates/mutace-skills.py` → **8 z 8** |
-| **Mutační důkaz `render.anim`** | `python tools/gates/mutace-render-anim.py` → **11 z 11** |
-| **Mutační důkaz `render.hue`** | `python tools/gates/mutace-render-hue.py` → **12 z 12** |
+| **Mutační důkaz `render.anim`** | `python tools/gates/mutace-render-anim.py` → **11 z 11** (fixture v gitu, běží i v CI) |
+| **Mutační důkaz `render.hue`** | `python tools/gates/mutace-render-hue.py` → **12 z 12** (fixture v gitu, běží i v CI) |
 | **Sonda: unikátnost mutačních vzorů** | `python _analyza/mutace-vzory.py` (**gitignore**) → `mutace-tests: 53 vzorů` + `mutace-render-anim: 11` = **64**, `OK`; ověřená mutací sebe sama |
 | **Registr bytostí (nové)** | `sim/entity/registry.gd` + `tests/cases/registry.gd`; `register`, `get_mobile`, `all`, `remove`, `size` |
 | **Animace: dekodér** | `python tools/uoextract/anim.py --self-test \| --verify \| --export assets/uo/anim \| --export-check assets/uo/anim` |
@@ -403,6 +422,9 @@ Dvě věci, které blokátor **nejsou**, ale je dobře je vědět:
 | **Snímek z běhu** | `godot --path . --rendering-driver opengl3 --resolution 1280x720 --write-movie .cache/render/run-<tag>/frame.png --quit-after 5` — **cesta musí mít dopředná lomítka** (viz pasti) |
 | **Důkaz chůze (řidič)** | `godot --path . --rendering-driver opengl3 --write-movie .cache/render/chuze/frame.png --script res://.cache/analysis/demo-chuze.gd` (řidič je v `.cache/`, gitignore) |
 | Fixture pro `world.map` | `python tests/fixtures/world/make_fixture.py [--check]` |
+| **Fixture pro `render.hue` (nové)** | `python tests/fixtures/hues/make_fixture.py [--check]` — sady 1002/1003; test je měří VŽDY (`render_hue.gd`, sekce D) |
+| **Fixture pro `render.anim` (nové)** | `python tests/fixtures/anim/make_fixture.py [--check]` — 6 spritů + 2 PNG; test je měří VŽDY (`render_anim.gd`, sekce FIXTURE) |
+| **Harness testů: kde je smlouva** | `docs/04 §4.8.1` (co dělá při parse erroru) a `§4.8.2` (fixture + které harnessy běží v CI) |
 | Replaye pro G9 | `tests/replays/tic_200.json`, `tic_1000.json` |
 | Sonda renderu + mutace | `.cache/analysis/{probe-render.gd,mutace-render.py,mutace-snimek.py}` |
 | Stav a logy CI běhů | `node _analyza/ci-beh-stav.mjs` · `node _analyza/ci-log.mjs` · `node _analyza/ci-artefakt.mjs` |
@@ -420,9 +442,9 @@ Dvě věci, které blokátor **nejsou**, ale je dobře je vědět:
 | `sim/` | **14** | **1 810** | **`world/walk.gd` 150 → 220** (6. session: id prostor statiků, dveře, pásmo, výška schodů); dále `world/pathfind.gd` (5. session, 173 řádků), `entity/registry.gd`, `entity/skills.gd`, `entity/mobile.gd`, `systems/movement.gd` |
 | `render/` | 5 | **770** | `sort.gd`, **`texture_cache.gd`** (+48: cache oken a počítadlo načtení), `chunk_renderer.gd`, `anim_player.gd`, `hue_cache.gd`; `ui/` pořád neexistuje |
 | `app/` | 6 (5 kód) | 651 | `main.gd`, `world_view.gd`, `player_controller.gd` (bez granule) |
-| `tests/` | **38** (31 kód) | **3 820** | **28 case souborů**; `cases/walk.gd` +17 kontrol (6. session) |
+| `tests/` | **42** (33 kód) | **4 693** | **3 nové soubory fixture** (`tests/fixtures/{hues,anim}/make_fixture.py` + `hues.json`, `anim-sheets.json`, 2 PNG); `cases/render_hue.gd` +15 a `cases/render_anim.gd` +22 kontrol (7. session) |
 | `tools/uoextract/` | 38 | 6 278 | `anim.py` umí pixely, `--export`, `--export-check` |
-| `tools/gates/` | 22 | **4 957** | `mutace-tests.py` — modul `walk` **12 mutací** (bylo 6) |
+| `tools/gates/` | 22 | **4 996** | `mutace-anim.py` má navíc baseline reálné sondy + `--install` |
 
 *(Počty jsou Pythonem `splitlines()` nad kódovými soubory `.gd`/`.py`/`.sh`/`.mjs`,
 bez `.uid` a `__pycache__` — `python _analyza/radky.py`.)*
@@ -463,8 +485,16 @@ Doklady, které jsem viděl na vlastní oči (ne opsané z předání):
   naměřeno na reálné mapě (`sonda-walk-statiky.gd`, `sonda-walk-presnost.gd`):
   z 6 750 kroků se statikem v pásmu postavy jich projde **0** (před opravou 1 173),
   `surface_z` se u **130 ze 130** dlaždic se schodem shoduje s `z + výška`.
-- **Testy 537/0**, **brány 11/0/0** (`exit 0`), **mutace `mutace-tests.py` 53/53**
-  (z toho `walk` **12/12**).
+- **Testy už NEMLČÍ (7. session)** — parse error v case souboru i v granulích,
+  které case používá, dnes sada **ohlásí** (`FAIL`, `exit 1`), místo aby tiše
+  zmizela část kontrol; doloženo **třemi mutacemi** (`504/1`, `453/3`, `480/3`)
+  a `case souboru spusteno: N z M`.
+- **CI měří i render (7. session)** — `render.hue` a `render.anim` mají fixture
+  v gitu, takže jejich mutační harnessy běží v CI a **v CI stavu** (bez
+  `assets/uo`) dávají `12/12` a `11/11`.
+- **Testy 574/0 s assety (519/0 bez nich)**, **brány 11/0/0** (`exit 0`),
+  **mutace 92/92** (`mutace-tests` 53, `skills` 8, `render-hue` 12,
+  `render-anim` 11, `anim` 8).
 - **Hra nespadne**: G11 `smoke` → `framu 120, script_error 0, parse_error 0`.
 
 ### ⚠ Co na obrazovce ještě NENÍ
@@ -497,11 +527,12 @@ a barva kůže.** Statiky nesou barvu ze záznamu mapy, ale **nikdo ji nepouží
 | **Co v CI NEJDE ověřit bez tokenu** | `node _analyza/ci-log.mjs` → **HTTP 403**; `ci-artefakt.mjs` → **HTTP 401** | Kdo nemá token, **vidí jen stav kroků**, ne jejich obsah — takže „krok 9 prošel" je naměřené, ale **počet chycených mutací v CI je neověřený** (naměřeno je 53/53 **lokálně**). Nezapisuj do předání „CI má 53/53", když to nevidíš |
 | Repo je veřejné | API bez tokenu | `visibility: public` |
 | **Oprávnění** | `whoami /groups \| Select-String Mandatory` | **`Medium`** = plný přístup. `Low` = sandbox → brány hlásí **falešné vady**, `.uid` nevzniknou a `run-all.py` spadne na `summary.json` (5. session to naměřila: G7 „VADA save/load", G11 NEMĚŘENO, self-test 9 chyb — **všechno byl sandbox**) |
-| Testy | testy s `APPDATA` ve workspace (`Low`: dej ho do `.tmp`) | **537 kontrol, 0 selhání**, 28 case souborů (v čistém klonu je kontrol méně — část měří data z `assets/uo/`) |
+| Testy | testy s `APPDATA` ve workspace (`Low`: dej ho do `.tmp`) | **574 kontrol, 0 selhání** (s assety; bez `assets/uo/` **519/0**), 28 case souborů. Souhrn vypisuje `case souboru spusteno: N z M` — když je M < 28, něco se ne načetlo |
 | **FPS (nové)** | `& .cache\godot\...console.exe --path . --rendering-driver opengl3 --script res://.cache/analysis/sonda-fps.gd` | **40–45 FPS** (22–25 ms/frame), 5 767 objektů, 1 516 draw callů; cache se po nabehu nemění (27 načtení, 0 změn) |
 | Brány | `python tools/gates/run-all.py` | **11 měřeno / 0 NEMĚŘENO / 0 vad**, `exit 0` |
 | Self-testy | `python tools/gates/run-all.py --self-test` | **19, 0 chyb**, `exit 0` |
-| Mutační důkaz | `mutace-tests.py` + `mutace-anim.py` + `mutace-skills.py` + `mutace-render-anim.py` + `mutace-render-hue.py` | `53/53`, `8/8`, `8/8`, `11/11`, `12/12` (= **92/92**) |
+| Mutační důkaz | `mutace-tests.py` + `mutace-skills.py` + `mutace-render-hue.py` + `mutace-render-anim.py` + `mutace-anim.py` | `53/53`, `8/8`, `12/12`, `11/11`, `8/8` (= **92/92**); **první čtyři běží v CI**, poslední taky (bez instalace UO měří jen self-test a řekne to) |
+| Fixture (nové) | `python tests/fixtures/{world,hues,anim}/make_fixture.py --check` | **3× OK**, `exit 0`; v CI je hlídá krok „Fixture sedí na generátor" |
 | Vzory mutací | `python _analyza/mutace-vzory.py` (gitignore) | `mutace-tests: 53 vzorů` + `mutace-render-anim: 11` = **64 celkem**, `OK`, `exit 0` |
 | Animace | `python tools/uoextract/anim.py --self-test` | `35 kontrol, 0 chyb` |
 | Barvy | `python tools/uoextract/hues.py --self-test` | `5 kontrol, 0 chyb` |
@@ -562,8 +593,14 @@ a barva kůže.** Statiky nesou barvu ze záznamu mapy, ale **nikdo ji nepouží
 19. **Výkonnostní dluh: `AtlasTexture` na objekt** (`UNVERIFIED`) — **PLATÍ DÁL.**
     Nové číslo: ve snímku s postavou se kreslí **5 767 objektů**.
 20. ~~Až CI ožije, bude červené kvůli chybějícím assetům~~ — **VYŘEŠENO.**
-21. **`tests/run_tests.gd` tiše přeskočí case soubor s parse errory** — **PLATÍ
-    DÁL** (věc 21 z minula; oprava `script.can_instantiate()`).
+21. ~~**`tests/run_tests.gd` tiše přeskočí case soubor s parse errory**~~ —
+    **VYŘEŠENO 7. session** (rozhodnutí uživatele). Mechanismus byl jiný, než
+    jsme si mysleli: `load()` vrací **nenulový** `GDScript` a teprve `new()`
+    přeruší `_init_case`, která vrátí `null` → smyčka to brala jako „ohlášeno"
+    a přeskočila soubor (`503 kontrol, 0 selhání`). Opraveno na třech místech
+    (`can_instantiate()` před `new()`, `script_at()` v `tests/lib.gd`, guard na
+    „0 nových kontrol") a doloženo **třemi mutacemi** (`504/1`, `453/3`,
+    `480/3`, všechny `exit 1`). Detail: `docs/04 §4.8.1`.
 22. **Replay neměří příkazy** (jiné příkazy = stejný hash) — **PLATÍ DÁL**:
     `sim.movement` je zaregistrovaný **jen v `app/main.gd`**, takže replay přes
     `sim_probe.gd` (bez scény) ho nemá a pohyb v replayi nic nezmění. **Až se
@@ -704,6 +741,10 @@ a barva kůže.** Statiky nesou barvu ze záznamu mapy, ale **nikdo ji nepouží
     časovým stropem (`subprocess` s kratším limitem + klasifikace „ZASEKLA SE").
     Dnes je mutace ze seznamu vyřazená (a je to v `mutace-tests.py` u modulu
     `pathfind` popsané), aby 6/6 nebylo postavené na neměřeném.
+    **DOPLNĚNO 7. session:** časový strop zatím **není potřeba pro velikost** —
+    naměřeno v CI (běh #30): **53 mutací `mutace-tests.py` se vešlo do
+    `timeout-minutes: 30`** i s krokem 9. Zbývá jen rozlišení „zasekla se" od
+    „je pomalá" (věc zůstává otevřená).
 54. **NOVÉ (5. session): `sim.pathfind` NEMÁ VOJÁKA.** Nikdo ho nevolá —
     `sim.ai` ani click-to-move neexistují, `sim.commands` cestu nezná. Je to
     hotová granule bez volajícího (stejná past jako `hued_art`, věc 40). Další
@@ -758,26 +799,31 @@ a barva kůže.** Statiky nesou barvu ze záznamu mapy, ale **nikdo ji nepouží
     jak být vidět. Patří tam viditelný placeholdr (magenta/šrafování) a vizuální
     kontrola úplnosti land artu (dnes ji nemá nikdo; G10 měří jen barvu postavy).
 62. **NOVÉ (6. session): KONVENCE DVEŘÍ v `world.doors` je podezřelá — a je to
-    CÍL 7. SESSION.** `doors.gd` tvrdí (hlavička, „rozhodnuto obrázkem"):
+    CÍL 8. SESSION.** `doors.gd` tvrdí (hlavička, „rozhodnuto obrázkem"):
     „kusy 1–4 = čtyři zavřené orientace, kusy 5–8 tytéž otevřené". **Naměřeno
-    dnes (nic z toho nebylo při rozhodování k dispozici):**
-    (a) `assets/uo/tiles.json` má u dveří sloupec `layer` **po dvojicích**:
-    `1717`/`1718` = `0`, `1719`/`1720` = `1`, … `1731`/`1732` = `7` — tedy
-    **8 orientací a u každé DVA arty**, ne „4 + 4";
+    (nic z toho nebylo při rozhodování k dispozici):**
+    (a) `assets/uo/tiles.json` má u artů 1717..1732 sloupec `layer` **po
+    dvojicích**: `1717`/`1718` = `0`, `1719`/`1720` = `1`, … `1731`/`1732` = `7`;
     (b) RunUO/ServUO `Scripts/Items/Construction/Doors/Doors.cs` párují
     **sousední** arty: `closed = base + 2f`, `open = closed + 1`
     (MediumWoodDoor = 0x6B5: zavřené 1717/1719/1721/1723, otevřené 1718/1720/1722/1724);
-    (c) kdyby platilo „kus 1 zavřený ↔ kus 5 otevřený", **otevření dveří by
-    změnilo orientaci** (jiný `layer`) — fyzikálně nesmysl;
-    (d) **slabý, ale reálný signál:** 4 arty z 16 v řadě **nemají `Impassable`**
-    (1714, 1730, 1732, 1666) a jsou to **sudé** (tedy „partneři +1"), což je
-    přesně to, co se čeká od otevřeného artu;
+    (c) **rozhodující úvaha:** celý blok 1717..1732 je **16 artů = 8 × 2**, tedy
+    „8 hodnot `layer` krát dva arty". Osm hodnot odpovídá **4 směrům zdi × 2
+    stranám pantu** (zrcadlové dvojice) a `doors.txt` uvádí z každé dvojice
+    **jeden** art — takže **otevřené arty nemohou být „kusy 5–8"** (to je druhá
+    strana pantu téhož zavřeného stavu). Otevřený stav musí být druhý člen
+    dvojice (`+1`), jinak by v datech žádný otevřený art nebyl;
+    (d) **nezávislý signál:** 4 arty ze 16 **nemají `Impassable`** (1714, 1730,
+    1732, 1666) a **všechny čtyři jsou sudé** = „partneři +1" (otevřené dveře
+    jsou ty průchozí); při náhodném stavu je to šance 1/16;
     (e) **co měření NEŘEKLO:** zrcadlová metrika (`d(art, zrcadlo(art'))`) je
-    u obou hypotéz blízko šumu (13,9–24,4), takže **sama nerozhoduje** —
-    proto se to nemá „opravit od stolu", ale rozhodnout **pohledem** na montáž
-    dvojic (`.cache/analysis/dvere-pary.png`, `dvere-zrcadleni.py`,
-    `dvere-orientace.py`, `sonda-dvere-schody.py`; vše gitignore).
-    **Dnešní dopad je nulový** (v okolí startu 80×80 **není ani jeden statik
+    u obou hypotéz blízko šumu (13,9–24,4), a **pouhý pohled na montáž je
+    zavádějící** — v 3. session se přesně tak „rozhodlo obrázkem" špatně
+    (zrcadlovou stranu pantu si člověk splete s otevřeným křídlem). Nová montáž
+    dvojic pro nezávislou kontrolu pohledem: `.cache/analysis/dvere-par-pohled.png`
+    (skript `dvere-par-pohled.py`; dále `dvere-zrcadleni.py`, `dvere-orientace.py`,
+    `sonda-dvere-schody.py`; vše gitignore).
+    **Dopad je dnes nulový** (v okolí startu 80×80 **není ani jeden statik
     dveří**) a `walk` je na konvenci nezávislý (ptá se `is_open`) — ale
     **Úkol 4 (`sim.interaction`) na tom stát bude**.
 63. **NOVÉ (6. session): pravidlo kroku na schod je ROZHODNUTÍ, ne opsaná
@@ -844,13 +890,13 @@ a barva kůže.** Statiky nesou barvu ze záznamu mapy, ale **nikdo ji nepouží
    **HOTOVO 2026-10-07 (6. session)**: `world.doors.is_open`, výška schodů,
    výškové pásmo statiků **a oprava id prostoru statiků** (`+0x4000`).
    Testy `pathfind` (mají stub) zůstaly zelené ✓ — předpoklad z předání platil.
-4. **Rozhodnout konvenci dveří ve `world.doors`** (věc 62) — **cíl 7. session**;
+4. **Rozhodnout konvenci dveří ve `world.doors`** (věc 62) — **cíl 8. session**;
    je to vstup pro Úkol 4 (`sim.interaction`, „dveře → otevřít/zavřít").
-5. **Opravit slepé místo v `tests/run_tests.gd`** (`script.can_instantiate()`
-   před `script.new()`) — pořád jediná známá slepá brána (věc 21) a **5. session
-   na ni naletěla znovu** (parse error v `tests/cases/pathfind.gd` → sada
-   hlásila `480 kontrol, 0 selhání`; poznat se to dalo **jen podle poklesu
-   počtu kontrol**). Soubor je `boot.tests` → **potřebuje rozhodnutí uživatele**.
+   Evidence je v věci 62 (blok 16 artů = 8 × 2; `doors.txt` má z dvojice jeden).
+5. ~~**Opravit slepé místo v `tests/run_tests.gd`**~~ — **HOTOVO 7. session**
+   (rozhodnutí uživatele): `can_instantiate()` před `new()`, `script_at()`
+   v `tests/lib.gd`, guard na „0 nových kontrol"; tři mutace to dokazují.
+   Souhrn nově vypisuje `case souboru spusteno: N z M`.
 6. **Úkol 4 ze `ZADANI-DALSI-VYVOJ-2.md`: `sim.interaction`** (`use`, `use_on`,
    kontextové menu; routing dynamicky, `not_available` místo ticha) — **až po
    věci 62**.
@@ -865,11 +911,9 @@ a barva kůže.** Statiky nesou barvu ze záznamu mapy, ale **nikdo ji nepouží
     ovládá „klikatě".
 12. Pak M2 zbytek: `entity.container`, `entity.notoriety`, `world.teleport`,
     `world.regions`, **`sim.interaction` (Úkol 4)**.
-13. (nepovinné) `if: always()` u diagnostických kroků CI (věc 26) a doplnit
-    **čtyři** mutační harnessy do `ci.yml`; časový strop v `mutace-tests.py`
-    (věc 53) — plný běh harnessu je dnes **53 mutací × celá sada** (naměřeno
-    6. session: celý `mutace-tests.py` trval desítky minut) a v CI má
-    job `timeout-minutes: 30`, takže to chce změřit, než se přidá víc.
+13. (nepovinné) `if: always()` u diagnostických kroků CI (věc 26); časový strop
+    v `mutace-tests.py` (věc 53) — **velikost už změřená**: 53 mutací se vešlo do
+    `timeout-minutes: 30`, zbývá rozlišení „zasekla se" od „je pomalá".
 
 ## Jak to dělat (co se osvědčilo)
 

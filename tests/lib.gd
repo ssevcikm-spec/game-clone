@@ -7,7 +7,17 @@ extends RefCounted
 
 
 static func script_at(path: String):
-	return load(path) if FileAccess.file_exists(path) else null
+	# POZOR (namEReno 2026-10-07, otevrena vec 21): `load()` na soubor s PARSE
+	# ERROREM vraci NENULOVY `GDScript`, ktery ale nejde instanciovat. Kdo na nem
+	# zavola `new()`, dostane runtime error a jeho funkce se PRERUSI - case pak
+	# tise zmeri mene kontrol a sada hlasi "0 selhani" (namEReno: 503 misto 537).
+	# Vracime proto `null`, aby to case ohlasil jako NEMERENO.
+	if not FileAccess.file_exists(path):
+		return null
+	var script = load(path)
+	if script == null or not (script is GDScript) or not script.can_instantiate():
+		return null
+	return script
 
 
 static func new_at(path: String):

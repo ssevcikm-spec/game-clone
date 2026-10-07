@@ -10,7 +10,15 @@ Harness u KAŽDÉ mutace overi CTYRI veci (stejne jako `mutace-tests.py`):
   4. SMLOUVA VSTUPU - nad neexistujici cestou / prazdnym blokem to spadne,
      ne ze to tiše projde.
 
-Pouziti: python tools/gates/mutace-anim.py [--only nazev]
+⚠ POZOR NA REALNOU SONDU (namEReno 2026-10-07): sonda `sonda_realna_data` cte
+`anim.mul` z instalace UO. **Kdyz instalace neni, vraci chybu pro KAZDY blok -
+a stary harness tim prohlasil kazdou mutaci za chycenou** (8/8), i kdyz
+nezmeril nic. Presne past "brana, ktera nema jak selhat". Proto se sonda pousti
+i na ORIGINALE (baseline): kdyz na originalu chyby ma, do chyceni se NEPOCITA
+a rekne se to (`NEMERENO`). V CI (bez instalace UO) tak harness meri jen
+self-test - a je to videt.
+
+Pouziti: python tools/gates/mutace-anim.py [--only nazev] [--install <cesta UO>]
 """
 
 from __future__ import annotations
@@ -18,6 +26,7 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import io
+import os
 import re
 import sys
 from contextlib import redirect_stdout
@@ -30,7 +39,7 @@ for _stream in (sys.stdout, sys.stderr):
 ROOT = Path(__file__).resolve().parents[2]
 ZDROJ = ROOT / "tools" / "uoextract" / "anim.py"
 PRACOVNI = ROOT / ".cache" / "mutace-anim"
-INSTALL = r"D:\Games\Electronic Arts\Ultima Online Classic"
+INSTALL = Path(os.environ.get("UO_INSTALL", r"D:\Games\Electronic Arts\Ultima Online Classic"))
 
 # (nazev, co nahradit, cim) - kazda mutace vraci JEDNU konkretni vec do kódu.
 MUTACE = [
@@ -60,7 +69,7 @@ def nacti_modul(cesta: Path):
     return mod
 
 
-def sonda_realna_data(mod) -> list[str]:
+def sonda_realna_data(mod, install: Path) -> list[str]:
     """Invariant na REALNYCH datech: RLE nikdy nezapisuje mimo frame.
 
     Tohle je to, co odlisuje spravny vyklad od drivejsiho (x bez znamenka):
@@ -68,7 +77,7 @@ def sonda_realna_data(mod) -> list[str]:
     ("run_maska_0x0ff") tise prosla - v syntetickem bloku je beh maly.
     """
     chyby = []
-    m = mod.MulAnim(INSTALL)
+    m = mod.MulAnim(install)
     for telo in (400, 401):
         for cislo in (0, 1, 4):
             for smer in range(5):
@@ -90,10 +99,37 @@ def sonda_realna_data(mod) -> list[str]:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--only", default=None)
+    ap.add_argument("--install", default=str(INSTALL),
+                    help="cesta k instalaci UO (anim.idx + anim.mul); "
+                         "lze i promennou prostredi UO_INSTALL")
     args = ap.parse_args()
+    install = Path(args.install)
 
     original = ZDROJ.read_text(encoding="utf-8")
     PRACOVNI.mkdir(parents=True, exist_ok=True)
+
+    # 0) BASELINE realne sondy - viz hlavicka. Bez tohohle je "8/8 chyceno"
+    #    pravda i na stroji, kde sonda nemeri nic (chybi anim.mul).
+    real_ok = False
+    if (install / "anim.idx").exists() and (install / "anim.mul").exists():
+        try:
+            zaklad = nacti_modul(ZDROJ)
+            zakladni = sonda_realna_data(zaklad, install)
+        except Exception as exc:                       # rozbita data / cteni
+            print(f"[mutace] CHYBA: baseline realne sondy spadla: {type(exc).__name__}: {exc}")
+            return 1
+        if zakladni:
+            print(f"[mutace] CHYBA: baseline realne sondy ma {len(zakladni)} chyb "
+                  f"(na ORIGINALE) - sonda by 'chytila' kazdou mutaci:")
+            for c in zakladni[:5]:
+                print(f"[mutace]   {c}")
+            return 1
+        real_ok = True
+        print("[mutace] baseline realne sondy: 0 chyb (sonda se pocita do chyceni)")
+    else:
+        print(f"[mutace] NEMERENO: realna sonda neni - chybi {install / 'anim.idx'} / "
+              f"{install / 'anim.mul'} (meri se JEN self-test; da se predat --install)")
+
     chycene = 0
     chyby: list[str] = []
     for nazev, stary, novy in MUTACE:
@@ -133,13 +169,15 @@ def main() -> int:
         # (presne tak vypadal falesny dukaz stareho `mutace-atlas.py`).
         if spadlo:
             chycena_selftestem = True
-        real = sonda_realna_data(mod)
+        # Realna sonda se pocita JEN kdyz je baseline cista (viz krok 0).
+        real = sonda_realna_data(mod, install) if real_ok else []
         chycena = chycena_selftestem or bool(real)
         kontroly = m.group(1) if m else "?"
         chyb = m.group(2) if m else "?"
         stav = "CHYCENA" if chycena else "PROSLABY"
+        sonda = f"realna sonda: {len(real)} chyb" if real_ok else "realna sonda: NEMERENA"
         print(f"[mutace] {nazev:24s} provedena={provedena} probehla={probehla} "
-              f"({kontroly} kontrol, {chyb} chyb self-testu, realna sonda: {len(real)} chyb"
+              f"({kontroly} kontrol, {chyb} chyb self-testu, {sonda}"
               f"{', spadlo: ' + spadlo if spadlo else ''}) -> {stav}")
         if not (provedena and (probehla or spadlo) and chycena):
             chyby.append(f"{nazev}: provedena={provedena} probehla={probehla} chycena={chycena}")
@@ -156,7 +194,8 @@ def main() -> int:
         chyby.append("smlouva o vstupu: prazdny vstup neprosel")
 
     print(f"[mutace] {chycene}/{len([m for m in MUTACE if not args.only or m[0] == args.only])} "
-          f"mutaci chyceno, {len(chyby)} chyb")
+          f"mutaci chyceno ({'self-test + realna sonda' if real_ok else 'JEN self-test - realna sonda NEMERENA'}), "
+          f"{len(chyby)} chyb")
     for c in chyby:
         print(f"[mutace] CHYBA: {c}")
     return 1 if chyby else 0

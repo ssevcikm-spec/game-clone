@@ -96,14 +96,40 @@ jobs:
       # POZOR: i tenhle krok potřebuje `env: GODOT` (harness pouští testovací
       # sadu v Godotu) - bez něj spadne na "Godot nenalezen (nastav $GODOT)".
       # Naměřeno 2026-10-06: přesně to shodilo běh #17 (krok bez env).
-      # POZOR 2: `mutace-anim.py` a `mutace-render-anim.py` v CI běžet NEMOHOU -
-      # první chce instalaci UO (`D:\Games\...`), druhý `assets/uo/anim/*.png`
-      # (obojí je gitignore). Pouští se lokálně; kdo je bude chtít v CI, musí
-      # jim dát fixture.
       - name: Mutační důkaz dat (data/skills.json)
         env:
           GODOT: ${{ env.GODOT_BIN }}
         run: python tools/gates/mutace-skills.py
+
+      # Mutační důkaz RENDERU. Do 2026-10-07 se pouštěly JEN RUČNĚ, protože
+      # chtěly `assets/uo/` (gitignore). Dnes mají FIXTURE V GITU
+      # (`tests/fixtures/hues/`, `tests/fixtures/anim/`) a testy je měří VŽDY -
+      # naměřeno 2026-10-07: bez `assets/uo/` sada 519 kontrol / 0 selhání a oba
+      # harnessy plné (12/12 a 11/11), protože mutace chytá fixture sekce.
+      - name: Mutační důkaz render.hue (tests/cases opravdu měří)
+        env:
+          GODOT: ${{ env.GODOT_BIN }}
+        run: python tools/gates/mutace-render-hue.py
+
+      - name: Mutační důkaz render.anim (tests/cases opravdu měří)
+        env:
+          GODOT: ${{ env.GODOT_BIN }}
+        run: python tools/gates/mutace-render-anim.py
+
+      # Mutační důkaz DEKODÉRU animací - je to Python, Godot nepotřebuje.
+      # Bez instalace UO měří JEN self-test a řekne to (`realna sonda: NEMERENA`);
+      # s instalací se do chycení počítá i sonda na reálných datech
+      # (baseline na originále - viz hlavička harnessu).
+      - name: Mutační důkaz dekodéru animací (self-test opravdu měří)
+        run: python tools/gates/mutace-anim.py
+
+      # Fixture je pro ty mutace VSTUP: ruční editace souboru místo generátoru by
+      # tiše změnila, co se měří. `--check` porovná disk s generátorem.
+      - name: Fixture sedí na generátor
+        run: |
+          python tests/fixtures/world/make_fixture.py --check
+          python tests/fixtures/hues/make_fixture.py --check
+          python tests/fixtures/anim/make_fixture.py --check
 
       # Stav plánu je MĚŘENÝ (soubor v gitu + test), ne deklarovaný v roadmapě.
       # `--check` spadne jen na rozporu "done: true, ale neměřeno" (dnes 0).

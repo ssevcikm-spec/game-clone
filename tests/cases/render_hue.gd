@@ -5,7 +5,7 @@ extends RefCounted
 # (tools/gates/mutace-render-hue.py) mohl predat mutanta a aby se dokazalo, ze
 # test meri opravdu ten soubor, ktery dostane.
 #
-# Test ma TRI casti a je to zamer:
+# Test ma CTYRI casti a je to zamer:
 #   A) BEZ DAT - synteticky obrazek (`Image.create`) + tabulka 5 -> 8 bitu proti
 #      REFERENCNIMU KLIENTOVI. Bezi VZDY, i v CI, kde `assets/uo/` neni (je
 #      v .gitignore) a `_src/` take ne.
@@ -15,6 +15,11 @@ extends RefCounted
 #   C) PROTI SKUTECNYM DATUM (`assets/uo/hues.json`) - kontrola proti sade,
 #      ktera se opravdu pouziva. Chybejici data = NEMERENO s duvodem (nikdy
 #      tiche projiti a NIKDY selhani: v CI assety nejsou a byt nemaji).
+#   D) FIXTURE (`tests/fixtures/hues/hues.json`, v GITU) - sada 1002 (= HUE_SKIN)
+#      a 1003 prenesene z realneho exportu. Bezi VZDY - i v CI a i tehdy, kdyz
+#      `assets/uo/hues.json` na disku JE. Duvod: v CI se C) preskoci, takze by
+#      mutace, ktere chytala jen ona, v CI "prosly" (harness by hlasil slepe
+#      kontroly). Je ZAMERNE PRED C) - C) konci `return`.
 #
 # POZOR (namEReno 2026-10-06, beh CI #16): prvni verze tohohle testu mela
 # kontroly proti datum NEpodminene - v CI (bez `assets/uo`) tim shodila cely
@@ -30,6 +35,30 @@ const COLORS: int = 32          # urovni barvy v sade (docs/03 §3.2b)
 # spravnou tabulku od posunu `v << 3`. `_src/` je v .gitignore, takze v CI
 # soubor NENI - pak je to NEMERENO (ne selhani).
 const REFERENCE := "res://_src/classicuo/src/ClassicUO.Utility/HuesHelper.cs"
+
+# --- fixture (sekce D): v gitu, takze bezi i v CI -------------------------
+const FIXTURE := "res://tests/fixtures/hues/hues.json"
+const FIXTURE_SETS: int = 1003   # 1001 vyplnovych + sada 1002 + sada 1003
+const FIXTURE_SKIN: int = 1002   # index 1001 = "SkinHue #1001" (HUE_SKIN)
+const FIXTURE_SECOND: int = 1003 # index 1002 = "SkinHue #1002" (jine hodnoty)
+# NEZAVISLY vzor expanze 5 -> 8 bitu - hodnoty z referencniho klienta
+# (ClassicUO `HuesHelper._table`, BSD-2). Je tu ZAMERNE jako LITERAL, ne opsany
+# z mereneho `EXPAND_5_TO_8`: v CI `_src/` neni, a kdyby se vzor bral z mereneho
+# souboru, byla by kontrola KRUHOVA (mutace tabulky by ji prosla).
+const EXPAND_REF := [0, 8, 16, 24, 32, 41, 49, 57, 65, 74, 82, 90, 98, 106,
+	115, 123, 131, 139, 148, 156, 164, 172, 180, 189, 197, 205, 213, 222, 230,
+	238, 246, 255]
+
+# ZNAME barvy obou sad z fixture - opsane z realneho exportu
+# (`assets/uo/hues.json`, 2026-10-07) a ve fixture jsou 1:1. Jsou tu ZAPSANE
+# schvalne: kdyby se ocekavana barva pocitala z mereneho JSONu, byla by kontrola
+# KRUHOVA (poskozena fixture by zmenila i ocekavani) a sabotaz fixture by prosla.
+const SKIN_COLORS := [1, 1, 1058, 2114, 3139, 4196, 5252, 6309, 7334, 8390,
+	9447, 9447, 10504, 11561, 12617, 13642, 14699, 15755, 16780, 17836, 18893,
+	19950, 19950, 21007, 22064, 23088, 24145, 25201, 26258, 27283, 28339, 29396]
+const SECOND_COLORS := [1, 1, 1058, 2082, 3139, 4195, 5220, 5252, 6309, 7334,
+	8390, 9447, 10471, 10504, 11560, 12585, 13642, 14698, 15723, 16779, 16812,
+	17836, 18893, 19949, 20974, 22031, 22063, 23088, 24144, 25201, 26225, 27282]
 
 
 func _arg(name: String, fallback: String) -> String:
@@ -81,6 +110,15 @@ func _ref_tabulka() -> Array:
 	for n in re.search_all(telo):
 		hodnoty.append(n.get_string(1).hex_to_int())
 	return hodnoty
+
+
+func _oracle(barva5: int) -> Color:
+	# 5bitova barva UO -> ocekavana 8bitova RGB, pocitana NEZAVISLYM vzorem
+	# (`EXPAND_REF`), ne merenym `EXPAND_5_TO_8`. Kanály: R = (c >> 10) & 0x1F,
+	# G = (c >> 5) & 0x1F, B = c & 0x1F (stejne jako `_barvy` v hue_cache.gd,
+	# ale hodnoty expanze jsou odtud nezavisle).
+	return Color8(int(EXPAND_REF[(barva5 >> 10) & 0x1F]),
+		int(EXPAND_REF[(barva5 >> 5) & 0x1F]), int(EXPAND_REF[barva5 & 0x1F]))
 
 
 func run(t) -> void:
@@ -155,6 +193,212 @@ func run(t) -> void:
 	t._check(hlasi_sady >= 1 and hlasi_id >= 1,
 		"render.hue: chybejici data i nezname id se HLA SI (hlasi sad=%d, hlasi id=%d; ocekavano 1 a 1)"
 		% [hlasi_sady, hlasi_id])
+
+	# ---------- D) FIXTURE (`res://tests/fixtures/hues/hues.json`) ----------
+	# Bezi VZDY - i v CI a i tehdy, kdyz `assets/uo/hues.json` existuje. Duvod
+	# je v hlavicce: v CI se C) preskoci, takze by vady, ktere chytala jen ona,
+	# v CI "prosly" (harness by hlasil slepe kontroly).
+	# Ocekavana barva se bere z ZAPSANYCH hodnot (`SKIN_COLORS`/`SECOND_COLORS`)
+	# a z NEZAVISLEHO vzoru (`EXPAND_REF`), NE z mereneho JSONu ani z mereneho
+	# `EXPAND_5_TO_8` - jinak by kontrola byla KRUHOVA a poskozena fixture (nebo
+	# vracena vada v tabulce) by ji prosla.
+	var fx_data = Lib.json_at(FIXTURE)
+	if not (fx_data is Dictionary) or not (fx_data.get("sets") is Array):
+		# Fixture je v GITU, takze jeji absence NENI "nemereno s duvodem" - je to
+		# vada. Kdyby se jen preskocila, vypnula by se presne tam, kde ma merit.
+		t._pending("render.hue: fixture " + FIXTURE + " chybi nebo se necte - "
+			+ "spust `python tests/fixtures/hues/make_fixture.py`")
+		return
+	var fx_sady: Array = fx_data["sets"]
+	var fx_popis: String = str(fx_data.get("fixture", ""))
+	t._check(fx_popis.begins_with("tests/fixtures/hues/make_fixture.py")
+		and fx_sady.size() == FIXTURE_SETS,
+		"render.hue: fixture je z generatoru a ma %d sad (ma %d; popis: %s)"
+		% [FIXTURE_SETS, fx_sady.size(), fx_popis])
+	if fx_sady.size() < FIXTURE_SECOND:
+		t._pending("render.hue: fixture ma jen %d sad - sada %d v ni neni (ocekavano %d)"
+			% [fx_sady.size(), FIXTURE_SKIN, FIXTURE_SETS])
+		return
+
+	var fx = script.new(FIXTURE, 8)
+	t._check(fx.available() and fx.set_count() == fx_sady.size(),
+		"render.hue: fixture se nacte CELA (%d sad z %d v JSONu)"
+		% [fx.set_count(), fx_sady.size()])
+
+	# Sada na indexu `hue - 1` (index je PRIMO hue - 1) a jeji jmeno z JSONu:
+	# kdyby fixture nebyla "SkinHue", test by meril jinou sadu, nez hra pouziva.
+	var fx_skin: int = int(script.get_script_constant_map().get("HUE_SKIN", -1))
+	var fx_jmeno: String = str(fx_sady[FIXTURE_SKIN - 1].get("name", ""))
+	t._check(fx_skin == FIXTURE_SKIN and fx_jmeno.begins_with("SkinHue"),
+		"render.hue: HUE_SKIN = %d a fixture ma na tom indexu sadu '%s'"
+		% [fx_skin, fx_jmeno])
+
+	# D1) FIXTURE SEDI NA ZNAME BARVY: kdyby se fixture poskodila (nebo vymenila za
+	#    jinou), test to MUSI rict - a pozna se to i na barvach nize, ktere se
+	#    pocitaji z techto ZAPSANYCH hodnot, ne z fixture.
+	var fx_rozchody := ""
+	for i in COLORS:
+		var fx_f: int = int(fx_sady[FIXTURE_SKIN - 1]["colors"][i])
+		var fx_s: int = int(fx_sady[FIXTURE_SECOND - 1]["colors"][i])
+		if fx_f != int(SKIN_COLORS[i]):
+			fx_rozchody += " 1002/u%d: %d (test %d)" % [i, fx_f, int(SKIN_COLORS[i])]
+		if fx_s != int(SECOND_COLORS[i]):
+			fx_rozchody += " 1003/u%d: %d (test %d)" % [i, fx_s, int(SECOND_COLORS[i])]
+	t._check(fx_rozchody == "",
+		"render.hue: fixture sedi na ZNAME barvy sad %d a %d (rozchody:%s)"
+		% [FIXTURE_SKIN, FIXTURE_SECOND, fx_rozchody])
+
+	# D2) VSECH 32 urovni OBOU sad proti ZNAME barve a nezavislemu vzoru 5 -> 8
+	#    bitu (odlisi prohozene kanaly i posun `v << 3`).
+	var fx_vadne := ""
+	for i in COLORS:
+		var fx_je: Color = fx.hue_color(FIXTURE_SKIN, i)
+		if not fx_je.is_equal_approx(_oracle(int(SKIN_COLORS[i]))):
+			if fx_vadne.length() < 160:
+				fx_vadne += " 1002/u%d: %s (cek. %s)" % [i, str(fx_je),
+					str(_oracle(int(SKIN_COLORS[i])))]
+		var fx_je2: Color = fx.hue_color(FIXTURE_SECOND, i)
+		if not fx_je2.is_equal_approx(_oracle(int(SECOND_COLORS[i]))):
+			if fx_vadne.length() < 160:
+				fx_vadne += " 1003/u%d: %s (cek. %s)" % [i, str(fx_je2),
+					str(_oracle(int(SECOND_COLORS[i])))]
+	t._check(fx_vadne == "",
+		"render.hue: hue_color() sedi na ZNAME barvy obou sad (2 x %d urovni; vadne:%s)"
+		% [COLORS, fx_vadne])
+
+	# D3) zpetny prevod na CELYCH 32 hodnotach NEZAVISLEHO vzoru. Chyti
+	#    zaokrouhleni `(k8 + 4) / 8`, ktere u urovne 18 vyjde 19 (namEReno).
+	var fx_zpet := ""
+	for i in EXPAND_REF.size():
+		if fx._uroven(int(EXPAND_REF[i])) != i:
+			fx_zpet += " %d(%d)->%d" % [i, int(EXPAND_REF[i]), fx._uroven(int(EXPAND_REF[i]))]
+	t._check(fx_zpet == "",
+		"render.hue: _uroven() je presny na vsech %d hodnotach NEZAVISLEHO vzoru (chyby:%s)"
+		% [EXPAND_REF.size(), fx_zpet])
+
+	# D4) TONOVANI CELE RAMPA: 32 sedych hodnot -> ZNAME barvy sady 1002. Tohle je
+	#    kontrola, ktera odlisi spravnou sadu (`hue - 1`) i spravny index barvy.
+	var fx_rampa := Image.create(COLORS, 1, false, Image.FORMAT_RGBA8)
+	fx_rampa.fill(Color(0, 0, 0, 0))
+	for v in COLORS:
+		fx_rampa.set_pixel(v, 0, Color8(int(EXPAND_REF[v]), int(EXPAND_REF[v]),
+			int(EXPAND_REF[v]), 255))
+	var fx_rampa_tex := ImageTexture.create_from_image(fx_rampa)
+	var fx_ton: Texture2D = fx.hued(fx_rampa_tex, FIXTURE_SKIN)
+	if fx_ton == null:
+		t._pending("render.hue: fixture - hued() vratil null, dal se neda merit")
+		return
+	var fx_rampa_vadne := ""
+	var fx_detail := ""
+	for v in COLORS:
+		var fx_cv: int = int(SKIN_COLORS[v])
+		var fx_cekana: Color = _oracle(fx_cv)
+		var fx_jev: Color = _pixel(fx_ton, v)
+		fx_detail += " %d->%d" % [int(EXPAND_REF[v]), roundi(fx_jev.r * 255.0)]
+		if not fx_jev.is_equal_approx(fx_cekana):
+			fx_rampa_vadne += " #%d(%d): %s (cek. %s)" % [v, int(EXPAND_REF[v]),
+				str(fx_jev), str(fx_cekana)]
+	t._check(fx_rampa_vadne == "",
+		"render.hue: fixture - rampa %d sedych hodnot -> barvy sady %d (vadne:%s)"
+		% [COLORS, FIXTURE_SKIN, fx_rampa_vadne])
+	print("[test]      mereno (fixture rampa -> R):", fx_detail)
+
+	# D5) INDEX JE Z R KANALU, ne ze zeleneho: R = 41 (uroven 5), G = 247
+	#    (uroven 30). U sediveho pixelu jsou R a G stejne a mutace by prosla.
+	var fx_rg := Image.create(1, 1, false, Image.FORMAT_RGBA8)
+	fx_rg.set_pixel(0, 0, Color8(int(EXPAND_REF[5]), 247, 0, 255))
+	var fx_rg_tex := ImageTexture.create_from_image(fx_rg)
+	var fx_rg_ton: Texture2D = fx.hued(fx_rg_tex, FIXTURE_SKIN)
+	var fx_c5: int = int(SKIN_COLORS[5])
+	var fx_vzor_g: Color = _oracle(int(SKIN_COLORS[30]))
+	t._check(not _oracle(fx_c5).is_equal_approx(fx_vzor_g)
+		and _pixel(fx_rg_ton, 0).is_equal_approx(_oracle(fx_c5)),
+		"render.hue: fixture - index barvy je z R (R=%d -> uroven 5 = %s, vyslo %s; uroven 30 by byla %s)"
+		% [int(EXPAND_REF[5]), str(_oracle(fx_c5)), str(_pixel(fx_rg_ton, 0)), str(fx_vzor_g)])
+
+	# D6) PARTIAL_HUE: prebarvi JEN pixely s R == G == B, barevne necha. A plny
+	#    hue prebarvi i barevny pixel (jinak by "partial" byla jedina cesta).
+	var fx_mix := Image.create(3, 1, false, Image.FORMAT_RGBA8)
+	fx_mix.set_pixel(0, 0, Color8(int(EXPAND_REF[12]), int(EXPAND_REF[12]),
+		int(EXPAND_REF[12]), 255))                        # seda (uroven 12)
+	fx_mix.set_pixel(1, 0, Color8(200, 40, 40, 255))     # cervena - NENI seda
+	fx_mix.set_pixel(2, 0, Color8(0, 0, 0, 255))         # cerna (uroven 0)
+	var fx_mix_tex := ImageTexture.create_from_image(fx_mix)
+	var fx_castecne: Texture2D = fx.hued(fx_mix_tex, FIXTURE_SKIN, true)
+	var fx_plne: Texture2D = fx.hued(fx_mix_tex, FIXTURE_SKIN, false)
+	var fx_c12: int = int(SKIN_COLORS[12])
+	var fx_c24: int = int(SKIN_COLORS[24])
+	t._check(_pixel(fx_castecne, 0).is_equal_approx(_oracle(fx_c12))
+		and _pixel(fx_castecne, 1).is_equal_approx(Color8(200, 40, 40, 255))
+		and _pixel(fx_castecne, 2).is_equal_approx(_oracle(int(SKIN_COLORS[0]))),
+		"render.hue: fixture - partial_hue prebarvi JEN sedive (seda %s, barevny %s, cerny %s)"
+		% [str(_pixel(fx_castecne, 0)), str(_pixel(fx_castecne, 1)), str(_pixel(fx_castecne, 2))])
+	t._check(not _pixel(fx_plne, 1).is_equal_approx(Color8(200, 40, 40, 255))
+		and _pixel(fx_plne, 1).is_equal_approx(_oracle(fx_c24)),
+		"render.hue: fixture - plny hue prebarvi i barevny pixel (R=200 -> uroven 24 = %s, vyslo %s)"
+		% [str(_oracle(fx_c24)), str(_pixel(fx_plne, 1))])
+
+	# D7) ALFA je MASKA spritu (128 zustane 128, pruhledny zustane pruhledny).
+	var fx_maska_img := Image.create(3, 1, false, Image.FORMAT_RGBA8)
+	for i in 3:
+		var fx_a: int = [128, 0, 255][i]
+		fx_maska_img.set_pixel(i, 0, Color8(int(EXPAND_REF[8]), int(EXPAND_REF[8]),
+			int(EXPAND_REF[8]), fx_a))
+	var fx_maska_tex := ImageTexture.create_from_image(fx_maska_img)
+	var fx_maska: Texture2D = fx.hued(fx_maska_tex, FIXTURE_SKIN)
+	t._check(is_equal_approx(_pixel(fx_maska, 0).a, 128.0 / 255.0)
+		and is_equal_approx(_pixel(fx_maska, 1).a, 0.0)
+		and is_equal_approx(_pixel(fx_maska, 2).a, 1.0),
+		"render.hue: fixture - alfa se zachova (128 -> %d, 0 -> %d, 255 -> %d)"
+		% [roundi(_pixel(fx_maska, 0).a * 255.0), roundi(_pixel(fx_maska, 1).a * 255.0),
+			roundi(_pixel(fx_maska, 2).a * 255.0)])
+
+	# D8) CHYBEJICI SADA: v fixture sada 1004 NENI -> puvodni textura + `missing`.
+	var fx_pred_missing: int = int(fx.stats()["missing"])
+	var fx_nic: Texture2D = fx.hued(fx_rampa_tex, FIXTURE_SETS + 1)
+	t._check(fx_nic == fx_rampa_tex and int(fx.stats()["missing"]) == fx_pred_missing + 1,
+		"render.hue: fixture - sada %d v ni NENI -> puvodni textura a missing (%d -> %d)"
+		% [FIXTURE_SETS + 1, fx_pred_missing, int(fx.stats()["missing"])])
+
+	# D9) CACHE PODLE OBSAHU: dve RUZNE textury vytvorene ZA BEHU (obě maji
+	#    `resource_path` prazdny) se stejnym hue si nesmi vymenit vysledek.
+	var fx_druha_img := Image.create(3, 1, false, Image.FORMAT_RGBA8)
+	for i in 3:
+		fx_druha_img.set_pixel(i, 0, Color8(int(EXPAND_REF[8]), int(EXPAND_REF[8]),
+			int(EXPAND_REF[8]), 0 if i == 1 else 255))
+	var fx_druha_tex := ImageTexture.create_from_image(fx_druha_img)
+	var fx_druha: Texture2D = fx.hued(fx_druha_tex, FIXTURE_SKIN)
+	t._check(fx_druha != fx_maska and is_equal_approx(_pixel(fx_druha, 1).a, 0.0)
+		and is_equal_approx(_pixel(fx_maska, 0).a, 128.0 / 255.0),
+		"render.hue: fixture - dve textury se stejnym hue maji VLASTNI vysledek (stejna instance %s, alfa 128 -> %d)"
+		% [str(fx_druha == fx_maska), roundi(_pixel(fx_maska, 0).a * 255.0)])
+
+	# D10) STROP CACHE se opravdu vyhazuje (maly strop = meritelny, ne tichy rust).
+	var fx_maly = script.new(FIXTURE, 2)
+	for i in 6:
+		var fx_obrazek := Image.create(1, 1, false, Image.FORMAT_RGBA8)
+		fx_obrazek.set_pixel(0, 0, Color8(int(EXPAND_REF[i + 2]), int(EXPAND_REF[i + 2]),
+			int(EXPAND_REF[i + 2]), 255))
+		fx_maly.hued(ImageTexture.create_from_image(fx_obrazek), FIXTURE_SKIN)
+	var fx_ms: Dictionary = fx_maly.stats()
+	t._check(int(fx_ms["polozek"]) <= 2 and int(fx_ms["bytes"]) > 0,
+		"render.hue: fixture - strop 2 polozky drzi (polozek %d, bytes %d), ne tichy rust"
+		% [int(fx_ms["polozek"]), int(fx_ms["bytes"])])
+
+	# D11) DVE RUZNE SADY daji na teze rampe RUZNE barvy (fixture je ma odlisne -
+	#     kdyby ne, "sada bez posunu" by se na barvach nepoznala).
+	var fx_druha_sada: Texture2D = fx.hued(fx_rampa_tex, FIXTURE_SECOND)
+	var fx_lisi_se: int = 0
+	for i in COLORS:
+		if int(SKIN_COLORS[i]) != int(SECOND_COLORS[i]):
+			fx_lisi_se += 1
+	var fx_rozdil := false
+	for v in COLORS:
+		if not _pixel(fx_ton, v).is_equal_approx(_pixel(fx_druha_sada, v)):
+			fx_rozdil = true
+	t._check(fx_lisi_se > 0 and fx_rozdil,
+		"render.hue: fixture - sada %d a %d maji %d odlisnych urovni a na rampe daji JINE barvy (%s)"
+		% [FIXTURE_SKIN, FIXTURE_SECOND, fx_lisi_se, str(fx_rozdil)])
 
 	# ---------- C) proti skutecnym datum (jen kdyz jsou) ----------
 	if not FileAccess.file_exists(HUES):

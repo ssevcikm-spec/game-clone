@@ -25,9 +25,19 @@ func _pending(text: String) -> void:
 	_check(false, text)
 
 func _init_case(path: String):
-	var script = load(path) if FileAccess.file_exists(path) else null
-	if script == null:
-		_pending("case soubor " + path + " nelze nacist")
+	# POZOR (namEReno 2026-10-07, otevrena vec 21): `load()` na case soubor
+	# s PARSE ERROREM vraci NENULOVY `GDScript`, ktery nejde instanciovat.
+	# `script.new()` pak vyhodi runtime error, `_init_case` se PRERUSI a vrati
+	# `null` - a `_initialize` to pochopil jako "uz o hlaseno" a soubor TISE
+	# preskocil (namEReno: 503 kontrol, 0 selhani; spravne 537). Proto:
+	#   * ptame se `can_instantiate()` PRED `new()`,
+	#   * kazdou cestu, ktera vraci `null`, hlasime (viz i guard v `_initialize`).
+	if not FileAccess.file_exists(path):
+		_pending("case soubor " + path + " neexistuje")
+		return null
+	var script = load(path)
+	if script == null or not (script is GDScript) or not script.can_instantiate():
+		_pending("case soubor " + path + " nelze nacist (parse error?)")
 		return null
 	var test_case = script.new()
 	if test_case == null or not test_case.has_method("run"):
@@ -48,12 +58,24 @@ func _initialize() -> void:
 			files.append(name)
 	files.sort()
 	print("[test] case souboru: ", files.size())
+	var spusteno: int = 0
 	for name in files:
+		var pred_selhani: int = _failed
+		var pred_kontrol: int = _checks
 		var test_case = _init_case(CASES_DIR + "/" + name)
 		if test_case == null:
+			# Ticha cesta je vada harnessu: `_init_case` selhani o hlasit MUSI.
+			if _failed == pred_selhani:
+				_pending("case soubor " + name + " se nenacetl a nikdo to neohlasil")
 			continue
 		print("[test] -- ", name)
 		test_case.run(self)
+		# Case, ktery nepridal ani jednu kontrolu, nic nezmeril - i kdyby jeho
+		# `run()` probehl prazdny (nebo se prerusil na prvnim radku).
+		if _checks == pred_kontrol:
+			_pending("case " + name + " neprobehl: 0 novych kontrol")
+		spusteno += 1
+	print("[test] case souboru spusteno: ", spusteno, " z ", files.size())
 	var status: int = 0
 	if _checks == 0:
 		status = 2

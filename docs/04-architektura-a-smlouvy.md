@@ -455,3 +455,45 @@ _check(sim.player().pos.x > 1495, "hráč se pohnul na východ")
 
 Replay: soubor `tests/replays/*.json` = posloupnost příkazů s ticky; testy
 ověřují `state_hash` po replayi (detekce regrese v mechanikách).
+
+### 4.8.1 Co harness dělá, když se case soubor NENAČTE (DOPLNĚNO 2026-10-07)
+
+**Tiché přeskočení byla vada a je opravená.** `load()` na case soubor s parse
+errorem vrací **nenulový `GDScript`**, který ale nejde instanciovat; `script.new()`
+pak vyhodí runtime error, `_init_case` se **přeruší** a vrátí `null` — a smyčka to
+do 2026-10-07 brala jako „už ohlášeno" a soubor přeskočila. Naměřeno: sada
+hlásila **503 kontrol, 0 selhání** (správně 537) a `exit 0`. Dnes platí:
+
+* `_init_case` se ptá `can_instantiate()` **před** `new()` a každou cestu, která
+  vrátí `null`, **hlásí** (`_pending` → `FAIL`, `exit 1`);
+* `tests/lib.gd:script_at()` vrací `null` i pro skript s parse errorem (jinak by
+  se přerušil `run()` case souboru a zmizel by zbytek kontrol);
+* case soubor, který **nepřidá ani jednu kontrolu**, je `FAIL` (`0 novych kontrol`);
+* souhrn navíc vypisuje `case souboru spusteno: N z M`.
+
+Ověřeno **třemi mutacemi** (parse error v case souboru → `27 z 28`, `504/1`,
+`exit 1`; parse error v měřené granuli → tři case soubory `FAIL`, `453/3`;
+parse error v granuli, kterou case `preloaduje` → `26 z 28`, `480/3`).
+
+### 4.8.2 Fixture: aby testy měřily i v CI (DOPLNĚNO 2026-10-07)
+
+`assets/uo/` je v `.gitignore`, takže v CI data z instalace UO nejsou. Testy
+granul, které data potřebují, proto mají **fixture v gitu** a měří ji **VŽDY**
+(ne jen když data chybí):
+
+| fixture | co pokrývá | doklad |
+|---|---|---|
+| `tests/fixtures/world/` | bloky mapy (`world.map`, `world.walk`) | `make_fixture.py --check` |
+| `tests/fixtures/hues/` | sady barev (`render.hue`) | `mutace-render-hue.py` **12/12** i bez `assets/uo/` |
+| `tests/fixtures/anim/` | framy animace (`render.anim`) | `mutace-render-anim.py` **11/11** i bez `assets/uo/` |
+
+**Pravidlo pro fixture:** očekávané hodnoty musí být v testu **zapsané**
+(literály), ne přečtené z téhož souboru, který se měří — jinak je kontrola
+kruhová a sabotáž fixture projde (naměřeno u obou nových fixture; odhalil to až
+požadavek „vrať do fixture vadu a ukaž, že test spadne").
+
+**Mutační harnessy v CI:** `mutace-tests.py`, `mutace-skills.py`,
+`mutace-render-hue.py`, `mutace-render-anim.py` a `mutace-anim.py` — poslední
+měří bez instalace UO jen `self-test` a **řekne to** (`realna sonda: NEMERENA`;
+jeho sonda na reálných datech má navíc baseline na originále, aby chybějící data
+nevypadala jako „mutace chycena").
