@@ -61,8 +61,8 @@ v `.forge/roadmap.json`.
 | id | soubor | provides |
 |---|---|---|
 | `entity.mobile` | `sim/entity/mobile.gd` | `serial:int`, `body:int`, `hue:int`, `name:String`, `pos:Vector3i`, `dir:int`, `flags:int`, `hp/max_hp:int`, `stam/max_stam:int`, `mana/max_mana:int`, `stats:Stats`, `skills:Skills` (obě **instance**, ne pole), `equip:Dictionary` (layer → serial; dřív tu stálo `equipment:Equipment`), `backpack:int`, `notoriety:int`, `fame:int`, `karma:int`, `hunger:int`, `ai:AiState` (`{state, target, home, timer_ms}`), `alive()->bool` |
-| `entity.item` | `sim/entity/item.gd` | `serial:int`, `tile:int`, `hue:int`, `amount:int`, `parent:int`, `layer:int`, `pos:Vector3i`, `flags:int`, `durability:int/max_durability:int`, `props:Dictionary` |
-| `entity.container` | `sim/entity/container.gd` | `can_add(c:int, item:Item)->Dictionary` (`{ok, reason}`), `add(c:int,item:Item)->bool`, `remove(c:int,item:int,amount:int)->int`, `weight_of(c:int)->int`, `contents(c:int)->Array[int]` |
+| `entity.item` | `sim/entity/item.gd` | `serial:int`, `tile:int` (**art id** 0x4000–0xFFFF, `docs/03` §3.4: „item id = art id"), `hue:int`, `amount:int`, `parent:int` (0 = na zemi, jinak serial kontejneru/mobila), `layer:int` (0 = nenasazený), `pos:Vector3i` (platí **jen** na zemi), `flags:int`, `durability:int`, `max_durability:int`, `quality:int` (0 normal, 1 exceptional), `props:Dictionary`; navíc `is_on_ground()`, `pile_weight(unit_weight)->int` (jednotková váha × `amount`), `same_pile(other)->bool` (stejný `tile` + `hue` = kandidát na sloučení). **DOPLNĚNO 2026-10-07**, viz §4.2.1 |
+| `entity.container` | `sim/entity/container.gd` | `_init(tiledata = null, max_items = 125, max_weight = 400)` — **jedna instance spravuje všechny kontejnery světa** (`c` = serial kontejneru; jinak by nešel držet invariant „právě jeden rodič"); `can_add(c:int, item:Item)->Dictionary` (`{ok, reason}`; reason `no_container`/`no_item`/`no_serial`/`amount`/`stack`/`already_here`/`full`/`weight`), `add(c:int,item:Item)->bool` (**při neúspěchu se stav nemění**; před vložením vyjme předmět z předchozího rodiče), `remove(c:int,item:int,amount:int)->int` (**kolik opravdu odstranil**; `amount <= 0` = celá hromada), `weight_of(c:int)->int` (stones, jen přímý obsah), `contents(c:int)->Array[int]` (seriály, **seřazené**); navíc `has_weights()` (bez `tiledata` se váha **neměří**). **DOPLNĚNO 2026-10-07**, viz §4.2.1 |
 | `entity.equipment` | `sim/entity/equipment.gd` | `equip(m:int, item:int)->Dictionary`, `unequip(m:int, layer:int)->int`, `at_layer(m:int, layer:int)->int`, `total_weight(m:int)->int`, `bonus(m:int, key:String)->int` |
 | `entity.stats` | `sim/entity/stats.gd` | `str_:int`, `dex:int`, `int_:int` (dřív tu stálo `str/dex/int:int`; `int` je klíčové slovo a `str` by přebilo globální funkci `str()`), `hits_max()->int` (= `50 + STR/2`), `stam_max()->int` (= DEX), `mana_max()->int` (= INT), `stat_total()->int`, `at_cap()->bool` |
 | `entity.skills` | `sim/entity/skills.gd` | `value(skill:int)->int` (desetiny), `set_value(skill:int,v:int)->void`, `cap(skill:int)->int`, `total()->int`, `lock(skill:int)->int`, `set_lock(skill:int,l:int)->void` |
@@ -238,6 +238,52 @@ změnil, je tu i **původní znění** — historie se nepřepisuje, jen doplňu
   se tiše přeskočí (otevřená věc 21). Opraveno v tabulce §4.2 i v
   `tools/roadmap-gen.py`; `.forge/roadmap.json` se z generátoru přegeneruje.
 
+- **`entity.item` + `entity.container` jsou HOTOVÉ (DOPLNĚNO 2026-10-07, 9. session).**
+  Kód je `sim/entity/item.gd` a `sim/entity/container.gd`, testy `tests/cases/item.gd`
+  a `tests/cases/container.gd` (cesta k měřenému souboru je **vstup**:
+  `-- --item-script=` / `-- --container-script=`), mutační moduly `item` a
+  `container` v `tools/gates/mutace-tests.py`. Co tabulka výš nepinovala a co je
+  **naměřené** (doklady v HANDOFF.md, „CO JE NOVÉHO (9. session)"):
+  - **`tile` je ART ID** (0x4000–0xFFFF), ne tiledata id. `docs/03` §3.4 to má
+    v tabulce („item id = art id") a v tom prostoru berou `world.tiledata`
+    (flags/weight/height/layer) i `render.textures`. `data/items.json`
+    a `data/recipes.json` mají **tiledata id** — kdo z nich předmět vyrábí,
+    přičítá `+0x4000` (stejná past jako u statiků ve `world.walk`, 6. session).
+  - **Jedna instance `entity.container` = všechny kontejnery světa.** Smlouva bere
+    `c:int` (serial kontejneru) a invariant „právě jeden rodič" jde držet jen
+    tehdy, když `add` vidí i předchozího rodiče. Vzor: ServUO `Server/Item.cs:3971`
+    (`AddItem` volá `RemoveItem` na předchozím rodiči, `:3999-4006`).
+  - **`add` vrací `bool`, `can_add` vrací `{ok, reason}`.** Zadání granule
+    v `.forge/roadmap.json` píše u přijímacího kritéria „přidání nad limit vrátí
+    `{ok:false, reason:'full'}`", ale `provides` má `add(...)->bool` — platí
+    `provides` a tvar `{ok, reason}` je v `can_add` (kritérium je tím splněné
+    obojím: `add` vrátí `false` a `can_add` řekne `full`).
+  - **`remove` vrací, KOLIK opravdu odstranil** (0 = předmět v tom kontejneru
+    není; `amount <= 0` = celá hromada). Smlouva to neříkala.
+  - **Limity:** 125 předmětů (`full`), 400 stones (`weight`), hromada 60 000
+    (`stack`); váha = `tiledata.weight(tile) × amount` (ServUO `Server/Item.cs:3854`
+    `PileWeight = ceil(Weight * Amount)`). Reference `Server/Items/Container.cs:1672-1673`
+    (`m_GlobalMaxItems = 125`, `m_GlobalMaxWeight = 400`) a `CheckHold` `:230-268`.
+  - **Sloučení hromad:** stejný `tile` + `hue` **a** flag `Generic` v tiledata =
+    stackable (ClassicUO `TileDataLoader.cs:281`, `TileFlag.Generic = 0x00000800`;
+    naměřeno nad `assets/uo/tiles.json`: zlato/obvaz/log/ingot/reagencie **ano**,
+    dagger/longsword/backpack **ne**). Slučuje se do `MAX_STACK`; co se nevejde,
+    zůstane předmětu. **Odchylky od ServUO (vědomé):** plná hromada není cíl
+    sloučení (ServUO `WillStack` kapacitu nezkoumá a předmět pak přidá jako nový,
+    čímž může překročit `MaxItems`) a plně sloučený předmět ServUO maže — my
+    objekt volajícího smazat nemůžeme, takže skončí prázdný (`amount == 0`) a bez
+    rodiče (`parent == 0`).
+  - **Váha se bez `tiledata` NEMĚŘÍ** (`has_weights()`); je to závislost
+    konstruktoru (ne preload), protože `sim/entity` nesmí na `sim/world` (§4.1).
+  - **Co se NEMODELUJE (otevřené věci, ne dohady):** ServUO drží váhu jako
+    `double`, u chybějícího údaje (tiledata 0 nebo 255) dosazuje 1
+    (`Server/Item.cs:3806-3809`) a zlato si ji přebíjí na 0.02 stones
+    (`Scripts/Items/Consumables/Gold.cs:34`) — naše data mají u zlata 0
+    a přebíjení nemáme, takže **zlato u nás váží 0** (docs/05 §5.4 chce 0.02).
+    Dále: vnořené kontejnery se do váhy nepočítají (ServUO `TotalWeight` je
+    rekurzivní) a předchozí rodič **mobil** (nasazená výbava) se neuklízí —
+    patří to `entity.equipment`.
+
 ## 4.3 Příkazy klient → simulace
 
 **Jediná cesta, jak měnit stav.** Všechny příkazy mají tvar slovníku
@@ -316,7 +362,7 @@ Vector3i  # pozice: x, y = dlaždice (int), z = světová výška (int)
   # metoda: alive()->bool (v puvodnim tvaru chybela, v kode je)
 }
 
-# Item (sim/entity/item.gd)
+# Item (sim/entity/item.gd) - KÓD JE (2026-10-07); `tile` = ART ID (0x4000-0xFFFF)
 { serial:int, tile:int, hue:int, amount:int,
   parent:int,            # 0 = na zemi, jinak serial kontejneru/mobila
   layer:int,             # 0 = nenasazený
@@ -324,6 +370,11 @@ Vector3i  # pozice: x, y = dlaždice (int), z = světová výška (int)
   flags:int,             # 0x01 blessed, 0x02 newbie, 0x04 locked, 0x08 insured
   durability:int, max_durability:int, quality:int,  # 0 normal, 1 exceptional
   props:Dictionary }     # AoS properties: {"damage_increase":25, ...}
+
+# Kontejner NENÍ pole v Item (2026-10-07): obsah drží `sim/entity/container.gd`
+# podle SERIALU kontejneru (`can_add`/`add`/`remove`/`weight_of`/`contents`)
+# a JEDINÁ instance spravuje všechny kontejnery světa - jinak by nešel držet
+# invariant "právě jeden rodič" (viz §4.2.1). Item sám drží jen `parent` a `pos`.
 
 # Recept (data/recipes.json)
 { id:int, skill:int, min_skill:int, category:[String], name:String,

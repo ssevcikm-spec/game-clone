@@ -247,6 +247,67 @@ MODULY = {
              "		_missing += 1\n", ""),
         ],
     },
+    "item": {
+        "soubor": ROOT / "sim" / "entity" / "item.gd",
+        "prefix": "sim.entity.item",
+        "prepinac": "--item-script",
+        "mutace": [
+            ("predmet na zemi se hlasi jako v kontejneru (parent obracene)",
+             "return parent == 0", "return parent != 0"),
+            ("vaha hromady ignoruje mnozstvi",
+             "return unit_weight * amount", "return unit_weight"),
+            ("mnozstvi se z konstruktoru neprevezme (vzdy 1)",
+             "amount = amount_value", "amount = 1"),
+            ("same_pile ignoruje hue (sloucil by ruzne barvy)",
+             "tile == other.tile and hue == other.hue", "tile == other.tile"),
+            ("same_pile vraci true i pro prazdnou hromadu",
+             "and other.amount > 0", "and true"),
+        ],
+    },
+    "container": {
+        "soubor": ROOT / "sim" / "entity" / "container.gd",
+        "prefix": "sim.entity.container",
+        "prepinac": "--container-script",
+        "mutace": [
+            ("limit predmetu se vubec nekontroluje",
+             "if _obsah.get(c, []).size() >= _max_items:", "if false:"),
+            ("limit predmetu je o jedna vyssi (>= -> >)",
+             "if _obsah.get(c, []).size() >= _max_items:",
+             "if _obsah.get(c, []).size() > _max_items:"),
+            ("vaha se nekontroluje",
+             "if has_weights() and weight_of(c) + _vaha(item) > _max_weight:", "if false:"),
+            ("limit hromady (MAX_STACK) se nekontroluje",
+             "if int(item.amount) > Const.MAX_STACK:", "if false:"),
+            ("predmet muze byt ve DVOU kontejnerech (predchozi se nevyjme)",
+             "if int(item.parent) != 0 and int(item.parent) != c:\n\t\t_vyjmi(int(item.parent), item)",
+             "if false:\n\t\t_vyjmi(int(item.parent), item)"),
+            ("hromady se neslucuji",
+             "var cil = _cil_slouceni(c, item)\n\tif cil != null:", "var cil = null\n\tif cil != null:"),
+            ("slouceni prekroci MAX_STACK",
+             "var prevedeno: int = mini(int(item.amount), Const.MAX_STACK - int(cil.amount))",
+             "var prevedeno: int = int(item.amount)"),
+            ("plna hromada se povazuje za cil slouceni",
+             "if predmet.same_pile(item) and int(predmet.amount) < Const.MAX_STACK:",
+             "if predmet.same_pile(item):"),
+            ("stackable flag se cte obracene",
+             "(int(_tiledata.flags(tile)) & F_STACKABLE) != 0",
+             "(int(_tiledata.flags(tile)) & F_STACKABLE) == 0"),
+            ("vaha hromady ignoruje mnozstvi",
+             "return int(_tiledata.weight(int(predmet.tile))) * int(predmet.amount)",
+             "return int(_tiledata.weight(int(predmet.tile)))"),
+            ("remove vraci 0, i kdyz predmet odstranil",
+             "\treturn brat", "\treturn 0"),
+            ("contents vraci poradi vlozeni (ne serazene)",
+             "\tserialy.sort()", "\tpass"),
+            ("stejny predmet se prida dvakrat (duplikat v obsahu)",
+             "if _najdi(c, int(item.serial)) != null:", "if false:"),
+            ("predmet bez serialu se prijme",
+             "if int(item.serial) <= 0:", "if false:"),
+            ("bez tiledata se vaha hlasi jako namERena",
+             "# Bez tiledata se vaha nemeri - volajici to musi poznat (nula neni uspech).\n	return _tiledata != null",
+             "# Bez tiledata se vaha nemeri - volajici to musi poznat (nula neni uspech).\n	return true"),
+        ],
+    },
     "movement": {
         "soubor": ROOT / "sim" / "systems" / "movement.gd",
         "prefix": "sim.movement",
@@ -299,7 +360,8 @@ def fail_radky(vystup: str, prefix: str) -> list[str]:
 def main() -> int:
     ap = argparse.ArgumentParser(description="Mutacni dukaz testu")
     ap.add_argument("--only", default=None,
-                    help="sort, map, walk, doors, movement, registry, pathfind, textures (nebo vic carkami)")
+                    help="sort, map, walk, doors, movement, registry, pathfind, textures, "
+                         "item, container (nebo vic carkami)")
     args = ap.parse_args()
     if godot_bin() is None:
         print("CHYBA: Godot nenalezen (nastav $GODOT) - mutace by nic nemerily")

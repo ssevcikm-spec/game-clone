@@ -24,6 +24,87 @@ Typy: `chyba` (moje vada) · `past-nástroje` (prostředí/nástroj, ne logika) 
 
 ---
 
+### 2026-10-07 — Sandbox (Low integrita) vyrobil 9 falešných selhání: 583/9 vs 584/0 (past-nástroje)
+**Co se stalo:** první běh sady v této session dal `583 kontrol, 9 selhání` a nebyla to
+vada kódu: 8× `render.textures` (test si vyrábí vlastní atlas v `.cache/test-textures/`)
+a 1× `sim.world_loop: save() vraci true`. Příčina je sandbox: `whoami /groups` →
+`Mandatory Label\Low`, zápis do `.cache` skončí `Access denied` (`.cache` má navíc
+deny ACE pro `Everyone`). Po přepnutí politiky na plný přístup dal **týž příkaz**
+`584 kontrol, 0 selhání` a `check-docs-refs`/`check-zadani`/`roadmap-gen --check`
+`exit 0`.
+**Doklad:** `.tmp/baseline-tests.txt` (583/9, Low) vs `.tmp/baseline-full.txt`
+(584/0, Medium). Past 31 v HANDOFF měla jen „G3/G7/G11 hlásí VADA" — teď má
+i konkrétní čísla sady.
+**Ponaučení:** integritu změř **před** prvním během (`whoami /groups | Select-String
+Mandatory`) a zapiš **obě** čísla; „9 selhání" bez toho vypadá jako regrese a svádí
+k opravě kódu, který je správný.
+
+### 2026-10-07 — `[exit code: 1]` u zelené sady byl exit kód roury, ne Godotu (past-nástroje)
+**Co se stalo:** sada vypsala `640 kontrol, 0 selhání`, ale příkaz hlásil
+`[exit code: 1]`. Když jsem týž běh ukončil `Write-Output "LASTEXITCODE=$LASTEXITCODE"`,
+vyšlo `0` — exit kód tedy nesl poslední článek roury (`Select-String`/`Tee-Object`),
+ne Godot.
+**Doklad:** `.tmp/tests-po-zmene.txt` (640/0) + `LASTEXITCODE=0` z téhož běhu bez filtrů.
+**Ponaučení:** u měřicího běhu čti exit kód **hned za nativním příkazem**
+(`$LASTEXITCODE`), ne z roury s filtry; jinak se zelená sada zapíše jako červená
+a naopak se skutečná chyba schová za „to je jen filtr".
+
+### 2026-10-07 — Invariant přes dva kontejnery nejde držet po instancích (chyba)
+**Co se stalo:** `entity.container` má `add(c, item)` s `c` = serial kontejneru
+a invariant „právě jeden rodič" (před vložením se předmět vyjme z předchozího
+rodiče). Test jsem napsal se **dvěma instancemi** (jedna na kontejner) a invariant
+neprošel: `add` na druhé instanci o předchozím kontejneru nevěděla, takže předmět
+zůstal v obou (`c1 [50]`). Správně je **jedna instance = všechny kontejnery světa**;
+test to teď měří jedním objektem a smlouva (`docs/04 §4.2` + `§4.2.1`) to říká.
+**Doklad:** `tests/cases/container.gd` sekce H (`sklad.contents(101)` je po přesunu
+prázdné), mutace `container/predmet muze byt ve DVOU kontejnerech` (chycena).
+**Ponaučení:** když invariant **přesahuje** hranici toho, co API bere jako parametr
+(`c`), patří správa všech takových objektů do **jedné** instance — jinak se
+invariant nedá vynutit. A patří to do smlouvy: kdo si udělá instanci na objekt,
+dostane duplikáty.
+
+### 2026-10-07 — `tile` předmětu je ART ID; stub to schoval, reálná data ne (vada-zadani)
+**Co se stalo:** první verze testu brala `GOLD = 0x0EED` (tiledata id). Se stubem
+tiledaty prošla, ale sekce nad **reálnými daty** spadla
+(`longsword 3x7 stones = 21 (vyslo 0)`): `world.tiledata.flags/weight` bere **art
+id** (`tile >= 0x4000`) a u `0x0EED` vrátí řádek tabulky **LAND** (nuly). Správně
+je `0x4EED` (zlato), `0x4F52` (dyka), `0x4F61` (meč). `docs/03` §3.4 to má
+(„**item id = art id**"), ale `docs/04 §4.5` id prostor u `tile` neuváděl —
+doplněno (datum 2026-10-07).
+**Doklad:** `assets/uo/tiles.json`: `0x4EED` = gold coin (Generic ano, váha 0),
+`0x4F61` = longsword (váha 7), `0x4F52` = dagger (Generic ne); `tests/cases/container.gd`
+sekce K (3 kontroly nad reálnými daty).
+**Ponaučení:** stub v testu musí používat **stejný id prostor jako reálný zdroj**
+— a sada má mít vždycky i malou sekci nad **reálnými daty**, která stub usvědčí.
+Byla to jediná kontrola, která tuhle vadu odhalila.
+
+### 2026-10-07 — Kritérium a `provides` si odporovaly; rozhodl `provides` (vada-zadani)
+**Co se stalo:** zadání granule `entity.container` v `.forge/roadmap.json` žádá
+u přijímacího kritéria „přidání nad limit vrátí `{ok:false, reason:'full'}`", ale
+`provides` téhož zadání má `add(c,item)->bool`. Splnitelné je obojí: `add` vrací
+`bool` (a při neúspěchu se stav nemění) a **důvod nese `can_add`** (`{ok, reason}`),
+což kritérium měří na obou místech.
+**Doklad:** `tests/cases/container.gd` sekce D a F (`can_add(...).reason == "full"`
+**a** `add(...) == false`); mutace `limit predmetu se vubec nekontroluje`,
+`vaha se nekontroluje`, `limit hromady (MAX_STACK) se nekontroluje`.
+**Ponaučení:** když se próza kritéria a `provides` rozcházejí, **rozhoduje
+`provides`** (je to rozhraní) — ale kritérium musí zůstat **splnitelné a měřené**,
+ne „vyložené". Rozpor patří do „Vad ZADÁNÍ" v předání.
+
+### 2026-10-07 — Mutace pro dvojici granul: modul na soubor a pattern z KÓDU (postup)
+**Co se stalo:** `entity.item` a `entity.container` jsou dva soubory, takže
+`mutace-tests.py` dostal **dva moduly** (`item` 5 mutací, `container` 15) a oba
+case soubory berou měřenou cestu z argumentů (`-- --item-script=`,
+`-- --container-script=`; kontrakt vstupu ověřen neexistující cestou). Jedna mutace
+se **neprovedla** (`PATRANA VETA SE VE ZDROJI NENASLA`): pattern jsem opsal
+z komentáře v hlavičce, ale kód má `int(_tiledata.flags(tile))`.
+**Doklad:** `.tmp/mutace-item-container.txt` (19/20; jediná „nechycená" byla
+neprovedená) a `.tmp/mutace-container-2.txt` po opravě patternu (15/15).
+**Ponaučení:** pattern mutace **kopíruj z kódu, ne z komentáře**, a „neprovedená
+mutace" se musí dočíst z výstupu — vypadá totiž stejně jako slepý test. Fail-řádky
+nesou **celé id granule** (`sim.entity.item`), proto ho musí mít v názvu každá
+kontrola i zpráva o NEMĚŘENO, jinak ji harness modulu nepřiřadí.
+
 ### 2026-10-07 — Přijímací kritérium mělo vadu: „otevřeno = sudý art" (vada-zadani)
 **Co se stalo:** cíl 8. session zapsaný v předání žádal `is_open(tile)` = „**sudý**
 člen dvojice". To platí jen pro blok `1717..1732`, ze kterého kritérium vzniklo —
