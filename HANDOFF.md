@@ -357,11 +357,13 @@ opravená** (6. session: statiky se čtou správnou tabulkou, dveře rozhoduje
 `world.doors`, schody svou výškou). **Hra jede 40–45 FPS** (bylo 1–2 FPS) — viz
 sekce VÝKON.
 
-**⚠ CI: BĚH NAD COMMITEM 6. SESSION JE ZELENÝ — `#30` nad `f243ba2` = `success`,
-13/13 kroků** (ověřeno živě `node _analyza/ci-beh-stav.mjs`; krok 9 = mutační
-důkaz testů, tedy **53 mutací se vešlo do `timeout-minutes: 30`** — to je
-naměřená odpověď na část otevřené věci 53). Předtím: **#23 nad `e6ff22e` =
-`success`, #24 nad `88b4747` = `success`**, #29 nad `702dac2` = `success`.
+**⚠ CI: BĚH NAD COMMITEM 7. SESSION JE ZELENÝ — `#34` nad `4259091` = `success`,
+17 kroků** (ověřeno živě přes API s tokenem z Credential Manageru; `ci-beh-stav.mjs`
+bez tokenu je limitovaný, viz past v `LESSONS`). **Nové kroky 11–14 prošly:**
+`Mutační důkaz render.hue`, `Mutační důkaz render.anim`, `Mutační důkaz dekodéru
+animací` a `Fixture sedí na generátor`. Předtím: **#30 nad `f243ba2` = `success`
+(13 kroků; krok 9 = 53 mutací se vešlo do `timeout-minutes: 30`)**, #31 nad
+`062f419`, #29 nad `702dac2`, #23 nad `e6ff22e`, #24 nad `88b4747` — vše `success`.
 **Pozor na hranici toho tvrzení:** logy ani artefakty nejdou bez tokenu stáhnout
 (`ci-log.mjs` → 403, `ci-artefakt.mjs` → 401), takže **obsah kroků v CI ověřený
 není** — mutace jsou naměřené **lokálně** (92/92) a v CI je ověřeno jen to, že
@@ -523,7 +525,7 @@ a barva kůže.** Statiky nesou barvu ze záznamu mapy, ale **nikdo ji nepouží
 |---|---|---|
 | Strom je čistý | `git status --porcelain -uall` | **prázdné** po commitu této session |
 | Je před GitHubem | `git rev-list --count origin/main..HEAD` | **`0`** — **6. session pushla** (uživatel 2026-10-07 povolil commit i push po každé session) |
-| **Běží CI?** | `node _analyza/ci-beh-stav.mjs` (funguje i bez tokenu) · anotace: `node _analyza/ci-anotace.mjs` | **#30 nad `f243ba2` (6. session) = `success`, 13/13 kroků**; předtím #29 nad `702dac2`, #23 nad `e6ff22e`, #24 nad `88b4747` — všechny `success`. **Pozor:** bez tokenu je API limitovaný (HTTP 403) a `ci-beh-stav.mjs` hlavičku neposílá; s tokenem z Windows Credential Manageru funguje (postup v `LESSONS`) — a **sha rozhoduje**, ne „poslední běh" |
+| **Běží CI?** | `node _analyza/ci-beh-stav.mjs` (bez tokenu je limitovaný — viz past v `LESSONS`) · anotace: `node _analyza/ci-anotace.mjs` | **#34 nad `4259091` (7. session) = `success`, 17 kroků** (včetně nových 11–14: mutace render.hue, render.anim, dekodéru animací a kontrola fixture); předtím #30 nad `f243ba2` = `success` (13 kroků). **sha rozhoduje**, ne „poslední běh" |
 | **Co v CI NEJDE ověřit bez tokenu** | `node _analyza/ci-log.mjs` → **HTTP 403**; `ci-artefakt.mjs` → **HTTP 401** | Kdo nemá token, **vidí jen stav kroků**, ne jejich obsah — takže „krok 9 prošel" je naměřené, ale **počet chycených mutací v CI je neověřený** (naměřeno je 53/53 **lokálně**). Nezapisuj do předání „CI má 53/53", když to nevidíš |
 | Repo je veřejné | API bez tokenu | `visibility: public` |
 | **Oprávnění** | `whoami /groups \| Select-String Mandatory` | **`Medium`** = plný přístup. `Low` = sandbox → brány hlásí **falešné vady**, `.uid` nevzniknou a `run-all.py` spadne na `summary.json` (5. session to naměřila: G7 „VADA save/load", G11 NEMĚŘENO, self-test 9 chyb — **všechno byl sandbox**) |
