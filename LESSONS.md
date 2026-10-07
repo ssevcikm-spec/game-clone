@@ -2084,6 +2084,25 @@ podezření je **vlastní nástroj**, ne měřený kód.
     `flags 0x4E55…, texture 21333, jméno "ED"`. Mapa id 0 nepoužívá (0 dlaždic)
     → **důsledek nulový**, ale je to zapsané (V5), aby to někdo nehledal znovu.
 
+11. **⚠ Nový test za `return` je MRTVÝ KÓD — a lokálně se tváří zeleně.**
+    Novou sekci (okno `AtlasTexture`) jsem přidal na **konec** `run()`
+    v `tests/cases/render_hue.gd`. Lokálně (s `assets/uo`) prošla a **chytila
+    obě mutace** — ale sekce C končí `return`, když `assets/uo/hues.json` není,
+    takže **v CI se ta sekce nikdy nespustila**. Projevilo se to až **selháním
+    CI běhu #48 na kroku 11** („Mutační důkaz render.hue"), zatímco lokálně bylo
+    „14/14 chyceno". Reprodukováno přenesením `assets/uo` mimo workspace:
+    baseline 886 kontrol, mutace **PROSLA - TEST JE SLEPÝ**. Po přesunu sekce
+    **před** `return` (do fixture části) je v CI chycena (3 a 2 selhání).
+    **Pravidlo:** nová kontrola patří do části, která běží **i v CI** (bez
+    `assets/uo`), a **push se ověřuje na CI, ne jen lokálně** — „lokálně zelené"
+    a „v CI zelené" jsou dvě různé věty. Je to táž rodina jako „mrtvá větev je
+    slepé místo" z trvalých pravidel.
+
+12. **`--only` v `mutace-render-hue.py` je PŘESNÁ shoda, ne seznam.** Zápis
+    `--only a,b` tiše nevybere **nic** a harness vypíše „0/0 mutaci chyceno,
+    0 chyb" — tedy zeleně, přestože nezměřil nic. Kdo čte jen poslední řádek,
+    myslí si, že prošlo 13 mutací. (`mutace-tests.py` seznam podporuje.)
+
 ## Vytvořené nástroje (12. session)
 
 | Nástroj | K čemu | Ověření |
