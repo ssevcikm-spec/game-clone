@@ -147,7 +147,6 @@ var _faze: int = 3                   # 0 sber artu, 1 sloty, 2 geometrie, 3 hoto
 var _potreba: Dictionary = {}        # klic -> [vyska, sirka, tex] (faze 0)
 var _poc: Dictionary = {"svahu": 0, "der": 0, "nodraw": 0, "ceka": 0, "bez_slotu": 0}
 var _q: int = 0                      # kolik kvadru je hotovych
-var _t0: int = 0                     # zacatek stavby (pro `stavba_ms`)
 var _prace_us: int = 0               # kolik us skutecne zabrala stavba (pres framy)
 var _kroku: int = 0                  # kolik `krok` volani stavba potrebovala
 var _faze1_us: int = 0               # kolik z toho zabralo predehleni slotu (nerezene)
@@ -365,7 +364,6 @@ func zacni(objects: Array) -> void:
 	_q = 0
 	_diry = []
 	_rezervuj(objects.size())
-	_t0 = Time.get_ticks_usec()
 
 
 func _rezervuj(n: int) -> void:
@@ -726,11 +724,6 @@ func draw_before(view) -> void:
 func draw_after(view) -> void:
 	if _mesh_po != null:
 		view.draw_mesh(_mesh_po, _viewport.get_texture())
-
-
-func ma_predchozi() -> bool:
-	# Je k dispozici PREDCHOZI davka (kresli se, dokud se stranka prekresluje)?
-	return _predchozi
 
 
 func draw_before_predchozi(view) -> void:
