@@ -828,14 +828,14 @@ zbývající záseky jsou **jedna přestavba dávky 53,8 ms každé 4 kroky** (m
 
 **⚠ CI NAD COMMITTY TÉTO SESSION (15.) JE ZELENÝ — `#57` nad `0275c0e`
 (kód + testy + smlouvy + HANDOFF/LESSONS) = `success`**, job **5:00 min**
-(23:41:40 → 23:46:41 UTC, 17 kroků + post kroky). Ověřeno **s PAT** živě přes
-`node _analyza/ci-beh-stav.mjs` (bez tokenu je API limitované). Běh nad mezicommitem
-`9ac2e0a` se nekontroloval (byl to checkpoint před optimalizací); rozhoduje `sha`,
-a to je `0275c0e` = `HEAD` = `origin/main` (ahead 0).
-**⚠ Co ověřené NENÍ:** obsah kroků (čísla z logu) — v tomto běhu se log
-nevyžádal; ověřený je **návratový kód všech kroků** včetně kroku 9 (plný mutační
-důkaz) a kroku 15 (stav plánu). Kdo chce čísla, ať spustí
-`node _analyza/ci-hledej.mjs 57` s PAT (viz „Předletová kontrola“).
+(23:41:40 → 23:46:41 UTC, 17 kroků + post kroky), a **`#58` nad `e7f8e0b`**
+(commit, který zapisuje `#57` do HANDOFFu) = `success`, job **5:19 min**
+(06:01:49 → 06:07:08 UTC). Ověřeno **s PAT** živě přes
+`node _analyza/ci-beh-stav.mjs` (bez tokenu je API limitované).
+**⚠ Konec řetězu:** tenhle zápis je zase nový (jen dokumentační) commit, takže
+**běh nad ním zkontrolovaný není** — jinak by každý záznam plodil další. Rozhoduje
+`sha`: kód je v `0275c0e` (zelený), dokumentace v `e7f8e0b` (zelený); kdo chce
+ověřit i tenhle commit, ať se podívá na `sha` v `ci-beh-stav.mjs`.
 
 **⚠ CI NAD COMMITTY 14. SESSION JE ZELENÝ — `#52` nad `5a42887`
 (kód + testy + smlouvy + HANDOFF/LESSONS) = `success`**, **17 kroků (+ 3 post
