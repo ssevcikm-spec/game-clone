@@ -632,7 +632,7 @@
       "size_lines": "<= 150",
       "model": "strong",
       "milestone": "M1",
-      "prompt": "Rozhodni zdroj (anim*.mul vs AnimationFrame*.uop) podle pokrytí těl (docs/03 §3.5.1, O3) a zapiš rozhodnutí. Extrahuj jen těla, která obsah potřebuje."
+      "prompt": "Rozhodni zdroj (anim*.mul vs AnimationFrame*.uop) podle pokrytí těl (docs/03 §3.5.1, O3) a zapiš rozhodnutí. Extrahuj jen těla, která obsah potřebuje. POZOR (naměřeno 2026-10-08): export dnes umí jen akce `0:walk, 1:run, 4:idle` a jen těla 400/401 — pro souboj je potřeba přidat akci ÚTOKU a SMRTI (`--actions`) a těla monster (kostlivec = tělo 50/56, `_src/servuo/Scripts/Mobiles/Normal/Skeleton.cs:14`); číslo akce útoku/smrti se musí ZMĚŘIT, ne domyslet."
     },
     {
       "id": "assets.worldmap",
@@ -959,7 +959,7 @@
       "size_lines": "<= 60",
       "model": "any",
       "milestone": "M1",
-      "prompt": "Jméno po kliku/najetí, barva podle notoriety (docs/04 §4.4)."
+      "prompt": "Jméno po kliku/najetí, barva podle notoriety (docs/04 §4.4). Pro souboj (docs/05 §5.5.2) musí umět i **HP pruh cíle** — `sim.combat` posílá `stats_changed`, klient ho jen zobrazuje."
     },
     {
       "id": "render.light",
@@ -1936,7 +1936,7 @@
         "data.items"
       ],
       "provides": [
-        "~120 zbraní: skill, hands, damage, speed, str_req, weight, layer, special"
+        "134 zbraní: skill, hands, damage, speed, str_req, weight, layer, special"
       ],
       "consumes": [],
       "acceptance": [
@@ -1946,7 +1946,7 @@
       "size_lines": "<= 60",
       "model": "any",
       "milestone": "M5",
-      "prompt": "Z research/03 (weapons3.json). Vrstva z tiledata, dokud není, `layer: null` + `layer_source: pending-tiledata` (past P19)."
+      "prompt": "Z research/_src/weapons3.json (134 záznamů, naměřeno 2026-10-08; docs/06 §6.4). Vrstva z tiledata, dokud není, `layer: null` + `layer_source: pending-tiledata` (past P19)."
     },
     {
       "id": "data.armor",
@@ -1959,7 +1959,7 @@
         "data.items"
       ],
       "provides": [
-        "~90 kusů: slot, AR/resisty, str_req, weight, trvanlivost, materiál"
+        "165 záznamů: slot, AR/resisty, str_req, weight, trvanlivost, materiál"
       ],
       "consumes": [],
       "acceptance": [
@@ -1969,7 +1969,7 @@
       "size_lines": "<= 60",
       "model": "any",
       "milestone": "M5",
-      "prompt": "Z research/03 (armor_raw.json), stejné pravidlo pro vrstvy."
+      "prompt": "Z research/_src/armor_raw.json (165 záznamů, naměřeno; docs/06 §6.4 chce >= 30 nasaditelných), stejné pravidlo pro vrstvy jako u zbraní."
     },
     {
       "id": "data.item_properties",
@@ -1992,7 +1992,7 @@
       "size_lines": "<= 60",
       "model": "any",
       "milestone": "M5",
-      "prompt": "Z research/03 (itemprops_table.tsv). Slouží loot generátoru (docs/06 §6.4)."
+      "prompt": "Z research/_src/itemprops_table.tsv (159 řádků bez hlavičky, naměřeno; `research/03` §5.3 má 158 — chybí `ExtendedWeaponAttribute.Bane`). Slouží loot generátoru (docs/06 §6.4)."
     },
     {
       "id": "data.monsters",
@@ -2005,7 +2005,7 @@
         "data.gen_content"
       ],
       "provides": [
-        "88 monster: staty, skilly, damage, resisty, fame/karma, loot, AI, flagy"
+        "monstra z research/06 §3 (naměřeno 84 řádků / 81 unikátních jmen): staty, skilly, damage, resisty, fame/karma, loot_pack, AI, flagy"
       ],
       "consumes": [],
       "acceptance": [
@@ -2015,7 +2015,7 @@
       "size_lines": "<= 60",
       "model": "any",
       "milestone": "M5",
-      "prompt": "Z research/06 §3 (docs/06 §6.5). Minimálně 45 použitých musí mít loot a AI typ."
+      "prompt": "Z research/06 §3 (docs/06 §6.5). POZOR: `loot_pack` je PER MONSTRUM (`AddLoot(LootPack.X)`), NIKDY odvozený z fame — fame vybírá loot jen paragonům (`_src/servuo/Scripts/Mobiles/Normal/BaseCreature.cs:5386-5408`); zdroj packu pro první vlnu je `GenerateLoot()` v `_src/servuo/Scripts/Mobiles/**`."
     },
     {
       "id": "sim.combat",
@@ -2036,7 +2036,8 @@
         "attack(m, target)",
         "swing_delay_ms(m)",
         "resolve_swing(m, t)",
-        "stop_combat(m)"
+        "stop_combat(m)",
+        "state_of(m)"
       ],
       "consumes": [],
       "acceptance": [
@@ -2046,7 +2047,7 @@
       "size_lines": "<= 150",
       "model": "strong",
       "milestone": "M5",
-      "prompt": "AoS vzorce podle docs/05 §5.5 (swing 40000/swiftness, hit chance s HCI/DCI, resisty, Tactics je damage skill). Test: 20 swingů dá >=5 zásahů a cíl ztratí hp."
+      "prompt": "AoS vzorce podle docs/05 §5.5, NAMĚŘENÉ v `_src/servuo/Scripts/Items/Equipment/Weapons/BaseWeapon.cs:1598-1615`: `v = (Stam + 100) * Speed`, `delay = floor(40000 / v) * 0,5 s`, dolní mez 1,25 s; obrana `Sigma(dmg * podil * (100 - resist)) / 10000`, minimum 1 (`_src/servuo/Scripts/Misc/AOS.cs:170-177`); strop 35 je JEN direct damage (`AOS.cs:213`). Tactics je DAMAGE skill, ne přesnost. Přijímací číslo: `swing_delay_ms` při stam 100 / speed 30 = 3000 ms. Test: 20 švihů na cíl s hp > 0 dá >= 5 zásahů."
     },
     {
       "id": "sim.poison",
@@ -2070,7 +2071,7 @@
       "size_lines": "<= 60",
       "model": "any",
       "milestone": "M5",
-      "prompt": "5 úrovní podle research/03 (docs/05 §5.14). Test: jed 3. úrovně ubere hp do 10 s."
+      "prompt": "5 úrovní podle AoS tabulky `_src/servuo/Scripts/Misc/Poison.cs:23-27` (intervaly 2,25 / 3,25 / 4,25 / 5,25 / 5,25 s) a docs/05 §5.14. Damage na tik = `1 + int(Hits * Scalar)` s clampem [min, max] (`:222-227`). Test: jed 3. úrovně ubere hp do 10 s."
     },
     {
       "id": "sim.ai",
@@ -2082,11 +2083,14 @@
       "depends_on": [
         "sim.movement",
         "sim.combat",
+        "sim.pathfind",
         "world.regions"
       ],
       "provides": [
         "tick(m)",
-        "set_state(m, state)"
+        "set_state(m, state)",
+        "think(m)",
+        "state_of(m)"
       ],
       "consumes": [],
       "acceptance": [
@@ -2096,7 +2100,7 @@
       "size_lines": "<= 150",
       "model": "strong",
       "milestone": "M5",
-      "prompt": "Stavy idle/wander/aggro/attack/flee/dead + vendor/guard (docs/05 §5.12). Test: NPC v idle se do 10 s pohne (wander)."
+      "prompt": "Stavy z docs/05 §5.12 (`idle/wander/aggro/attack/flee/dead`) NAMAPUJ na referenční `Wander, Combat, Guard, Flee, Backoff, Interact` (`_src/servuo/Scripts/Mobiles/AI/BaseAI.cs:45-53`) — vlastní jména smíš mít, ale mapování musí být v kódu popsané. Interval myšlení je `CurrentSpeed` v SEKUNDÁCH (0,2 s v boji / 0,4 s v klidu, `BaseAI.cs:3046-3053`), NE v ms. Flee: práh 20 % HP + šance `max(10, 10 + c.Hits - m.Hits)` (`Scripts/Mobiles/AI/MeleeAI.cs:98-101`). Návrat domů: `RangeHome = 10`, po 5 selháních teleport (`Scripts/Mobiles/Normal/BaseCreature.cs:262`, `:7446-7463`). Test: NPC v idle se do 10 s pohne (wander) a po 60 s bez cíle je zpět na `home`."
     },
     {
       "id": "sim.loot",
@@ -2121,7 +2125,7 @@
       "size_lines": "<= 60",
       "model": "any",
       "milestone": "M5",
-      "prompt": "pre-AoS LootPack + magic chance (docs/05 §5.16, research/06 §3). Test: monstrum se zlatem nechá v těle zlato."
+      "prompt": "pre-AoS `LootPack.Old*` (`_src/servuo/Scripts/Misc/LootPack.cs:421-492`): zlato jako kostky (`OldPoor` = `1d25`), `chance` v tabulce je PROCENTO x100 (`:831`) a `maxProps` je u všech `Old*` = 1 (`:429-491`). Pack bere Z MONSTRA (`loot_pack` v data/monsters.json), ne z fame. Test: monstrum s `loot_pack: poor` nechá v těle zlato 1-25 a nikdy `rich` loot (docs/05 §5.16)."
     },
     {
       "id": "sim.death",
@@ -2132,7 +2136,8 @@
       ],
       "depends_on": [
         "entity.container",
-        "entity.notoriety"
+        "entity.notoriety",
+        "sim.decay"
       ],
       "provides": [
         "die(m)",
@@ -2147,7 +2152,7 @@
       "size_lines": "<= 60",
       "model": "any",
       "milestone": "M5",
-      "prompt": "Corpse + ghost + hp=10 po vzkříšení (docs/05 §5.13). Test: po die je is_ghost true a inventář v těle."
+      "prompt": "NAMĚŘENO v `_src/servuo`: tělo se rozpadne za 7 min (`Scripts/Items/Corpses/Corpse.cs:421-422`), právo na loot 2 min (`:118`), vzkříšení dá `Hits = 10`, `Stam = StamMax`, `Mana = 0` (`Server/Mobile.cs:3646-3678`), duch je `Body = Race.GhostBody(this)` (`:4241`), monstra ducha nevidí (`:9223-9233`) a duch nemůže útočit (`:11851-11871`); NEHRÁČ se po smrti maže (`:4229-4232`) — stav `dead` tedy znamená „mobil odstraněn, tělo zůstává“ (docs/05 §5.13). Test: po die je `is_ghost(m) == true` a inventář v těle."
     },
     {
       "id": "data.spells",
@@ -2234,7 +2239,7 @@
         "data.gen_content"
       ],
       "provides": [
-        "25 vendorů: zboží, ceny, restock, profese"
+        "vendory: zboží, ceny, restock, profese"
       ],
       "consumes": [],
       "acceptance": [
@@ -2244,7 +2249,7 @@
       "size_lines": "<= 60",
       "model": "any",
       "milestone": "M7",
-      "prompt": "Z research/06 §4 (docs/06 §6.6). Ceny: buy = 1.90 × sell (docs/05 §5.9)."
+      "prompt": "Z research/06 **§2.2 + §5** (docs/06 §6.6) — POZOR, dřív tu stálo „§4“, což je oddíl o spawnu; v §2.2 je naměřeno 54 klasických shop vendorů (roadmapa dřív uváděla 25). Ceny: buy = 1.90 × sell (docs/05 §5.9)."
     },
     {
       "id": "data.spawns",
@@ -2257,7 +2262,7 @@
         "data.monsters"
       ],
       "provides": [
-        "12 tabulek prostředí + 3 dungeony + města"
+        "tabulky spawnu podle prostředí (research/06 §4.8 má naměřeno 10 tabulek A-J) + dungeony"
       ],
       "consumes": [],
       "acceptance": [
@@ -2266,8 +2271,8 @@
       ],
       "size_lines": "<= 60",
       "model": "any",
-      "milestone": "M7",
-      "prompt": "Z research/06 §5 (docs/06 §6.7) — regionální tabulky, prodlevy 5-10 min, refill 1/3."
+      "milestone": "M5",
+      "prompt": "Z research/06 **§4** (model spawnu; docs/06 §6.7) — POZOR, dřív tu stálo „§5“, což je oddíl o obchodu. Prodlevy 5-10 min a refill 1/3 jsou NAMĚŘENÉ: `_src/servuo/Scripts/Services/Spawner/Spawner.cs:41` (`this(1, 5, 10, 0, 4, …)`) a `Scripts/Regions/Spawning/SpawnEntry.cs:536` (`max((max - spawned) / 3, 1)`). První vlna stačí 1 tabulka (hřbitov u Britainu) + 3 monstra, zbytek je M7."
     },
     {
       "id": "data.regions",
@@ -2282,7 +2287,7 @@
         "data.gen_content"
       ],
       "provides": [
-        "19 měst s hranicemi, 9 moongate, 3 dungeony"
+        "19 měst s hranicemi, 9 moongate, dungeony"
       ],
       "consumes": [],
       "acceptance": [
@@ -2292,7 +2297,7 @@
       "size_lines": "<= 60",
       "model": "any",
       "milestone": "M2",
-      "prompt": "Z research/06 §1 (docs/06 §6.7) — přesné souřadnice."
+      "prompt": "Z research/06 §1 (docs/06 §6.7) — přesné souřadnice. NAMĚŘENO 2026-10-08: §1.4 má 19 měst a §1.6 9 moongate (obojí sedí), ale §1.7 má 15 dungeonů, zatímco obsah mají podle docs/06 §6.7 jen 3 (Deceit, Despise, Shame) — zbytek je jen geometrie, neslibuj obsah."
     },
     {
       "id": "data.professions",
@@ -2383,7 +2388,9 @@
       "provides": [
         "register(point)",
         "tick()",
-        "alive_at(point_id)"
+        "alive_at(point_id)",
+        "state()",
+        "restore(d)"
       ],
       "consumes": [],
       "acceptance": [
@@ -2392,8 +2399,8 @@
       ],
       "size_lines": "<= 60",
       "model": "any",
-      "milestone": "M7",
-      "prompt": "Jeden world tick místo tisíců spawnerů (docs/05 §5.12). Test: po zabití monstra se do 10 min obnoví."
+      "milestone": "M5",
+      "prompt": "Jeden world tick místo tisíců spawnerů (docs/05 §5.12); `state()`/`restore()` plní klíč `spawn_state` v save (docs/04 §4.7). Prodleva a doplnění deficitu jsou naměřené (viz `data.spawns`). Test: po zabití monstra se do 10 min obnoví a po uložení/načtení zůstane stejný stav spawnu."
     },
     {
       "id": "app.char_create",
@@ -2581,6 +2588,32 @@
       "model": "any",
       "milestone": "M2",
       "prompt": "Kamera se posouvá po dlaždicích (žádný plynulý lerp, docs/05 §5.1.4) a musí respektovat `z` hráče (`iso.to_screen` odečítá `z * Z_SCALE`). Vazby kláves patří do `ui.hotkeys`; než vznikne, drží je tenhle soubor a je to vidět v hlavičce."
+    },
+    {
+      "id": "app.pick",
+      "title": "Výběr objektu pod kurzorem",
+      "kind": "code",
+      "owns": [
+        "app/pick.gd"
+      ],
+      "depends_on": [
+        "app.input",
+        "sim.entity_registry",
+        "core.iso",
+        "render.sort"
+      ],
+      "provides": [
+        "at(screen, view, registry) -> {kind, serial, tile, z}"
+      ],
+      "consumes": [],
+      "acceptance": [
+        "tests",
+        "wiring"
+      ],
+      "size_lines": "<= 60",
+      "model": "any",
+      "milestone": "M2",
+      "prompt": "Hit test v pořadí kreslení ODZADU (mobil před statikem, když má vyšší klíč) — vzor: ClassicUO si nechává objekt s nejvyšší hloubkou, `_src/classicuo/src/ClassicUO.Client/Game/Scenes/GameSceneDrawingSorting.cs:601-610` (BSD-2, jen fakt). Vrací `{kind:'mobile'|'item'|'land', serial, tile, z}`; když nic, `kind='land'` a `serial=0` (NIKDY tichý prázdný slovník). Řazení bere z `render.sort.sort_key` — vlastní porovnání `x + y` je vada. Je to ČISTÁ funkce (bod na obrazovce + seznam + registr), takže se dá měřit bez okna. Konzument: `app/loop.gd` mění dvojklik na `Command{t:'attack'|'use'}`."
     },
     {
       "id": "sim.entity_registry",

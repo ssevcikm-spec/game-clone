@@ -54,7 +54,7 @@ v `.forge/roadmap.json`.
 | `world.stairs` | `sim/world/stairs.gd` | `is_stair(tile:int)->bool`, `stair_group(tile:int)->Dictionary` | data z `stairs.txt` |
 | `world.regions` | `sim/world/regions.gd` | `region_at(x:int,y:int)->Dictionary` (`{name, is_town, is_guard_zone, music, spawn_table}`) | data z `data/regions.json` |
 | `world.time` | `sim/world/time.gd` | `hour()->int`, `minute()->int`, `is_night()->bool`, `light_level()->int`, **`bind(clock)->void`, `tick(ms)->void`** (DOPLNĚNO 2026-10-06: bez nich modul nikdo nenaplní časem — `world_time_ms` dřív plnily jen testy, takže `hour()` vracelo ve hře vždy 0; viz `tests/cases/time_clock.gd`) | `SecondsPerUOMinute = 5.0` → **den = 7200 s** (ověřeno v ServUO/ModernUO; viz §10 past P12) |
-| `world.spawn` | `sim/world/spawn.gd` | `register(point:Dictionary)->void`, `tick()->void`, `alive_at(point_id:int)->int` | spawnery z `data/spawns.json` |
+| `world.spawn` | `sim/world/spawn.gd` | `register(point:Dictionary)->void`, `tick()->void`, `alive_at(point_id:int)->int`, **`state()->Dictionary`**, **`restore(d:Dictionary)->void`** (DOPLNĚNO 2026-10-08: `state()` plní klíč `spawn_state` v save — `sim/sim_world.gd:140` ho má od začátku prázdný) | spawnery z `data/spawns.json`; **od 2026-10-08 je granule v M5**, ne v M7 (rozhodnutí D1 v plánu `PLAN-NPC-A-SOUBOJ-2026-10-08.md` v kořeni repa) — bez spawnu nejde splnit „zabije kostlivce". Prodleva 5–10 min a doplnění deficitu `max((max − spawned)/3, 1)` jsou naměřené (`_src/servuo/Scripts/Services/Spawner/Spawner.cs:41`, `Scripts/Regions/Spawning/SpawnEntry.cs:536`) |
 
 ### sim/entity
 
@@ -75,16 +75,16 @@ v `.forge/roadmap.json`.
 |---|---|---|---|
 | `sim.movement` | `sim/systems/movement.gd` | **odkud bere mobily (2026-10-06): z granule `sim.entity_registry`** — `register(mobile)->void` a `mobile(serial)` jsou jen průchod do registru; registr jde předat **konstruktorem** jako pátý argument (`_init(walk, clock, events, drain_model, registry)`), bez něj si systém založí vlastní. Dále `player_serial:int` (rozhoduje o asymetrické diagonále); `request_step(m:int, dir:int, run:bool)->Dictionary` (`{ok, delay_ms, reason}`), `apply_step(m:int, dir:int)->void` (**od 2026-10-07 zapisuje i `pos.z`** — stojnou výšku z `can_step`), `pending_step(serial:int)->Dictionary` (`{dir, run, start_ms, delay_ms, due_ms, z}`; prázdný = žádný krok v letu; vstup klienta pro vadu V2), `consume_stamina(m:int, steps:int)->void`, `pending_count()->int`, `delay_ms_for(run:bool)->int` | `request_step(m, 0, false).delay_ms == 400` **pro mobil v registru** (jinak `{ok:false, reason:"no_mobile"}`); po `apply_step` se `pos.x += 1`; viz §4.2.1 |
 | `sim.interaction` | `sim/systems/interaction.gd` | **KÓD JE (DOPLNĚNO 2026-10-07, 10. session)** `use(m:int, serial:int)->Dictionary`, `use_on(m:int, serial:int, target:Dictionary)->Dictionary`, `context_menu(m:int, serial:int)->Array[Dictionary]`, `context_action(m:int, serial:int, entry:int)->Dictionary` — každý vrací `{ok, reason, action}` (**původní znění `->void` je zapsané v §4.2.1 i s důvodem, proč se změnilo**) | `use(m, anvil)` nic neudělá; `use_on(m, ore, {"serial": forge})` spustí tavení |
-| `sim.combat` | `sim/systems/combat.gd` | `set_war(m:int, on:bool)->void`, `attack(m:int, target:int)->void`, `swing_delay_ms(m:int)->int`, `resolve_swing(m:int, t:int)->Dictionary`, `stop_combat(m:int)->void` | `swing_delay_ms` na `dex=100, speed=30` vrátí hodnotu dle vzorce z §5.5 |
+| `sim.combat` | `sim/systems/combat.gd` | `set_war(m:int, on:bool)->void`, `attack(m:int, target:int)->void`, `swing_delay_ms(m:int)->int`, `resolve_swing(m:int, t:int)->Dictionary`, `stop_combat(m:int)->void`, **`state_of(m:int)->Dictionary`** (DOPLNĚNO 2026-10-08: `{war, target, next_swing_ms}` — klient z něj kreslí `combat_state` a test má co číst) | **Přijímací číslo (naměřeno 2026-10-08):** `swing_delay_ms` při **stam 100 a speed 30 = 3000 ms** — AoS `v = (Stam+100) × Speed`, `delay = floor(40000/v) × 0,5 s`, dolní mez 1,25 s (`_src/servuo/Scripts/Items/Equipment/Weapons/BaseWeapon.cs:1598-1615`); `resolve_swing` vrací `{ok, hit, damage, absorbed, hp_left, killed, reason}` |
 | `sim.magic` | `sim/systems/magic.gd` | `cast(m:int, spell:int)->Dictionary` (`{ok, delay_ms, reagents, reason}`), `interrupt(m:int)->void`, `add_spell(m:int, spell:int)->bool`, `scribe(m:int, scroll:int)->bool` | `cast` bez reagent → `{ok:false, reason:"reagents"}` |
 | `sim.skill_gain` | `sim/systems/skill_gain.gd` | `check(m:int, skill:int, difficulty:int)->Dictionary` (`{success, gained, new_value}`), `gain_stat(m:int, stat:int)->void` — **KÓD JE (DOPLNĚNO 2026-10-07, 11. session):** návrat je `{success, gained, new_value, reason}` s `reason` = `no_mobile`/`locked`/`too_difficult`/`cap`/`no_challenge`; `difficulty` je **`minSkill` v desetinách** a `maxSkill = difficulty + 500` (50,0 — naměřeno: 183 z 196 Blacksmithy receptů); `_init(registry, rng, clock, events)` bere **registr a RNG ze `SimWorld`** (vlastní RNG by rozbil determinismus); **růst je nezávislý na úspěchu** (naměřeno: 100 pokusů, 89 neúspěchů, skill 0 → 100). **DOPLNĚNO 2026-10-08 (16. session):** `check(m, skill, difficulty, span := SKILL_SPAN)` má **nepovinný `span`** v desetinách — sběr a výroba mají okna 800/1000/1200 (ruda 25..105, ryba 0..120) a pevných 500 by je netrefilo; staré volání se chová beze změny. `era.skill_gain: "pre-aos"` v `data/balance.json` znamená, že **neúspěch přispívá 0,2** do šance na růst (AoS `0,0`) | opakované `check` s `difficulty` 0 při `value=0` dá za 100 pokusů > 0 |
 | `sim.harvest` | `sim/systems/harvest.gd` | `mine(m:int, x:int, y:int)->Dictionary`, `chop(m:int, x:int, y:int)->Dictionary`, `fish(m:int, x:int, y:int)->Dictionary`, `resource_left(x:int,y:int)->int` — **KÓD JE (DOPLNĚNO 2026-10-08, 16. session):** návrat je `{ok, reason, kind, tile, art, amount, hue, serial, item, resource, left, skill, gained, success, busy_ms}`; `reason` = `no_mobile`/`off_map`/`too_far`/`busy`/`not_ore`/`not_tree`/`not_water`/`empty`/`skill`/`no_pack` (bez `reason` by „nic se nestalo" a „není hotové" vypadalo stejně). **`_init(map, tiledata, registry, rng, clock, events, skill_gain, container, serials, items)`** — závislosti konstruktorem. Banky: ruda 8×8 (10–34, respawn 10–20 min), dřevo 4×3 (20–45, 20–30 min), rybolov 8×8 (5–15, 10–20 min); žíla je **deterministická podle bucketu** (pre-ML větev reference); `resource_left(x,y)` je banka **rudy**, ostatní druhy vydává `resource_left_kind(kind, x, y)` (na téže dlaždici jsou až 4 banky) | `mine` s pickaxe na hoře vrátí `{ok:true, item:ore, amount:1..}`; špatná dlaždice → `{ok:false, reason:"not_ore"}` |
 | `sim.craft` | `sim/systems/craft.gd` | `recipes_for(m:int, skill:int)->Array[Dictionary]`, `craft(m:int, recipe_id:int, count:int)->Dictionary`, `smelt(m:int, ore:int, forge:int)->Dictionary`, `repair(m:int, tool:int, target:int)->Dictionary` — **KÓD JE (DOPLNĚNO 2026-10-08, 16. session):** `_init(container, items, map, tiledata, skill_gain, serials, rng, clock, events, registry)`; **kovadlina/vyheň** se hledá do 2 dlaždic jako **statik v mapě** (role z `data/items.json`, protože `world.tiledata` `role` nemá) **i jako PŘEDMĚT** ze světa v `items` (server má kovadlinu jako předmět; naměřeno: v okně 600 dlaždic kolem Britainu **žádný statik s rolí `anvil`/`forge` není**); `recipes_for` vrací i **nedostupné** recepty (`available: false` = v gumpu zešedlý) a `craftable: false` pro recept bez `tile` výsledku; `craft` má **dva nezávislé hody** (1. = exceptionalita, 2. = úspěch, `CraftItem.cs:1352-1359`), `reason` = `no_mobile`/`no_recipe`/`no_system`/`no_result`/`anvil`/`forge`/`materials`/`skill`/`failed`/`pack_full`; `smelt` umí i **zpětné tavení** (`props["ingot_cost"]`, `floor(0,66×)`); `repair` bere nástroj podle role z `data/items.json` | `craft` bez materiálu → `{ok:false, reason:"materials"}`; bez kovadliny → `reason:"anvil"` |
-| `sim.ai` | `sim/systems/ai.gd` | `tick(m:int)->void`, `set_state(m:int, state:String)->void` | NPC bez cíle se pohne alespoň 1× za 10 s (wander) |
+| `sim.ai` | `sim/systems/ai.gd` | `tick(m:int)->void`, `set_state(m:int, state:String)->void`, **`think(m:int)->void`**, **`state_of(m:int)->String`**; `depends_on` navíc **`sim.pathfind`** (DOPLNĚNO 2026-10-08) | NPC bez cíle se pohne alespoň 1× za 10 s (wander) a po 60 s bez cíle je zpět na `home`. ⚠ **Jména stavů z §5.12 jsou NAŠE, ne referenční:** `idle/wander/aggro/attack/flee/dead` se mapuje na `Wander, Combat, Guard, Flee, Backoff, Interact` (`_src/servuo/Scripts/Mobiles/AI/BaseAI.cs:45-53`; stav `dead` v referenci není — nehráč se po smrti **maže**, `Server/Mobile.cs:4229-4232`, takže `dead` = mobil odstraněn a tělo zůstává). **Interval myšlení je v SEKUNDÁCH** (0,2 s v boji / 0,4 s v klidu, `BaseAI.cs:3046-3053`) |
 | `sim.vendor` | `sim/systems/vendor.gd` | `stock(v:int)->Array[Dictionary]`, `buy_price(v:int, item:int, amount:int)->int`, `sell_price(v:int, item:int, amount:int)->int`, `buy(m:int,v:int,lines:Array)->Dictionary`, `sell(m:int,v:int,lines:Array)->Dictionary`, `restock()->void` | `sell_price` odpovídá `value` z tiledata × koeficient; `buy_price == ceil(1.9 × sell_price)` |
-| `sim.loot` | `sim/systems/loot.gd` | `fill_corpse(mob:int, corpse:int)->void`, `roll_magic_item(level:int)->Dictionary` | z monstra s `loot.gold_min>0` vznikne v těle zlato |
-| `sim.death` | `sim/systems/death.gd` | `die(m:int)->Dictionary`, `resurrect(m:int, hp:int)->void`, `is_ghost(m:int)->bool` | po `die` je `is_ghost(m) == true`, `hp == 0`, vznikne tělo s obsahem |
-| `sim.poison` | `sim/systems/poison.gd` | `apply(m:int, level:int)->void`, `cure(m:int, level:int)->bool`, `tick()->void` | jed 3. úrovně ubere hp během 10 s |
+| `sim.loot` | `sim/systems/loot.gd` | `fill_corpse(mob:int, corpse:int)->void`, `roll_magic_item(level:int)->Dictionary` | z monstra s nenulovým `loot_pack` vznikne v těle zlato. **DOPLNĚNO 2026-10-08 (naměřeno):** `loot_pack` je **per monstrum** (`data/monsters.json`, `AddLoot(LootPack.X)`) — **NIKDY z fame** (fame vybírá loot jen paragonům, `_src/servuo/Scripts/Mobiles/Normal/BaseCreature.cs:5386-5408`); `OldPoor` = `1d25` zlata, `chance` v tabulce je procento ×100, `maxProps` u všech `Old*` = 1 (`Scripts/Misc/LootPack.cs:421-422`, `:831`, `:429-491`) |
+| `sim.death` | `sim/systems/death.gd` | `die(m:int)->Dictionary`, `resurrect(m:int, hp:int)->void`, `is_ghost(m:int)->bool`; `depends_on` navíc **`sim.decay`** (DOPLNĚNO 2026-10-08) | po `die` je `is_ghost(m) == true`, `hp == 0`, vznikne tělo s obsahem. **Naměřeno 2026-10-08:** tělo se rozpadne za **7 min** a právo na loot je **2 min** (`_src/servuo/Scripts/Items/Corpses/Corpse.cs:421-422`, `:118`); vzkříšení dá `Hits = 10`, `Stam = StamMax`, `Mana = 0` (`Server/Mobile.cs:3646-3678`); duch je `Race.GhostBody(this)` (`:4241`) a monstra ho nevidí (`:9223-9233`) |
+| `sim.poison` | `sim/systems/poison.gd` | `apply(m:int, level:int)->void`, `cure(m:int, level:int)->bool`, `tick()->void` | jed 3. úrovně ubere hp během 10 s. **Úrovně se berou z AoS tabulky** (naměřeno 2026-10-08): intervaly 2,25 / 3,25 / 4,25 / 5,25 / 5,25 s, damage na tik `1 + int(Hits × Scalar)` s clampem `[min,max]` (`_src/servuo/Scripts/Misc/Poison.cs:23-27`, `:222-227`) |
 | `sim.regen` | `sim/systems/regen.gd` | `tick()->void` (hp/stam/mana podle statů a hladu) | `mana` roste u postavy s INT > 0 |
 | `sim.hunger` | `sim/systems/hunger.gd` | `eat(m:int, item:int)->bool`, `level(m:int)->int` | jídlo sníží hlad, hlad −1 za 5 min |
 
@@ -127,7 +127,7 @@ v `.forge/roadmap.json`.
 | `render.chunk` | `render/chunk_renderer.gd` | sestavení kreslicího seznamu pro viditelné bloky, cache; **land nese navíc `texmap` (TexID) a `z_corners` `[horní, pravý, levý, dolní]`** = výšky rohů ze sousedů (2026-10-07, pro svahy); **statik nese navíc `priority_z`** = `z − 1` za `IsBackground` (flag `0x1`) `+ 1` za `Height != 0` (bez tiledata = `z`) — proto se plocha mostu kreslí před jeho zábradlím (2026-10-07, vada V6) |
 | `render.chunk_mesh` | `render/chunk_mesh.gd` | **M9, 2026-10-08:** celý viditelný seznam jako **jeden mesh** (1–2 draw cally místo 1324). **18. session (R6): stavba je ČASOVĚ DĚLENÁ** — `zacni(objects)` + opakované `krok(ms_limit)` (fáze 0 sběr artů / 1 sloty / 2 geometrie / 3 hotovo), `stavi_se()`, `stav()` (0 hotovo, 1 staví se nebo `hold` → kresli předchozí, 2 nelze → původní cesta), `je_geometrie_hotova()`, `treba_split()`, `klic_kvadru(i)`, `build(objects)` = atomicky (`zacni` + `krok(1e9)`) pro testy, **`split_for_player(klic)`** (dělení podle CELÉHO klíče — `z` může přebít 2,5 diagonály), `draw_before/draw_after`, `draw_before_predchozi/draw_after_predchozi` + `stats_predchozi()` (během `hold` se kreslí PŘEDCHOZÍ dávka — na starou stránku sedí přesně), `missing_art_ids()`, `stats()` (navíc `ceka`, `kroku`, `faze1_ms`, `stavba_ms` = jen skutečná práce, ne stěna přes framy), `hold()`/`tick_hold()`, `invalidate()` (nechává předchozí dávku); statické `slope_polygon`/`slope_uv(sirka,vyska)`/**`je_svah`** + `SVAH_BARVA`; runtime atlas 2048² skládaný **na GPU** (`SubViewport`), `pretek()` hlásí, že se nevešel. **18. session:** `slope_uv` mapuje ROHY textury (`(0,0),(1,0),(1,1),(0,1)` + půlpixelový inset); vynechané objekty (`ceka`) nejsou díry |
 | `render.anim` | `render/anim_player.gd` | `play(serial:int, action:int, dir:int, now_ms:int = -1)->Dictionary` → `{ok, texture, frame, count, anchor, mirror, mirror_x, sprite_dir}` (chybějící sprite = `ok:false` + `texture:null`); **číslo těla se bere z registru** — `body_of(serial)->int` (`-1`, když serial v registru není; bez registru je `serial` sám tělem, starší chování), registr jde předat konstruktorem `_init(manifest_path, registry)`; framy těl a worn artu podle `animdata`, časování 80 ms; zrcadlení 8 → 5 směrů a `mirror_x` viz §4.2.1 |
-| `render.names` | `render/name_plates.gd` | jména a HP pruhy nad mobily (jen na dosah/po kliku) |
+| `render.names` | `render/name_plates.gd` | jména a HP pruhy nad mobily (jen na dosah/po kliku). **DOPLNĚNO 2026-10-08:** pro souboj musí umět **HP pruh cíle** (docs/05 §5.5.2 „jméno cíle a jeho HP pruh po kliku"); data bere z událostí (`stats_changed`), sám nic nepočítá |
 | `render.light` | `render/light_layer.gd` | úroveň světla z `world.time`, světelné zdroje (louče, okna) |
 | `render.effects` | `render/effects.gd` | kouř, oheň, zásah, smrt, animace kouzel |
 
@@ -138,6 +138,7 @@ v `.forge/roadmap.json`.
 | `app.main` | `app/main.gd` | scéna, kostra, načtení dat, spuštění smyčky. **18. session:** skládá i **černý pás pro GUI** (`GUI_PAS_VPRAVO = 320`, `GUI_PAS_DOLE = 120`, `CanvasLayer` s `layer = 1` pod HUD `layer = 2`) — starý způsob UO, na přání uživatele („aby mi journal nezakrýval výhled“); stavový pruh jde do dolního pásu, žurnál do pravého (`journal.velikost`), a kameru posune `view.gui_odsazeni = (160, 60)`, aby hráč stál ve středu **viditelného** světa |
 | `app.loop` | `app/loop.gd` | pumpuje `sim.tick(50)`, překládá vstup na `Command`, předává události UI; **čas vstupu je čas simulace** (`poll(..., sim.world_time())`, 2026-10-07) — prodleva kroku je pravidlo sim, ne nástěnných hodin (`REVIZE-POHYB` §2.1) |
 | `app.input` | `app/input_map.gd` | mapování kláves a myši na `Command` (jediné místo s `Input`); `poll(player, camera_offset, z=0, mouse_position=Vector2.ZERO, now_ms=-1)` — **držení kroky opakuje** (prodleva `step_delay_ms` = 400/200 ms), `walk_to` = držené pravé tlačítko: **směr je z pozice kurzoru vůči hráči na obrazovce** (`direction_from_screen(center, mouse)`, prahy `|dy| ≤ 0,4|dx|` a `|dy| ≥ 2,5|dx|` z ClassicUO `GameCursor.cs:670-754`; kurzor na hráči = `-1` a **prodleva se neSpotřebuje**), `run` podle `mouse_run()` = 190 px od středu okna; `player_screen_position(player, camera_offset, z)` je opačný převod k `click_at`; `now_ms` a `view_size` jsou vstupy kvůli měřitelnosti (2026-10-07). **⚠ 18. session:** `always_run` je **výchozí `true`** (UO má běh jako výchozí pohyb, `PlayerMobile.cs:530`, `:532`; do 18. session byl `false` a nikdo ho nezapnul, takže klávesy chodily vždy 400 ms — vada „chybí běh jako rychlost pohybu“) a akce **`run_toggle`** (Shift, v `player_controller.TOGGLE_KEYS`) ho přepíná; přepnutí se **hlásí** do konzole |
+| `app.pick` **(NOVÁ 2026-10-08)** | `app/pick.gd` | `at(screen:Vector2, view, registry)->{kind:"mobile"|"item"|"land", serial:int, tile:Vector2i, z:int}` — **jediné místo, kde se z pozice kurzoru stane serial** (hit test v pořadí kreslení odzadu; vzor: ClassicUO si nechává objekt s nejvyšší hloubkou, `_src/classicuo/src/ClassicUO.Client/Game/Scenes/GameSceneDrawingSorting.cs:601-610`). Je to **čistá funkce** (měřitelná bez okna) a `kind:"land"`/`serial:0` znamená „nic tam není", nikdy tichý prázdný slovník | Konzument: `app/loop.gd` mění dvojklik na `Command{t:"attack"}` / `{t:"use"}`. **Důvod vzniku (naměřeno):** `app/input_map.object_command(serial)` existuje, ale v produkci ho nikdo nevolá a `poll()` vydává jen krok na dlaždici (`app/loop.gd:39`) — bez tohohle souboru se na monstrum nedá zaútočit |
 | `app.menu` | `app/menu.gd` | hlavní menu, výběr postavy, uložit/načíst |
 | `app.char_create` | `app/char_create.gd` | tvorba postavy: profese, staty, skilly, jméno, barvy |
 | `app.config` | `app/config.gd` | **M9, 2026-10-08:** typovaná konfigurace nad `data/balance.json` — `SCHEMA` (klíč + typ + default + rozsah/`values`), `value(key, default)`, `known_keys()`, `check()->Array chyb`, `all()` (surová data pro `SimWorld`), `values()`, `source(key)`, `stats()`. **Pozor: metoda se jmenuje `value`, ne `get`** (viz §4.2.1) |
@@ -534,7 +535,14 @@ Vector3i  # pozice: x, y = dlaždice (int), z = světová výška (int)
                                             #   `equipment:Equipment` a §4.5 `equip:Dictionary`)
   backpack:int,                             # serial batohu
   notoriety:int, fame:int, karma:int, hunger:int,
-  ai:{ state:String, target:int, home:Vector3i, timer_ms:int },
+  ai:{ state:String, target:int, home:Vector3i, timer_ms:int,
+       next_think_ms:int, path:Array[Vector3i], path_i:int },   # DOPLNENO 2026-10-08 (plan NPC a souboj):
+                                            #   mysleni AI ma svuj casovac a cestu; bez toho by stav
+                                            #   "kam jdu" nebyl v save ani ve state_hash
+  combat:{ war:bool, target:int, next_swing_ms:int, last_hit_ms:int },  # DOPLNENO 2026-10-08:
+                                            #   stav souboje je NA MOBILU (ne v systemu), aby ho
+                                            #   videl save/state_hash i klient; `sim.combat.state_of(m)`
+                                            #   je jen pruchod do nej
   # metoda: alive()->bool (v puvodnim tvaru chybela, v kode je)
 }
 
@@ -632,6 +640,12 @@ swing: resolve_swing(m, t) → hit chance (zbraňový skill vs zbraňový skill)
 **Přijímací kritérium:** se zbraní a `tactics=100` dá 20 swingů na cíl s `hp`
 > 0 alespoň 5 zásahů (nenulový damage) a cíl ztratí hp; **bez zbraně**
 (wrestling) funguje útok dál.
+**DOPLNĚNO 2026-10-08 (naměřeno v `_src/servuo`):** `swing_delay_ms` při
+**stam 100 a speed 30 = 3000 ms** (`v = (Stam+100) × Speed`, `delay =
+floor(40000/v) × 0,5 s`, dolní mez 1,25 s — `BaseWeapon.cs:1598-1615`);
+`resolve_swing` vrací `{ok, hit, damage, absorbed, hp_left, killed, reason}`;
+obrana je `Σ(damage × podíl × (100 − resist)) / 10000` s minimem 1 (`AOS.cs:170-177`)
+a **strop 35 platí jen pro direct damage** (`AOS.cs:213`), ne obecně.
 
 ### 4.6.5 Obchod
 
@@ -656,6 +670,31 @@ sim.death.resurrect → hp = 10 (ověřeno), equip se vrátí podle blessed/insu
 ```
 **Přijímací kritérium:** po `die` je `is_ghost(m) == true` a v těle je
 inventář; po `resurrect` je `hp == 10` a hráč není duch.
+
+### 4.6.7 Nasazení NPC: spawn → aggro → útok → smrt → obnova
+
+*(DOPLNĚNO 2026-10-08 z plánu `PLAN-NPC-A-SOUBOJ-2026-10-08.md` v kořeni repa; čísla jsou naměřená v `_src/servuo`.)*
+
+```
+world tick → world.spawn.tick()
+   → deficit proti tabulce: max((max − spawned)/3, 1), prodleva 5–10 min
+   → nový mobil: serial ze sim.next_serial(), tělo/staty/skilly z data/monsters.json,
+     home = bod spawnu, registrace v sim.entity_registry (JEDINÉ místo serial → mobil)
+   → event mobile_added{serial, body, hue, name, x, y, z, notoriety}
+sim tick → sim.ai.tick(m)   # myšlení 0,2 s v boji / 0,4 s v klidu (v SEKUNDÁCH)
+   → aggro jen když IsHostile/IsEnemy a CanSee/InLOS (notoriety do agga nevstupuje)
+   → krok: sim.movement.request_step(m, dir, run=false); AI se ptá pending_step,
+     aby neztrácela kroky na "busy"; cestu hledá sim.pathfind (ne vlastní pravidla)
+   → sim.combat.resolve_swing → hp cíle + eventy message / mobile_anim / stats_changed
+hp <= 0 → sim.death.die(m) → tělo (corpse) s lootem ze sim.loot.fill_corpse,
+   event death + mobile_removed; NEHRÁČ se maže (jako reference), tělo zůstává 7 min
+   → sim.decay tělo po 7 min odstraní; spawn po prodlevě doplní nové monstrum
+```
+
+**Přijímací kritérium:** monstrum z `data/spawns.json` se objeví, do 10 s se
+pohne (wander), při přiblížení hráče zaútočí (a hráč na něj dvojklikem), po
+zabití je v jeho těle loot a do 10 minut herního času se obnoví; po
+`save → load` je stav mobilů i spawnu stejný (`state_hash`).
 
 ## 4.7 Uložení, načtení, determinismus
 

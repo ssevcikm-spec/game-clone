@@ -52,7 +52,7 @@ kontrola (snímek + projití scénáře).
 | **M2** | **Pohyb a interakce** | hráč chodí (400/200 ms), **najde cestu (click-to-move)**, otevírá dveře, projde teleportem, používá předměty kurzorem; postava je vidět **v pořadí kreslení** (mezi statiky) | G3, G4, G9 |
 | **M3** | **Předměty a manipulace** | zvedne, položí, nasadí, dá do batohu a truhly; váha a stacky sedí; equippované věci jsou vidět na postavě | G3, G7, G10 |
 | **M4** | **Skilly, sběr, výroba** | vytěží rudu, vytaví ingot, vyková dagger; skill roste; gump výroby funguje | G3, G5, G9 |
-| **M5** | **Souboj a smrt** | zabije kostlivce, dostane loot, umře, stane se duchem, nechá se vzkřísit | G3, G8, G9 |
+| **M5** | **Souboj a smrt** | zabije kostlivce, dostane loot, umře, stane se duchem, nechá se vzkřísit; **monstrum se ve světě objeví samo** (spawn — rozhodnutí D1 v plánu `PLAN-NPC-A-SOUBOJ-2026-10-08.md` v kořeni repa, §3: `data.spawns` a `world.spawn` se **přesunuly z M7 do M5**, protože bez nich milník nejde splnit) | G3, G8, G9 |
 | **M6** | **Magie** | sesílá kouzla 1.–8. kruhu s many a reagenty; spellbook a svitky | G3, G5 |
 | **M7** | **Ekonomika a svět** | koupí a prodá u vendora, uloží zlato do banky, potká spawny ve 3 dungeonech, **funguje den/noc a světlo (`render.light`)** | G3, G5, G9, G12 |
 | **M8** | **Trvanlivost a uzavření** | uložení/načtení, determinismus, replaye, výkon, makra, credits, vydání (**zvuk a hudba je od 2026-10-07 VLASTNÍ TRAŤ** — viz poznámka pod tabulkou) | G7, G8, G9, G12, G13 |
@@ -84,11 +84,14 @@ vlastní milník `A`, musí rozšířit `MILNIKY_PORADI` v `tools/roadmap-gen.py
 | **W9** | `world.spawn`, `app.char_create`, `ui.options`, `ui.hotkeys`, `ui.macros`, `render.effects`, `audio.playback` |
 | **W10** | `sim.entity_registry`, `sim.pathfind` (po `world.walk`), `app.scene`, `app.player_view`, `app.player_controller` (integrace scény) |
 | **W11** | `app.config`, `app.metrics`, `render.chunk_mesh` (M9 — až po M8) |
+| **W12** | `sim.ai`, `data.spawns`, `render.names`, `app.pick` (NPC a souboj — přidáno 2026-10-08 z plánu; `world.spawn` se pouští **až po** `sim.ai`) |
 
 **Granule bez vlny (a proč):** `boot.*` (bootstrap — zakládá je člověk),
 `assets.*` (extrakce dat — sekvenční, jedna po druhé, viz W1) a `app.*` integrační
 uzly, které se dotýkají scény. Naměřeno 2026-10-06 (`python tools/plan-status.py`):
-vlny pokrývají **62 z 111** granul; zbytek jsou právě tyhle tři druhy.
+vlny pokrývaly **62 z 111** granul (číslo **ve svém čase správné**); po vložení
+vlny W12 a granul z plánu naměřeno 2026-10-08: **73 z 112**. Zbytek jsou právě
+tyhle tři druhy.
 **Pravidlo: granule, která není ani ve vlně, ani v tomhle seznamu, se nesmí vydat** —
 nejdřív se zařadí (jinak se nedá poznat, co může běžet paralelně).
 
@@ -108,9 +111,10 @@ tick mezi sebou).
 ## 7.5 Odhad rozsahu
 
 **Pozor: tabulka níž je ODHAD ze vzniku plánu (2026-10-02) a je zastaralá.**
-Skutečné počty granul hlásí generátor — naměřeno 2026-10-06 po revizi plánu:
+Skutečné počty granul hlásí generátor — naměřeno 2026-10-06 po revizi plánu
+(číslo **ve svém čase správné**; dnešní stav je v druhé tabulce):
 
-| Milník | Granulí (měřeno) |
+| Milník | Granulí (měřeno 2026-10-06) |
 |---|---|
 | M0 | 17 |
 | M1 | 23 |
@@ -123,6 +127,11 @@ Skutečné počty granul hlásí generátor — naměřeno 2026-10-06 po revizi 
 | M8 | 4 |
 | M9 | 3 |
 | **celkem** | **111** |
+
+**Naměřeno 2026-10-08** po vložení granul z plánu NPC a souboje
+(`python tools/roadmap-gen.py`): M2 **34**, M5 **11**, M7 **7**, M8 **3**,
+ostatní beze změny, **celkem 112** (přibyla `app.pick`; `data.spawns`
+a `world.spawn` se přesunuly z M7 do M5).
 
 *(M2 je velký, protože do něj patří integrace scény a cesta hráče; M3–M8 jsou
 zatím jen deklarované — jejich obsah vzniká, až na ně dojde. Původní odhad
