@@ -18,6 +18,11 @@ var input_map = null
 var journal = null              # `ui.journal` (16. session): zpravy dostava VSTUPEM
 var camera_offset: Vector2 = Vector2.ZERO
 var player_tile: Vector2i = Vector2i.ZERO
+# ⚠ 20. session: VYSKA HRACE pro prepočet kliku na dlazdici. Do teto session
+# chodil do `input_map.poll` i `click_at`/`interact_command` jako `z = 0`, coz
+# na vysce (Britain z = 10) posune cil o 40 px - stejna vada, jakou u stredu pro
+# smer z mysi opravila V14. Plni ji `app/player_controller._follow()`.
+var player_z: int = 0
 
 var _accumulator_ms: float = 0.0
 var _ticks: int = 0
@@ -36,7 +41,7 @@ func _process(delta: float) -> void:
 			# hodinami vzorkovanymi po framech (27 FPS = 37 ms), vychazela
 			# kadence 430 ms misto 400 a byla rozhozene. `sim.world_time()`
 			# tiká presne po 50 ms, takze krok vychazi na 8 tiku presne.
-			for command in input_map.poll(player_tile, camera_offset, 0,
+			for command in input_map.poll(player_tile, camera_offset, player_z,
 					get_viewport().get_mouse_position(), sim.world_time()):
 				sim.enqueue(command)
 		sim.tick(Const.TICK_MS)

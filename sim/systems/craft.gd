@@ -155,7 +155,6 @@ var _registry = null
 
 var _recipes: Array = []             # recepty podle id (index == id)
 var _by_skill: Dictionary = {}       # jmeno systemu -> Array id
-var _role_by_tile: Dictionary = {}   # tiledata id -> role (data/items.json)
 var _tile_by_name: Dictionary = {}   # nazev -> tiledata id (data/items.json)
 var _made: int = 0
 
@@ -609,12 +608,12 @@ func _station_near(mob, role: String) -> bool:
 
 
 func _role_of_tile(tile: int) -> String:
-	# Static muze byt v tiledata prostoru i v art prostoru - zkusi se oba.
-	if _role_by_tile.has(tile):
-		return str(_role_by_tile[tile])
-	if tile >= ITEM_OFFSET and _role_by_tile.has(tile - ITEM_OFFSET):
-		return str(_role_by_tile[tile - ITEM_OFFSET])
-	return ""
+	# ⚠ 20. session: ROLE SE CTE Z TYPU PREDMETU (`sim/entity/item.gd`), ne
+	# z vlastni tabulky artu. Do teto session tu byl `_role_by_tile` - druhy
+	# nacitac `data/items.json`, ktery se mohl (a u rudy se to stalo) rozejit
+	# s tim, co vi `sim.interaction`. Registry zvladne oba id prostory sama
+	# (art je prvni, tiledata id druhy) - viz `Item.type_of`.
+	return ItemScript.role_of(tile)
 
 
 func _skill_of_tool(nastroj) -> int:
@@ -699,11 +698,12 @@ func _load_items() -> void:
 		if not (rec is Dictionary) or not rec.has("tile"):
 			continue
 		var tile: int = int(rec["tile"])
-		var role: String = str(rec.get("role", ""))
-		if role != "":
-			_role_by_tile[tile] = role
+		# ⚠ ROLE SE TU UZ NEDRZI (20. session): je vlastnost TYPU a cte ji
+		# `ItemScript.role_of`. Tabulka roli na artech byla druhy zdroj pravdy.
 		var jmeno: String = str(rec.get("name", "")).replace("%s", "").to_lower().strip_edges()
 		if jmeno != "" and not _tile_by_name.has(jmeno):
+			# tohle je RESOLVE JMENA NA ART (materialy receptu), ne sémantika -
+			# zustava, dokud recepty nemluvi typem (viz HANDOFF, otevrene).
 			_tile_by_name[jmeno] = tile
 
 

@@ -148,6 +148,25 @@ def najdi(podle_jmena: dict[str, list[dict]], hledane: str) -> list[dict]:
     return []
 
 
+def slug(jmeno: str) -> str:
+    """`iron ore` -> `iron_ore`; IDENTITA predmetu (`type`), ne popis pro hrace.
+
+    ⚠ 20. session (2026-10-08): `type` je odpoved na to, co bylo do teto session
+    jen na artech - "co ta vec JE". Sdili ho VSECHNY arty tehoz jmena, takze
+    "vsechna ruda je ruda" je vlastnost DAT, ne seznam artu v kódu.
+    UO znacka pluralu (`%s`, `%`) NENI soucast jmena - `iron ingot%s` je
+    `iron ingot` (viz `je_platne_jmeno`, ktera ji popisuje); kdyby zustala,
+    vznikl by z ingotu druhy typ a pravidla by se rozesla."""
+    zaklad = jmeno.replace("%s", "").replace("%", "")
+    out: list[str] = []
+    for ch in zaklad.lower():
+        out.append(ch if (ch.isalnum() and ord(ch) < 128) else "_")
+    text = "".join(out)
+    while "__" in text:
+        text = text.replace("__", "_")
+    return text.strip("_")
+
+
 def kategorie(rec: dict) -> tuple[str, str]:
     """Zaradi predmet podle VLASTNOSTI (docs/03 §3.3.1b). Vraci (kategorie, pravidlo).
 
@@ -222,6 +241,10 @@ def gen_items(root: Path) -> tuple[bytes, list[dict]]:
             "flags": rec["flags"], "source": zdroj, "era": "t2a",
             "count": rec["count"], "value_source": val_src, "role": role,
             "category_rule": pravidlo,
+            # `type` = IDENTITA PREDMETU (20. session): vsechny arty tehoz jmena
+            # ji sdili, takze pravidla ("pouzij rudu na vyhen") se ptají typu,
+            # ne cisla artu. Art zustava INDEX pro kresleni a `tiledata`.
+            "type": slug(rec["name"]),
         })
 
     for role, jmeno in list(NASTROJE.items()) + [(m, m) for m in SUROVINY]:
@@ -231,8 +254,23 @@ def gen_items(root: Path) -> tuple[bytes, list[dict]]:
                                "kategorie": "tool" if role in NASTROJE else "material",
                                "duvod": "jmeno v tiledata neni"})
             continue
-        # u vicero shod (dva arty tehoz predmetu) ber prvni
+        # ⚠⚠ 20. session (2026-10-08) - ROLE PATRI VSEM NOSENYM ARTUM TEHOZ
+        # JMENA, ne jen prvnimu. Do teto session tu stalo "u vicero shod (dva
+        # arty tehoz predmetu) ber prvni", takze `role: "iron ore"` mel JEDEN
+        # ze ctyr artu rudy (tiledata 6583 = art 0x59B7) a ruda, kterou hra
+        # opravdu vytezi (`sim.harvest.ORE_ART = 0x59B8`), roli NEMELA - hrac s
+        # ni nemohl pouzit vyhen (`sim.interaction.use_on` vraci `no_pair`).
+        # NAMERENO (`.cache/over-role-vsechny-arty.py`): VSECHNY shody by pridaly
+        # roli 130 artum - z toho 33 "forge", 34 "sand" a 20 "bottle" s vahou
+        # 255, coz jsou STATICKE DEKORACE (generator je o par radku niz
+        # vynechava: `weight == 255` neni noseny predmet). Proto:
+        #   * prvni shoda jako dosud (i kdyz ma vahu 255 - je v datech uz dnes
+        #     a ubrat zaznam by znamenalo zmenu, ktera sem nepatri),
+        #   * k ni vsechny dalsi shody, ktere jsou NOSENE (weight != 255).
         pridej(nalezy[0], "tiledata-exact-name", role)
+        for shoda in nalezy[1:]:
+            if shoda["weight"] != 255:
+                pridej(shoda, "tiledata-exact-name", role)
 
     # vse ostatni podle vlastnosti
     for rec in predmety:
@@ -243,6 +281,26 @@ def gen_items(root: Path) -> tuple[bytes, list[dict]]:
         pridej(rec, "tiledata-by-properties")
 
     zaznamy.sort(key=lambda r: r["tile"])          # deterministicke poradi
+    # KONTROLA TYPU (20. session): jeden `type` = jedna vec, takze se jeho
+    # zaznamy NESMI rozejit v NEPRAZDNE roli ani v kategorii. Kdyz se rozejdou,
+    # je to rozpor DAT (dva arty tehoz jmena znamenaji neco jineho) a hlasi se
+    # to - ticha volba "vyhral prvni" by byla presne ta vada, kterou resime.
+    # Prazdna role u ostatnich artu téhož typu NENI rozpor: role se prirazuje
+    # jen vybranym jmenum (`NASTROJE`/`SUROVINY`), ale typ ji sdili cely.
+    podle_typu: dict[str, list[dict]] = {}
+    for r in zaznamy:
+        podle_typu.setdefault(r["type"], []).append(r)
+    for typ, zaznamy_typu in sorted(podle_typu.items()):
+        role = {r["role"] for r in zaznamy_typu if r["role"]}
+        kat = {r["category"] for r in zaznamy_typu}
+        if len(role) > 1 or len(kat) > 1:
+            nenalezene.append({
+                "duvod": "jeden typ ma vic roli/kategorii (art se rozesel)",
+                "type": typ,
+                "role": sorted(role),
+                "kategorie": sorted(kat),
+                "arty": [r["tile"] for r in zaznamy_typu],
+            })
     raw = json.dumps(zaznamy, ensure_ascii=False, sort_keys=True,
                      separators=(",", ":")).encode("utf-8")
     return raw, nenalezene

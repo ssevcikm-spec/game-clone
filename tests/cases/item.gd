@@ -5,7 +5,7 @@ extends RefCounted
 #   * vychozi hodnoty a to, ze `_init(serial, tile, amount)` je opravdu nastavi,
 #   * `parent == 0` = na zemi a jen tam plati `pos` (`is_on_ground()`),
 #   * `pile_weight(unit)` = jednotkova vaha x mnozstvi (vaha hromady),
-#   * `same_pile` = stejny `tile` + `hue` (kandidat na slouceni; jestli je
+#   * `same_pile` = stejny `type` + `hue` (kandidat na slouceni; jestli je
 #     predmet stackovatelny, vi az `entity.container` z tiledata).
 #
 # Cesta k souboru je VSTUP: `-- --item-script=<cesta>` - mutacni harness
@@ -62,16 +62,26 @@ func run(t) -> void:
 	t._check(mec.pile_weight(7) == 7,
 		"sim.entity.item: jedna vec vazi jednotkovou vahu (vyslo %d)" % mec.pile_weight(7))
 
-	# 4) SAME_PILE: stejny tile + hue (kandidat na slouceni)
+	# 4) SAME_PILE: stejny TYP + hue (kandidat na slouceni)
+	# ⚠ 20. session: rozhoduje `type` (identita z `data/items.json`), ne `tile`.
 	var druhy = script.new(0x40000003, 0x0F61, 3)
 	t._check(mec.same_pile(druhy) and druhy.same_pile(mec),
-		"sim.entity.item: stejny tile a hue = kandidat na slouceni")
+		"sim.entity.item: stejny typ a hue = kandidat na slouceni")
 	druhy.hue = 1002
 	t._check(not mec.same_pile(druhy),
-		"sim.entity.item: jina hue se neslucuje (i kdyz je tile stejny)")
+		"sim.entity.item: jina hue se neslucuje (i kdyz je typ stejny)")
 	druhy.hue = 0
+	# ⚠ Do teto session tu stalo `druhy.tile = 0x0F52` a cekalo se "neslucuje".
+	# Jenze art se u TEHOZ predmetu meni (velikost hromady rudy, otevrene dvere
+	# = `art + 1`), takze "jiny art" NENI "jina vec" - identity je TYP.
+	druhy.type = "jiny_predmet"
+	t._check(not mec.same_pile(druhy),
+		"sim.entity.item: jiny TYP se neslucuje (namEReno '%s' vs '%s')" % [mec.type, druhy.type])
+	druhy.type = mec.type
 	druhy.tile = 0x0F52
-	t._check(not mec.same_pile(druhy), "sim.entity.item: jiny tile se neslucuje")
+	t._check(mec.same_pile(druhy) and druhy.type == mec.type,
+		"sim.entity.item: zmena ARTU typ NEMENI (otevrene dvere, velikost hromady)")
+	druhy.tile = 0x0F61
 	t._check(not mec.same_pile(null), "sim.entity.item: same_pile(null) je false (ne pad)")
 	druhy.tile = 0x0F61
 	druhy.amount = 0

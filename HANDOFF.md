@@ -8,6 +8,67 @@
 > **Kdo soubor přepisuje celý, ať tyhle bloky nechá** — nebo si je přesune;
 > zkontroluj to **hledáním**, ne pamětí (`docs/09 §9.7`).
 
+## ✅ CO JE NOVÉHO (20. session) — OBECNÁ INTERAKCE + „TYP JE IDENTITA, ART JE JEHO PROJEV"
+
+**Zadání uživatele (doslova):** „Cílem je nyní zprovoznit nějakou interaktivitu…
+Jak začnu těžbu?" → „tlačítko je nejen na těžbu, ale **všeobecně interaktivní**.
+Do pytlíku přidej **všechny nástroje** — pokud má probíhat interakce s něčím, co
+není připraveno, prostě neproběhne." → „všechna ruda je ruda, tedy použitelná —
+aplikovat na arty" → „**Udělej B teď**" (typ jako zdroj pravdy, art jako jeho projev).
+
+| Věc | Co je hotové a čím je to doložené |
+|---|---|
+| **Obecné interakční tlačítko** | `E` nebo `T` → `Command{t:"interact", target:{kind:"tile",…}}`; klient posílá **jen cíl**, nástroj vybírá SIM (`sim.interaction.interact`/`tool_for`) podle `harvest.resource_kind(x,y)` — hora → krumpáč/lopata, strom → sekera, voda → prut. Jeden úder na stisk (rozhodnutí uživatele). |
+| **Všechny nástroje v batohu** | `app/main._give_tools()` — z DAT (`data/items.json`, `category == "tool"`), **jeden od každého TYPU** = 16 (dřív 28: bral se každý art → dva krumpáče, tři sekery) |
+| **Těžba je HRATELNÁ** | `data/balance.json` → `player_start_skills` = šablona **Blacksmithy** z `research/profese.json` (4 skilly po 30.0). Naměřeno: se skilly 0 **0 rudy za 30 úderů**, s 30.0 **ruda za 1 úder**. ⚠ Jméno je z NAŠICH dat (`skills.mul` má „Blacksmithy", profesní šablona „Blacksmith") — s druhým jménem by se skill tiše nepřidal |
+| **Nikdy ticho** | `sim.harvest` hlásí i `not_ore`/`not_tree`/`not_water`/`too_far`/`empty`/`busy` — do 20. session tyhle větve vracely jen slovník a hráč neviděl nic |
+| **TYP = IDENTITA (rozhodnutí B)** | `data/items.json` má `type` (**3812 typů**, z toho **1277 s víc arty = 6213 artů**); `Item.type`; `same_pile` = **typ + hue**; `role`/`category` se ČTOU Z TYPU (`sim/entity/item.gd` je jediný vlastník mapy `art → typ → role`); `sim.interaction` i `sim.craft` ZRUŠILY svoje tabulky artů (`_by_tile`, `_role_by_tile` — byly to druhý a třetí načítač `items.json`) |
+| **Ruda je ruda** | `gen-content.py`: roli dostávají **všechny nošené arty téhož jména** (ruda 0x59B7–0x59BA = 4 arty, dřevo 4, prkna 4, ingoty 3, svitky 13…); dekorace s váhou 255 zůstaly nedotčené; `--check` = shoda se souborem |
+| **Smlouvy** | `docs/04 §4.5` — tvar `Item` má `type` (dopsáno 20. session). ⚠ `Command{t:"interact"}` je **NAD RÁMEC §4.3** (tabulka má 18 příkazů) — patří do `docs/04 §4.3`; je to pojmenovaná odchylka v hlavičce `sim/commands.gd` |
+
+**Naměřená čísla (celá na tomto stromě):** testy **1320 kontrol / 0 selhání**
+(před session 1283/0, +37); brány `run-all.py` **11 měřeno / 0 chyb** (G3 testy,
+G11 smoke, G2 vrstvy, G5 obsah nad daty); mutace `--only item,container,interaction,craft`
+**44/44 chyceno** a `--only harvest` **9/9**; živý průkaz `_analyza/p23-interakce.gd`
+(16 nástrojů, klávesa → **1** příkaz s cílem hory, Mining 30.1, **ruda za 1 úder**,
+se skillem 0 nic za 30 úderů). Nové soubory: `tests/cases/interact.gd` (nový case),
+`_analyza/p23-interakce.gd` (sonda), `.cache/over-role-vsechny-arty.py` (měření dopadu).
+
+**⚠ NÁLEZY, KTERÉ STOJÍ ZA POZORNOST:**
+(`a`) **HEAD po commitu 19. session byl NEKONZISTENTNÍ.** Jejich commit `b8bff4d`
+(`git add` přes víc souborů) stáhl i část práce 20. session (`app/main.gd`,
+`app/input_map.gd`, `app/player_controller.gd`, `sim/commands.gd`, `app/config.gd`,
+`data/balance.json`, `tests/cases/player_controller.gd`, `tools/gates/mutace-tests.py`),
+ale `sim/systems/interaction.gd`, `sim/entity/item.gd`, `sim/systems/{harvest,craft}.gd`,
+`data/items.json` a `tests/cases/interact.gd` nechal necommitnuté. **Důsledek:** v tom
+commitu se trasuje `interact`, který tam `sim.interaction` neumí (hráč by dostal
+„Not available yet: interact -> interaction.interact."). 20. session to docommitovala
+(commit 20. session) — **kdo se vrací k `b8bff4d`, ať ví, že je to smíšený stav.**
+(`b`) **Dva mrtvé mutační vzory.** Po refaktoru mířily `item/same_pile ignoruje hue`
+a `interaction/id prostor se neprevadi` na kód, který už neexistuje — harness je
+poctivě hlásil jako „PATRANA VETA SE NENASLA… nepočítá se" (a tím i `NECHYCENE`),
+takže se opravily (vzor pro id prostory se přesunul z `interaction` do `item`,
+protože se tam přestěhovala konverze `art ↔ tiledata id`). **Bez toho by sada
+tvrdila, že měří, a neměřila.**
+(`c`) **Typová vrstva hned odhalila vadu, kterou způsobila 20. session:** `_give_tools`
+bral každý ART, ne typ → hráč dostal 28 nástrojů (dva krumpáče, tři sekery). Sonda
+`p23-interakce.gd` to ukázala jako „nastroju v batohu: 28" proti dřívějším 16.
+(`d`) **Sonda, která počítá rudu podle ROLE, hlásí nulu i když ruda vznikla** —
+poprvé to vypadalo jako „těžba nefunguje", přitom v logu bylo dvakrát
+„You gather some iron.". Sonda teď počítá podle ARTU (`ORE_ART`).
+
+**Co zůstává mluvit ARTEM (pojmenované, ne zamlčené):** recepty
+(`materials[].tile`/`result.tile`, 1053 záznamů — resolver jmen na art zůstal),
+`world.stairs`/`world.doors` (vlastní tabulky z `stairs.txt`/`doors.txt`),
+`world.tiledata` (váha/flagy/vrstva — to je SPRÁVNĚ art-keyed, je to tabulka klienta),
+`ui.target_cursor` + `target_reply` (dvojklik na předmět → kurzor cíle; `use`/`use_on`
+proto `check-wiring` pořád hlásí jako „volá ho jen tests/"), a loot/spawn/ukládání
+předmětů (ještě neexistují — až vzniknou, mají mluvit typem).
+
+**Příští krok k hratelné smyčce:** výheň a kovadlina **do světa jako předměty**
+(dnes je svět nemá) + gump batohu → `ruda → ingot`. Ruda už má typ i roli, takže
+chybí jen „něco ve světě, na co se dá kliknout".
+
 > **Co je tenhle soubor:** **stav projektu** pro další session agenta. Přepisuje
 > se celý; historie je v `git log`. **Současný stav se bere odtud** — a ověřuje
 > se živě (je tu k tomu sekce „Předletová kontrola").

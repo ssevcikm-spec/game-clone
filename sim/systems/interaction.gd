@@ -23,6 +23,22 @@ extends RefCounted
 # "nic se nestalo" a "neni to hotove" vypadalo stejne (presne ta vada, kterou
 # cíl 10. session zakazuje). `context_menu` vraci `Array[Dictionary]` dle smlouvy.
 #
+# ⚠⚠ 20. session (2026-10-08) - OBECNA INTERAKCE (`interact`) JE NAD RÁMEC §4.3.
+# Pokyn uzivatele (doslova): "prozatim nastav, ze tlacitko je nejen na tezbu, ale
+# vseobecne interaktivni. Do pytliku pridej vsechny nastroje - pokud ma probihat
+# interakce s necin, co neni pripraveno, proste neprobehne."
+#   * Klient posle JEN CIL (`Command{t:"interact", target}`) - ktery predmet se
+#     na nej hodi, rozhoduje SIM (`tool_for` + PÁROVÁ TABULKA §5.2.3). Kdyby to
+#     vybiral klient, byla by to herni pravidla v UI (docs/05 §5.3 to zakazuje).
+#   * Pro dlaždici se navic ptá `sim.harvest.resource_kind(x, y)` - seznam
+#     dlaždic ("co je hora") je jen tam, takze se nerozejde s tim, co sbírá
+#     `_harvest`. Bez toho by se vsemi nástroji v batohu mohl na strom vybrat
+#     krumpáč (a "první pár v tabulce" je náhodný podle serialu).
+#   * Co není hotové, PROSTĚ NEPROBĚHNE: `no_pair` = hláška "You see nothing
+#     special." a žádná změna stavu; když systém v `SimWorld.systems` není,
+#     `use_on` vrátí `not_available` (taky s hláškou).
+#   * `interact` NENÍ v tabulce §4.3 (ta má 18 příkazů) - patří do docs/04.
+#
 # ⚠ CO NEMA PRODUCENTA (pojmenovane, ne zamlcene - HANDOFF, otevrena vec 68):
 #   * PREDMETY: `entity.item` nikdo nedrzi podle serialu (vec 64); modul je bere
 #     VSTUPEM (`items` = `{serial: Item}` nebo objekt s `get_item(serial)`),
@@ -42,8 +58,13 @@ extends RefCounted
 #     je v kontejneru (`item` cil).
 
 const Const = preload("res://core/const.gd")
+# ⚠ 20. session: role a kategorie se ctou z TYPU predmetu (`entity.item`), ne
+# z vlastni tabulky artu. Do teto session si tenhle modul vodil `_by_tile`
+# (druhy nacitac `data/items.json`) - a prave proto mohlo platit, ze ruda ma
+# roli jen na jednom ze ctyr artu, zatimco `entity.container` se ptalo neceho
+# jineho. Jeden zdroj pravdy: `type` -> role (`sim/entity/item.gd`).
+const ItemScript = preload("res://sim/entity/item.gd")
 
-const ITEMS_PATH := "res://data/items.json"
 const SKILLS_PATH := "res://data/skills.json"
 const ITEM_OFFSET := 0x4000               # tiledata id -> art id (item.gd)
 
@@ -101,7 +122,6 @@ var _doors = null            # world.doors
 var _containers = null       # entity.container (jedna instance pro cely svet)
 var _registry = null         # sim.entity_registry
 var _items = null            # {serial: Item} nebo objekt s `get_item(serial)`
-var _by_tile: Dictionary = {}   # tiledata id -> {category, role}
 var _skills: Dictionary = {}    # jmeno -> id (data/skills.json)
 var _cursor: int = 0
 
@@ -114,7 +134,6 @@ func _init(world = null, events = null, doors = null, containers = null,
 	_containers = containers
 	_registry = registry
 	_items = items
-	_load_items()
 	_load_skills()
 
 
@@ -125,6 +144,64 @@ func use(m: int, serial: int) -> Dictionary:
 	var cil: Dictionary = describe(serial)
 	var route: Dictionary = route_of(str(cil["kind"]))
 	return _run_use(m, serial, cil, str(route["akce"]))
+
+
+func interact(m: int, target: Dictionary) -> Dictionary:
+	# OBECNA INTERAKCE (nad ramec §4.3, viz hlavicka): klient posle jen cil.
+	var na: Dictionary = _describe_target(target)
+	var pozadovana: String = ""
+	if str(na.get("kind", "")) == "tile":
+		pozadovana = _method_for_tile(int(na.get("x", 0)), int(na.get("y", 0)))
+		if pozadovana == "":
+			# Na te dlazdici neni uzel, se kterym umime neco delat (travnik,
+			# zed, voda bez rybarskeho prutu neni duvod). Hlaska, ne ticho.
+			return _fail("no_pair")
+	var serial: int = tool_for(m, na, pozadovana)
+	if serial <= 0:
+		return _fail("no_pair")
+	return use_on(m, serial, target)
+
+
+func tool_for(m: int, na: Dictionary, pozadovana_metoda: String = "") -> int:
+	# Ktery predmet z batohu hrace se na cil hodi = PÁROVÁ TABULKA §5.2.3.
+	# Poradi je dane obsahem batohu (`contents()` je serazene podle serialu),
+	# takze volba je deterministicka. `pozadovana_metoda` ("" = jakakoli) je
+	# ROZHODNUTI PRO DLAZDICI: na horu se hodi jen nastroj, ktery umi tezit -
+	# se vsemi nastroji v batohu by jinak "prvni par v tabulce" mohl byt
+	# krumpac pouzity na strom.
+	var mob = _mobile(m)
+	if mob == null or int(mob.backpack) <= 0 or _containers == null:
+		return 0
+	for serial in _containers.contents(int(mob.backpack)):
+		var cil: Dictionary = describe(int(serial))
+		var par: Dictionary = pair_of(cil, na)
+		if par.is_empty():
+			continue
+		if pozadovana_metoda != "" and str(par.get("method", "")) != pozadovana_metoda:
+			continue
+		return int(serial)
+	return 0
+
+
+func _method_for_tile(x: int, y: int) -> String:
+	# Co se na te dlazdici da delat: `method` z PÁROVÉ TABULKY ("mine" pro rudu,
+	# "chop" pro drevo, "fish" pro vodu). Druh dlazdice vraci `sim.harvest`
+	# (`resource_kind`), aby seznam dlazdic nezil na dvou mistech.
+	# ⚠ Jmena druhu ("ore"/"wood"/"fish") jsou LITERALY z `sim.harvest` - modul
+	# se preloadovat neda (routing je dynamicky, `depends_on` na harvest nemame).
+	# Kdyby je harvest prejmenoval, ROZBIJE SE VOLBA NASTROJE, ne sber; proto to
+	# hlida `tests/cases/interact.gd` proti konstantam harvestu.
+	var system = _system("harvest")
+	if system == null or not system.has_method("resource_kind"):
+		return ""
+	match str(system.resource_kind(x, y)):
+		"ore":
+			return "mine"
+		"wood":
+			return "chop"
+		"fish":
+			return "fish"
+	return ""
 
 
 func use_on(m: int, serial: int, target: Dictionary) -> Dictionary:
@@ -232,11 +309,17 @@ func pair_of(od: Dictionary, na: Dictionary) -> Dictionary:
 
 
 func category_of(tile: int) -> String:
-	return str(_record(tile).get("category", ""))
+	# Kategorie je VLASTNOST TYPU (20. session) - viz hlavicka.
+	return ItemScript.category_of(tile)
 
 
 func role_of(tile: int) -> String:
-	return str(_record(tile).get("role", ""))
+	return ItemScript.role_of(tile)
+
+
+func type_of(tile: int) -> String:
+	# Identita predmetu pro pravidla; `role_of` je na ni postavena.
+	return ItemScript.type_of(tile)
 
 
 func skill_id(name: String) -> int:
@@ -244,7 +327,7 @@ func skill_id(name: String) -> int:
 
 
 func has_data() -> bool:
-	return not _by_tile.is_empty() and not _skills.is_empty()
+	return ItemScript.known() and not _skills.is_empty()
 
 
 func cursor() -> int:
@@ -418,34 +501,10 @@ func _item_event(item) -> Dictionary:
 
 
 # -- vnitrni: data ---------------------------------------------------------
-
-func _record(tile: int) -> Dictionary:
-	# Dve id prostranstvi se PREKRYVAJI (tiledata id 0-65535, art id 0x4000-0xFFFF):
-	# z cisla samotneho se neda poznat, ktere to je. `entity.item.tile` je ART ID
-	# (docs/03 §3.4, item.gd), proto se hleda NEJDRIV art konvence (`tile - 0x4000`)
-	# a teprve pak prime `tile` (pro volajiciho, ktery preda tiledata id).
-	if tile >= ITEM_OFFSET:
-		var rec = _by_tile.get(tile - ITEM_OFFSET)
-		if rec != null:
-			return rec
-	return _by_tile.get(tile, {})
-
-
-func _load_items() -> void:
-	if not FileAccess.file_exists(ITEMS_PATH):
-		push_warning("sim.interaction: chybi " + ITEMS_PATH + " - routing bude jen `unknown`")
-		return
-	var parsed = JSON.parse_string(FileAccess.get_file_as_string(ITEMS_PATH))
-	if not (parsed is Array):
-		push_warning("sim.interaction: " + ITEMS_PATH + " neni seznam")
-		return
-	for rec in parsed:
-		if rec is Dictionary and rec.has("tile"):
-			# JSON vraci cisla jako float (HANDOFF past 10) - vzdy int().
-			_by_tile[int(rec["tile"])] = {
-				"category": str(rec.get("category", "")),
-				"role": str(rec.get("role", "")),
-			}
+# ⚠ `_record` a `_load_items` TU BYLY DO 20. SESSION (druhy nacitac
+# `data/items.json` s tabulkou art -> {category, role}). Nahradil je
+# `sim/entity/item.gd`, kde je mapa `art -> type -> (role, kategorie)`: jeden
+# zdroj pravdy pro cely projekt. Kdo chce roli, vola `role_of(tile)`.
 
 
 func _load_skills() -> void:

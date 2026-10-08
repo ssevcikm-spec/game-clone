@@ -24,6 +24,73 @@ Typy: `chyba` (moje vada) · `past-nástroje` (prostředí/nástroj, ne logika) 
 
 ---
 
+# 20. session (2026-10-08) — OBECNÁ INTERAKCE + TYP JAKO IDENTITA PŘEDMĚTU
+
+### 2026-10-08 — Sonda hlásila „ruda nevznikla“, ale v logu stálo dvakrát „You gather some iron.“ (chyba)
+**Co se stalo:** sonda `_analyza/p23-interakce.gd` měřila úspěch těžby tím, že
+v batohu hledala předměty s `role == "iron ore"`. Ruda se ale vyrábí s artem
+`0x59B8`, a ten měl v `data/items.json` **prázdnou roli** (role byla jen
+u `0x59B7`) — takže sonda hlásila **0 kusů**, i když v jejím vlastním výpisu
+hlášek bylo dvakrát „You gather some iron.“. Skoro to vypadalo jako vada těžby;
+ve skutečnosti to byla **naměřená vada dat**, kterou tím sonda objevila.
+**Doklad:** `_analyza/p23-interakce.gd` (běh před opravou: hlasy 2× „gather“,
+`rudy 0`); oprava v `tools/gates/gen-content.py` (role pro všechny nošené arty
+téhož jména), po ní 4 arty rudy s rolí `iron ore`.
+**Ponaučení:** když metrika hlásí **nulu**, ověř dvě věci: (1) čím to počítá
+(role/art/typ jsou tři různé klíče téhož jevu) a (2) jestli jev v datech vůbec
+nastal (hlášky, log). A když se rozcházejí dvě měření téhož, hledej **rozdíl
+v klíči**, ne „které je správné“.
+
+### 2026-10-08 — Commit druhé session stáhl půlku mojí práce a HEAD byl nekonzistentní (past-nástroje)
+**Co se stalo:** v jednom workspace běžely dvě session. Session 19 commitla
+(`b8bff4d`) `git add` přes víc souborů — a stáhla i rozpracovanou práci session 20
+(`app/main.gd`, `app/input_map.gd`, `app/player_controller.gd`, `sim/commands.gd`,
+`app/config.gd`, `data/balance.json`, `tests/cases/player_controller.gd`,
+`tools/gates/mutace-tests.py`), ale `sim/systems/interaction.gd`,
+`sim/entity/item.gd` a `data/items.json` nechala necommitnuté. **Výsledek: HEAD
+trasoval `Command{t:"interact"}`, který v tom stromě `sim.interaction` neuměl.**
+Kdo by z HEAD hrál nebo měřil, dostal by „Not available yet: interact ->
+interaction.interact.“ a hledal vadu v interakci.
+**Doklad:** `git show --stat b8bff4d` (25 souborů, mezi nimi moje) vs
+`git status` (9 zbylých mých souborů); 20. session to docommitovala.
+**Ponaučení:** ve sdíleném workspace **nikdy `git add -A`/`git add .`** — jen
+vyjmenované soubory vlastní práce. A kdo v takovém stromě končí, ať ověří, že
+**HEAD je konzistentní**: `git show --stat HEAD` + spustit testy nad HEAD
+(ne jen nad pracovním stromem).
+
+### 2026-10-08 — Refaktor zneplatní mutační vzory a brána pak měří něco jiného (postup)
+**Co se stalo:** po přesunu sémantiky z artu na typ jsem přepsal
+`Item.same_pile` a zrušil `sim.interaction._record`. Dva vzory v
+`tools/gates/mutace-tests.py` mířily přesně na ty řádky, takže se **neprovedly**.
+Harness to poctivě vypsal („PATRANA VETA SE VE ZDROJI NENASLA — mutace se
+neprovedla, nepočítá se“) a ve souhrnu je uvedl jako `NECHYCENE`. Kdo čte jen
+„41 z 43 chyceno“, myslí si, že dva testy jsou slabé — přitom **dva vzory
+nemutovaly nic**.
+**Doklad:** `python tools/gates/mutace-tests.py --only item,container,interaction,craft`
+před opravou (2× „NENASLA“) a po ní **44/44 chyceno, smlouva vstupu OK**; vzor
+pro id prostory se přesunul z `interaction` do `item` (tam se přestěhoval kód).
+**Ponaučení:** po **každém** refaktoru, který se dotkne kódu s mutačními vzory,
+pusť harness na ty moduly a čti i `NEPROVEDENA`; mrtvý vzor je **slepé místo**,
+ne zelená. A vzor, jehož kód se přesunul jinam, se **přesune s ním** — jinak
+vznikne dojem, že ta vlastnost je měřená, a měřená není.
+
+### 2026-10-08 — Vrstva identity je levná, dokud předměty nikdo neukládá ani nekreslí (postup)
+**Co se stalo:** rozhodnutí „typ je identita, art je jeho projev“ (B) se dalo
+udělat za jedno sezení, protože **předměty se neukládají** (`sim_world.save()`
+má `"items": []`), **nekreslí** (`app/` čte `contents(` jen při zakládání batohu)
+a mapové statiky nejsou `Item`. Změna se dotkla 5 produkčních souborů + generátoru
++ dat, a hned první den odhalila vadu, kterou by jinak nikdo neviděl (hráč dostával
+28 nástrojů místo 16, protože se bral každý art místo typu).
+**Doklad:** `git status` před/po (5 souborů + data), testy 1283 → **1320 kontrol /
+0 selhání**, mutace 44/44, sonda `p23-interakce.gd` („nastroju v batohu: 28“ → 16).
+**Ponaučení:** u vrstvy, která mění **identitu** dat, se ptát „co ji už používá?“
+— cena roste s každou vrstvou, která z identity začne rozhodovat (ukládání, loot,
+výbava, spawn). **Dokud nic z toho není, je to 1–2 sezení; potom je to migrace.**
+A nová vrstva se má pustit na **existující data** hned: co najde (duplicity,
+rozpory typu), to je její první zisk.
+
+---
+
 # 19. session (2026-10-08) — SEDMNÁCT VAD ZE SNÍMKŮ (řazení hráče, zoom, patra, pohyb, staty)
 
 ## Pasti, které mě dnes chytily (a co z nich platí dál)

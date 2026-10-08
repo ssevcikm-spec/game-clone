@@ -155,6 +155,20 @@ const MESSAGE_FAIL_ORE := "You loosen some rocks but fail to find any useable or
 const MESSAGE_FAIL_WOOD := "You chop the tree but fail to get any useable wood."
 const MESSAGE_FAIL_FISH := "You fish for a while, but fail to catch anything."
 const MESSAGE_FULL := "Your backpack cannot hold anything else."
+# ⚠ 20. session (2026-10-08) - "NIKDY TICHO" PLATI I PRO TYHLE VETVE.
+# Do teto session vracely `not_ore`/`not_tree`/`not_water`/`too_far`/`empty`/`busy`
+# jen slovnik a hrac nevidel NIC: s obecnym interakcnim tlacitkem ("pouzij, co se
+# na to hodi") to znamena, ze kliknuti na travu vypadalo jako rozbita hra.
+# Texty jsou UO-ovske ("You can't mine that."), cisla clilocu nemame - je to text
+# klonu, stejne jako `MESSAGE_FAIL_ORE` vyse (docs/11 O7).
+const MESSAGE_NOT_ORE := "You can't mine that."
+const MESSAGE_NOT_TREE := "You can't chop that."
+const MESSAGE_NOT_WATER := "You can't fish there."
+const MESSAGE_TOO_FAR := "That is too far away."
+const MESSAGE_BUSY := "You must wait to perform another action."
+const MESSAGE_EMPTY_ORE := "There is no metal left here."
+const MESSAGE_EMPTY_WOOD := "There are no logs left here."
+const MESSAGE_EMPTY_FISH := "The fish are not biting here."
 
 var _map = null
 var _tiledata = null
@@ -217,6 +231,29 @@ func resource_left_kind(kind: String, x: int, y: int) -> int:
 	return int(_bank(kind, x, y)["current"])
 
 
+func resource_kind(x: int, y: int) -> String:
+	# CO JE NA DLAZDICI ZA UZEL (20. session, pro obecnou interakci
+	# `sim.interaction.interact`): "ore" / "wood" / "fish", nebo "" (nic).
+	#
+	# PROC TO NENI V `interaction`: rozhoduje SEZNAM DLAZDIC, a ten je tady
+	# (`MINE_LAND`/`MINE_STATIC`/`TREE_STATIC`/`WATER_*`, docs/05 §5.7). Kdyby si
+	# `interaction` vedl vlastni seznam, vznikl by druhy zdroj pravdy o tom, co je
+	# "hora" - a obecne tlacitko by vybiralo nastroj podle neceho jineho, nez
+	# podle ceho sbira `_harvest`.
+	#
+	# Poradi je dane: kdyz je dlazdice v obou seznamech (nemerene, ale mozne),
+	# vyhraje ruda - stejne poradi pouziva `interact` pri volbe nastroje.
+	if x < 0 or y < 0:
+		return ""
+	if _resource_tile(KIND_ORE, x, y) >= 0:
+		return KIND_ORE
+	if _resource_tile(KIND_WOOD, x, y) >= 0:
+		return KIND_WOOD
+	if _resource_tile(KIND_FISH, x, y) >= 0:
+		return KIND_FISH
+	return ""
+
+
 # -- mereni (co test a sonda potrebuji videt) ------------------------------
 
 func vein_name(kind: String, x: int, y: int) -> String:
@@ -246,24 +283,26 @@ func stats() -> Dictionary:
 func _harvest(kind: String, m: int, x: int, y: int) -> Dictionary:
 	var mob = _mobile(m)
 	if mob == null:
+		# Neznamy mobil je VADA VOLAJICIHO, ne hracuv pokus - hlasku tu zamerne
+		# NEDAVAME (hrac by videl "neco se pokazilo" za neco, co nezpusobil).
 		return _fail(kind, "no_mobile")
 	if x < 0 or y < 0:
-		return _fail(kind, "off_map")
+		return _fail_msg(kind, "off_map")
 	var p: Dictionary = BANKS[kind]
 	var range_max: int = int(p["range"])
 	if absi(int(mob.pos.x) - x) > range_max or absi(int(mob.pos.y) - y) > range_max:
-		return _fail(kind, "too_far")
+		return _fail_msg(kind, "too_far")
 	var now: int = _now()
 	if now < int(_busy_until.get(kind, 0)):
 		# Jeden sber na system (`GetLock` vraci `this`, research §1.1).
-		return _fail(kind, "busy")
+		return _fail_msg(kind, "busy")
 	var tile: int = _resource_tile(kind, x, y)
 	if tile < 0:
-		return _fail(kind, "not_" + ("ore" if kind == KIND_ORE else ("tree" if kind == KIND_WOOD else "water")))
+		return _fail_msg(kind, "not_" + ("ore" if kind == KIND_ORE else ("tree" if kind == KIND_WOOD else "water")))
 	var bank: Dictionary = _bank(kind, x, y)
 	var yield_amount: int = int(p["yield"])
 	if int(bank["current"]) < yield_amount:
-		return _fail(kind, "empty")
+		return _fail_msg(kind, "empty")
 	var skill: int = _skill_id(kind)
 	var value: int = mob.skills.value(skill)
 	var resource_index: int = resource_index_for(kind, int(bank["vein"]), value)
@@ -496,6 +535,38 @@ func _now() -> int:
 func _fail(kind: String, reason: String) -> Dictionary:
 	return {"ok": false, "reason": reason, "kind": kind, "skill": _skill_id(kind),
 		"gained": false, "success": false, "tile": 0, "amount": 0, "serial": 0}
+
+
+func _fail_msg(kind: String, reason: String) -> Dictionary:
+	# Selhani, ktere HRAZ VIDI: hrac neco zkusil a musi se dozvedet, proc to
+	# neslo (docs/05 §5.2.2 "nikdy ticho"). Text je prazdny jen u `no_mobile`
+	# (vada volajiciho) - kdyby vratil prazdno i jinde, je to chyba a test to
+	# pozna podle chybejici hlasky.
+	var text: String = _fail_message(kind, reason)
+	if text != "":
+		_message(text)
+	return _fail(kind, reason)
+
+
+func _fail_message(kind: String, reason: String) -> String:
+	match reason:
+		"off_map":
+			return MESSAGE_TOO_FAR
+		"too_far":
+			return MESSAGE_TOO_FAR
+		"busy":
+			return MESSAGE_BUSY
+		"empty":
+			if kind == KIND_ORE:
+				return MESSAGE_EMPTY_ORE
+			return MESSAGE_EMPTY_WOOD if kind == KIND_WOOD else MESSAGE_EMPTY_FISH
+		"not_ore":
+			return MESSAGE_NOT_ORE
+		"not_tree":
+			return MESSAGE_NOT_TREE
+		"not_water":
+			return MESSAGE_NOT_WATER
+	return ""
 
 
 func _message(text: String) -> void:

@@ -547,7 +547,21 @@ Vector3i  # pozice: x, y = dlaždice (int), z = světová výška (int)
 }
 
 # Item (sim/entity/item.gd) - KÓD JE (2026-10-07); `tile` = ART ID (0x4000-0xFFFF)
+# ⚠⚠ DOPLNENO 2026-10-08 (20. session, rozhodnuti uzivatele "typ je identita,
+# art je jeho projev"): pribyl `type` - IDENTITA PREDMETU (`iron_ore`, `pickaxe`;
+# slug z `data/items.json`). Vsechny arty tehoz jmena ji sdili (data: 3812 typu,
+# 1277 z nich s vic arty = 6213 artu), takze se `role` a `category` CTou Z TYPU,
+# ne z artu - presne to byla vada "ruda ma roli jen na jednom ze ctyr artu"
+# (ruda se tezi s ART 0x59B8, roli mel jen 0x59B7). `same_pile` proto porovnava
+# `type` + `hue` (art se u tehoz predmetu meni: velikost hromady, otevrene dveře
+# = `art + 1`). `tile` zustava INDEX pro kresleni a `world.tiledata` (vaha, flagy,
+# vrstva) - menit se nema. Mapu `art -> type -> (role, kategorie, jmeno)` vlastni
+# `sim/entity/item.gd` (`Item.type_of/role_of/category_of/arts_of`); `sim.interaction`
+# a `sim.craft` sve vlastni tabulky artu ZRUSILY (byly to druhe a treti nacitace
+# `data/items.json`). Co jeste mluvi artem: recepty (`materials[].tile`),
+# `stairs`/`doors` a `tiledata` - viz HANDOFF "Co zustava".
 { serial:int, tile:int, hue:int, amount:int,
+  type:String,           # IDENTITA (`iron_ore`); "" = data o artu nevi (stara data)
   parent:int,            # 0 = na zemi, jinak serial kontejneru/mobila
   layer:int,             # 0 = nenasazený
   pos:Vector3i,          # platné jen na zemi
