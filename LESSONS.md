@@ -24,6 +24,61 @@ Typy: `chyba` (moje vada) · `past-nástroje` (prostředí/nástroj, ne logika) 
 
 ---
 
+# 20. session, druhá část (2026-10-08) — RECEPTY NA TYPY, VÝHEŇ VE SVĚTĚ, BATOH, VÝROBA
+
+### 2026-10-08 — Mutační harness počítá chycenou mutaci podle PREFIXU hlášky (past-nástroje)
+**Co se stalo:** přidal jsem vzor „stanice se hledá jen v mapě" pro `sim.craft` a test,
+který ji odhalí — řetězový (`interact: vyhen jako PREDMET NA ZEMI … ruda se vytavi`).
+Harness poctivě vypsal `PROVEDENA ano | PROBEHLALA ano (1351 kontrol, 1 selhání)`, ale
+verdikt byl **„PROSLA — TEST JE SLEPÝ: sada selhala, ale bez FAIL tohoto modulu"** a mutace
+se počítala jako NECHYCENÁ. Ruční běh téhož mutanta přitom ukázal `FAIL interact: vyhen jako
+PREDMET NA ZEMI … (hlasky ["You see nothing special."])` — **test tedy chytal**.
+**Doklad:** `tools/gates/mutace-tests.py --only craft` (verdikt „TEST JE SLEPÝ") vs ruční běh
+`run_tests.gd -- --craft-script=res://.cache/gates/mutace/muj-craft-stanice.gd` (FAIL).
+Po přidání **přímé** kontroly s prefixem modulu (`sim.craft: station_role_at`) je verdikt
+**46/46 chyceno**.
+**Ponaučení:** k řetězovému testu (kontroluje chování modulu X přes modul Y) patří **i přímá
+kontrola s prefixem X** — jinak harness mutaci X vyhodnotí jako nechycenou, i když spadne.
+A kdo verdiktu „test je slepý" uvěří, půjde „opravovat" správný test: **než uvěříš nálezu
+o měřidle, zopakuj měření jinou cestou** (tady ručním mutantem).
+
+### 2026-10-08 — `queue_free()` v testu bez framů nechá staré uzly (chyba)
+**Co se stalo:** okno batohu se po `nastav_obsah([])` tvářilo, že nemá prázdný stav
+(`(empty)` se nenašlo), a po vložení ikony hlásilo jen 1 uzel místo 2. Příčina: `flush()`
+uvolňoval staré řádky `queue_free()`, což je **odložené na konec framu** — a test žádné
+framy nemá, takže v okně zůstaly STARÉ uzly a měřilo se něco jiného, než okno má.
+**Doklad:** `tests/cases/backpack.gd` (dvě selhání před opravou), oprava na
+`remove_child()` + `free()` v `ui/backpack.gd` i `ui/craft_gump.gd`.
+**Ponaučení:** v kódu, který čte i test (a sonda), uvolňuj uzly **okamžitě**; `queue_free()`
+je jen pro běžící hru. A obecněji: když test hlásí jiný obsah, než kód „očividně" má, ptej se
+**kdy** se ta změna projeví (frame, fronta, signál) — ne co je špatně v datech.
+
+### 2026-10-08 — Než začneš stavět, změř, jestli to ve světě vůbec je (postup)
+**Co se stalo:** sonda `_analyza/p24-vyroba.gd` hledala výheň a kovadlinu ve světě a vrátila
+`vyhen (-1,-1), kovadlina (-1,-1)` — v okolí Britainu (160 dlaždic) **není žádná stanice jako
+statik mapy**. Do té chvíle byl plán „hráč klikne na výheň ve světě" jen domněnka: `sim.craft`
+sice stanici jako předmět uměl, ale nikdo ji do světa nedával. Řešení: `app/main._postav_stanice()`
+je pokládá jako předměty na zem, a `station_role_at` se musel naučit hledat i v předmětech
+(první běh jinak vracel `no_pair`).
+**Doklad:** `_analyza/p24-vyroba.gd` (běh 1: NEMĚŘENO; běh 2 po opravě: ruda 12 → ingoty 12 →
+196 receptů → vyrobený `buckler`).
+**Ponaučení:** u každé vazby „hráč udělá X s věcí Y" **nejdřív změř, že Y v datech/světě
+existuje** — jinak se staví cesta k něčemu, co tam není. A když sonda hlásí `-1`/nulu,
+je to **nález o datech**, ne o sondě.
+
+### 2026-10-08 — Sonda hlásila „CHYBA", ale chování bylo věrné (chyba)
+**Co se stalo:** tavení rudy v sondě selhalo („You burn away the impurities but are left with
+less useable metal.") a sonda vyhlásila `VERDIKT: CHYBA - z rudy nevznikly ingoty`. Podle
+reference je to ale **správně**: `Ore.cs:355-370` dává železu `minSkill 25`, `maxSkill 75`,
+takže při Mining 30.0 je úspěch ~10 % a neúspěch část hromady spálí (a učí).
+**Doklad:** `_src/servuo/Scripts/Items/Resource/Ore.cs:355-370` vs `sim/systems/craft.gd`
+(`METAL_DIFFICULTY`, `_skill_gain.check(..., (obtížnost-25)*10, 500)`); sonda po opravě měří
+„kolik pokusů to dalo" místo aby tvrdila chybu.
+**Ponaučení:** **selhání akce není vada** — než označíš výsledek za chybu, ověř v referenci,
+jaká je šance. Sonda má měřit („N pokusů → M ingotů"), ne soudit.
+
+---
+
 # 20. session (2026-10-08) — OBECNÁ INTERAKCE + TYP JAKO IDENTITA PŘEDMĚTU
 
 ### 2026-10-08 — Sonda hlásila „ruda nevznikla“, ale v logu stálo dvakrát „You gather some iron.“ (chyba)

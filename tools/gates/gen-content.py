@@ -224,6 +224,23 @@ def gen_items(root: Path) -> tuple[bytes, list[dict]]:
         if je_platne_jmeno(rec):
             podle_jmena.setdefault(rec["name"].lower(), []).append(rec)
 
+    # ⚠⚠ PLURAL: `board%s` a `boards` je TATAZ VEC (jiny art tehoz predmetu).
+    # `slug` u `%s`/`%` vyhodi UO znacku pluralu, ale hole `boards` zustane
+    # "boards" - a pak ma jeden predmet DVA typy (namEReno: 33 takovych dvojic:
+    # board/boards, log/logs, copper_ingot/copper_ingots, feather/feathers...).
+    # Dusledek by byl TICHY: recept vyreseny na `log%s` by nenasel hromadu typu
+    # `logs`, takze by vyroba rekla "chybi material", i kdyz ho hrac ma.
+    # Sjednocuje se na JEDNOTNE cislo, kdyz v datech existuje (deterministicke:
+    # rozhoduje mnozina vsech jmen, ne poradi souboru).
+    vsechny_typy: set[str] = {slug(rec["name"]) for rec in predmety if je_platne_jmeno(rec)}
+    kanonicky: dict[str, str] = {}
+    for typ in vsechny_typy:
+        kanonicky[typ] = typ[:-1] if (typ.endswith("s") and typ[:-1] in vsechny_typy) else typ
+    typ_podle_jmena: dict[str, str] = {
+        rec["name"].lower(): kanonicky[slug(rec["name"])]
+        for rec in predmety if je_platne_jmeno(rec)
+    }
+
     zaznamy: list[dict] = []
     pouzite_tile: set[int] = set()
     nenalezene: list[dict] = []
@@ -241,10 +258,11 @@ def gen_items(root: Path) -> tuple[bytes, list[dict]]:
             "flags": rec["flags"], "source": zdroj, "era": "t2a",
             "count": rec["count"], "value_source": val_src, "role": role,
             "category_rule": pravidlo,
-            # `type` = IDENTITA PREDMETU (20. session): vsechny arty tehoz jmena
-            # ji sdili, takze pravidla ("pouzij rudu na vyhen") se ptají typu,
-            # ne cisla artu. Art zustava INDEX pro kresleni a `tiledata`.
-            "type": slug(rec["name"]),
+            # `type` = IDENTITA PREDMETU: vsechny arty tehoz jmena ji sdili
+            # (a po sjednoceni pluralu i `board%s` s `boards`), takze pravidla
+            # ("pouzij rudu na vyhen") se ptají typu, ne cisla artu. Art zustava
+            # INDEX pro kresleni a `tiledata`.
+            "type": typ_podle_jmena.get(rec["name"].lower(), slug(rec["name"])),
         })
 
     for role, jmeno in list(NASTROJE.items()) + [(m, m) for m in SUROVINY]:
@@ -281,6 +299,25 @@ def gen_items(root: Path) -> tuple[bytes, list[dict]]:
         pridej(rec, "tiledata-by-properties")
 
     zaznamy.sort(key=lambda r: r["tile"])          # deterministicke poradi
+    # SJEDNOCENI KATEGORIE V RAMCI TYPU (20. session): jeden typ = jedna vec,
+    # takze jeho arty NESMI mit jinou kategorii - jinak se tyz predmet chova
+    # podle grafiky jinak (`sim.interaction` routuje z kategorie: `dagger` byl
+    # u nekterych artu "weapon" a u jinych "misc", `wooden box` container/misc).
+    # Pravidlo (merene, ne vymyslene): ROLE > VLASTNOST (layer/jmeno/flag) >
+    # fallback `layer0-other`/`other`. Kdyz maji vsechny arty typu jen fallback,
+    # je kategorie uz stejna a nic se nemeni.
+    FALLBACK_RULES = {"layer0-other", "other"}
+    for typ in sorted({r["type"] for r in zaznamy}):
+        skupina = [r for r in zaznamy if r["type"] == typ]
+        kandidati = [r for r in skupina if r["category_rule"] not in FALLBACK_RULES]
+        if not kandidati:
+            continue
+        role_kandidati = [r for r in kandidati if r["category_rule"] == "role"]
+        vybrany = min(role_kandidati or kandidati, key=lambda r: r["tile"])
+        for r in skupina:
+            if r["category"] != vybrany["category"]:
+                r["category"] = vybrany["category"]
+                r["category_rule"] = "type:" + vybrany["category_rule"]
     # KONTROLA TYPU (20. session): jeden `type` = jedna vec, takze se jeho
     # zaznamy NESMI rozejit v NEPRAZDNE roli ani v kategorii. Kdyz se rozejdou,
     # je to rozpor DAT (dva arty tehoz jmena znamenaji neco jineho) a hlasi se
@@ -343,27 +380,36 @@ def gen_recipes(root: Path) -> tuple[bytes, list[dict]]:
     from cliloc import Cliloc                                   # noqa: PLC0415
 
     predmety = json.loads(gen_items(root)[0])
-    podle_jmena: dict[str, list[int]] = {}
+    podle_jmena: dict[str, list[dict]] = {}
     for rec in predmety:
-        podle_jmena.setdefault(rec["name"].lower(), []).append(rec["tile"])
+        podle_jmena.setdefault(rec["name"].lower(), []).append(rec)
     texty = Cliloc(CLILOC_INSTALL).cliloc_all()
     craft = json.loads((root / "research/04-craft-data.json").read_text(encoding="utf-8"))
 
-    def najdi(jmeno: str) -> int | None:
+    def najdi(jmeno: str) -> dict | None:
         for k in (jmeno, jmeno + "%s", jmeno + "s", jmeno + "%"):
             if podle_jmena.get(k):
                 return podle_jmena[k][0]
         return None
 
     def ref(kind: str, rec: dict) -> dict:
-        """Jeden material/vysledek. Poradi: text kliloku -> C# typ."""
+        """Jeden material/vysledek. Poradi: text kliloku -> C# typ.
+
+        ⚠ 20. session: zaznam nese i `item_type` - IDENTITU z `data/items.json`
+        (slug jmena, ktere se v instalaci naslo). `craft` pak hleda material
+        podle TYPU, ne podle artu, takze se do receptu pocita i hromada s jinou
+        grafikou (prkna 4 arty, klada 4 arty). Kdyz se jmeno nenajde, `item_type`
+        se NEVYPISUJE - vymyslena identita, ktera se s zadnym predmetem nemuze
+        potkat, je horsi nez zadna (a `tile` tam taky neni)."""
         text = klilok(rec.get("cliloc") or rec.get("name"), texty)
+        nalezeny = None
         for kandidat in (text, camel_jmeno(str(rec.get("type", "")))):
             if not kandidat:
                 continue
-            tile = najdi(kandidat.lower())
-            if tile is not None:
-                out = {"name": kandidat.lower(), "tile": tile}
+            nalezeny = najdi(kandidat.lower())
+            if nalezeny is not None:
+                out = {"name": kandidat.lower(), "tile": nalezeny["tile"],
+                       "item_type": str(nalezeny["type"])}
                 break
         else:
             out = {"name": (text or camel_jmeno(str(rec.get("type", "")))).lower()}

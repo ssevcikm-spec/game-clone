@@ -78,6 +78,9 @@ const ITEMS_PATH := "res://data/items.json"
 const ITEM_OFFSET := 0x4000
 const MAX_MAKE_NUMBER := 100          # "make number" prijima 1-100
 const STATION_RANGE := 2              # kovadlina/vyhen do 2 dlazdic (docs/05 §5.8)
+# Role, ktere jsou STANICE (ne nastroje): hrac na ne klikne v svete a sim
+# podle role vybere, co se na ne hodi (ruda na vyhen = taveni).
+const STATION_ROLES: Array = ["anvil", "forge"]
 const LIFT_RANGE := 2                 # taveni: ruda i vyhen do 2 dlazdic
 
 const SKILL_MINING := 45
@@ -282,8 +285,13 @@ func smelt(m: int, ore: int, forge: int) -> Dictionary:
 		return _fail("no_ore")
 	var vyhen = _item(forge)
 	if vyhen == null:
-		return _fail("no_forge")
-	if not _near(mob, vyhen, LIFT_RANGE):
+		# ⚠ 20. session: kovadlina/vyhen VE SVETE je STATIK MAPY - nema serial,
+		# takze ji hrac nema jak poslat. Kdyz serial chybi (0), overi se ROLE
+		# v dosahu hrace (`_station_near`); bez toho by taveni u svetove vyhne
+		# vracelo `no_forge`, i kdyz hrac stoji u vyhne.
+		if not _station_near(mob, "forge"):
+			return _fail("no_forge")
+	elif not _near(mob, vyhen, LIFT_RANGE):
 		return _fail("too_far")
 	var hu: int = int(predmet.hue)
 	var je_ruda: bool = int(predmet.tile) in ORE_ARTS
@@ -426,21 +434,38 @@ func _materials(recipe: Dictionary) -> Array:
 	# Materiál se bere podle `tile` z dat (`+0x4000` = art); kdyz `tile` neni,
 	# hleda se podle jmena v `data/items.json`. Co se nedohleda, ma `art: -1`
 	# a craft vraci `materials` - nikdy fiktivni predmet.
+	# ⚠ 20. session: `item_type` (identita z `data/items.json`) jde s materialem
+	# dal - shoda s predmětem se pak hledá podle TYPU, ne podle artu. Duvod:
+	# jeden typ ma vic artu (prkna 4, klada 4, `iron ingot%s`) a hromada s jinou
+	# grafikou se do receptu do teto session NEPOCITALA.
 	var out: Array = []
 	for m in recipe.get("materials", []):
 		if not (m is Dictionary):
 			continue
 		var tile: int = _tile_of(m)
 		out.append({"type": str(m.get("type", "")), "name": str(m.get("name", "")),
+			"item_type": str(m.get("item_type", "")),
 			"amount": maxi(1, int(m.get("amount", 1))), "art": (tile + ITEM_OFFSET) if tile >= 0 else -1})
 	return out
+
+
+func _shoda(item, material: Dictionary) -> bool:
+	# Hodi se predmet do receptu? PREDNOSTNE podle TYPU (identita), jinak podle
+	# artu (stara data bez `item_type`). "Nevim" (prazdny typ) nesmi znamenat
+	# "nesedi" - proto fallback na art, ktery fungoval do 20. session.
+	if item == null:
+		return false
+	var hledany: String = str(material.get("item_type", ""))
+	if hledany != "" and str(item.type) != "":
+		return str(item.type) == hledany
+	return int(item.tile) == int(material.get("art", -1))
 
 
 func _has_materials(mob, materialy: Array, nasobek: int) -> bool:
 	for m in materialy:
 		if int(m["art"]) < 0:
 			return false
-		if _count(mob, int(m["art"])) < int(m["amount"]) * nasobek:
+		if _count(mob, m) < int(m["amount"]) * nasobek:
 			return false
 	return true
 
@@ -451,7 +476,7 @@ func _max_amount(mob, materialy: Array) -> int:
 	for m in materialy:
 		if int(m["art"]) < 0:
 			return 0
-		var mam: int = _count(mob, int(m["art"]))
+		var mam: int = _count(mob, m)
 		var kus: int = mam / int(m["amount"])
 		maximum = kus if maximum < 0 else mini(maximum, kus)
 	return maxi(maximum, 0)
@@ -469,34 +494,35 @@ func _consume(mob, materialy: Array, nasobek: int, uspech: bool, use_all: bool) 
 		var chtit: int = int(m["amount"]) * nasobek
 		if not uspech and use_all:
 			chtit = maxi(1, chtit / 2)
-		var vzato: int = _odeber(mob, null, chtit, int(m["art"]))
+		var vzato: int = _odeber(mob, null, chtit, m)
 		spotreba.append({"type": str(m["type"]), "art": int(m["art"]), "amount": vzato})
 	return spotreba
 
 
-func _count(mob, art: int) -> int:
+func _count(mob, material: Dictionary) -> int:
+	# Kolik toho hrac ma (20. session: podle TYPU, ne podle artu - viz `_shoda`).
 	var soucet: int = 0
 	for serial in _contents(int(mob.backpack)):
 		var item = _item(serial)
-		if item != null and int(item.tile) == art:
+		if _shoda(item, material):
 			soucet += int(item.amount)
 	return soucet
 
 
-func _odeber(mob, predmet, mnozstvi: int, art: int = -1) -> int:
+func _odeber(mob, predmet, mnozstvi: int, material: Dictionary = {}) -> int:
 	# Odebira z batohu; `predmet` (kdyz neni null) ma prednost podle serialu.
 	if _container == null or int(mob.backpack) <= 0:
 		return 0
 	if predmet != null:
 		return int(_container.remove(int(mob.backpack), int(predmet.serial), mnozstvi))
-	if art < 0:
+	if material.is_empty():
 		return 0
 	var zbyva: int = mnozstvi
 	for serial in _contents(int(mob.backpack)):
 		if zbyva <= 0:
 			break
 		var item = _item(serial)
-		if item == null or int(item.tile) != art:
+		if not _shoda(item, material):
 			continue
 		zbyva -= int(_container.remove(int(mob.backpack), int(item.serial), zbyva))
 	return mnozstvi - zbyva
@@ -575,6 +601,41 @@ func _missing_station(mob, system: Dictionary) -> String:
 	for role in potreba:
 		if not _station_near(mob, str(role)):
 			return str(role)     # "anvil" nebo "forge" (docs/05 §5.8)
+	return ""
+
+
+func station_role_at(x: int, y: int) -> String:
+	# Role stanice NA DLAZDICI (20. session, pro obecnou interakci): hrac klika
+	# na dlazdici, ne na serial - takze se ptáme MAPY, jestli na ni stoji
+	# kovadlina/vyhen. Vraci "anvil"/"forge", nebo "" (neni tam).
+	# Dve mista, kde stanice muze byt (stejne jako `_station_near`):
+	#   (1) STATIK MAPY (`map.statics_at` - klientsky obraz sveta),
+	#   (2) PREDMET NA ZEMI (`parent == 0`) - tak je stanice ve svete od
+	#       20. session (`app/main._postav_stanice`); bez teto vetve by kliknuti
+	#       na nasi vyhen vracelo `no_pair` (NAMERENO sondou `p24-vyroba.gd`).
+	# Pouziva STEJNE pravidlo jako `_station_near` (`_role_of_tile` = role
+	# z typu predmetu), aby se "co je stanice" nerozeslo na dvou mistech.
+	if x < 0 or y < 0:
+		return ""
+	if _map != null and _map.has_method("statics_at"):
+		var lokalni_x: int = x % Const.BLOCK_SIZE
+		var lokalni_y: int = y % Const.BLOCK_SIZE
+		for s in _map.statics_at(x, y):
+			if int(s.get("x", -1)) != lokalni_x or int(s.get("y", -1)) != lokalni_y:
+				continue
+			var role: String = _role_of_tile(int(s["tile"]))
+			if role in STATION_ROLES:
+				return role
+	if _items is Dictionary:
+		for serial in _items:
+			var item = _items[serial]
+			if item == null or int(item.parent) != 0:
+				continue
+			if int(item.pos.x) != x or int(item.pos.y) != y:
+				continue
+			var role_predmetu: String = _role_of_tile(int(item.tile))
+			if role_predmetu in STATION_ROLES:
+				return role_predmetu
 	return ""
 
 

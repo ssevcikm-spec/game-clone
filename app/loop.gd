@@ -16,6 +16,10 @@ const REPORT_EVERY_TICKS: int = 20   # 1x za sekundu herniho casu (M0: "simulace
 var sim = null
 var input_map = null
 var journal = null              # `ui.journal` (16. session): zpravy dostava VSTUPEM
+# ⚠ 20. session: okna, ktera chteji i JINE udalosti nez `message` (okno vyroby
+# dostava `gump_open`). Kazdy prvek musi mit `apply_event(event) -> bool`;
+# smycka o nich nic nevi - jen jim udalost preda (UI je tenky klient).
+var gump_okna: Array = []
 var camera_offset: Vector2 = Vector2.ZERO
 var player_tile: Vector2i = Vector2i.ZERO
 # ⚠ 20. session: VYSKA HRACE pro prepočet kliku na dlazdici. Do teto session
@@ -68,5 +72,8 @@ func _deliver_events() -> void:
 	for event in snapshot.get("events", []):
 		if journal != null:
 			journal.apply_event(event)
+		for okno in gump_okna:
+			if okno != null and okno.has_method("apply_event"):
+				okno.apply_event(event)
 		if event.get("name") == "message":
 			print("[sim] ", str(event.get("data", {}).get("text", "")))

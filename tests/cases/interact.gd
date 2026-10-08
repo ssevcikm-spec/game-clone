@@ -35,6 +35,7 @@ const Iso = preload("res://core/iso.gd")
 
 const INTERACTION_SCRIPT := "res://sim/systems/interaction.gd"
 const HARVEST_SCRIPT := "res://sim/systems/harvest.gd"
+const CRAFT_SCRIPT := "res://sim/systems/craft.gd"
 const ITEMS_DATA := "res://data/items.json"
 const PLAYER_SCRIPT := "res://app/player_controller.gd"
 const INPUT_SCRIPT := "res://app/input_map.gd"
@@ -110,7 +111,8 @@ func _statik(mapa, x: int, y: int, tile: int) -> void:
 	mapa.statics[Vector2i(x, y)] = seznam
 
 
-func _sestav(t, land: Dictionary, statiky: Dictionary, nastroje: Array) -> Dictionary:
+func _sestav(t, land: Dictionary, statiky: Dictionary, nastroje: Array,
+		s_craftem: bool = false) -> Dictionary:
 	# Vraci slovnik s celym svetem testu, nebo {} (a to je SELHANI, ne zelena).
 	var harvest_script = Lib.script_at(_arg("harvest-script", HARVEST_SCRIPT))
 	if harvest_script == null:
@@ -126,7 +128,8 @@ func _sestav(t, land: Dictionary, statiky: Dictionary, nastroje: Array) -> Dicti
 	var registry = RegistryScript.new()
 	registry.register(mob)
 	sim.player_serial = SERIAL
-	var container = ContainerScript.new(StubTiledata.new())
+	var tiledata := StubTiledata.new()
+	var container = ContainerScript.new(tiledata)
 	var items: Dictionary = {}
 	var mapa := StubMap.new()
 	mapa.land = land
@@ -142,9 +145,20 @@ func _sestav(t, land: Dictionary, statiky: Dictionary, nastroje: Array) -> Dicti
 		if container.add(PACK, nastroj):
 			items[int(nastroj.serial)] = nastroj
 			dane.append(int(nastroj.serial))
+	var craft = null
+	if s_craftem:
+		# REALNY `sim.craft` (ne stub): test "ruda -> ingot u vyhne ve svete"
+		# musi projit skutecnou kontrolou stanice i skutecnym tavenim.
+		var craft_script = Lib.script_at(_arg("craft-script", CRAFT_SCRIPT))
+		if craft_script == null:
+			t._pending("sim.craft NENI K DISPOZICI: " + CRAFT_SCRIPT)
+			return {}
+		craft = craft_script.new(container, items, mapa, tiledata, StubSkill.new(),
+			sim, sim.rng(), sim.clock(), sim.events(), registry)
+		sim.systems["craft"] = craft
 	var commands = CommandsScript.new()
 	return {"sim": sim, "mob": mob, "mapa": mapa, "container": container, "items": items,
-		"harvest": harvest, "interaction": interaction, "commands": commands,
+		"harvest": harvest, "interaction": interaction, "craft": craft, "commands": commands,
 		"nastroje": dane}
 
 
@@ -180,6 +194,13 @@ func _posli_na_predmet(sestava, serial: int) -> Array[String]:
 	sestava["commands"].dispatch(sestava["sim"],
 		{"t": "interact", "target": {"kind": "item", "serial": serial}})
 	return _texty(sestava["sim"])
+
+
+func _posli_udalosti(sestava, x: int, y: int) -> Array:
+	# Jako `_posli`, ale vraci VSECHNY udalosti (testy potrebuji `gump_open`).
+	sestava["commands"].dispatch(sestava["sim"],
+		{"t": "interact", "target": {"kind": "tile", "x": x, "y": y, "z": 0}})
+	return sestava["sim"].drain_events()
 
 
 func run(t) -> void:
@@ -342,47 +363,108 @@ func run(t) -> void:
 		"app.main: pocatecni skilly pokryvaji celou sablonu (Blacksmith, Tinkering, Mining, Tailoring) - namEReno %d"
 			% start_skilly.size())
 
-	# -- N) TYP JE IDENTITA, ART JE JEJI PROJEV (20. session, rozhodnuti B) ---
-	# Co se tu hlida:
-	#   1. kazdy zaznam v `data/items.json` ma `type` (jinak by identita chybela),
-	#   2. vsechny arty rudy maji JEDEN typ a TEN ma roli (ne "art ma roli"),
-	#   3. hromady tehoz typu s RŮZNOU grafikou se sliji (do 20. session rozhodoval
-	#      art, takze by se ruda z ruzne velkych hromad neslila),
-	#   4. `hue` uvnitr typu porad rozlisuje (zelezo vs dull copper).
-	var item_script = Lib.script_at("res://sim/entity/item.gd")
-	if item_script == null:
-		t._pending("sim.entity.item NENI K DISPOZICI")
+	# -- N) TYP JE IDENTITA ------------------------------------------------
+	# Kontroly identity typu (data: jeden typ = jedna role/kategorie, plural se
+	# nedeli; entita: `same_pile` = typ + hue; a hlavne ZISK: recept najde
+	# material i s jinym artem tehoz typu) se 20. session presunuly do
+	# `tests/cases/item_type.gd` - patri k sobe a ne do interakce. Tady zustava
+	# jen ta cast, ktera chrani SMELT cestu (viz H vyse).
+
+	# -- O) VYHEN VE SVETE (STATIK MAPY) -> RUDA SE VYTAVI ---------------
+	# Cesta hrace presne podle zadani: stoji u vyhne, ma rudu v batohu a klikne
+	# na vyhen. Vyhen ve svete je STATIK MAPY (nema serial), takze se role
+	# stanice hleda PRES MAPU (`craft.station_role_at`) - a `smelt` si ji overi
+	# znovu v dosahu. Do 20. session by tudy taveni vracelo `no_forge`, protoze
+	# `smelt` chtel serial predmetu.
+	var craft_consts: Dictionary = Lib.consts_at(_arg("craft-script", CRAFT_SCRIPT))
+	var forge_tiledata: int = int(craft_consts.get("FORGE_TILEDATA", 0))
+	if forge_tiledata <= 0:
+		# Konstanta v craftu neni - vezmeme ji z dat podle role (jediny zdroj).
+		for rec in Lib.json_at(ITEMS_DATA):
+			if rec is Dictionary and str(rec.get("role", "")) == "forge":
+				forge_tiledata = int(rec["tile"])
+				break
+	var ingot_art: int = int(craft_consts.get("INGOT_ART_DEFAULT", 0x5BEF))
+	var o := _sestav(t, {Vector2i(100, 100): TRAVNIK}, {}, [ore_art_h], true)
+	if o.is_empty():
 		return
-	var bez_typu: int = 0
+	_statik(o["mapa"], 101, 100, forge_tiledata)
+	var pred_o: int = _obsah(o).size()
+	var texty_o: Array[String] = _posli(o, 101, 100)
+	var ingot_v_batohu: bool = false
+	for serial in _obsah(o):
+		var predmet = o["items"].get(int(serial))
+		if predmet != null and str(predmet.type) == "iron_ingot":
+			ingot_v_batohu = true
+	t._check(ingot_v_batohu,
+		"interact: ruda + VYHEN VE SVETE (statik, tiledata %d) -> ingot v batohu (art %d, hlasky %s)"
+			% [forge_tiledata, ingot_art, str(texty_o)])
+	t._check(_obsah(o).size() == pred_o,
+		"interact: ruda se spotrebovala a ingot pribyl (predmetu %d -> %d)"
+			% [pred_o, _obsah(o).size()])
+
+	# -- O2) STANICE JAKO PREDMET NA ZEMI (tak ji ma hra) ------------------
+	# `app/main._postav_stanice()` poklada kovadlinu a vyhen jako PREDMETY
+	# (`parent == 0`), protoze v okoli Britainu zadny statik neni (namEReno
+	# sondou `p24-vyroba.gd`). Kdyby `station_role_at` hledal jen v mape,
+	# kliknuti na nasi vyhen by vracelo `no_pair` - presne to se stalo.
+	var o2 := _sestav(t, {Vector2i(100, 100): TRAVNIK}, {}, [ore_art_h], true)
+	if o2.is_empty():
+		return
+	var vyhen_predmet = ItemScript.new(o2["sim"].next_serial(), forge_tiledata + 0x4000, 1)
+	vyhen_predmet.parent = 0
+	vyhen_predmet.pos = Vector3i(101, 100, 0)
+	o2["items"][int(vyhen_predmet.serial)] = vyhen_predmet
+	var texty_o2: Array[String] = _posli(o2, 101, 100)
+	var ingot_o2: bool = false
+	for serial in _obsah(o2):
+		var predmet2 = o2["items"].get(int(serial))
+		if predmet2 != null and str(predmet2.type) == "iron_ingot":
+			ingot_o2 = true
+	t._check(ingot_o2,
+		"interact: vyhen jako PREDMET NA ZEMI (ne statik) se pozna a ruda se vytavi (hlasky %s)"
+			% str(texty_o2))
+	# ⚠ PRIMÁ KONTROLA TÉ FUNKCE, NE JEN ŘETĚZOVÁ: mutační harness počítá
+	# mutaci za chycenou jen když selže kontrola s PREFIXEM toho modulu
+	# (`mutace-tests.py`: "sada selhala, ale bez FAIL tohoto modulu" = slepý
+	# test). Řetězová kontrola výše má prefix `interact`, takže by se mutace
+	# `sim.craft` tvářila jako nechycená, i když spadne.
+	t._check(str(o2["craft"].station_role_at(101, 100)) == "forge",
+		"sim.craft: `station_role_at` najde vyhen jako PREDMET NA ZEMI (namEReno '%s')"
+			% str(o2["craft"].station_role_at(101, 100)))
+
+	# -- P) KOVADLINA + KLADIVO -> OKNO VYROBY (recepty) -------------------
+	# Smlouva §4.6.3: dvojklik na kladivo -> `gump_open{gump:"craft", data:{skill,
+	# recipes:[...]}}`. Do 20. session se recepty jen vratily z `recipes_for`
+	# a UDALOST SE NEPOSLALA - okno vyroby tedy nemelo co zobrazit.
+	var anvil_tiledata: int = 0
 	for rec in Lib.json_at(ITEMS_DATA):
-		if rec is Dictionary and str(rec.get("type", "")) == "":
-			bez_typu += 1
-	t._check(bez_typu == 0,
-		"data.items: kazdy zaznam ma `type` (bez nej: %d)" % bez_typu)
-	t._check(str(item_script.type_of(ore_art_h)) == "iron_ore"
-			and str(item_script.role_of(ore_art_h)) == "iron ore"
-			and item_script.arts_of("iron_ore").size() >= 4,
-		"entity.item: art 0x%04X -> typ '%s' -> role '%s' (%d artu typu) - role patri TYPU"
-			% [ore_art_h, str(item_script.type_of(ore_art_h)),
-				str(item_script.role_of(ore_art_h)), item_script.arts_of("iron_ore").size()])
-	var arty_rudy: Array = item_script.arts_of("iron_ore")
-	var role_rudy: Array = []
-	for art in arty_rudy:
-		role_rudy.append(str(item_script.role_of(int(art))))
-	t._check(role_rudy.size() >= 4 and role_rudy.all(func(r): return r == "iron ore"),
-		"entity.item: VSECHNY arty rudy maji roli 'iron ore' (namEReno %s)" % str(role_rudy))
-	# 3) slouceni hromad: dva arty TEHOZ typu (ruzne velikosti hromady) + stejna hue
-	var hromada_a = ItemScript.new(1, int(arty_rudy[0]), 3)
-	var hromada_b = ItemScript.new(2, int(arty_rudy[arty_rudy.size() - 1]), 2)
-	hromada_a.hue = 0x973
-	hromada_b.hue = 0x973
-	t._check(hromada_a.same_pile(hromada_b),
-		"entity.item: hromady tehoz typu s jinym artem se sliji (art %d vs %d, typ '%s')"
-			% [hromada_a.tile, hromada_b.tile, hromada_a.type])
-	hromada_b.hue = 0x966
-	t._check(not hromada_a.same_pile(hromada_b),
-		"entity.item: jina `hue` (jiny kov) se NESLUCUJE (namEReno hue %d vs %d)"
-			% [hromada_a.hue, hromada_b.hue])
+		if rec is Dictionary and str(rec.get("role", "")) == "anvil":
+			anvil_tiledata = int(rec["tile"])
+			break
+	var hammer_art: int = _art_role("smith hammer")
+	var p := _sestav(t, {Vector2i(100, 100): TRAVNIK}, {}, [hammer_art], true)
+	if p.is_empty() or anvil_tiledata <= 0 or hammer_art <= 0:
+		t._check(false, "interact: kovadlina/kladivo nejdou najit v datech (tiledata %d, art %d)"
+			% [anvil_tiledata, hammer_art])
+	else:
+		_statik(p["mapa"], 101, 100, anvil_tiledata)
+		var udalosti: Array = _posli_udalosti(p, 101, 100)
+		var recepty: Array = []
+		var skill_gumpu: int = -1
+		for event in udalosti:
+			if not (event is Dictionary) or str(event.get("name", "")) != "gump_open":
+				continue
+			var obal: Dictionary = event.get("data", {})
+			if str(obal.get("gump", "")) != "craft":
+				continue
+			var obsah = obal.get("data", {})
+			if obsah is Dictionary:
+				recepty = obsah.get("recipes", [])
+				skill_gumpu = int(obsah.get("skill", -1))
+		t._check(not recepty.is_empty() and skill_gumpu == 7,
+			"interact: kovadlina + kladivo -> `gump_open{craft, skill:7, recipes:%d}` (do 20. session se recepty neposlaly)"
+				% recepty.size())
 
 	# -- J) KLIENT: klik na dlazdici pod kurzorem --------------------------
 	var input_script = Lib.script_at(INPUT_SCRIPT)

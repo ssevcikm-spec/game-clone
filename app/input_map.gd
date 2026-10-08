@@ -453,3 +453,12 @@ func _je_stisknuty(akce: String) -> bool:
 		return false
 	var input_action: String = str(bindings[akce])
 	return InputMap.has_action(input_action) and Input.is_action_pressed(input_action)
+
+
+func akce_just_pressed(akce: String) -> bool:
+	# ⚠ 20. session: UI akce (batoh) - NENI to prikaz pro sim, takze se
+	# neposila pres `poll`; ale `Input` smi cist JEN tenhle modul (docs/02 §2.2),
+	# takze se sem chodi i pro okraj stisku. Akce musi byt v `InputMap`
+	# (`app/player_controller.register_actions`); kdyz neni, vraci false -
+	# "nevim" se nesmi tvarit jako "stisknuto".
+	return InputMap.has_action(akce) and Input.is_action_just_pressed(akce)

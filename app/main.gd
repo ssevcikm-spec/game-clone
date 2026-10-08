@@ -34,6 +34,14 @@ const ItemScript = preload("res://sim/entity/item.gd")
 const HarvestScript = preload("res://sim/systems/harvest.gd")
 const CraftScript = preload("res://sim/systems/craft.gd")
 const JournalScript = preload("res://ui/journal.gd")
+# 20. session: BATOH (granule `ui.backpack`). UI je tenky klient - obsah mu plni
+# `app/main` z `entity.container` a ikony dostava INJEKCI z `render` (ui/ na
+# render/ sahat nesmi, docs/04 §4.1).
+const BackpackScript = preload("res://ui/backpack.gd")
+# 20. session: OKNO VYROBY (`ui.craft_gump`). Otevre ho udalost `gump_open`
+# z `sim.interaction` (par "kladivo + kovadlina"); kliknuti na recept se vrati
+# jako pozadavek a `app/main` z nej posle `Command{t:"craft"}`.
+const CraftGumpScript = preload("res://ui/craft_gump.gd")
 # 20. session (2026-10-08): obecna interakce. `sim.interaction` se registruje
 # TADY (integraci misto) - do teto session nebyl v behu hry vubec, takze kazdy
 # prikaz `use`/`use_on`/`interact` skoncil hlaskou "Not available yet".
@@ -79,6 +87,9 @@ var controller = null
 var hud = null
 var status_bar = null
 var journal = null
+var backpack = null              # `ui.backpack` (20. session)
+var craft_gump = null            # `ui.craft_gump` (20. session)
+var _batoh_klic: Array = []      # posledni obsah batohu (neplnit UI kazdy frame)
 var tiledata = null
 var container = null
 var items: Dictionary = {}       # serial -> Item (smelt/repair hledaji podle serialu)
@@ -132,6 +143,8 @@ func _process(_delta: float) -> void:
 	# ne "nevim": hrac dnes nic nema.
 	if status_bar == null or player == null:
 		return
+	_batoh()
+	_recept()
 	var values: Dictionary = {
 		"name": player.name,
 		"hp": player.hp, "hp_max": player.max_hp, "max_hp": player.max_hp,
@@ -197,6 +210,26 @@ func _setup_ui() -> void:
 		push_warning("app.main: zurnal se nepodarilo zaregistrovat v HUD")
 	if loop != null:
 		loop.journal = journal
+	# BATOH (20. session): okno se seznamem predmetu v batohu. Zavrene, dokud
+	# hrac nezmackne `B` (klavesu vlastni `app/player_controller`, dokud neni
+	# `ui.hotkeys`); ikony dostava INJEKCI v `_setup_world` (textury jeste
+	# neexistuji - `_setup_ui` bezi prvni).
+	backpack = BackpackScript.new()
+	backpack.name = "Backpack"
+	hud.add_child(backpack)
+	backpack.visible = false
+	if not hud.register_window("backpack", backpack, Vector2(8.0, 8.0)):
+		push_warning("app.main: batoh se nepodarilo zaregistrovat v HUD")
+	# OKNO VYROBY (20. session): otevre ho az udalost `gump_open` (dokud recepty
+	# nejsou, nema co zobrazit - a prazdne okno by vypadalo jako vada).
+	craft_gump = CraftGumpScript.new()
+	craft_gump.name = "CraftGump"
+	hud.add_child(craft_gump)
+	craft_gump.visible = false
+	if not hud.register_window("craft_gump", craft_gump, Vector2(8.0, 300.0)):
+		push_warning("app.main: okno vyroby se nepodarilo zaregistrovat v HUD")
+	if loop != null:
+		loop.gump_okna.append(craft_gump)
 	print("[main] UI: okna ", hud.layout().keys(), ", cerny pas vpravo ", GUI_PAS_VPRAVO,
 		" px, dole ", GUI_PAS_DOLE, " px (svet ", rozm - Vector2(GUI_PAS_VPRAVO, GUI_PAS_DOLE), ")")
 
@@ -215,6 +248,9 @@ func _setup_world() -> void:
 	view.gui_odsazeni = Vector2(float(GUI_PAS_VPRAVO) / 2.0, float(GUI_PAS_DOLE) / 2.0)
 	map = MapScript.new()
 	textures = TextureCache.new()
+	# Ikony do batohu jdou INJEKCI (`ui/` nesmi na `render/`, docs/04 §4.1).
+	if backpack != null:
+		backpack.nastav_textury(textures)
 	view.setup(map, textures)
 	print("[main] svet: ", view.visible_count(), " objektu (", view.counts(), "), textury ",
 		textures.stats())
@@ -267,6 +303,12 @@ func _setup_player(view) -> void:
 	# Nastroje (20. session): do batohu jde KAZDY nastroj z `data/items.json`.
 	# Bez nich by obecna interakce nemela co vybrat a vracela by `no_pair`.
 	var nastroju: int = _give_tools()
+	# STANICE VE SVETE (20. session): kovadlina a vyhen. NAMERENO sondou
+	# `_analyza/p24-vyroba.gd`: v okoli Britainu (160 dlazdic) NENI zadna
+	# stanice jako statik mapy, takze bez tohohle by se ruda nedala vytavit -
+	# `sim.craft` sice stanici jako PREDMET umi (`_station_near`), ale nikdo
+	# ji do sveta nedaval. Dava se VEDLE hrace, aby na ni hrac dosahl (2 dlazdice).
+	var stanic: int = _postav_stanice()
 	# Barva kuze (granule `render.hue`, sada `HUE_SKIN` z `hues.json`). Bez ni je
 	# telo 400 sedive: art z `anim.mul` je jen rampa jasu, barvu dava hue.
 	# V UO znamena `hue == 0` "zadna barva", proto se sada dava jen kdyz je 0.
@@ -321,6 +363,7 @@ func _setup_player(view) -> void:
 		push_warning("app.main: ve scene chybi uzel PlayerController - hrac se nepohne")
 		return
 	controller.setup(player, sim, loop.input_map, movement, view, loop)
+	controller.backpack = backpack      # klavesa `B` prepina okno batohu
 	print("[main] hrac: serial ", serial, " na ", player.pos, " (", map.land_at(player.pos.x, player.pos.y),
 		" land), hue ", player.hue, " (0 = bez barvy), barvy: ", view.hue_stats(),
 		", nastroju v batohu ", nastroju, ", pocatecnich skillu ", skillu,
@@ -429,6 +472,88 @@ func _apply_start_skills() -> int:
 		jmena.append("%s %s" % [str(jmeno), str(float(int(mapa[jmeno])) / 10.0)])
 	print("[main] pocatecni skilly: ", ", ".join(PackedStringArray(jmena)))
 	return hodnoty.size()
+
+
+func _recept() -> void:
+	# Kliknuti na recept v okne vyroby -> Command (20. session). Okno samo
+	# neodesila NIC (je to `ui/`); tady se pozadavek vyzvedne a posle do sim.
+	# Stejna cesta jako u klaves: `sim.enqueue` -> `sim.tick` -> dispatch.
+	if craft_gump == null or sim == null:
+		return
+	var pozadavek: Dictionary = craft_gump.odeber_pozadavek()
+	if pozadavek.is_empty():
+		return
+	print("[main] vyroba: recept ", int(pozadavek.get("recipe", -1)),
+		" x", int(pozadavek.get("count", 1)))
+	sim.enqueue(pozadavek)
+
+
+func _batoh() -> void:
+	# Obsah batohu pro okno (20. session). UI je TENKY KLIENT: tady se precte
+	# kontejner a preda se hotovy seznam radku; kdyz se obsah nezmenil, UI se
+	# neprebavuje (jinak by se okno stavělo 60x za sekundu).
+	if backpack == null or player == null or container == null:
+		return
+	var radky: Array = []
+	var klic: Array = []
+	for serial in container.contents(int(player.backpack)):
+		var predmet = items.get(int(serial))
+		if predmet == null:
+			continue
+		var art: int = int(predmet.tile)
+		var amount: int = int(predmet.amount)
+		radky.append({"art": art, "name": ItemScript.name_of(art), "amount": amount})
+		klic.append([int(serial), art, amount])
+	if klic == _batoh_klic:
+		return
+	_batoh_klic = klic
+	backpack.nastav_obsah(radky)
+
+
+func _postav_stanice() -> int:
+	# KOVADLINA A VYHEN DO SVETA (20. session). Bere se z DAT podle role
+	# (`data/items.json`), ne z kódu; `parent == 0` = na zemi, `pos` plati jen
+	# tam (docs/04 §4.5). Hrac stoji na `BRITAIN`, stanice jsou VEDLE nej
+	# (dosah stanice je 2 dlazdice - `sim.craft.STATION_RANGE`).
+	#
+	# ⚠ CO ZATIM NENI: predmety na zemi se NEKRESLI (`app/world_view` kresli
+	# mapu a hrace) - hrac tedy stanici nevidi, jen ji muze pouzit. Vidi to
+	# v zurnalu ("A forge stands to the east."). Kresleni pozemskych predmetu
+	# je dalsi krok (patri do `render` s paritni branou a snimkem).
+	var chci: Array = [{"role": "forge", "x": 1, "y": 0, "smer": "east"},
+		{"role": "anvil", "x": 0, "y": 1, "smer": "south"}]
+	if not FileAccess.file_exists(ITEMS_DATA):
+		push_warning("app.main: chybi " + ITEMS_DATA + " - stanice se nepostavi")
+		return 0
+	var parsed = JSON.parse_string(FileAccess.get_file_as_string(ITEMS_DATA))
+	if not (parsed is Array):
+		return 0
+	var podle_role: Dictionary = {}
+	for rec in parsed:
+		if rec is Dictionary and str(rec.get("role", "")) != "":
+			podle_role[str(rec["role"])] = int(rec.get("tile", 0))
+	var postaveno: int = 0
+	for stanice in chci:
+		var role: String = str(stanice["role"])
+		if not podle_role.has(role):
+			push_warning("app.main: role '" + role + "' v " + ITEMS_DATA + " neni - stanice se nepostavi")
+			continue
+		var art: int = int(podle_role[role]) + ITEM_OFFSET
+		var predmet = ItemScript.new(sim.next_serial(), art, 1)
+		predmet.parent = 0
+		predmet.pos = Vector3i(BRITAIN.x + int(stanice["x"]), BRITAIN.y + int(stanice["y"]),
+			int(player.pos.z))
+		items[int(predmet.serial)] = predmet
+		postaveno += 1
+		_hlaseni_do_zurnalu("A " + role + " stands to the " + str(stanice["smer"]) + ".")
+		print("[main] stanice: ", role, " (art ", art, ") na ", predmet.pos)
+	return postaveno
+
+
+func _hlaseni_do_zurnalu(text: String) -> void:
+	# Hlaseni hraci pri startu. sim ho posila jako udalost (UI je tenky klient).
+	if sim != null and sim.has_method("push_event"):
+		sim.push_event("message", {"text": text, "kind": "system"})
 
 
 func _start_stats() -> Dictionary:

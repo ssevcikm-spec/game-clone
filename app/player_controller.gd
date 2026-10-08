@@ -125,6 +125,14 @@ const MOUSE := {
 	"walk_to_cursor": MOUSE_BUTTON_RIGHT,
 }
 
+# ⚠ UI KLAVESY (20. session): nejsou to prikazy pro sim, takze NEJSOU
+# v `default_bindings()` (to je seznam vetev pro `input_map.poll`) - ale
+# v `InputMap` byt musi, protoze `Input` cte jen `app/input_map.gd`.
+# Presna sada patri granuli `ui.hotkeys`; dokud neni, drzi ji tenhle soubor.
+const UI_KEYS := {
+	"backpack_toggle": [KEY_B],
+}
+
 # Doba jednoho animacniho framu (docs/05 §5.1.1 = `core/const.gd` TURN_MS).
 # Je to ZAROVEN krok pixeloveho posunu: ClassicUO `Mobile.cs:776-782` pocita
 # `x = delay / 80` a `steps = maxDelay / 80`, takze se postava posune
@@ -138,6 +146,9 @@ var player = null
 var view: Node2D = null
 var loop = null            # app/loop.gd - jen kvuli `player_tile` a `camera_offset`
 var camera: Camera2D = null
+# ⚠ 20. session: okno batohu (injektuje `app/main.gd`). Kontroller na nem jen
+# prepina viditelnost - obsah plni `app/main` (UI je tenky klient).
+var backpack = null
 
 var _iso
 var _last_tile: Vector2i = Vector2i(-9999, -9999)
@@ -233,6 +244,16 @@ static func register_actions() -> int:
 			if not InputMap.action_has_event(action, inter):
 				InputMap.action_add_event(action, inter)
 				added += 1
+	# UI KLAVESY (20. session): batoh. Neni to prikaz pro sim (viz hlavicka).
+	for action in UI_KEYS.keys():
+		if not InputMap.has_action(action):
+			InputMap.add_action(action)
+		for code in UI_KEYS[action]:
+			var ui_klavesa := InputEventKey.new()
+			ui_klavesa.keycode = code
+			if not InputMap.action_has_event(action, ui_klavesa):
+				InputMap.action_add_event(action, ui_klavesa)
+				added += 1
 	return added
 
 
@@ -287,6 +308,12 @@ func _process(_delta: float) -> void:
 			input_map.gui_pas = view.gui_odsazeni * 2.0
 	# Krok v letu ridi STAV (akce) i posun v pixelech - viz hlavicka (V2).
 	update_step(_pending_of_player())
+	# UI KLAVESY (20. session): batoh se prepina klavesou `B`. Pres `input_map`
+	# (jedine misto s `Input`) a HLAST do konzole - ticho by znamenalo, ze hrac
+	# nevi, jestli okno otevrel on, nebo se neco pokazilo.
+	if backpack != null and input_map != null and input_map.akce_just_pressed("backpack_toggle"):
+		var otevreny: bool = bool(backpack.toggle())
+		print("[controller] batoh: ", "OTEVREL" if otevreny else "ZAVREL")
 	# ⚠⚠ KAMERA SE POSOUVA KAZDY FRAME (17. session, 2026-10-08) - VADA
 	# "obraz se pohybuje skokove, ne plynule": do teto session se stred kamery
 	# prepsal JEN kdyz se zmenila DLAZDICE (`if tile != _last_tile: _follow()`),

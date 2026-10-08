@@ -8,6 +8,46 @@
 > **Kdo soubor přepisuje celý, ať tyhle bloky nechá** — nebo si je přesune;
 > zkontroluj to **hledáním**, ne pamětí (`docs/09 §9.7`).
 
+## ✅ CO JE NOVÉHO (20. session, DRUHÁ ČÁST) — RECEPTY NA TYPY, VÝHEŇ VE SVĚTĚ, BATOH, VÝROBA
+
+**Zadání uživatele (doslova):** „Proveď všechny 3" — (1) push, (2) výheň a kovadlina do světa
++ batoh → `ruda → ingot → dagger`, (3) recepty z artů na typy.
+
+| Věc | Co je hotové a čím je to doložené |
+|---|---|
+| **(1) Push** | `origin/main` = `105114e`; `git rev-list --count origin/main..HEAD` = **0**. PAT ze souboru, přes `http.extraHeader` (do trezoru se neukládá), před pushí zobrazen `git status` + `git diff --stat` |
+| **(3) Recepty mluví TYPEM** | `data/recipes.json`: materiály i výsledky mají `item_type` (1035/1696 materiálů, 354/1053 výsledků — jen tam, kde se jméno v instalaci NAŠLO; vymyšlená identita by byla horší než žádná). `sim.craft` páruje materiál **podle typu** (`_shoda`), s fallbackem na art pro stará data. **Zisk je měřený**: case `item_type` sekce 3 vyrobí recept z materiálu s **JINÝM artem téhož typu** (do 20. session se nepočítal) |
+| **Plural se nesmí rozpadnout** | `board%s` vs `boards` (= táž věc, jiný art) dělilo jeden předmět na DVA typy — naměřeno **33 dvojic**. `gen-content.py` je sjednocuje na jednotné číslo (typy 3812 → **3779**) a **sjednocuje kategorii v rámci typu** (role > vlastnost > fallback): `dagger` byl u některých artů „weapon" a u jiných „misc". Report: **0 rozporů typu** |
+| **(2) Výheň a kovadlina VE SVĚTĚ** | ⚠ NAMĚŘENO sondou `p24-vyroba.gd`: v okolí Britainu (160 dlaždic) **není žádná stanice jako statik mapy** → `app/main._postav_stanice()` je pokládá jako **předměty na zem** (`parent == 0`) vedle hráče, z DAT podle role. `sim.craft.station_role_at(x,y)` hledá stanici **v mapě i v předmětech** (dřív jen v mapě → kliknutí na naši výheň vracelo `no_pair`) a `smelt` si stanici ověří znovu v dosahu, když nemá serial |
+| **BATOH (`ui.backpack`)** | Okno se seznamem předmětů; obsah plní `app/main` z `container.contents`, **ikony jdou INJEKCÍ** z `render.textures` (ui/ nesmí na render/, docs/04 §4.1). Klávesa `B` (`app/player_controller.UI_KEYS`), otevření/zavření se hlásí do konzole |
+| **VÝROBA (`ui.craft_gump`)** | Okno receptů; otevírá ho událost `gump_open{gump:"craft"}` — ⚠ **tu do 20. session sim vůbec neposílal** (recepty se ztratily ve `_call`), teď je posílá `sim.interaction._run_pair` podle smlouvy §4.6.3. Klik na recept dá POZADAVEK, který `app/main` pošle jako `Command{t:"craft"}` (UI nezná `sim` ani `Input`) |
+| **CELÁ SMYČKA OVĚŘENÁ ŽIVĚ** | `_analyza/p24-vyroba.gd` na SKUTEČNÉ mapě: 12 rudy (Mining 30.0 → 31.5) → **12 ingotů** („You smelt the ore and get 12 ingots.") → kovadlina + kladivo → **196 receptů** → vyrobený **buckler** („You create the item."). Naměřeno i to, že tavení železa při Mining 30 často selže — **je to věrné** (`Ore.cs:355-370`: minSkill 25, maxSkill 75 → ~10 %) |
+
+**Čísla (celá na tomto stromě):** testy **1283 → 1352 kontrol / 0 selhání** (48 case souborů,
+všechny se načtou); brány `run-all.py` **11 měřeno / 0 chyb**; mutace
+`--only item,container,interaction,craft` **46/46 chyceno** (dva nové vzory: párování materiálu
+podle typu a hledání stanice v předmětech).
+
+**⚠ NÁLEZY TÉTO ČÁSTI:**
+(`a`) **Mutační harness počítá mutaci za chycenou podle PREFIXU hlášky.** Můj řetězový test
+(prefix `interact`) mutaci `sim.craft` **odhalil**, ale harness ji vyhodnotil jako
+„PROSLA - TEST JE SLEPÝ: sada selhala, ale bez FAIL tohoto modulu". Řešení: k řetězové kontrole
+patří i **přímá kontrola té funkce s prefixem jejího modulu** (`sim.craft: station_role_at …`).
+Bez toho vzniká falešný nález „test je slepý" u správného testu — a kdo ho uvěří, „opraví" ho.
+(`b`) **`queue_free()` v testu bez framů nechá staré uzly v okně** — okno pak hlásí jiný obsah,
+než má (naměřeno: batoh tvrdil prázdný text a chybějící ikonu). V `ui.backpack`/`ui.craft_gump`
+se proto uvolňuje `remove_child` + `free()` (okamžitě).
+(`c`) **`Control` je ve Godotu viditelný ve vychozím stavu** — nové okno musí `visible = false`
+v `_init`, jinak při startu překryje svět (a test měří něco jiného než hra).
+(`d`) **Smelting železa při Mining 30 selhává (~10 %) a je to SPRÁVNĚ** — než jsem to ověřil
+v referenci, sonda hlásila „CHYBA - z ingotů nic". Sonda teď měří, kolik pokusů to dá
+(a neúspěch učí: Mining roste).
+
+**Co zůstává (pojmenované):** **předměty na zemi se NEKRESLÍ** — hráč výheň/kovadlinu uvidí
+jen v žurnálu („A forge stands to the east."), ne na obrazovce; kreslení pozemských předmětů
+patří do `render` s paritní branou a snímkem. Dále: recepty pořád nesou `tile` (art) vedle
+typu (resolver jmen zůstal), `ui.target_cursor`/`target_reply`, loot/spawn a ukládání předmětů.
+
 ## ✅ CO JE NOVÉHO (20. session) — OBECNÁ INTERAKCE + „TYP JE IDENTITA, ART JE JEHO PROJEV"
 
 **Zadání uživatele (doslova):** „Cílem je nyní zprovoznit nějakou interaktivitu…

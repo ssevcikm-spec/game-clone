@@ -152,9 +152,10 @@ func interact(m: int, target: Dictionary) -> Dictionary:
 	var pozadovana: String = ""
 	if str(na.get("kind", "")) == "tile":
 		pozadovana = _method_for_tile(int(na.get("x", 0)), int(na.get("y", 0)))
-		if pozadovana == "":
-			# Na te dlazdici neni uzel, se kterym umime neco delat (travnik,
-			# zed, voda bez rybarskeho prutu neni duvod). Hlaska, ne ticho.
+		if pozadovana == "" and str(na.get("station_role", "")) == "":
+			# ⚠ 20. session: dlazdice muze byt UZEL (hora/strom/voda) nebo
+			# STANICE (kovadlina/vyhen). Kdyz neni ani jedno, nema smysl hledat
+			# nastroj - a hrac to musi VIDET (hlaska, ne ticho).
 			return _fail("no_pair")
 	var serial: int = tool_for(m, na, pozadovana)
 	if serial <= 0:
@@ -300,8 +301,11 @@ func route_of(kind: String) -> Dictionary:
 
 
 func pair_of(od: Dictionary, na: Dictionary) -> Dictionary:
-	# `na` je role u predmetu, nebo "tile" u cíle do sveta.
-	var hledane_na: String = "tile" if str(na.get("kind", "")) == "tile" else str(na.get("role", ""))
+	# `na` je role u predmetu, STANICE (kovadlina/vyhen) u dlazdice, nebo "tile"
+	# u uzlu suroviny (hora/strom/voda).
+	var hledane_na: String = str(na.get("station_role", ""))
+	if hledane_na == "":
+		hledane_na = "tile" if str(na.get("kind", "")) == "tile" else str(na.get("role", ""))
 	for par in PAIRS:
 		if str(par["od"]) == str(od.get("role", "")) and str(par["na"]) == hledane_na:
 			return par
@@ -401,7 +405,18 @@ func _run_pair(m: int, od: Dictionary, na: Dictionary, par: Dictionary) -> Dicti
 		var skill: int = skill_id(str(par.get("skill", "")))
 		if skill < 0:
 			return _fail("no_data")      # chybejici skill NENI "neni to hotove"
-		args = [m, skill]
+		# ⚠ 20. session: SMLOUVA §4.6.3 zadava, ze dvojklik na kladivo posle
+		# `gump_open{gump:"craft", data:{skill, recipes:[...]}}` - do teto session
+		# se ale recepty jen vratily z `recipes_for` a UDALOST SE NEPOSLALA,
+		# takze se seznam receptu ke klientovi vubec nedostal (a okno vyroby
+		# nemelo co zobrazit). Ted se posila; seznam je v datech udalosti.
+		var recepty = _call_array("craft", "recipes_for", [m, skill])
+		if recepty == null:
+			return _fail("not_available")
+		_event("gump_open", {"gump": "craft",
+			"data": {"skill": skill, "recipes": recepty}})
+		return {"ok": true, "action": akce2, "reason": "", "skill": skill,
+			"recipes": recepty}
 	elif akce2 == "harvest":
 		args = [m, int(na.get("x", 0)), int(na.get("y", 0))]
 	else:
@@ -424,6 +439,17 @@ func _merge(od: Dictionary, na: Dictionary) -> Dictionary:
 
 
 # -- vnitrni: dynamicky routing -------------------------------------------
+
+func _call_array(system_name: String, method: String, args: Array) -> Variant:
+	# Volani systemu, ktery vraci SEZNAM (napr. `craft.recipes_for`). Kdyz
+	# system neni nebo nevrati seznam, vraci `null` - volajici to hlasí
+	# (`not_available`), nikdy ticho.
+	var system = _system(system_name)
+	if system == null or not system.has_method(method):
+		return null
+	var res = system.callv(method, args)
+	return res if res is Array else null
+
 
 func _call(system_name: String, method: String, args: Array, akce: String) -> Dictionary:
 	# Kdyz system v `SimWorld.systems` neni, vraci se `not_available` - nikdy ticho.
@@ -468,10 +494,25 @@ func _describe_target(target: Dictionary) -> Dictionary:
 		"item", "mobile":
 			return describe(int(target.get("serial", 0)))
 		"tile":
-			return {"kind": "tile", "serial": 0, "role": "tile", "category": "tile",
+			var out: Dictionary = {"kind": "tile", "serial": 0, "role": "tile", "category": "tile",
 				"x": int(target.get("x", 0)), "y": int(target.get("y", 0)),
 				"z": int(target.get("z", 0))}
+			# ⚠ 20. session: na te dlazdici muze stat STANICE (kovadlina/vyhen).
+			# Ptáme se `sim.craft` (dynamicky - kdyz system neni, odpovedi je "")
+			# a vysledek jde do `station_role`; `pair_of` ho pouzije MISTO "tile",
+			# takze "ruda na vyhen" funguje i na statik mapa (nema serial).
+			var role_stanice: String = _station_role(int(out["x"]), int(out["y"]))
+			if role_stanice != "":
+				out["station_role"] = role_stanice
+			return out
 	return {"kind": "unknown", "serial": 0, "role": "", "category": ""}
+
+
+func _station_role(x: int, y: int) -> String:
+	var system = _system("craft")
+	if system == null or not system.has_method("station_role_at"):
+		return ""
+	return str(system.station_role_at(x, y))
 
 
 func _is_door(tile: int) -> bool:

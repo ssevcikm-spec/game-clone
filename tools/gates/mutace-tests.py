@@ -978,6 +978,20 @@ MODULY = {
             ("exceptionalita se nikdy nevyhodnoti",
              "var exceptionalni: bool = _rng.chance(_exceptional_chance(system, hodnota, sance))",
              "var exceptionalni: bool = false"),
+            # ⚠ 20. session: MATERIAL RECEPTU SE HLEDA PODLE TYPU (identita),
+            # ne podle artu - jeden typ ma vic artu (prkna 4, klada 6).
+            # Kdyby se porovnaval jen art, hromada s jinou grafikou by se do
+            # receptu NEPOCITALA (kryje to case `item_type`, sekce 3).
+            ("material se porovnava jen podle artu (jiny art tehoz typu se nenajde)",
+             '\tif hledany != "" and str(item.type) != "":\n\t\treturn str(item.type) == hledany',
+             '\tif false:\n\t\treturn false'),
+            # ⚠ 20. session: STANICE MUZE BYT I PREDMET NA ZEMI (tak ji klade
+            # `app/main._postav_stanice`; v okoli Britainu neni statik).
+            # Kdyby se ptala jen mapy, kliknuti na vyhen by vracelo `no_pair`
+            # (namEReno sondou `p24-vyroba.gd`, kryje to case `interact`, O2).
+            ("stanice se hleda jen v mape (predmet na zemi se ignoruje)",
+             '\tif _items is Dictionary:\n\t\tfor serial in _items:\n\t\t\tvar item = _items[serial]\n\t\t\tif item == null or int(item.parent) != 0:',
+             '\tif false:\n\t\tfor serial in _items:\n\t\t\tvar item = _items[serial]\n\t\t\tif item == null or int(item.parent) != 0:'),
         ],
     },
     # 16. session: zurnal (docs/04 §4.2). Mutace miri na davkove prebaveni
