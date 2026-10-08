@@ -31,6 +31,39 @@ const Const = preload("res://core/const.gd")
 
 const CHUNK_MESH_SCRIPT := "res://render/chunk_mesh.gd"
 const STRANKA: int = 64              # velikost runtime atlasu v testu
+# Jas ROVNE plochy podle reference (`IsometricWorld.fx:64,67`): n = (0,0,1),
+# svetlo = normalize((0,1,1)), dot = 1/sqrt(2) -> (0.7071068/2)+0.5.
+# Je to SPECIFIKACE, proto je tady napsana natvrdo (ne ctena z module) - kdyby
+# se cetla z mutanta, mutace konstanty by testem prosla.
+const SVAH_JAS_REF: float = 0.85355339
+# Smer svetla reference (`IsometricWorld.fx:14`) - taky natvrdo (specifikace).
+const SVETLO_REF := Vector3(0.0, 1.0, 1.0)
+
+
+static func _jas_reference(obj: Dictionary) -> float:
+	# NEZAVISLY prepis reference: normala ROVINY ctyr rohu (`Land.CalculateNormal`,
+	# `Land.cs:164-238`; meritka 22 px a `Z*4`) + `get_light`
+	# (`IsometricWorld.fx:60-69`, `Brightlight = 1.0`). Test si ji pocita SAM,
+	# aby nemeril tou funkci, kterou testuje (jinak by prosla i konstanta).
+	var rohy: Array = obj.get("z_corners", [])
+	if rohy.size() != 4:
+		return SVAH_JAS_REF
+	var zt: float = float(int(obj["z"]))
+	var zr: float = float(int(rohy[1]))
+	var zl: float = float(int(rohy[2]))
+	var zb: float = float(int(rohy[3]))
+	if zt == zr and zt == zl and zt == zb:
+		return SVAH_JAS_REF
+	var krok: float = float(Const.ISO_STEP)
+	var zs: float = float(Const.Z_SCALE)
+	var t := Vector3(0.0, -krok, zs * zt)
+	var r := Vector3(krok, 0.0, zs * zr)
+	var b := Vector3(0.0, krok, zs * zb)
+	var l := Vector3(-krok, 0.0, zs * zl)
+	# Diagonaly (soucet normal obou trojuhelniku), ne tri rohy - levy roh musi
+	# do normály vstoupit taky.
+	var n: Vector3 = (r - l).cross(b - t).normalized()
+	return maxf(n.dot(SVETLO_REF.normalized()), 0.0) / 2.0 + 0.5
 
 
 class FakeChunk:
@@ -268,14 +301,23 @@ func run(t) -> void:
 		and r3[1] == p4 + Vector2(2.0 * krok, 0.0)
 		and r3[2] == p4 + Vector2(2.0 * krok, krok),
 		"render.chunk_mesh: dira ma tvar z `_draw_hole` (namEReno %s)" % str(r3))
-	# barvy: land bile, SVAH ztmaveny (reference pousti texmapu rezimem
-	# `SHADER_LAND` s jasem 0.85355339), dira magenta (jinak by zmizela)
+	# barvy: land bile, dira magenta (jinak by zmizela), SVAH STINOVANY podle
+	# normaly (task-5: reference `IsometricWorld.fx:60-69` + `:14`). Barvu svahu
+	# pocita `svah_barva()`, takze se tu meri DVE veci zvlast: (1) ze dávka
+	# pouziva PRAVE tu funkci (vrchol == jeji vystup), (2) ze funkce dava
+	# referencni hodnotu - tu si test pocita SAM (`_jas_reference`).
 	var hole_color: Color = Lib.consts_at(cesta).get("HOLE_COLOR", Color.WHITE)
-	var svah_barva: Color = Lib.consts_at(cesta).get("SVAH_BARVA", Color.WHITE)
-	t._check(barvy[0] == Color.WHITE and barvy[1 * 6].is_equal_approx(svah_barva)
+	var svah_barva_davky: Color = script.svah_barva(seznam[2])
+	var svah_jas_ref: float = _jas_reference(seznam[2])
+	t._check(barvy[0] == Color.WHITE and barvy[1 * 6] == svah_barva_davky
 		and barvy[3 * 6].is_equal_approx(hole_color),
-		"render.chunk_mesh: dira ma barvu HOLE_COLOR, svah barvu SVAH_BARVA, land bilou "
+		"render.chunk_mesh: dira ma barvu HOLE_COLOR, svah barvu z `svah_barva`, land bilou "
 		+ "(namEReno %s / %s / %s)" % [str(barvy[0]), str(barvy[1 * 6]), str(barvy[3 * 6])])
+	t._check(is_equal_approx(svah_barva_davky.r, svah_jas_ref)
+		and absf(svah_jas_ref - SVAH_JAS_REF) > 0.001,
+		"render.chunk_mesh: svah ma jas PODLE NORMALY (namEReno %.6f, reference %.6f, "
+			% [svah_barva_davky.r, svah_jas_ref]
+		+ "rovina %.8f)" % SVAH_JAS_REF)
 
 	# PORADI: druhy kvadr zacina presne tam, kde prvni konci (v poradi seznamu)
 	t._check(body[6] != body[0] and _rohy(body, 1)[0].x > _rohy(body, 0)[0].x,
@@ -520,3 +562,92 @@ func run(t) -> void:
 	var ok5: bool = velky.build(maly_seznam)
 	t._check(not ok5 and velky.pretek(),
 		"render.chunk_mesh: art vetsi nez stranka se NAHLASI (build %s)" % str(ok5))
+
+	# --- H) ⚠ task-5: STINOVANI SVAHU PODLE NORMALY ------------------------
+	# Reference: `IsometricWorld.fx:14` (`LIGHT_DIRECTION = (0,1,1)`) a `:60-69`
+	# (`get_light`); normala = rovina ctyr rohu (`Land.CalculateNormal`,
+	# `Land.cs:164-238`). Co se tu meri:
+	#   (a) ROVNA dlazdice = dnesni barva BEZE ZMENY (identita) - jedina
+	#       kontrola, ktera pozna, ze se nemeni to, co menit nema,
+	#   (b) dva svahy s OPACNYM sklonem maji RUZNY jas,
+	#   (c) svah s JINOU normalou ma jas jiny nez prvni dva,
+	#   (d) jas zustava v <0,1> a NEPRESVITI texturu - i kdyz volajici preda
+	#       `Brightlight` profilu 15 (1.5), ktery na realnem terenu dava 1.073223.
+	var rovna := _obj("land", 0, 0, 3, {"z": 5, "texmap": 0, "z_corners": [5, 5, 5, 5]})
+	var svah_a := _obj("land", 0, 0, 3, {"z": 0, "texmap": 7, "z_corners": [0, 0, 0, 10]})
+	var svah_b := _obj("land", 1, 0, 3, {"z": 10, "texmap": 7, "z_corners": [10, 0, 0, 0]})
+	var svah_c := _obj("land", 2, 0, 3, {"z": 0, "texmap": 7, "z_corners": [0, 0, 10, 0]})
+	var svah_barva: Color = Lib.consts_at(cesta).get("SVAH_BARVA", Color.WHITE)
+	# (a) IDENTITA: rovna dlazdice vraci PRESNE puvodni konstantu (ne priblizne)
+	# - proto se to srovnava `==`, ne `is_equal_approx` (jinak by proslo
+	# i "0.8535534 misto 0.85355339", coz je zmena, ktera se merit nema).
+	var n_rovna: Vector3 = script.svah_normal(rovna)
+	var jas_rovna: float = script.svah_jas(rovna)
+	t._check(n_rovna == Vector3.ZERO and jas_rovna == SVAH_JAS_REF
+		and script.svah_barva(rovna) == svah_barva,
+		"render.chunk_mesh: ROVNA dlazdice = normala 0 a PRESNE puvodni barva "
+		+ "(namEReno n %s, jas %.8f vs %.8f, barva %s vs %s)" % [str(n_rovna),
+			jas_rovna, SVAH_JAS_REF, str(script.svah_barva(rovna)), str(svah_barva)])
+	# (b)+(c) jas podle normaly: srovnani s NEZAVISLY prepisem reference
+	var ja: float = script.svah_jas(svah_a)
+	var jb: float = script.svah_jas(svah_b)
+	var jc: float = script.svah_jas(svah_c)
+	var ra: float = _jas_reference(svah_a)
+	var rb: float = _jas_reference(svah_b)
+	var rc: float = _jas_reference(svah_c)
+	t._check(is_equal_approx(ja, ra) and is_equal_approx(jb, rb) and is_equal_approx(jc, rc),
+		"render.chunk_mesh: jas svahu sedi na referenci (namEReno %.6f/%.6f/%.6f, "
+			% [ja, jb, jc]
+		+ "reference %.6f/%.6f/%.6f)" % [ra, rb, rc])
+	t._check(absf(ja - jb) > 0.1 and ja < jb,
+		"render.chunk_mesh: dva svahy s OPACNYM sklonem maji RUZNY jas "
+		+ "(namEReno %.6f vs %.6f)" % [ja, jb])
+	t._check(absf(jc - ja) > 0.05 and absf(jc - jb) > 0.05,
+		"render.chunk_mesh: svah s JINOU normalou ma jas jiny nez prvni dva "
+		+ "(namEReno %.6f vs %.6f / %.6f)" % [jc, ja, jb])
+	# (d) rozsah: s VYCHOZIM `Brightlight` (1.0) je jas v <0,1) - nikdy nic
+	# nepresviti. S profilem 15 (1.5) by reference prekrocila 1.0, takze se
+	# BARVA oreze na 1.0 (kresleni nesmi dat vic) - a `svah_jas` to cislo
+	# ukaze nezorezane, aby byl videt rozdil.
+	var rozsah_ok: bool = true
+	var nejmensi: float = 9.0
+	var nejvetsi: float = -9.0
+	var nejvetsi_15: float = -9.0
+	for o in [svah_a, svah_b, svah_c, seznam[2]]:
+		var c: Color = script.svah_barva(o)
+		nejmensi = minf(nejmensi, minf(c.r, minf(c.g, c.b)))
+		nejvetsi = maxf(nejvetsi, maxf(c.r, maxf(c.g, c.b)))
+		if c.r < 0.0 or c.r > 1.0 or c.g < 0.0 or c.g > 1.0 or c.b < 0.0 or c.b > 1.0:
+			rozsah_ok = false
+		var c15: Color = script.svah_barva(o, 1.5)
+		nejvetsi_15 = maxf(nejvetsi_15, maxf(c15.r, maxf(c15.g, c15.b)))
+		if c15.r < 0.0 or c15.r > 1.0 or c15.g < 0.0 or c15.g > 1.0 or c15.b < 0.0 or c15.b > 1.0:
+			rozsah_ok = false
+	t._check(rozsah_ok and nejmensi >= 0.0 and nejvetsi < 1.0 and nejvetsi_15 <= 1.0,
+		"render.chunk_mesh: barva svahu je v <0,1) a NEPRESVITI ani s profilem 15 "
+		+ "(namEReno min %.6f, max pri 1.0 %.6f, max pri 1.5 %.6f)"
+			% [nejmensi, nejvetsi, nejvetsi_15])
+	# `Brightlight` je VSTUP, ne mrtvy parametr: s 1.5 se jas ZVETSI a reference
+	# by prekrocila 1.0 - kdyby se parametr ignoroval, tohle spadne.
+	var base_b: float = _jas_reference(svah_b)
+	var ocekavane_15: float = base_b + (1.5 * (base_b - SVAH_JAS_REF) - (base_b - SVAH_JAS_REF))
+	t._check(script.svah_jas(svah_b, 1.5) > script.svah_jas(svah_b)
+		and is_equal_approx(script.svah_jas(svah_b, 1.5), ocekavane_15)
+		and ocekavane_15 > 1.0 and script.svah_barva(svah_b, 1.5).r <= 1.0,
+		"render.chunk_mesh: `Brightlight` je VSTUP (1.5 da %.6f > 1.0, barva se oreze na %.6f)"
+			% [script.svah_jas(svah_b, 1.5), script.svah_barva(svah_b, 1.5).r])
+	# A CELOU CESTU: dávka da do VRCHOLU presne to, co vraci `svah_barva`
+	var mesh_s = script.new(FakeChunk.new(), textury, STRANKA)
+	mesh_s.build([svah_a, svah_b, svah_c])
+	mesh_s.tick_hold()
+	mesh_s.tick_hold()
+	var barvy_s: PackedColorArray = mesh_s.get("_barvy")
+	var sedi_vrcholy: bool = barvy_s.size() == 3 * 6
+	for i in 3:
+		var ocekavana: Color = script.svah_barva([svah_a, svah_b, svah_c][i])
+		for v in 6:
+			if barvy_s[i * 6 + v] != ocekavana:
+				sedi_vrcholy = false
+	t._check(sedi_vrcholy and int(mesh_s.stats()["svahu"]) == 3,
+		"render.chunk_mesh: dávka kresli kazdy svah svou barvou z `svah_barva` "
+		+ "(svahu %s, vrcholu %d)" % [str(mesh_s.stats()["svahu"]), barvy_s.size()])

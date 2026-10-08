@@ -761,24 +761,40 @@ func cesty() -> Dictionary:
 func _draw_slope(obj: Dictionary, pozice: Vector2) -> bool:
 	# SVAH: kresli se TEXMAPEM natazenym pres ctyrrohy (ClassicUO `Batcher2D.cs:241`
 	# `DrawStretchedLand`). Rozhodnuti je v `is_slope()` - tady uz jen kresleni.
-	# ⚠ Zjednoduseni (zapsane, ne zamlcene): ClassicUO pocita jeste NORMALS pro
-	# svetlo (`CalculateNormal`) - tady se svah kresli bez srafovani svetlem,
-	# protoze `render.light` v projektu jeste neni.
+	# ⚠ ZMENENO (task-5, 20. session): do teto zmeny se svah kreslil JEDNOU
+	# konstantni barvou (bez srafovani svetlem). Dnes se barva bere z NORMALY
+	# svahu (`chunk_mesh.svah_barva`, reference `IsometricWorld.fx:60-69`
+	# `get_light` + `Land.CalculateNormal`) - kopec tim dostal smer svetla.
+	# Rovna plocha vraci presne puvodni `SVAH_JAS` (identita).
 	if not is_slope(obj):
 		return false
 	var body: PackedVector2Array = slope_polygon(obj, pozice)
 	var tex: Texture2D = _textures.texmap(int(obj["texmap"]))
 	# ⚠ 18. session: barva svahu a UV jsou STEJNE jako v dávce (`chunk_mesh`),
 	# aby se obe cesty nerozesly (docs/08: modernizace nesmi ubrat mereni).
+	# Od task-5 to plati i pro JAS: obe cesty volaji TUTEZ funkci
+	# (`slope_barva` -> `chunk_mesh.svah_barva`), zadna si ji nepocita po svem
+	# (na rozejiti se obou cest padala 18. session).
 	# `slope_uv` dostava velikost textury, aby sel pridat pulpixelovy inset
 	# proti sevum - `AtlasTexture.get_width()` vraci sirku regionu.
-	var barvy := PackedColorArray([MeshScript.SVAH_BARVA, MeshScript.SVAH_BARVA,
-		MeshScript.SVAH_BARVA, MeshScript.SVAH_BARVA])
+	var barva: Color = slope_barva(obj)
+	var barvy := PackedColorArray([barva, barva, barva, barva])
 	if tex == null:
 		return false
 	draw_polygon(body, barvy,
 		MeshScript.slope_uv(float(tex.get_width()), float(tex.get_height())), tex)
 	return true
+
+
+static func slope_barva(obj: Dictionary, brightlight: float = 1.0) -> Color:
+	# BARVA SVAHU pro PUVODNI cestu (kresleni `_draw_slope`). Je to jen
+	# pruchod na `render.chunk_mesh.svah_barva` - jedna funkce pro obe cesty
+	# (dávku i puvodni kresleni), aby se NEMOHLY rozejit (18. session: presne
+	# to byla vada "ruzne svetle svahy"). Test porovnava tuhle funkci
+	# s nezavislym prepisem reference, ne jen s `chunk_mesh`.
+	# `brightlight` je vstup (vychozi 1.0 = neutralni profil; viz hlavicka
+	# `render/chunk_mesh.gd`), aby ho budouci `render.light` mohl predat.
+	return MeshScript.svah_barva(obj, brightlight)
 
 
 static func slope_polygon(obj: Dictionary, pos: Vector2) -> PackedVector2Array:

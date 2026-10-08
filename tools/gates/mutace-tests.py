@@ -853,10 +853,34 @@ MODULY = {
             ("ceka stranka se kresli jako dira (magenta)",
              "if tex == null and _textures.page_pending(art_id):",
              "if false:"),
-            # ⚠ 18. session: barva svahu (reference stinuje jen stretched land).
-            ("svah se kresli bez ztmaveni (jina svetlost nez rovina)",
-             "barva = SVAH_BARVA       # viz `SVAH_JAS` v hlavicce",
-             "barva = Color.WHITE"),
+            # ⚠ 19. session (task-5): STINOVANI SVAHU PODLE NORMALY. Do teto
+            # session tu byl vzor `barva = SVAH_BARVA  # viz SVAH_JAS v hlavicce`,
+            # ale ten radek se prepsal na `barva = svah_barva(obj)`, takze se
+            # mutace TISE neprovadela ("PATRANA VETA SE NENASLA"). Nahrazeny jsou
+            # dva vzory od teammate „svetlo" (overene rucnim behem, kazdy ma
+            # v dokladu pocet selhani): vypnuti stinovani a zruseni normaly.
+            ("svah se kresli bez stinovani podle normaly (jedna barva)",
+             "var base: float = maxf(n.dot(SVETLO_SMER.normalized()), 0.0) / 2.0 + 0.5",
+             "var base: float = SVAH_JAS"),
+            ("normala svahu je vzdy svisla (zadny sklon)",
+             "return (r - l).cross(b - t).normalized()",
+             "return Vector3(0.0, 0.0, 1.0)"),
+            ("svetlo sviti z opacne strany (stin na spatne strane)",
+             "const SVETLO_SMER := Vector3(0.0, 1.0, 1.0)",
+             "const SVETLO_SMER := Vector3(0.0, -1.0, 1.0)"),
+            ("jas se neořezává na 1.0 (textura se muze preexponovat)",
+             "var j: float = clampf(svah_jas(obj, brightlight), 0.0, 1.0)",
+             "var j: float = svah_jas(obj, brightlight)"),
+            # ⚠ 19. session: ZKOUSENO a ODSTRANENO (stejna rodina jako u `sort`):
+            # vetev `if j == SVAH_JAS: return SVAH_BARVA` vraci PRESNE tutez
+            # barvu, kterou by dala i cesta pres `Color(j, j, j, 1.0)`. Zkousene
+            # mutace ("vetev nikdy", "vrat 0.8535534") testy NEODHALI (namEReno
+            # `_analyza/p22-mutace-trate7.txt`), protoze `Color` se v GDScriptu
+            # uklada jako float32 a 0.8535534 i 0.85355339 zkola na tutez
+            # float32 hodnotu. Neni to slepa BRANA (test na identitu existuje
+            # a chyti zmenu prahu, napr. SVAH_JAS 0.85), ale je to mrtva METRIKA -
+            # a mrtva metrika se nema nechat lezet. Az bude mit vetev vlastni
+            # test na bitovou presnost (pres `PackedByteArray`), vzor se vrati.
         ],
     },
     # M9 (15. session): typovana konfigurace. Mutace miri na to, co ma byt

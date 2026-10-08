@@ -63,17 +63,49 @@ const HOLD_FRAMU: int = 2            # frame, nez se smi pouzit nova stranka
 # Kolik objektu se zpracuje, nez se zkontroluje cas (18. session). Kontrolovat
 # cas po KAZDEM objektu by bylo drazsi nez prace sama (`Time.get_ticks_usec`).
 const DRZKA: int = 64
-# ⚠ BARVA SVAHU (18. session): reference pousti plochy land art rezimem
-# `SHADER_NONE` (bez stineni) a SVah (texmapu) rezimem `SHADER_LAND`, kde se
-# barva nasobi `get_light(normal)`; pro plochou normalu to je presne
-# **0.85355339** (`IsometricWorld.fx:60-69`, konstanta je tam proto, aby
-# `TerrainShadowsLevel` menil jen kontrast svahu, ne jas roviny). Bez tohoto
-# faktoru jsou nase svahy o ~15 % svetlejsi nez rovina a nez klientsky obraz.
-# ⚠ VEDOME OMEZENI: stinovani podle NORMALY (`Land.CalculateNormal`, 4 křízove
-# souciny v obrazovem prostoru) tu NENI - patri k `render.light` (rozhodnuti R10
-# v `ROZHODNUTI-2026-10-08.md`). Dnes tedy vsechny svahy ztmavneme stejne.
+# ⚠ BARVA SVAHU (18. session; STINOVANI PODLE NORMALY pridano v task-5):
+# reference pousti plochy land art rezimem `SHADER_NONE` (bez stineni) a SVAH
+# (texmapu) rezimem `SHADER_LAND` (`_src/classicuo/src/ClassicUO.Client/Game/
+# GameObjects/Views/LandView.cs:53`), kde se barva nasobi `get_light(normal)`
+# (`IsometricWorld.fx:143-146`). `get_light` (`IsometricWorld.fx:60-69`) je
+#     base = max(dot(normal, normalize((0,1,1))), 0) / 2 + 0.5
+# (smer svetla `IsometricWorld.fx:14`), takze ROVNA plocha (n = (0,0,1)) ma
+# base = 1/sqrt(2)/2 + 0.5 = **0.85355339** = `SVAH_JAS`. Presne proto jsou nase
+# svahy stejne svetle jako rovina a ne o ~15 % svetlejsi.
+#
+# ⚠⚠ DO teto zmeny se vsechny svahy ztmavovaly TOUTEZ konstantou, takze kopec
+# byl plosne stejne tmavy a nemel zadny smer svetla. Dnes se jas pocita
+# z NORMALY SVAHU (`svah_jas`): normala je rovina ctyr rohu dlazdice - presne
+# tech, ktere kresli `slope_polygon` (vysky rohu jsou `z` + `z_corners`).
+# Reference pocita normaly pro KAZDY ROH ZVLAST z osmi sousedu
+# (`Land.CalculateNormal`, `Land.cs:164-238`; vstupy `Land.cs:113-116,145-155`)
+# a shader je mezi vrcholy interpoluje - my kreslime JEDEN kvadr JEDNOU barvou,
+# takze bereme normalu ROVINY toho kvadru. Na planarni rovine je to TOTOTZ
+# (doklad: `_analyza/p22-svetlo-mereni.gd`, uhel 0.0000 st); na realnem terenu
+# se to lisi (namEReno 15-63 st), protoze dlazdicovy objekt severni a zapadni
+# soused vubec nema.
+#
+# ⚠ ODBOCKA OD REFERENCE (zapsana, ne zamlcena): reference ma v `get_light`
+# jeste clen `Brightlight` (`IsometricWorld.fx:68`), ktery klient nastavuje
+# z profilu `TerrainShadowsLevel` (`GameScene.cs:1002`: `* 0.1`). S profilem
+# 15 (default v `Configuration/Profile.cs:240`) je `Brightlight = 1.5` a jas
+# vychazi **0.323223 .. 1.073223** - tedy NAD 1.0, textura by se presvitila
+# do bila. My `Brightlight` ZADNY nemame (zadna denni doba ani profil), proto
+# je to VSTUP s vychozi hodnotou 1.0 (`BRIGHTLIGHT_DEFAULT`) - zamerne
+# zjednoduseni, ne opomenuti: az bude `render.light` a profil, staci hodnotu
+# predat (stejny princip jako u zoomu a statu). S vychozi 1.0 je jas
+# v <0.5, 1.0> (namEReno pres 3914 svahu: min 0.500000, max 1.000000; presne
+# 1.0 = dlazdice odvracena presne ke svetlu, textura zustane NEZTMAVENA, ne
+# presvicena - 1.0 * textura je textura).
 const SVAH_JAS: float = 0.85355339
 const SVAH_BARVA := Color(SVAH_JAS, SVAH_JAS, SVAH_JAS, 1.0)
+# Smer svetla reference (`IsometricWorld.fx:14`); `svah_jas` si ho normalizuje.
+const SVETLO_SMER := Vector3(0.0, 1.0, 1.0)
+# Vychozi `Brightlight` (neutralni profil = zadne zvyrazneni kontrastu svahu).
+const BRIGHTLIGHT_DEFAULT: float = 1.0
+# `Brightlight` profilu 15 - jen pro doklad v testu/probe, NEPOUZIVA se ke
+# kresleni (viz odstavec vyse: 1.5 dava jas az 1.072374, tedy presviti texturu).
+const BRIGHTLIGHT_PROFIL_15: float = 1.5
 # Pulpixelovy inset UV u TEXMAPY (`ChunkMesh.cs:458-462`: `rect.X + 0.5`,
 # `rect.Width - 1`) - bez nej se na sevech dlazdic proleva sousedni texel.
 const UV_INSET_PX: float = 0.5
@@ -309,6 +341,62 @@ static func slope_uv(sirka: float = 0.0, vyska: float = 0.0) -> PackedVector2Arr
 		Vector2(1.0 - ix, 1.0 - iy), Vector2(ix, 1.0 - iy)])
 
 
+static func svah_normal(obj: Dictionary) -> Vector3:
+	# Normala ROVINY svahu z jeho ctyr rohu. Vysky rohu: horni = `z`, pravy =
+	# `z_corners[1]`, levy = `[2]`, dolni = `[3]` - presne ty, ktere kresli
+	# `slope_polygon` (`render/chunk_renderer.gd:310` je plni jako
+	# [z, z(x+1,y), z(x,y+1), z(x+1,y+1)]). Meritka jsou z `core.const`
+	# (ISO_STEP px na osu dlazdice, Z_SCALE px na jednotku vysky) - stejna
+	# cisla, jakymi pocita reference (`Land.cs:181-228`: 22 px a `* 4`).
+	# Rovna plocha vraci ZERO ("neni co stinovat").
+	var rohy: Array = obj.get("z_corners", [])
+	if rohy.size() != 4:
+		return Vector3.ZERO
+	var zt: float = float(int(obj["z"]))
+	var zr: float = float(int(rohy[1]))
+	var zl: float = float(int(rohy[2]))
+	var zb: float = float(int(rohy[3]))
+	if zt == zr and zt == zl and zt == zb:
+		return Vector3.ZERO
+	var krok: float = float(Const.ISO_STEP)
+	var zs: float = float(Const.Z_SCALE)
+	var t := Vector3(0.0, -krok, zs * zt)
+	var r := Vector3(krok, 0.0, zs * zr)
+	var b := Vector3(0.0, krok, zs * zb)
+	var l := Vector3(-krok, 0.0, zs * zl)
+	# ⚠ DIAGONALY, ne tri rohy: `(r-t) x (b-t)` by levy roh VUBEC nepouzilo a
+	# zmena `z_corners[2]` by jasem nepohnula (namEReno pri psani teto zmeny).
+	# `(r-l) x (b-t)` je presne SOUCET normal OBOU TROJUHELNIKU kvadru
+	# (`(r-t)x(b-t) + (l-b)x(t-b)` = `(r-l)x(b-t)`, oba cleny maji velikost
+	# 2*plocha), takze je to plosne vazeny prumer normály - a na ROVINE dava
+	# PRESNE totez co reference (`Land.CalculateNormal`, doklad:
+	# `_analyza/p22-svetlo-mereni.gd`, uhel 0.0000 st).
+	return (r - l).cross(b - t).normalized()
+
+
+static func svah_jas(obj: Dictionary, brightlight: float = BRIGHTLIGHT_DEFAULT) -> float:
+	# Jas svahu podle normaly (`IsometricWorld.fx:60-69`). ROVNA plocha vraci
+	# PRESNE `SVAH_JAS` (identita - "nezmenilo se nic, co menit nema") a to
+	# i pro jiny `brightlight`; reference to ma stejne (clen je na rovine
+	# nulovy). `brightlight` je VSTUP (viz hlavicka), vychozi 1.0 = neutralni.
+	var n: Vector3 = svah_normal(obj)
+	if n == Vector3.ZERO:
+		return SVAH_JAS
+	var base: float = maxf(n.dot(SVETLO_SMER.normalized()), 0.0) / 2.0 + 0.5
+	return base + (brightlight * (base - SVAH_JAS) - (base - SVAH_JAS))
+
+
+static func svah_barva(obj: Dictionary, brightlight: float = BRIGHTLIGHT_DEFAULT) -> Color:
+	# Barva svahu = seda podle jasu. S vychozim `brightlight` je jas v <0.5, 1.0>,
+	# takze barva NIKDY nepresviti texturu do bila. Kdyby volajici predal
+	# `brightlight` > 1.0 (profil `TerrainShadowsLevel`), reference by jas
+	# nechala prekrocit 1.0 - kresleni to NESMI (zadani), proto se tu orezava.
+	var j: float = clampf(svah_jas(obj, brightlight), 0.0, 1.0)
+	if j == SVAH_JAS:
+		return SVAH_BARVA
+	return Color(j, j, j, 1.0)
+
+
 static func je_svah(obj: Dictionary, textures) -> bool:
 	# ROZHODNUTI o svahu - jedine misto, kde se to pocita (do M9 to bylo
 	# v `app/world_view.is_slope`). Dlazdice ma texmap, jeho textura existuje
@@ -542,7 +630,7 @@ func _kvadr(obj: Dictionary) -> void:
 		body3 = pozice + Vector2(0.0,
 			krok + float(z - int(obj["z_corners"][2])) * zs)
 		je_to_svah = true
-		barva = SVAH_BARVA       # viz `SVAH_JAS` v hlavicce
+		barva = svah_barva(obj)  # viz `svah_jas` a hlavicka (stinovani dle normaly)
 		_poc["svahu"] += 1
 	else:
 		var tex: Texture2D = _textures.texture(art_id)

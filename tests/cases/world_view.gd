@@ -725,6 +725,33 @@ func run(t) -> void:
 		+ "(namEReno %s/%s/%s/%s)" % [str(view.is_slope(svah_obj)), str(view.is_slope(rovny_obj)),
 			str(view.is_slope(bez_texmapu)), str(view.is_slope(bez_textury))])
 
+	# 11b) ⚠ task-5: BARVA SVAHU pro PUVODNI cestu (`_draw_slope`) se pocita
+	# z NORMALY svahu - a to TOUTEZ funkci jako dávka (`slope_barva` ->
+	# `chunk_mesh.svah_barva`), aby se obe cesty NEMOHLY rozejit (18. session:
+	# presne to byla vada "ruzne svetle svahy"). Reference: `IsometricWorld.fx:14`
+	# (`LIGHT_DIRECTION = (0,1,1)`) a `:60-69` (`get_light`); normala je rovina
+	# ctyr rohu (`Land.CalculateNormal`, `Land.cs:164-238`). Jas si test pocita
+	# SAM (nezavisly prepis), ne ctenim z mereneho modulu.
+	# ROVNA plocha = identita: presne puvodni `SVAH_BARVA` (0.85355339).
+	var svah_barva_konst: Color = Lib.consts_at("res://render/chunk_mesh.gd").get(
+		"SVAH_BARVA", Color.WHITE)
+	t._check(script.slope_barva(rovny_obj) == svah_barva_konst,
+		"app.world_view: _draw_slope na ROVNE plose vraci PRESNE puvodni barvu "
+		+ "(namEReno %s vs %s)" % [str(script.slope_barva(rovny_obj)), str(svah_barva_konst)])
+	var n_t := Vector3(0.0, -krok, zs * 20.0)
+	var n_r := Vector3(krok, 0.0, zs * 16.0)
+	var n_b := Vector3(0.0, krok, zs * 20.0)
+	var n_l := Vector3(-krok, 0.0, zs * 20.0)
+	# Diagonaly (soucet normal obou trojuhelniku) - stejne jako v modulu.
+	var n_svah: Vector3 = (n_r - n_l).cross(n_b - n_t).normalized()
+	var jas_ref: float = maxf(n_svah.dot(Vector3(0.0, 1.0, 1.0).normalized()), 0.0) / 2.0 + 0.5
+	var barva_svah: Color = script.slope_barva(svah_obj)
+	t._check(is_equal_approx(barva_svah.r, jas_ref)
+		and absf(barva_svah.r - svah_barva_konst.r) > 0.001
+		and barva_svah.r >= 0.0 and barva_svah.r <= 1.0 and barva_svah.a == 1.0,
+		"app.world_view: _draw_slope na SVAHU pocita barvu z NORMALY (namEReno %.6f, reference %.6f, rovina %.8f)"
+			% [barva_svah.r, jas_ref, svah_barva_konst.r])
+
 	# 12) M9 (2026-10-08): DAVKA JE ZAPOJENA, ne mrtvy kód. `_priprav_mesh()`
 	#     postavi `render.chunk_mesh` z TOHO SAMEHO seznamu a `mesh_stats()` to
 	#     rekne cislem; kdyby se stavba preskocila, zustane prazdny slovnik.
