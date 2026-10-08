@@ -1,23 +1,54 @@
-# Předání — UO-klon (M9 MODERNIZACE HOTOVÁ: 3 ze 3 granul; 2026-10-08, 15. session)
+# Předání — UO-klon (16. session: `sim.harvest` + `sim.craft` + `ui.journal` HOTOVÉ; řemeslo funguje; 2026-10-08)
 
 > **Co je tenhle soubor:** **stav projektu** pro další session agenta. Přepisuje
 > se celý; historie je v `git log`. **Současný stav se bere odtud** — a ověřuje
 > se živě (je tu k tomu sekce „Předletová kontrola").
 > **Zadání pro další vývoj je `ZADANI-DALSI-VYVOJ-2.md`** (etapa 2, Úkoly 1–9);
-> **Úkoly 1–4 jsou HOTOVÉ**, z Úkolu 6 hotové `entity.item`, `entity.container`
-> — **další je `entity.equipment`** — a **Úkol 8 = M9 je od 15. session HOTOVÝ**
-> (tři granule: `app.config`, `app.metrics`, `render.chunk_mesh`). Cíl 16. session
-> je `sim.harvest` + `sim.craft` + `ui.journal` (viz „CÍL 16. SESSION“ níž).
-> Předchozí etapa je v `ZADANI-DALSI-VYVOJ.md`.
+> **Úkoly 1–4 a 6 (část) HOTOVÉ**, **Úkol 8 = M9 hotový** (15. session),
+> a **16. session dodala `sim.harvest`, `sim.craft`, `ui.journal`** — tím je
+> smyčka „umět pracovat" (BIG WIN č. 1) postavená a měřená.
+> **Rozhodnutí otevřených témat (co dřív čekalo na uživatele) je v
+> [`ROZHODNUTI-2026-10-08.md`](ROZHODNUTI-2026-10-08.md)** — uživatel 2026-10-08
+> zadal „Pokračuj a témata čekající na mě rozhodni podle svého úsudku".
 > **Naměřený stav plánu je v `REVIZE-PLANU-2026-10-06.md`** a **stav granul
 > měří** `python tools/plan-status.py`.
 > **Kam pro co v referenčních zdrojích je `research/REJSTRIK-REFERENCI.md`**.
-> **Datum:** 2026-10-08 (15. session). **Poslední změna kódu:** tato session
-> (`render/chunk_mesh.gd` — nový, `app/config.gd` — nový, `app/metrics.gd` — nový,
-> `app/world_view.gd` (dávka jako výchozí cesta + fallback), `app/main.gd`
-> (config + metrics zapojené), `tests/cases/{chunk_mesh,config,metrics}.gd`,
-> `tools/gates/mutace-tests.py` (3 nové moduly, 25 vzorů), `tools/plan-status.py`
-> (M9 chyběl v `MILNIKY`), `docs/04` (§4.2, §4.2.1), nové sondy v `_analyza/`).
+> **Datum:** 2026-10-08 (16. session). **Poslední změna kódu:** tato session
+> (`sim/systems/harvest.gd` — nový, `sim/systems/craft.gd` — nový,
+> `ui/journal.gd` — nový, `sim/systems/skill_gain.gd` (`span`, `era.skill_gain`),
+> `app/main.gd` (registrace obou systémů, žurnál, batoh, barva pozadí),
+> `app/loop.gd` (události do žurnálu), `app/config.gd` (SCHEMA `era.skill_gain`),
+> `data/balance.json` (`era.skill_gain`), `tests/cases/{harvest,craft,journal}.gd`,
+> `tools/gates/mutace-tests.py` (3 nové moduly, 24 vzorů), `docs/04`, `docs/05`,
+> `docs/06`, nová sonda `_analyza/vlna16-sber-vyroba.gd`).
+
+## ✅ CO JE NOVÉHO (16. session) — ŘEMESLO JE CELÉ: sběr + výroba + žurnál
+
+**Zadání uživatele (doslova):** „Pokračuj a témata čekající na mě rozhodni podle
+svého úsudku." Vznikla z toho **dvě práce**: (1) rozhodnutí otevřených témat
+→ `ROZHODNUTI-2026-10-08.md` (15 rozhodnutí, dvě z nich se hned provedla),
+(2) **cíl 16. session** — `sim.harvest` + `sim.craft` + `ui.journal`.
+
+| Co | Doklad (naměřeno dnes) |
+|---|---|
+| **Sada: 1 163 kontrol / 0 selhání, 44 case souborů** | `godot --headless --path . --script res://tests/run_tests.gd` → `case souboru spusteno: 44 z 44`, `1163 kontrol, 0 selhani`, `exit 0` (bylo 1 055 / 41) |
+| **`sim.harvest` (nový)** | `mine/chop/fish(m,x,y)` + `resource_left(x,y)`; **9 rud** (ReqSkill 0…99, žíly 49,6→1,4 %, fallback 0,5 na železo), **7 dřev**, rybolov (8 s, `Fishing ≥ 75` uspěje bez hodu); banky **8×8 / 4×3** s 10–34 rudou, 20–45 logy a respawnem 10–20 / 20–30 min; jeden sběr na systém (`busy` = 1,6 s) a **respawn měřen posunem času** (test: vyčerpat → `empty` → +20 min → znovu ruda) |
+| **CELÁ SMYČKA NA REÁLNÉ MAPĚ (ruda → ingot → nůž)** | `_analyza/vlna16-sber-vyroba.gd`: hora nalezena na **(1501,1622)** (land id 240); hráč s **Mining 0** dobyl **624 rudy za 1 581 úseků** (7 cyklů přes 8 žil — jedna žíla má 10–34 rudy) a dostal se na **Mining 75,0**; **`smelt` 624 rudy → 624 ingotů** (1:1); **`craft(dagger)` uspěl na 44. pokus** (sance 0,094, `Blacksmithy` mezitím na 4,4 — neúspěch učí) a **3 ingoty se odečetly**; žurnál přitom drží **200 zpráv s JEDNÍM přebavením** a snímek je v `.cache/render/vlna16-zurnal.png` |
+| **⚠ První úspěch na Mining 0 přišel po 63 úsecích** | sance je `CheckSkill(0,100)` = **0 %** při skillu 0, takže nováček těží jen z toho, že **neúspěch učí** (`gained:true`) — je to měřená odpověď na „jde vůbec začít?", ne dohad |
+| **⚠ `docs/05 §5.7` mělo 2 chybná čísla** | dřevo: dokument „10–45 logů", reference **20–45** (`Lumberjacking.cs:46-47`); „10 logů za **sek**" → **za úder**; respawn 20–30 min v dokumentu chyběl. Opraveno v `docs/05 §5.7` |
+| **`sim.craft` (nový)** | `recipes_for/craft/smelt/repair`; **dva nezávislé hody** (1. exceptionalita, 2. úspěch, `CraftItem.cs:1352-1359`), `floor` podle systému (Tailoring/Carpentry/BowFletching 0,5), exceptionalita `−0,60 → −0,45`; materiál se odečte **opravdu** (test: 3 ingoty → 0), u neúspěchu **celý** (u `use_all_res` polovinu), **existence materiálu se kontroluje PŘED hodem** (jinak by šlo vyrobit z ničeho) |
+| **⚠ `skill_gain.check` nestačil: `SKILL_SPAN` byl napevno** | Recepty mají `max − min` **50,0 (509×), 25,0 (349×), jiný (194×)** a žíly 800/1000/1200 desetin. Oprava: `check(m, skill, difficulty, span := SKILL_SPAN)` (**aditivní** změna smlouvy, stará volání beze změny) a `sim.craft` počítá úspěch **vlastním vzorcem** — `check()` volá jen kvůli růstu. Bez toho by 543 z 1053 receptů mělo jinou šanci |
+| **⚠ `quality Low (0)` z výroby NIKDY nevznikne** (naměřeno, ne odhad) | `quality` startuje na 1 a jediné přiřazení je `quality = 2` (`CraftItem.cs:1354-1356`); `PlayEndingEffect` větev pro 0 má, ale nikdo ji nenastaví. Test: **40 pokusů na 25,0 skillu → 0× Low** (a 0× Exceptional, protože `chance − 0,6 < 0`), na 60,0 → Exceptional padá. Cíl session přitom žádal „čtyři výsledky" — správně jsou **tři** |
+| **⚠ 699 z 1053 receptů nemá `tile` výsledku** | Naměřeno nad `data/recipes.json` (354 má `result.tile`, **267** má `tile` u výsledku i materiálů). Brány to neměří — `check-content` i `tests/cases/recipes.gd` kontrolují jen odkazy, které `tile` **mají**. `craft` proto vrací `{ok:false, reason:"no_result"}` a `recipes_for` má `craftable: false` |
+| **`ui.journal` (nový)** | `apply_event/apply_events/add/flush/clear/lines/plain_text/color_of`; **žádná herní logika** (`ui/` je tenký klient); zprávy jdou z `app/loop.gd:_deliver_events`; v běhu hry naměřeno **200 zpráv = 1 přebavení textu** (ne 200) |
+| **⚠ Žurnál byl zelený, měřený — a NA OBRAZOVCE PRÁZDNÝ** | Testy procházely (1 163/0) a přesto nebyl na snímku ani řádek: `RichTextLabel` kreslí text **jen uvnitř svého rectu** a nový uzel má velikost `(0,0)`. Chytil to až **pohled na snímek** (`.cache/render/vlna16-zurnal.png`); opraveno (`custom_minimum_size`) + přidána kontrola i mutace. Stejná rodina jako „test prošel" vs. „test měřil" (viz `LESSONS` 16. session) |
+| **⚠ „Nováčenec" u žíly: 23 rudy a pak 10–20 min nic** | Sonda: `left:22` po prvním úspěchu, bucket se vyčerpal po 23 rudách; sonda proto měří přes **8 různých žil** (bucket = 8×8). Je to vlastnost reference, ne vada — ale znamená, že cesta na 25,0 Mining (od ní jde tavit železo) není „pár kopnutí" |
+| **Rozhodnutí hned provedená (R1, R2)** | **R1 `era.skill_gain: "pre-aos"`** — neúspěch učí (0,2 místo 0,0), `data/balance.json` + `app/config.gd` SCHEMA + `skill_gain._failure_weight`; **R2 barva pozadí `0,0,0`** z kódu (`RenderingServer.set_default_clear_color` v `app/main.gd`; `project.godot` zůstává nedotčený, protože je bootstrap) |
+| **Registrace v `SimWorld.systems` (věc 68 jen částečně)** | `app/main.gd` registruje `harvest` i `craft` → `sim.interaction.use_on` na ně **přestal** vracet `not_available` (log běhu: `systemu v sim: ["movement","skill_gain","harvest","craft","time"]`) |
+| **⚠ Co v produkci ZŮSTÁVÁ nedořešené** | (`a`) **světové statiky nejsou předměty**: `smelt(m, ore, forge)` bere vyheň jako **serial předmětu**, ale kovadlina/vyheň v mapě je statik a nikdo je podle serialu nedrží (věc 64) → v demu tavení u skutečné výhně nejde; sonda to **řekne**, nezamlčí. (`b`) V okolí Britainu (200 dlaždic) sonda **nenašla žádnou kovadlinu ani vyheň** (role z `data/items.json`) — buď tam nejsou, nebo mají jiný tvar, než role index čeká; **kdo půjde kolem kovárny, ať to změří** |
+| **Brány a mutace** | `harvest` **9/9**, `craft` **10/10**, `journal` **7/7** chyceno (`mutace-tests.py --only harvest,craft,journal` → **27 z 27** včetně kontroly vstupu, smlouva vstupu OK). **Mutace našla dvě slepé kontroly v nových testech** (barvy: „say ≠ combat a craft ≠ system" neprošlo, když se `combat` spletl se systémovou; a chybějící kontrola velikosti žurnálu) → obojí opraveno, viz `LESSONS`. Brány `run-all.py` = **11 měřeno / 0 vad**, self-testy **21 / 0 chyb** |
+| **Co se NEMĚNILO** | `render/*` (M9 zůstává), `sim/interaction.gd` (routing na `harvest`/`craft` tam byl od 10. session), `sim/sim_world.gd` (`SYSTEM_ORDER` už obě jména měl), `data/recipes.json`, `data/items.json`, `project.godot`, `app/main.tscn`, souboj a magie |
+
 
 ## ✅ CO JE NOVÉHO (15. session) — M9 „MODERNIZACE" JE HOTOVÁ (3 ze 3 granul)
 
@@ -595,7 +626,22 @@ každé 4 kroky chůze, nový art vidět o 2 frame později, mesh neorezává po
 > `entity.equipment`, obsah M3+ až M8, M9 granule `app.config`/`app.metrics`
 > **nejsou** blokované ničím (dají se udělat první a jsou levné).
 
-**⏭ CÍL 16. SESSION (odloženo za M9; text se nemění):**
+**⏭ CÍL 17. SESSION (rozhodnutí R6 z 2026-10-08) — ZÁSEK PŘI CHŮZI:**
+
+> **Sundat největší zásek hry: přestavba dávky stojí 53,8 ms každé 4 kroky**
+> (max frame 149,8 ms, `_analyza/m9-vykon-po.gd`), tedy přesně to, co uživatel
+> 12. session nazval „seká se". **Přijímací kritérium (měřitelné):**
+> **žádný frame > 8 ms při souvislé chůzi** (dnes 149,8 ms) a **parita obrazu
+> beze změny hashů** (`_analyza/m9-parita.gd` + `.py` musí dát stejné hashe jako
+> dnes) — pravidlo M9 platí i pro tuhle změnu. Cesty: stavět dávku **po částech**
+> (time-sliced) nebo **znovupoužít geometrii** objektů mezi přestavbami
+> (`split` je 0,66 ms). Měří se stejnou sondou `m9-vykon-po.gd`.
+> **Hned po R6 patří do plánu R5** (první frame < 300 ms — načtení atlasu)
+> a pak `entity.equipment` (odložený cíl níž), který odblokuje souboj.
+> **Co do cíle NEPATŘÍ:** `sim.enhance`, `ui.craft_gump`/`ui.backpack`, souboj,
+> magie, obsah M3+.
+
+**✅ CÍL 16. SESSION — SPLNĚN (text zadání se nemění, plní se jím další session):**
 
 > **Dokončit `sim.harvest` + `sim.craft` + `ui.journal` (BIG WIN č. 1: „umět
 > pracovat“).** Uživatel 11. session zvolil priority: **nejdřív řemeslo, souboj
@@ -693,6 +739,33 @@ zavřenými i otevřenými dveřmi, test kroku na schod nahoru/dolů, obojí s m
 (`--only walk` **12/12**), `run_tests.gd` **537/0**, `run-all.py` **0 vad**.
 
 ## Co čeká na tebe
+
+**✅ 2026-10-08: uživatel zadal „Pokračuj a témata čekající na mě rozhodni podle
+svého úsudku" — rozhodovací pravomoc nad touhle sekcí tím přenesl na agenta.
+Všechna otevřená témata jsou rozhodnutá v
+[`ROZHODNUTI-2026-10-08.md`](ROZHODNUTI-2026-10-08.md)** (15 rozhodnutí R1–R15,
+každé s naměřeným důvodem a cestou zpět). Dvě se provedla hned (R1 `era.skill_gain`,
+R2 barva pozadí), zbytek je buď odložený s měřitelným cílem, nebo uzavřený.
+
+**Co z toho zůstává jako práce agenta (ne rozhodnutí):**
+
+| # | Věc | Kdy / čím je hotová |
+|---|---|---|
+| R6 | **Zásek 53,8 ms při přestavbě dávky** (max frame 149,8 ms) | **Cíl 17. session** (viz „CÍL 17. SESSION" výš): žádný frame > 8 ms při chůzi + parita obrazu |
+| R5 | **První frame hry ~2 008 ms** (načtení 34 stránek atlasu) | Session po R6: první frame < 300 ms, měřeno `_analyza/m9-vykon-po.gd` |
+| R7 | **Mesh neorezává podle kamery** (15 838 primitiv místo 9 310) | Až s R6 (stejný soubor); dvouframové zpoždění nového artu je vědomé omezení |
+| R11 | **Brány na chování v čase v CI** — část bez assetů (kadence kroků) | Do `tests/cases/movement.gd`; vizuální část zůstává lokální sonda |
+| R12 | **`sim.enhance`** (zpackaná dýka) | Po `sim.craft` (řemeslo je hotové → může být další samostatný cíl) |
+| R3 | **97 svitků kouzel** (1150 vs 1053) | Až se `research/04-gathering-crafting.md` §5.5 převede na data a generátor je vyrobí; `id` musí zůstat bez děr (`tests/cases/recipes.gd`) |
+| — | **⚠ Světové statiky nejsou předměty (věc 64)** | Tavení u skutečné výhně nejde: `craft.smelt` bere vyheň jako **serial předmětu**, ale kovadlina/vyheň v mapě je statik. Buď `entity.item` dostane registr světa (`data.items` + mapa), nebo `smelt` přijme cíl dlaždice — **rozhodnout v `docs/04`** |
+| — | **⚠ V okolí Britainu (200 dlaždic) není kovadlina ani vyheň** (měřeno sondou) | Ověřit, jestli jsou jinde / jak vypadají; než to bude, je kovářství v demu jen v testech |
+
+**Dvě věci, které může udělat jen uživatel (a nic neblokují):** přenést barvu
+pozadí do `project.godot` (R2 — kód to dělá taky) a změnit **trvalá pravidla
+stanice** (`~/.dsh/AGENTS.md`), pokud by chtěl některé rozhodnutí povýšit na
+pravidlo.
+
+**Historické položky téhle sekce (zůstávají jako záznam, nic se nemaže):**
 
 **⚠ NOVÉ (15. session, k rozhodnutí): čtyři věci kolem M9 — tři z nich jsou
 vědomá omezení, jedno je nový nález.** Všechna čísla jsou naměřená
@@ -806,25 +879,33 @@ a viděl něco jiného, je to **nový nález**, ne oprava — ozvi se s ním.
 
 ## ⚠⚠ BLOKÁTORY
 
-**Žádný otevřený blokátor v kódu.** „Demo chodí, postava je barevná, **vlevo nahoře je stavový pruh** a **od 15. session je svět kreslený dávkou**" je naměřené
-(viz tabulky výš), brány jsou zelené (**11/0/0**), testy **1 055/0** a **průchodnost,
-svahy i most jsou opravené** (6. session: statiky se čtou správnou tabulkou,
-schody svou výškou; 8. session: `world.doors` páruje `art` ↔ `art + 1`;
-9. session: `entity.item` + `entity.container` hotové, **20/20 mutací**;
-10. session: `sim.interaction` hotový, **13/13 mutací** a routing z dat;
-11. session: `sim.skill_gain` + první UI, **15/15 nových mutací**, plán
-**50 měřeně hotových**; 12. session: **vlna oprav ze snímků** — svahy (atlas +
-texmapy), držení vstupu, stopa framů, sekání; **20 nových/rozšířených mutací**;
+**Žádný otevřený blokátor v kódu.** „Demo chodí, postava je barevná, **vlevo
+nahoře je stavový pruh**, **svět je kreslený dávkou** a **od 16. session je
+vidět žurnál a hráč umí kopat, tavit a vykovat nůž**" je naměřené
+(viz tabulky výš), brány jsou zelené (**11/0/0**), testy **1 160/0** (44 case
+souborů) a **průchodnost, svahy i most jsou opravené** (6. session: statiky se
+čtou správnou tabulkou, schody svou výškou; 8. session: `world.doors` páruje
+`art` ↔ `art + 1`; 9. session: `entity.item` + `entity.container` hotové,
+**20/20 mutací**; 10. session: `sim.interaction` hotový, **13/13 mutací**
+a routing z dat; 11. session: `sim.skill_gain` + první UI, **15/15 nových
+mutací**; 12. session: **vlna oprav ze snímků** — svahy (atlas + texmapy),
+držení vstupu, stopa framů, sekání; **20 nových/rozšířených mutací**;
 13. session: vlna pohybu A/D/E (kadence, směr z myši, `PriorityZ`);
-14. session: vlna pohybu DOKONČENA — V2, V4, V5; `walk`/`movement`/
-`player_controller`/`world_view` = 41/41 mutací;
-**15. session: M9 HOTOVÁ — `render.chunk_mesh` (dávka), `app.config`, `app.metrics`;
-`chunk_mesh`/`config`/`metrics`/`world_view` = 30/30 mutací**, celý harness
-**174 vzorů** (`mutace-tests.py`), plán **56 měřeně hotových, 0 rozporů**).
+14. session: vlna pohybu DOKONČENA — V2, V4, V5; 41/41 mutací;
+15. session: M9 HOTOVÁ — `chunk_mesh`/`config`/`metrics`/`world_view` = 30/30;
+**16. session: `sim.harvest` + `sim.craft` + `ui.journal` HOTOVÉ —
+`harvest` 9/9, `craft` 10/10, `journal` 7/7 mutací**, celý harness **201 vzorů**).
 **Hra jede 0,25 ms/frame (stoj) a 0,26 ms (chůze) se 4 draw cally** — naměřeno
-`_analyza/m9-vykon-po.gd` (3 s stoj + 6 s chůze, čeká se nástěnnými hodinami);
-zbývající záseky jsou **jedna přestavba dávky 53,8 ms každé 4 kroky** (max frame
-149,8 ms) — to je otevřená věc 4b v „Co čeká na tebe“.
+`_analyza/m9-vykon-po.gd`; zbývající zásek je **jedna přestavba dávky 53,8 ms
+každé 4 kroky** (max frame 149,8 ms) — to je **cíl 17. session (rozhodnutí R6)**.
+
+**⚠ Dvě pojmenované mezery z 16. session (nejsou to blokátory, ale je vidět, že
+jsou):** (1) **světové statiky nejsou předměty** (věc 64) → `craft.smelt` bere
+vyheň jako serial předmětu a skutečná výheň v mapě serial nemá, takže tavení
+u kovárny v demu nejde (sonda si vyheň položí jako předmět a **řekne to**);
+(2) **v okolí Britainu 600 dlaždic sonda nenašla kovadlinu ani vyheň** (role
+z `data/items.json`) — buď tam nejsou, nebo se statiky v mapě neshodují s rolemi;
+kdo půjde kolem kovárny, ať to změří.
 
 **⚠ CI NAD COMMITTY TÉTO SESSION (15.) JE ZELENÝ — `#57` nad `0275c0e`
 (kód + testy + smlouvy + HANDOFF/LESSONS) = `success`**, job **5:00 min**
@@ -1098,11 +1179,11 @@ a barva kůže.** Statiky nesou barvu ze záznamu mapy, ale **nikdo ji nepouží
 | **Obsah kroků CI (logy)** | **s PAT:** `$env:GH_TOKEN = (Get-Content 'E:\Workspaces\forge-orchestra\.secrets\github_pat.txt' -Raw).Trim()` a pak `node _analyza/ci-hledej.mjs <cislo_behu> ["vzor"...]` (hledá v logu podle vzorů) · `ci-log.mjs <id>` (posledních 60 řádků + „podezřelé“) — **bez PAT** → `ci-log.mjs` **HTTP 403**, `ci-artefakt.mjs` **401** | S PAT je ověřený **i obsah**: `#52` dal `932 kontrol, 0 selhání` (krok 7), `měřeno 9, čeká 2, chyb 0` (krok 8), **`149 z 149 mutaci chyceno`** (krok 9), `53 hotových, 0 rozporů` (krok 15). Bez PAT je ověřený jen **vznik a výsledek** běhu (a i ten jen mimo rate-limit okno: neautentizované API vrací **403**) |
 | Repo je veřejné | API bez tokenu | `visibility: public` |
 | **Oprávnění** | `whoami /groups \| Select-String Mandatory` | **⚠ 14. session začala v `Low`** (`workspace-write`): brány hlásily **2 falešné vady** (G3 `sim.world_loop` save a `render.textures`, protože podproces nesměl zapsat do `.cache`) a sada **9 selhání**; po přepnutí na **plný přístup** (`danger-full-access`, přepnul uživatel) je vše zelené. **Měř vždy pod plným přístupem** (`LESSONS` 14. session) |
-| Testy | `$env:APPDATA="$PWD\.cache\godot-appdata"` pak `godot --headless --path . --script res://tests/run_tests.gd` | **1 055 kontrol, 0 selhání**, **41 case souborů** (`case souboru spusteno: 41 z 41`), **`$LASTEXITCODE` = 0**. ⚠ exit kód ber z `$LASTEXITCODE` hned po Godotu — `exit code` celého `pwsh` s rourou je kód posledního příkazu v rouře |
+| Testy | `$env:APPDATA="$PWD\.cache\godot-appdata"` pak `godot --headless --path . --script res://tests/run_tests.gd` | **1 160 kontrol, 0 selhání**, **44 case souborů** (`case souboru spusteno: 44 z 44`), **`$LASTEXITCODE` = 0** (16. session; bylo 1 055 / 41). ⚠ exit kód ber z `$LASTEXITCODE` hned po Godotu — `exit code` celého `pwsh` s rourou je kód posledního příkazu v rouře |
 | **FPS (M9 hotová)** | `& .cache\godot\...console.exe --path . --rendering-driver opengl3 --resolution 1280x720 --script res://_analyza/m9-vykon-po.gd` (3 s stoj + 6 s chůze, čeká se **nástěnnými hodinami**) | **4 draw cally, frame 0,25 ms (stoj) / 0,26 ms (chůze), p90 0,33/0,34, Engine FPS 3 724/2 593**; přestavba dávky 53,8 ms, split 0,66 ms. **Před M9** (14. session / `m9-vykon-pred.gd`): 1 324 draw callů, 48,75 ms, 24 FPS. ⚠ `Performance.TIME_PROCESS` je klouzavý průměr — po 2s stavbě hlásí stará čísla; měř `delta` |
-| Brány | `python tools/gates/run-all.py` | **11 měřeno / 0 NEMĚŘENO / 0 vad**, `exit 0` (`_analyza/zaver14-brany.txt`) |
+| Brány | `python tools/gates/run-all.py` | **11 měřeno / 0 NEMĚŘENO / 0 vad**, `exit 0` (`_analyza/zaver16-brany.txt` = `.cache/zaver16-brany.txt` z 16. session) |
 | Self-testy | `python tools/gates/run-all.py --self-test` | **21 celkem (10 bran + 11 extrakčních nástrojů), 0 chyb**, `exit 0` |
-| Mutační důkaz | `python tools/gates/mutace-tests.py --only chunk_mesh,config,metrics` (nové moduly) · `--only world_view,...` · plný běh dělá CI | **25 z 25 chyceno** (`chunk_mesh` 10 + `config` 7 + `metrics` 6) a **30 z 30** s `world_view`; smlouvy vstupů OK. **Plný harness 174 vzorů** (14. session: 149). ⚠ Cestou spadlo na 22/25, protože optimalizace zabila 3 vzory — viz `LESSONS` |
+| Mutační důkaz | `python tools/gates/mutace-tests.py --only harvest,craft,journal` (nové moduly) · plný běh dělá CI | **27 z 27 chyceno** (`harvest` 9 + `craft` 10 + `journal` 7 + kontrola vstupu), smlouva vstupu OK (16. session). Předtím `chunk_mesh`/`config`/`metrics` = 25/25. **Plný harness 201 vzorů** (15. session: 174). ⚠ Mutace našla dvě slepé kontroly v nových testech (barvy, velikost žurnálu) — viz `LESSONS` |
 | Fixture | `python tests/fixtures/{world,hues,anim}/make_fixture.py --check` | **3× OK**, `exit 0` |
 | Animace / Barvy / Texmapy | `anim.py` / `hues.py` / `texmaps.py --verify` | `35 / 5 / 4 116` kontrol a texmap, 0 chyb (v self-testech bran) |
 | **Snímek je z běhu** | `Get-Item .cache/render/snapshot.png` | G10 prošla (**`kuze_pixelu 9101`**, `barev 3767`) — snímek vygenerovala 15. session (`_analyza/m9-snimek.gd`); **parita obrazu** (dávka vs. původní cesta, 3 scény, stejný hash) je v `_analyza/m9-parita.gd` + `m9-parita.py` |
@@ -1118,11 +1199,16 @@ a barva kůže.** Statiky nesou barvu ze záznamu mapy, ale **nikdo ji nepouží
 
 1. **Soubory bez testu** — **PLATÍ DÁL, ale je jich méně**: test má
    `world/walk.gd`, `systems/movement.gd`, `entity/skills.gd`, `entity/mobile.gd`,
-   `render/anim_player.gd`, `app/player_controller.gd`, `entity/registry.gd`
-   a nově **`entity/item.gd`** i **`entity/container.gd`** (9. session).
+   `render/anim_player.gd`, `app/player_controller.gd`, `entity/registry.gd`,
+   `entity/item.gd`, `entity/container.gd` (9. session) a **od 16. session
+   `systems/harvest.gd`, `systems/craft.gd` i `ui/journal.gd`**.
    **Bez testu zůstávají** `world/tiledata.gd`, `app/main.gd`, `app/main.tscn`,
    `render/texture_cache.gd`, `render/chunk_renderer.gd`, `app/world_view.gd`,
    `app/loop.gd`, `render/hue_cache.gd` (má test nepřímo přes G10).
+   **⚠ 16. session: `ui/journal.gd` MĚL test a přesto byl v demu neviditelný**
+   (velikost `RichTextLabel` 0) — chytil to až snímek; kontrola i mutace už na to
+   jsou (`LESSONS` 16. session). `app/main.gd` a `app/loop.gd` jsou teď jediné
+   dva soubory, kde se registruje a předává, a test nemají — to je věc 68.
 2. **`size_lines` nesedí** — **PLATÍ DÁL a přibylo to** (měří
    `python tools/plan-status.py`; **36 deklarací z 93**, bylo 34): nově
    **`entity/container.gd` 192/60** (3,2×) a **`entity/item.gd` 66/60** (1,1×) —

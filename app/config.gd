@@ -41,6 +41,9 @@ const SCHEMA := {
 	"era.content": {"type": TYPE_STRING, "default": "aos", "values": ["pre-aos", "aos"]},
 	"era.ui": {"type": TYPE_STRING, "default": "aos", "values": ["pre-aos", "aos"]},
 	"era.movement": {"type": TYPE_STRING, "default": "aos", "values": ["pre-aos", "aos"]},
+	# `era.skill_gain` (16. session, rozhodnuti R1): "pre-aos" = neuspech uci
+	# (0,2), "aos" = neucI (0,0). Cte ho `sim.skill_gain`.
+	"era.skill_gain": {"type": TYPE_STRING, "default": "aos", "values": ["pre-aos", "aos"]},
 	"era.tooltips": {"type": TYPE_STRING, "default": "on", "values": ["on", "off"]},
 	"stat_gain.delay_ms": {"type": TYPE_INT, "default": 2000, "min": 0, "max": 60000},
 	"stat_gain.chance_percent": {"type": TYPE_INT, "default": 25, "min": 0, "max": 100},

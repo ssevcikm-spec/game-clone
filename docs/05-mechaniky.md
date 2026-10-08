@@ -274,37 +274,48 @@ proběhne efekt, reagenty zmizí, `skill_gain.check(Magery, …)`.
 | Systém | Klíčová čísla (ověřeno) |
 |---|---|
 | **Mining** | 9 rud s požadavkem skillu **0/65/70/75/80/85/90/95/99**; šance žíly 49,6 % → 1,4 %; 50% fallback na iron; „buckety" 8×8 dlaždic, 10–34 rudy; respawn **10–20 min**; písek, žula, drahokamy, niter |
-| Shoda dlaždice | `(ItemID & 0x3FFF) | 0x4000` — přesně tohle pravidlo určuje, které dlaždice jsou „hora" |
-| **Lumberjacking** | buckety 4×3, 10–45 logů, **10 logů za sek** (20 ve Felucci), 7 druhů dřeva, **1 log → 1 prkno**; bonus k damage sekerou `(LJ × 0.2 + (LJ ≥ 100 ? 10 : 0)) / 100` |
-| **Fishing** | **8 s na pokus**, hluboká voda od **75** skillu; speciální úlovky (síť 1,12 %, mapa 1,11 %, láhev 2,99 %) |
-| **Kůže** | stažení zvířete nožem (Healing/Anatomy gate), druhy kůží dle zvířete |
-| Nástroje | opotřebení **jen při úspěšném** skill checku (1 use) |
+| Shoda dlaždice | `(ItemID & 0x3FFF) | 0x4000` — přesně tohle pravidlo určuje, které dlaždice jsou „hora". **Kód je v `sim/systems/harvest.gd` (2026-10-08)** a seznam dlaždic je v něm (316 id hor, 149 id stromů, 6 párů vodních id) — v `data/` nejsou |
+| **Lumberjacking** | buckety 4×3, **20–45 logů** (`Lumberjacking.cs:46-47`; dřív tu stálo 10–45 — měřeno špatně), **10 logů za ÚDER** (dřív tu stálo „za sek"), respawn **20–30 min** (v dokumentu chybělo), 7 druhů dřeva, **1 log → 1 prkno**; bonus k damage sekerou `(LJ × 0.2 + (LJ ≥ 100 ? 10 : 0)) / 100` |
+| **Fishing** | **8 s na pokus**, hluboká voda od **75** skillu; mělká voda: `Fishing ≥ 75` uspěje **bez hodu** (`CheckHarvestSkill` v `Fishing.cs`); speciální úlovky (síť 1,12 %, mapa 1,11 %, láhev 2,99 %) |
+| **Kůže** | stažení zvířete nožem, druhy kůží dle zvířete. **⚠ UNVERIFIED:** v `HarvestSystemu` žádný Healing/Anatomy gate není (jediný nález `BaseCreature.cs:2223`, `cutHides`) — kdo to bude dělat, ať to nejdřív změří |
+| Nástroje | opotřebení **jen při úspěšném** skill checku (1 use). **⚠ V klonu se neopotřebuje** (vědomé omezení): `mine/chop/fish` mají 3 argumenty a nástroj se do nich neposílá, dokud není `entity.equipment` |
 
-**Přijímací kritérium:** `mine(m, x, y)` se špatným `z`/dlaždicí vrátí
-`{ok:false, reason:"not_ore"}`; se správnou horou a pickaxe vrátí rudu;
+**Přijímací kritérium:** `mine(m, x, y)` se špatnou dlaždicí vrátí
+`{ok:false, reason:"not_ore"}`; se správnou horou vrátí rudu;
 **respawn** žíly se po vyčerpání obnoví za 10–20 min (test s posunem času).
+**⚠ Opraveno 2026-10-08:** dřív tu stálo „se špatným `z`" — to je nesplnitelné,
+smlouva `z` nemá a `sim.interaction` ho zahazuje (`interaction.gd:323`).
 
 ## 5.8 Výroba (§ V9)
 
-**Zdroj receptů:** `research/04-craft-data.json` — **1150 receptů**
+**Zdroj receptů:** `research/04-craft-data.json` — **1053 receptů**
 (Blacksmithy 196, Tailoring 198, Carpentry 223, Tinkering 165, Cooking 88,
-Masonry 59, Alchemy 51, BowFletching 27, Glassblowing 22, Inscription 16 +
-97 svitků, Cartography 8). Do klonu se dostanou **generátorem** do
-`data/recipes.json`, ne ručním opisem.
+Masonry 59, Alchemy 51, BowFletching 27, Glassblowing 22, Inscription 16,
+Cartography 8). Do klonu se dostanou **generátorem** do `data/recipes.json`,
+ne ručním opisem.
+**⚠ Naměřeno 2026-10-08 (16. session):** dokument dřív tvrdil **1150**; rozdíl
+97 jsou **svitky kouzel** (64 Magery + 17 Necromancy + 16 Mysticism), které
+`research/04-gathering-crafting.md` §5.5 má jen jako **markdown tabulky** —
+`research/04-craft-data.json` je neobsahuje, takže je generátor nemůže vyrobit.
+Do `data/recipes.json` se dostanou, až se §5.5 převede na data (samostatná
+práce); dokud ne, je správné číslo **1053**.
 
 | Věc | Vzorec / pravidlo (ověřeno) |
 |---|---|
-| Šance na úspěch | `floor + (val − min) / (max − min) × (1 − floor)`; `floor` podle systému (Tailoring/Carpentry 0.5); při `max` skillu 100 % |
+| Šance na úspěch | `floor + (val − min) / (max − min) × (1 − floor)`; `floor` = `GetChanceAtMin` systému: **Tailoring/Carpentry/BowFletching 0.5**, ostatní 0.0 (`Def*.cs`); při `max` skillu 100 % |
 | Exceptional | tři režimy: kovářství/krejčovství/truhlařina/tinkering/vaření `−0.60` slábnoucí k `−0.45`; lukovství `chance/2 − 0.10`; default `−0.60` |
-| Dvojitý hod | exceptionalita z **1. hodu**, úspěch z **2. hodu** |
-| Značka výrobce | jen když `quality == 2` **a** `MainSkill >= 100` |
+| Dvojitý hod | exceptionalita z **1. hodu**, úspěch z **2. hodu** (`CraftItem.cs:1352-1359`; **reference je ServUO, ne ClassicUO** — klientský `CraftItem.cs` v `_src/classicuo` neexistuje, ověřeno 2026-10-08) |
+| Kvalita | `Low 0 / Normal 1 / Exceptional 2`. **⚠ Naměřeno 2026-10-08: `Low` z výroby NIKDY nevznikne** — `quality` startuje na 1 a jediné přiřazení v cestě je `quality = 2` (`CraftItem.cs:1354-1356`); `PlayEndingEffect` větev pro 0 má, ale nikdo ji nenastaví. Klon proto vyrábí fail/normal/exceptional a test to měří (60 pokusů, 0× Low) |
+| Značka výrobce | jen když `quality == 2` **a** `MainSkill >= 100`; `entity.item` pole `maker` nemá → `props["maker"]` |
 | Nástroj | **−1 use na pokus** (úspěch i neúspěch) |
-| Neúspěch | spotřebuje **plný materiál** (kromě 18 položek ve výjimkách); u `UseAllRes` polovinu |
+| Neúspěch | spotřebuje **plný materiál** (kromě **25** typů v `_GlobalNoConsume`, `CraftSystem.cs:268-288`; dřív tu stálo 18); u `UseAllRes` polovinu (floor 1) |
+| `UseAllRes` | místo `count` se vezme celá hromada: `maxAmount = min(have/need)`; při neúspěchu se **půlí** |
 | Exceptional efekt | +14/+15 resist, +20 % trvanlivosti, zbraň +35 WeaponDamage, nástroje 2× uses |
-| Tavení rudy | ore → ingot **1:1**, skill gate podle kovu 50–99; neúspěch půlí hromádku |
+| Tavení rudy | **není paušálně 1:1**: střední hromada (0x19B8) 1:1, malá (0x19B7) **půlí**, velká (0x19B9) **×2** (`Ore.cs:385-399`); skill gate podle kovu 50–99 (iron gate nemá); neúspěch půlí hromádku |
 | Zpětné tavení | `floor(66 %)` ceny předmětu v ingotech; koupené = 1 ingot; jen když primární cena ≥ 2 |
 | Oprava | šance oslabit `40 + (max − cur) − skill/10` %; obtížnost `((max − cur) × 1250 / max) − 250` desetin; `CheckSkill(diff ± 25)` |
 | Ekonomika | plná plátová zbroj = **100 ingotů** (= 100 rudy); ringmail 58; chainmail 48; smelt ztráta 34 %/cyklus |
+| Zpracování | `sim/systems/craft.gd` (**hotové 2026-10-08**): `recipes_for` vrací i recepty nedostupné (`available: false`) a nevyrobitelné (`craftable: false`); **699 z 1053 receptů nemá `tile` výsledku** (generátor to hlásí do `content-report.json`) a `craft` na ně vrací `{ok:false, reason:"no_result"}` — nikdy fiktivní tile |
 
 **Přijímací kritérium:** `craft(dagger, count=1)` se 3 ingoty a dostatkem
 skilu → v batohu dagger (nebo hláška o neúspěchu) a **ingoty spotřebovány**;
@@ -452,13 +463,14 @@ souboru (`.sav` a `.sav.bak`), aby pád neznamenal ztrátu hry.
 | Notoriety a flagy | **pre-AoS sémantika** (Felucca), Trammel pravidla implementovaná, ale neaktivní | ve hře není jiný hráč, takže „bezpečná faceta" nemá smysl |
 | Skilly | 58 id, **mechanicky implementováno 48 klasických** (0–47) + `Remove Trap`; Necromancy/Bushido/Ninjitsu/Spellweaving/Throwing/Imbuing/Mysticism/Chivalry/Focus = `implemented: false` | drží id kompatibility, ale neslibuje nefunkční obsah |
 | **Stat gain** | **prodleva 2 s, šance 25 %** (rozhodnutí uživatele 2026-10-06, pásmo 1–3 s / 20–30 %) — hodnoty v `data/balance.json` (`stat_gain.*`), **laditelné** | UO default je 500 ms / 5 % (`SkillCheck.cs:52-53`, `:49`); vypnutá prodleva hru nezrychlí, jen zruší pojistku — viz §5.16.2 |
+| **Růst skillu při neúspěchu** | **pre-AoS** (`era.skill_gain`, rozhodnutí 2026-10-08 — 16. session): neúspěch přispívá do šance na růst **0,2**, v AoS **0,0** | `Core.AOS ? 0.0 : 0.2` (`SkillCheck.cs:295`); uživatel 11. session zvolil řemeslo jako „BIG WIN č. 1" a u něj jde o pocit z výzvy („učit se z chyb"), takže AoS by mu vzal přesně to, co chce. `combat`/`loot`/`content` zůstávají AoS — mění se jeden klíč, ne éra celku |
 | Recepty | **klasické** (z `research/04-craft-data.json`, označené érou) | bez runic/reforging (vypnuto) |
 | Loot | **pre-AoS `LootPack.Old*`** + magic item chance | odpovídá obsahu |
 | BOD, runic, reforging, imbuing | **mimo rozsah** | samostatné systémy |
 
 **Éra je od 2026-10-06 zapsaná PO SLOŽKÁCH** v `data/balance.json` (klíč `era.*`:
-`combat`, `loot`, `content`, `ui`, `movement`, `tooltips`) — tabulka výš je lidské
-čtení téhož. Kdo mění éru, mění **jeden klíč**, ne kód (viz §5.16.3).
+`combat`, `loot`, `content`, `ui`, `movement`, `skill_gain`, `tooltips`) — tabulka
+výš je lidské čtení téhož. Kdo mění éru, mění **jeden klíč**, ne kód (viz §5.16.3).
 
 ### 5.16.1 Podklad pro rozhodnutí „T2A vs AoS" (DOPLNĚNO 2026-10-06, měřeno)
 

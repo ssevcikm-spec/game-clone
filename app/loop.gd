@@ -15,6 +15,7 @@ const REPORT_EVERY_TICKS: int = 20   # 1x za sekundu herniho casu (M0: "simulace
 
 var sim = null
 var input_map = null
+var journal = null              # `ui.journal` (16. session): zpravy dostava VSTUPEM
 var camera_offset: Vector2 = Vector2.ZERO
 var player_tile: Vector2i = Vector2i.ZERO
 
@@ -55,9 +56,12 @@ func tick_count() -> int:
 
 
 func _deliver_events() -> void:
-	# Udalosti si klient vybere jednou za frame (docs/04 §4.4); zatim je jen
-	# predame dal - UI (žurnál) si je prevezme v M2.
+	# Udalosti si klient vybere jednou za frame (docs/04 §4.4). Zpravy dostava
+	# zurnal VSTUPEM (`ui.journal` je tenky klient, docs/04 §4.1); `print`
+	# zustava, protoze je to jedine mereni, ktere je videt v CI (G11).
 	var snapshot: Dictionary = sim.snapshot()
 	for event in snapshot.get("events", []):
+		if journal != null:
+			journal.apply_event(event)
 		if event.get("name") == "message":
 			print("[sim] ", str(event.get("data", {}).get("text", "")))

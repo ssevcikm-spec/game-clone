@@ -738,6 +738,93 @@ MODULY = {
              '"tile": 3621', '"tile": 999999'),
         ],
     },
+    # 16. session: sber surovina (docs/05 §5.7). Mutace miri na to, co ma byt
+    # VIDET: dlaždice, art, vydej, fallback na zelezo, casek a respawn banky.
+    "harvest": {
+        "soubor": ROOT / "sim" / "systems" / "harvest.gd",
+        "prefix": "sim.harvest",
+        "prepinac": "--harvest-script",
+        "mutace": [
+            ("hora se nepozna (kope se na jakoukoli land dlazdici)",
+             "if land >= 0 and _in_ranges(land, MINE_LAND):", "if land >= 0:"),
+            ("ruda je jiny art (0x59B7 misto 0x59B8)",
+             "const ORE_ART := 0x59B8", "const ORE_ART := 0x59B7"),
+            ("log je art bez flagu Generic (hromady se neslouci)",
+             "const LOG_ART := 0x5BDD", "const LOG_ART := 0x5BDE"),
+            ("z dreva se vyda 1 log misto 10",
+             '"respawn_min": 20, "respawn_max": 30, "yield": 10', '"respawn_min": 20, "respawn_max": 30, "yield": 1'),
+            ("skill pod ReqSkill dostane barevnou rudu",
+             'if value < int(r["req"]) or value < int(r["min"]):', "if false:"),
+            ("casek se nikdy nenastavi (dva sběry v jednom okamziku)",
+             '_busy_until[kind] = now + int(p["swing_ms"])', "_busy_until[kind] = 0"),
+            ("neuspesny sber tvrdi, ze skill nerostl",
+             '"gained": zisk, "success": false, "tile": tile', '"gained": false, "success": false, "tile": tile'),
+            ("rybolov netrva 8 s",
+             '"yield": 1, "swing_ms": 8000, "range": 4', '"yield": 1, "swing_ms": 0, "range": 4'),
+            ("respawn banku nevrati (zustane prazdna)",
+             'bank["current"] = int(bank["max"])', 'bank["current"] = 0'),
+        ],
+    },
+    # 16. session: vyroba (docs/05 §5.8). Mutace miri na sance, materialy,
+    # stanici, znacku vyrobce a na to, ze vysledek je v ART prostoru.
+    "craft": {
+        "soubor": ROOT / "sim" / "systems" / "craft.gd",
+        "prefix": "sim.craft",
+        "prepinac": "--craft-script",
+        "mutace": [
+            ("sance se neinterpoluje (zustane jen floor)",
+             "return floor_chance + (float(value - min_d) / float(max_d - min_d)) * (1.0 - floor_chance)",
+             "return floor_chance"),
+            ("na maximalnim skillu neni 100 %",
+             "if value >= max_d:\n\t\treturn 1.0", "if value >= max_d:\n\t\treturn 0.5"),
+            ("neuspech spali jen polovinu materialu",
+             "if not uspech and use_all:", "if not uspech:"),
+            ("dostupnost materialu se nekontroluje (vyroba z niceho)",
+             "if not _has_materials(mob, materialy, davka):", "if false:"),
+            ("kovadlina se nekontroluje",
+             "if not _station_near(mob, str(role)):", "if false:"),
+            ("kovadlina/vyhen jako PREDMET se neuzna",
+             "if item != null and _role_of_tile(int(item.tile)) == role",
+             "if false and _role_of_tile(int(item.tile)) == role"),
+            ("znacka vyrobce i pod 100,0 skillu",
+             "if exceptionalni and hodnota >= 1000:", "if exceptionalni:"),
+            ("vysledek zustane v TILEDATA prostoru (bez +0x4000)",
+             "var item = _add(mob, result_tile + ITEM_OFFSET, amount, 0)",
+             "var item = _add(mob, result_tile, amount, 0)"),
+            ("taveni rudy neda 1:1",
+             "var ingotu: int = mnozstvi", "var ingotu: int = mnozstvi / 2"),
+            ("exceptionalita se nikdy nevyhodnoti",
+             "var exceptionalni: bool = _rng.chance(_exceptional_chance(system, hodnota, sance))",
+             "var exceptionalni: bool = false"),
+        ],
+    },
+    # 16. session: zurnal (docs/04 §4.2). Mutace miri na davkove prebaveni
+    # textu (to je meritelne "nezpomali frame"), strop fronty a barvy.
+    "journal": {
+        "soubor": ROOT / "ui" / "journal.gd",
+        "prefix": "ui.journal",
+        "prepinac": "--journal-script",
+        "mutace": [
+            ("text se prebavi po KAZDE zprave (ne jednou za davku)",
+             "\t_dirty = true\n\treturn true", "\tflush()\n\treturn true"),
+            ("fronta se neomezuje (roste bez limitu)",
+             "while _lines.size() > MAX_LINES:", "while false:"),
+            ("zahozene zpravy se nepocitaji",
+             "_dropped += 1", "pass"),
+            ("bere i cizi udalosti",
+             'if str(event.get("name", "")) != "message" or not (event.get("data") is Dictionary):\n\t\treturn false',
+             'if str(event.get("name", "")) != "message" or not (event.get("data") is Dictionary):\n\t\treturn true'),
+            ("vsechny typy maji stejnou barvu",
+             "KIND_COMBAT: Color(0.90, 0.30, 0.25),", "KIND_COMBAT: Color(1.0, 0.85, 0.40),"),
+            ("neznamy typ zustane bez barvy",
+             "return COLORS.get(kind, COLORS[KIND_SYSTEM])", "return COLORS.get(kind, Color(0, 0, 0))"),
+            ("BBCode se neescapuje",
+             'text.replace("[", "[lb]")', "text"),
+            ("zurnal nema velikost (text se nevykresli)",
+             "label.custom_minimum_size = Vector2(SIRKA, VYSKA)\n\t\tlabel.size = Vector2(SIRKA, VYSKA)",
+             "label.custom_minimum_size = Vector2.ZERO\n\t\tlabel.size = Vector2.ZERO"),
+        ],
+    },
 }
 
 
@@ -769,7 +856,8 @@ def main() -> int:
     ap.add_argument("--only", default=None,
                     help="sort, map, walk, doors, movement, registry, pathfind, textures, "
                          "item, container, interaction, skill_gain, hud, status_bar, "
-                         "chunk_renderer, world_view, input, player_controller (nebo vic carkami)")
+                         "chunk_renderer, world_view, input, player_controller, chunk_mesh, "
+                         "config, metrics, harvest, craft, journal (nebo vic carkami)")
     args = ap.parse_args()
     if godot_bin() is None:
         print("CHYBA: Godot nenalezen (nastav $GODOT) - mutace by nic nemerily")

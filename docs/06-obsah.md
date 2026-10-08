@@ -19,7 +19,7 @@ instalace UO (tiledata)      ─┘                                        ▼
 | Soubor `data/` | Zdroj | Velikost |
 |---|---|---|
 | `items.json` | tiledata (jméno, váha, hodnota, vrstva, flagy) + ruční doplňky | ~3 000 záznamů |
-| `recipes.json` | `research/04-craft-data.json` (1150 receptů) | 1150 |
+| `recipes.json` | `research/04-craft-data.json` (**naměřeno 1053**, viz §6.3) | 1053 |
 | `weapons.json` | `research/03` (parse `weapons3.json`) | ~120 |
 | `armor.json` | `research/03` (`armor_raw.json`) | ~90 |
 | `spells.json` | `research/03` (`spells_raw.json`) | 64 |
@@ -62,7 +62,7 @@ v manifestu artu** — když ne, generátor to zapíše do `content-report.json`
 a brána `check-content` **selže** (obsah, který nemá obrázek, je neviditelný
 a hráč to pozná jako vadu).
 
-## 6.3 Recepty (1150, strojově)
+## 6.3 Recepty (1053, strojově)
 
 | Skill | Receptů | Poznámka |
 |---|---|---|
@@ -75,8 +75,16 @@ a hráč to pozná jako vadu).
 | Alchemy | 51 | lektvary (přesné kombinace reagentů) |
 | Bowcraft/Fletching | 27 | luky, šípy, bolt |
 | Glassblowing | 22 | sklo (mimo základ) |
-| Inscription | 16 + 97 svitků | svitky per kruh |
+| Inscription | 16 | **+ 97 svitků kouzel chybí**: `research/04-gathering-crafting.md` §5.5 je má jako markdown tabulky (64 Magery + 17 Necromancy + 16 Mysticism), ale `research/04-craft-data.json` je neobsahuje, takže je generátor nevyrobí. Naměřeno 2026-10-08: `data/recipes.json` = **1053** (dřív tu stálo 1150 včetně svitků) |
 | Cartography | 8 | mapy |
+
+**⚠ Slepé místo, které je potřeba znát (naměřeno 2026-10-08):** `check-content`
+i `tests/cases/recipes.gd` kontrolují jen odkazy, které `tile` **mají** — proto
+projde zeleně i 699 receptů, jejichž výsledek v `tiledata` této instalace
+**není** (jen 354 má `result.tile`, 267 má `tile` u výsledku i materiálů).
+`sim.craft.recipes_for` je proto označuje `craftable: false` a `craft` na ně
+vrací `{ok:false, reason:"no_result"}`. Zelená brána tu tedy netvrdí
+„recept je vyrobitelný“ — to tvrdí až tohle pole.
 
 **Pravidla generátoru:**
 1. Recept bez `min_skill` nebo bez materiálu se **nevypustí tiše** — jde do

@@ -24,7 +24,116 @@ Typy: `chyba` (moje vada) · `past-nástroje` (prostředí/nástroj, ne logika) 
 
 ---
 
-### 2026-10-08 — M9: modernizace se MUSÍ měřit dvakrát — a měřidlo, které si vymyslíš, může být to, co tě zastaví (postup + past-nástroje)
+### 2026-10-08 — Žurnál byl zelený, měřený, a přesto NA OBRAZOVCE PRÁZDNÝ (chyba + postup)
+**Co se stalo:** `ui.journal` měl 8 kontrol a mutace 7/7, sada 1 160/0 — a na
+snímku z běhu hry **nebyl vidět ani jeden řádek**. Příčina: `RichTextLabel`
+kreslí text **jen uvnitř svého rectu** a nově vytvořený uzel má velikost
+`(0,0)`; `Label` stavového pruhu se kreslí i mimo svůj rect (proto pruh vidět
+byl a žurnál ne). Testy to nemohly chytit — čtou `label.text`, a ten byl
+správný.
+**Doklad:** `.cache/render/vlna16-zurnal.png` (před opravou: jen svět a stavový
+pruh), po nastavení `custom_minimum_size`/`size` je v levém horním rohu vidět
+řádek zpráv; `tools/gates/mutace-tests.py` má na to vzor „zurnal nema velikost
+(text se nevykresli)" a `tests/cases/journal.gd` kontrolu nenulové velikosti.
+**Ponaučení:** (1) **UI se musí ověřit POHLEDEM**, ne jen testem textu —
+„text je správný" a „text je vidět" jsou dvě různé vlastnosti (stejná rodina
+jako „test prošel" vs. „test měřil"). (2) Když uzel v Godotu nic nekreslí,
+první otázka je **velikost rectu**, ne obsah.
+
+### 2026-10-08 — Mutační harness našel SLEPOU KONTROLU v tom, co jsem právě napsal (postup)
+**Co se stalo:** nový test `ui/journal` kontroloval barvy jako
+`color_of("say") != color_of("combat") and color_of("craft") != color_of("system")`.
+Mutace „všechny typy mají stejnou barvu" (přepíše barvu `combat` na barvu
+systému) **prošla** — protože se v párech nikdy neporovnal `combat` se `system`.
+Test tedy tvrdil „barvy se liší podle typu", ale měřil jen dva páry ze šesti.
+Po opravě (všechny dvojice) mutace padá.
+**Doklad:** `python tools/gates/mutace-tests.py --only journal` → nejdřív
+„23 z 24 … NECHYCENE: journal/vsechny typy maji stejnou barvu", po opravě
+**7 z 7 chyceno**; `tests/cases/journal.gd` (kontrola „všechny čtyři typy mají
+RŮZNOU barvu").
+**Ponaučení:** (1) Kontrola tvaru „A ≠ B a C ≠ D" **není** kontrola „všechny jsou
+různé" — vypiš všechny dvojice, nebo použij množinu. (2) Mutaci pouštěj
+i na test, který jsi právě napsal a který je zelený — přesně tam vzniká slepé
+místo.
+
+### 2026-10-08 — Dvě granule narazily na `SKILL_SPAN` napevno: soudržnost se nepozná z jedné (vada-zadani)
+**Co se stalo:** `sim.skill_gain.check(m, skill, difficulty)` měl okno růstu
+**napevno 500 desetin** (50,0). Sběr rud má ale okna **800/1000/1200** (dřevo
+0–100, ryba 0–120, barevné rudy 25–105) a výroba má recepty s `max − min`
+**25,0 (349×)**, 50,0 (509×) a jiným (194×) — naměřeno nad
+`data/recipes.json`. Kdyby výroba vzala `check().success` jako úspěch craftu,
+**543 z 1053 receptů** by mělo jinou šanci a u spreadu 25 by od `min + 50`
+vracelo `no_challenge` (falešný úspěch).
+**Doklad:** `sim/systems/skill_gain.gd:77` (`SKILL_SPAN`), `:156-159`;
+naměřeno `python -c` nad `data/recipes.json` (509× 50,0 / 349× 25,0 / 194× jiný);
+oprava: **nepovinný `span`** v `check()` (aditivní změna smlouvy, stará volání
+beze změny) + vlastní výpočet šance v `sim/systems/craft.gd`.
+**Ponaučení:** (1) Konstantní okno v předkovi je **skrytá smlouva** — když ho
+druhá granule potřebuje jinak, patří do signatury jako nepovinný parametr, ne
+jako „druhá kopie vzorce". (2) „Vzorec je v referenci" nestačí: **naměř rozptyl
+v datech** (tady 3 různé spready), jinak zvolíš konstantu, která sedí na 48 %
+případů.
+
+### 2026-10-08 — Citace mířila na soubor, který NEEXISTUJE (past-nástroje)
+**Co se stalo:** zadání i `docs/05 §5.8` odkazovaly u „dvojitého hodu"
+(exceptionalita z 1. hodu, úspěch z 2. hodu) na
+`_src/ClassicUO/.../Game/Data/Crafting/CraftItem.cs:1352-1359`. Python walk
+celého `_src/classicuo` našel **0 souborů** s „craft" v názvu i v obsahu — číslo
+přitom **přesně sedí** na `_src/servuo/Scripts/Services/Craft/Core/CraftItem.cs:1352-1359`.
+**Doklad:** walk `_src/classicuo` (0 nálezů); `CraftItem.cs:1352-1359` (dva
+`Utility.RandomDouble()` hody); opraveno v `docs/05 §5.8`.
+**Ponaučení:** **Citace je tvrzení** — než ji opíšeš, ověř, že soubor existuje
+a že řádek dělá to, co citace říká. Číslo, které „sedí", může být z jiného
+souboru; vada se pak neprojeví jako chyba, ale jako **důvěra v neexistující
+zdroj**.
+
+### 2026-10-08 — „Čtyři výsledky výroby" bylo o jeden víc, než reference umí (vada-zadani)
+**Co se stalo:** cíl 16. session žádal měřit čtyři výsledky craftu
+(fail / **low** / normal / exceptional). Naměřeno v referenci: `quality`
+**startuje na 1** a jediné přiřazení v cestě je `quality = 2`
+(`CraftItem.cs:1354-1356`); `PlayEndingEffect` sice větev pro `quality == 0` má
+(„barely able"), ale **nikdo ji nenastaví**. Klon proto vyrábí tři výsledky;
+`Low` zůstává v modelu předmětu (loot, budoucnost), ale z výroby ne.
+**Doklad:** `CraftItem.cs:1354-1356` vs `DefBlacksmithy.cs:259-262`;
+`tests/cases/craft.gd` měří 40 pokusů na 25,0 skillu → **0× Low** a zároveň
+0× Exceptional (pod 60 skillem je `chance − 0,6 < 0`), na 60,0 → Exceptional padá.
+**Ponaučení:** Když zadání žádá stav, který reference neumí vyrobit, **neimplementuj
+ho „aby to sedělo"** — změř, že nevzniká, zapiš to ať to zůstane vidět. Jinak
+vznikne čtvrtá hodnota, kterou nikdo nikdy neuvidí, a test ji bude „měřit" navěky.
+
+### 2026-10-08 — Art, který se v batohu NIKDY nesloučí (past-nástroje)
+**Co se stalo:** `data/items.json` má u role `logs` tiledata id **7134
+(0x1BDE)** — a ten má flagy `0x40` (Impassable), **ne** `0x800` (Generic).
+`entity.container` stackuje jen podle `0x800`, takže by každý sběr vyrobil
+**novou hromadu**, která se s předchozí nikdy nesloučí (a batoh má limit
+125 předmětů). Kanonický art pro log je **0x1BDD** (flagy `0x4800`) a pro prkno
+**0x1BD7**; stejná past je v `data/recipes.json`, kde `Board` odkazuje na
+tile **7790** (flagy `0x4040`).
+**Doklad:** `assets/uo/tiles.json` (flags pro 0x1BDE/0x1BDD/0x1E6E/0x1BD7),
+`sim/entity/container.gd:55`; opraveno v `sim/systems/harvest.gd`
+(`LOG_ART = 0x5BDD`) a **test to měří na reálných datech**
+(`tiledata.flags(0x5BDD) & 0x800 != 0`).
+**Ponaučení:** U předmětů, které kód **vyrábí**, se neptej jen „jaký má art
+jméno/role", ale **jaké má flagy** — jinak vyrobíš hromadu, která se nikdy
+nesloučí, a nikdo si toho nevšimne, dokud není batoh plný.
+
+### 2026-10-08 — Dvě vady, které našel až TEST psaný PŘED kódem (chyba)
+**Co se stalo:** (1) První verze `craft()` **nekontrolovala dostupnost
+materiálu před hodem** — `_consume` odebral, co bylo (třeba nic), a craft
+i tak vyrobil předmět z ničeho. (2) Neúspěch u **běžného** receptu půlil
+materiál, protože jsem půlení aplikoval na všechny neúspěchy; reference půlí
+**jen** `UseAllRes` (`CraftItem.cs:2009` + `:1099-1109`). Obojí na první
+pohled vypadalo „hotové" a zelené; chytly to až kontroly psané z kontraktu
+(`reason:"materials"`, „neúspěch spotřebuje CELÝ materiál").
+**Doklad:** `tests/cases/craft.gd` (sekce C a E), mutace
+„dostupnost materialu se nekontroluje" a „neuspech spali jen polovinu materialu"
+(obě chyceny: `mutace-tests.py --only harvest,craft,journal`).
+**Ponaučení:** Test psaný **před** implementací není formalita — u `craft` chytil
+dvě vady, které by v demu vypadaly jako „funguje to". A pozor na **univerzální**
+podmínku (`if not uspech:`), která má platit jen pro **část** případů.
+
+---
+
 **Co se stalo:** milník M9 („modernizace nesmí ubrat žádné měření“) měl tři granule.
 Než se cokoli napsalo, naměřilo se, KDE ty milisekundy jsou: `render.chunk_mesh`
 nemohl být „dávka místo 1 324 draw callů“, dokud se nezměřilo, že **přesná parita

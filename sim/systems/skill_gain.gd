@@ -23,10 +23,19 @@ extends RefCounted
 #     2026-10-06: 2 s / 25 %), capy `Const.STAT_CAP` (225) a 125,
 #   * poradi statu = `enum Stat { Str, Dex, Int }` (`SkillCheck.cs:351-356`).
 #
-# ERA (docs/05 §5.16): AoS - neuspech prispiva do sance na rust 0.0
-# (`Core.AOS ? 0.0 : 0.2`, `SkillCheck.cs:295`). Pre-AoS vetev tu ZAMERNE neni:
-# je to jeden vyraz a doplni se, az to `era.*` v `data/balance.json` bude chtit
-# (docs/05 §5.16.3, pravidlo 2 - jedno misto, ne dvacet `if`).
+# ERA (docs/05 §5.16): `era.skill_gain` je od 16. session ROZHODNUTY na
+# `pre-aos` (uzivatel 2026-10-08: "temata cekajici na me rozhodni podle sveho
+# usudku"; puvodni doporuceni 11. session). Znamena to, ze neuspech prispiva do
+# sance na rust **0,2** misto AoS 0,0 (`Core.AOS ? 0.0 : 0.2`,
+# `SkillCheck.cs:295`) - z neuspechu se tedy clovek uci. `combat`/`loot`/
+# `content` zustavaji AoS; meni se JEDEN klic, ne era celku (docs/05 §5.16.3,
+# pravidlo 2 - jedno misto, ne dvacet `if`).
+#
+# SPAN (okno rustu): `check(m, skill, difficulty, span)` ma od 16. session
+# NEPOVINNY `span` v desetinach. Sber a vyroba maji okna 800/1000/1200 desetin
+# (ruda 25..105, ryba 0..120), ktera pevnych 500 netrefi - bez parametru by se
+# rust zastavil o desitky skillu driv. Vychozi hodnota je `SKILL_SPAN`, takze
+# stare volani `check(m, skill, difficulty)` se chova PRESNE jako pred tim.
 #
 # STAV JE CELE CISLO (docs/09 §9.10.3): hodnoty skillu v desetinach, cas v ms.
 # Float je tu jen v LOKALNIM vypoctu pravdepodobnosti (`rng.chance(p:float)`);
@@ -101,6 +110,7 @@ var _stat_delay_ms: int = STAT_DEFAULT_DELAY_MS
 var _stat_chance_percent: int = STAT_DEFAULT_CHANCE
 var _next_ggs_ms: Dictionary = {}        # skill -> ms, kdy je rust garantovany
 var _last_stat_gain_ms: Dictionary = {}  # "serial:stat" -> ms posledniho zisku
+var _failure_weight: float = 0.0         # vaha neuspechu v sanci na rust (era)
 
 
 func _init(registry = null, rng = null, clock = null, events = null) -> void:
@@ -120,6 +130,11 @@ func _read_balance() -> void:
 		return
 	if parsed.has("ggs_on"):
 		_ggs_on = bool(parsed["ggs_on"])
+	# `era.skill_gain` (docs/05 §5.16): "pre-aos" = neuspech uci (0,2), "aos"
+	# = neucI (0,0). Neznamy obsah se hlasi jako AoS chovani (vychozi).
+	var era = parsed.get("era")
+	if era is Dictionary and era.has("skill_gain"):
+		_failure_weight = 0.2 if str(era["skill_gain"]) == "pre-aos" else 0.0
 	var stat_gain = parsed.get("stat_gain")
 	if stat_gain is Dictionary:
 		_stat_delay_ms = int(stat_gain.get("delay_ms", _stat_delay_ms))
@@ -134,9 +149,10 @@ func mobile(serial: int):
 	return _registry.get_mobile(serial)
 
 
-func check(m: int, skill: int, difficulty: int) -> Dictionary:
+func check(m: int, skill: int, difficulty: int, span: int = SKILL_SPAN) -> Dictionary:
 	# Vraci `{success, gained, new_value, reason}` - prvni tri klice zadava
-	# smlouva, `reason` je rozsireni (viz hlavicka).
+	# smlouva, `reason` je rozsireni (viz hlavicka). `span` = okno rustu
+	# v desetinach (nepovinny; viz hlavicka).
 	var mob = _mobile(m)
 	if mob == null:
 		return _result(false, false, 0, "no_mobile")
@@ -144,6 +160,7 @@ func check(m: int, skill: int, difficulty: int) -> Dictionary:
 		# `SkillLock.Up` je v UO PODMINKA rustu (`SkillCheck.cs:376`);
 		# `down` i `locked` rust blokuji (docs/05 §5.10).
 		return _result(false, false, mob.skills.value(skill), "locked")
+	var okno: int = span if span > 0 else SKILL_SPAN
 	var value: int = mob.skills.value(skill)
 	if value < difficulty:
 		# UO `Mobile_SkillCheckLocation`: "too difficult" vraci false PRED
@@ -153,10 +170,10 @@ func check(m: int, skill: int, difficulty: int) -> Dictionary:
 		# docs/05 §5.10: na stropu se nezvysi a hrac dostane hlasku.
 		_message("Your skill cannot advance further.")
 		return _result(true, false, value, "cap")
-	if value >= difficulty + SKILL_SPAN:
+	if value >= difficulty + okno:
 		# "no challenge": UO vraci true a gain check VYNECHAVA (`:146-147`).
 		return _result(true, false, value, "no_challenge")
-	var chance := float(value - difficulty) / float(SKILL_SPAN)
+	var chance := float(value - difficulty) / float(okno)
 	var success: bool = _rng.chance(chance)          # 1. hod: uspech
 	var gained: bool = _gain(mob, skill, value, chance, success)  # 2. hod: rust
 	return _result(success, gained, mob.skills.value(skill), "")
@@ -217,7 +234,7 @@ func _gain_chance(mob, skill: int, value: int, chance: float, success: bool) -> 
 	var gc := float(Const.SKILL_CAP - mob.skills.total()) / float(Const.SKILL_CAP)
 	gc += float(mob.skills.cap(skill) - value) / float(mob.skills.cap(skill))
 	gc /= 2.0
-	gc += (1.0 - chance) * (0.5 if success else 0.0)
+	gc += (1.0 - chance) * (0.5 if success else _failure_weight)
 	gc /= 2.0
 	return clampf(gc, 0.01, 1.0)
 

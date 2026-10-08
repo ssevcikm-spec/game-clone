@@ -25,6 +25,15 @@ const StatusBarScript = preload("res://ui/status_bar.gd")
 # Rust skillu a statu (granule `sim.skill_gain`, 11. session). Registruje se
 # s RNG ze `SimWorld` - vlastni RNG by rozbil determinismus a `state_hash`.
 const SkillGainScript = preload("res://sim/systems/skill_gain.gd")
+# 16. session: sber surovin, vyroba a zurnal. `sim.harvest` a `sim.craft` se
+# registruji TADY (integraci misto) - `sim.interaction` je pak najde dynamicky
+# v `SimWorld.systems` a prestane vracet `not_available`.
+const TiledataScript = preload("res://sim/world/tiledata.gd")
+const ContainerScript = preload("res://sim/entity/container.gd")
+const ItemScript = preload("res://sim/entity/item.gd")
+const HarvestScript = preload("res://sim/systems/harvest.gd")
+const CraftScript = preload("res://sim/systems/craft.gd")
+const JournalScript = preload("res://ui/journal.gd")
 # M9 (15. session): typovana konfigurace a mereni vykonu. Config se ptá na
 # `data/balance.json` (kontrola typu/rozsahu), metrics sbira frame cas, pocet
 # kreslenych objektu, textury a stavbu davky.
@@ -50,6 +59,12 @@ var map = null
 var controller = null
 var hud = null
 var status_bar = null
+var journal = null
+var tiledata = null
+var container = null
+var items: Dictionary = {}       # serial -> Item (smelt/repair hledaji podle serialu)
+var harvest = null
+var craft = null
 var config = null
 var metrics = null
 var world_view = null            # `app.world_view` (pro metriky)
@@ -59,6 +74,12 @@ var _metrics_s: float = 0.0
 
 
 func _ready() -> void:
+	# BARVA POZADI SVETA (rozhodnuti R2 z 2026-10-08, `ROZHODNUTI-2026-10-08.md`):
+	# UO ma pozadi tmave, kdezto Godot kresli vychozi sedou 77,77,77 - v NODRAW
+	# oblastech (727 dlazdic mapy) je to videt. Nastavuje se Z KODU, protoze
+	# `project.godot` je bootstrap granule a agenti do nej nesmi (docs/09 §9.2);
+	# efekt je stejny. Uzivatel muze tyz radek prenest do `project.godot`.
+	RenderingServer.set_default_clear_color(Color(0.0, 0.0, 0.0, 1.0))
 	var data: Dictionary = _load_data()
 	metrics = MetricsScript.new()
 	sim = SimScript.new(DEFAULT_SEED, data)
@@ -114,6 +135,15 @@ func _setup_ui() -> void:
 	hud.add_child(status_bar)
 	if not hud.register_window("status_bar", status_bar, Vector2(8.0, 8.0)):
 		push_warning("app.main: status bar se nepodarilo zaregistrovat v HUD")
+	# Zurnal (granule `ui.journal`, 16. session): okno pod stavovym pruhem.
+	# Zpravy do nej predava `app/loop.gd:_deliver_events` - UI je tenky klient.
+	journal = JournalScript.new()
+	journal.name = "Journal"
+	hud.add_child(journal)
+	if not hud.register_window("journal", journal, Vector2(8.0, 120.0)):
+		push_warning("app.main: zurnal se nepodarilo zaregistrovat v HUD")
+	if loop != null:
+		loop.journal = journal
 	print("[main] UI: okna ", hud.layout().keys())
 
 
@@ -144,6 +174,19 @@ func _setup_player(view) -> void:
 	player = MobileScript.new(serial, PLAYER_BODY, Vector3i(BRITAIN.x, BRITAIN.y, 0))
 	player.pos = Vector3i(BRITAIN.x, BRITAIN.y, walk.surface_z(BRITAIN.x, BRITAIN.y))
 	player.dir = 0
+	# TABULKA DLAZDIC a KONTEJNER: jedina instance pro cely svet (docs/04 §4.2
+	# `entity.container` - dve instance = duplikaty predmetu). `walk` dostava
+	# stejnou instanci, aby se `tiles.json` nectlo dvakrat.
+	tiledata = TiledataScript.new()
+	container = ContainerScript.new(tiledata)
+	# Batoh hrace: bez nej by sber i vyroba vracely `no_pack`. Vrstva 0x15
+	# (`data/items.json`, art 0x4E75) je v UO batoh; `entity.equipment` jeste
+	# neni, takze batoh nema vrstvu - je to serial v `player.backpack`.
+	player.backpack = sim.next_serial()
+	var batoh = ItemScript.new(int(player.backpack), 0x4E75, 1)
+	batoh.layer = 0
+	batoh.parent = serial
+	items[int(player.backpack)] = batoh
 	# Barva kuze (granule `render.hue`, sada `HUE_SKIN` z `hues.json`). Bez ni je
 	# telo 400 sedive: art z `anim.mul` je jen rampa jasu, barvu dava hue.
 	# V UO znamena `hue == 0` "zadna barva", proto se sada dava jen kdyz je 0.
@@ -164,6 +207,15 @@ func _setup_player(view) -> void:
 	# `SimWorld` (vlastni RNG by rozbil determinismus). System nema `tick`,
 	# takze ho `SimWorld._tick_system` jen preskoci - slouzi volanim.
 	sim.systems["skill_gain"] = SkillGainScript.new(registry, sim.rng(), sim.clock(), sim.events())
+	# Sber a vyroba (16. session): obe dostavaji STEJNY registr, kontejner,
+	# slovnik predmetu a RNG/clock z `SimWorld`. `sim.interaction` je pak najde
+	# v `SimWorld.systems` a prestane na ne vracet `not_available`.
+	harvest = HarvestScript.new(map, tiledata, registry, sim.rng(), sim.clock(),
+		sim.events(), sim.systems["skill_gain"], container, sim, items)
+	sim.systems["harvest"] = harvest
+	craft = CraftScript.new(container, items, map, tiledata, sim.systems["skill_gain"],
+		sim, sim.rng(), sim.clock(), sim.events(), registry)
+	sim.systems["craft"] = craft
 
 	# `world.time` se musi napojit na clock simulace (vada F6 z etapy 1: do
 	# 2026-10-06 `world_time_ms` plnily jen testy, takze `hour()` vratilo ve hre
