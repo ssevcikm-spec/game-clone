@@ -40,6 +40,22 @@ const ITEM_OFFSET: int = 0x4000
 # jeho zabradli - bez toho se na molu u Britannie kreslilo zabradli pod
 # dlazdicemi (namEReno 2026-10-07).
 const F_BACKGROUND: int = 0x00000001
+# ⚠ 18. session (2026-10-08) - STŘECHY NAD HRÁČEM (vada "v budově nevidím
+# vnitřek a postava chodí po střeše"). Reference to resi v `UpdateMaxDrawZ()`
+# (`GameSceneDrawingSorting.cs:57-213`): na dlazdici hrace a na (x+1,y+1) se
+# hleda statik NAD hrace (vys nez `playerZ + 14`); kdyz je to strecha
+# (`TileFlag.Roof = 0x10000000`, `TileDataLoader.cs:525`) nebo pochuzna plocha,
+# nastavi se `_noDrawRoofs = true` a strechy se vubec nekresli.
+#
+# ⚠ NAMERENO na nasich datech (`assets/uo/tiles.json`): flag `Roof` ma jen 1040
+# predmetu (hlavne "palm frond roof"), kdezto bezne plastove/bsidlicove strechy
+# v Britanii (`slate roof`, art 17792, flags 0x04006201) maji
+# `Surface|Background` a flag `Roof` NEMAJI. Proto se za strop/streshu povazuje
+# i `Surface & Background` - bez toho by se v dome neuklidilo nic.
+const F_SURFACE: int = 0x00000200
+const F_ROOF: int = 0x10000000
+const PZ_NAD: int = 14               # `pz14 = playerZ + 14` (reference)
+const PZ_SKRYT: int = 16             # `pz16 = playerZ + 16` (reference)
 
 var _map = null
 var _textures = null
@@ -50,6 +66,10 @@ var _list: Array = []
 var _cover: Rect2i = Rect2i()
 var _built: bool = false
 var _counts: Dictionary = {"land": 0, "static": 0}
+# Skryvat strechy/stropy nad hracem? Nastavuje `nastav_hrace()`; dokud to nikdo
+# nezavola, kresli se vsechno (chovani pred 18. session).
+var skryt_strechy: bool = false
+var _hrac_z: int = -9999
 
 
 func _init(map, textures, tiledata = null) -> void:
@@ -62,6 +82,55 @@ func _init(map, textures, tiledata = null) -> void:
 
 func invalidate() -> void:
 	_built = false
+
+
+func je_strop(art_id: int) -> bool:
+	# Je dany art strecha nebo strop (nad hrace)? `Roof` flag nebo pochuzna
+	# plocha s `Background` (viz namEReno v hlavicce).
+	if _tiledata == null:
+		return false
+	var f: int = _tiledata.flags(art_id)
+	return (f & F_ROOF) != 0 or ((f & F_SURFACE) != 0 and (f & F_BACKGROUND) != 0)
+
+
+func pod_strechou(px: int, py: int, pz: int) -> bool:
+	# Je hrac POD strechou/stropem? Hleda se na jeho dlazdici a na (x+1,y+1)
+	# (presne jako reference); staci JEDEN statik vys nez `pz + 14`.
+	if _tiledata == null:
+		return false
+	for posun in [Vector2i(0, 0), Vector2i(1, 1)]:
+		for record in _statiky_na(px + posun.x, py + posun.y):
+			if int(record["z"]) <= pz + PZ_NAD:
+				continue
+			if je_strop(int(record["tile"]) + ITEM_OFFSET):
+				return true
+	return false
+
+
+func nastav_hrace(px: int, py: int, pz: int) -> bool:
+	# Prebira stav hrace. Vraci TRUE, kdyz se zmenilo "je pod strechou" - tim se
+	# zahodi seznam (`invalidate`), aby se strechy prekreslily bez nich.
+	# Je to vzacna zmena (vstup/vystup z budovy), ne kazdy krok.
+	var novy: bool = pod_strechou(px, py, pz)
+	var zmena: bool = novy != skryt_strechy
+	skryt_strechy = novy
+	_hrac_z = pz
+	if zmena:
+		invalidate()
+	return zmena
+
+
+func _statiky_na(x: int, y: int) -> Array:
+	# Statiky JEDNE dlazdice (blok 8x8 drzi lokalni souradnice 0..7).
+	var bx: int = (x / Const.BLOCK_SIZE) * Const.BLOCK_SIZE
+	var by: int = (y / Const.BLOCK_SIZE) * Const.BLOCK_SIZE
+	var lx: int = x % Const.BLOCK_SIZE
+	var ly: int = y % Const.BLOCK_SIZE
+	var out: Array = []
+	for record in _map.statics_at(bx, by):
+		if int(record["x"]) == lx and int(record["y"]) == ly:
+			out.append(record)
+	return out
 
 
 func is_built() -> bool:
@@ -100,7 +169,7 @@ func visible(center: Vector2i, tiles_x: int, tiles_y: int) -> Array:
 
 func _build(area: Rect2i) -> Array:
 	var objects: Array = []
-	var counts := {"land": 0, "static": 0}
+	var counts := {"land": 0, "static": 0, "skryto": 0}
 	var zrohy: PackedInt32Array = _z_grid(area)
 	var sirka: int = area.size.x + 1
 	for y in range(area.position.y, area.end.y):
@@ -129,6 +198,11 @@ func _build(area: Rect2i) -> Array:
 					continue
 				var art_id: int = int(record["tile"]) + ITEM_OFFSET
 				var z_statiku: int = int(record["z"])
+				if skryt_strechy and z_statiku > _hrac_z + PZ_SKRYT and je_strop(art_id):
+					# Hrac je pod strechou/stropem: tenhle statik ho jen zakryva
+					# (vada "v budove nevidim vnitrek"). Nekresli se.
+					counts["skryto"] += 1
+					continue
 				objects.append({"kind": "static", "x": sx, "y": sy,
 					"z": z_statiku, "art_id": art_id,
 					"priority_z": _priorita(art_id, z_statiku),

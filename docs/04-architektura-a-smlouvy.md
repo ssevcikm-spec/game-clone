@@ -123,9 +123,9 @@ v `.forge/roadmap.json`.
 |---|---|---|
 | `render.textures` | `render/texture_cache.gd` | načítání z manifestu, LRU, strop paměti; **tři id prostory** (land = id, item = id + `0x4000`, texmap = id + `0x10000`) a `texmap(texmap_id)->Texture2D` pro texturu svahu (doplněno 2026-10-07) |
 | `render.hue` | `render/hue_cache.gd` | `(art_id, hue)` → textura (index 0 = použij hue); u `AtlasTexture` se bere **okno `region`**, ne celá stránka (opraveno 2026-10-07 — jinak se kreslily všechny framy animace) |
-| `render.sort` | `render/sort.gd` | **jediná** funkce řazení; klíč = `diagonal*K_PER_DIAGONAL + (priority_z−Z_MIN)*LAYERS + layer` (**diagonála → `z` → vrstva**; do 2026-10-08 byla vrstva PŘED `z`, což kreslilo střechu nad hráčem před hráče — „postava na střeše"); `priority_z(obj)->int` = **pořadová výška** (ClassicUO `PriorityZ`, `Chunk.cs:246-272`): `obj["priority_z"]`, jinak `obj["z"]` (chování před 2026-10-07); dále `sort_key(obj)->int`, `draw_order(objects:Array)->Array` |
+| `render.sort` | `render/sort.gd` | **jediná** funkce řazení; klíč = `pruchod*PASS_SPAN + diagonal*K_PER_DIAGONAL + (priority_z−Z_MIN)*LAYERS + layer` (**průchod land → diagonála → `z` → vrstva**; do 2026-10-08 byla vrstva PŘED `z`, což kreslilo střechu nad hráčem před hráče — „postava na střeše"; **18. session**: `K_PER_DIAGONAL` 769 → **300**, aby `z` přebilo ~2,55 diagonály jako reference, a land dostal **vlastní průchod** před statiky — jinak svah překresloval schody a most); `priority_z(obj)->int` = **pořadová výška** (ClassicUO `PriorityZ`, `Chunk.cs:169-272`): `obj["priority_z"]`, jinak `obj["z"]`; dále `sort_key(obj)->int`, `draw_order(objects:Array)->Array` |
 | `render.chunk` | `render/chunk_renderer.gd` | sestavení kreslicího seznamu pro viditelné bloky, cache; **land nese navíc `texmap` (TexID) a `z_corners` `[horní, pravý, levý, dolní]`** = výšky rohů ze sousedů (2026-10-07, pro svahy); **statik nese navíc `priority_z`** = `z − 1` za `IsBackground` (flag `0x1`) `+ 1` za `Height != 0` (bez tiledata = `z`) — proto se plocha mostu kreslí před jeho zábradlím (2026-10-07, vada V6) |
-| `render.chunk_mesh` | `render/chunk_mesh.gd` | **M9, 2026-10-08:** celý viditelný seznam jako **jeden mesh** (1–2 draw cally místo 1324). `build(objects, diagonal_hrace)->bool`, `split(diagonal)`, `draw_before(view)`/`draw_after(view)`, `hranice()`, `missing_art_ids()`, `stats()`, `hold()`/`tick_hold()`, `invalidate()`; statické `slope_polygon`/`slope_uv`/**`je_svah`** (odtud je bere `app.world_view`, aby se pravidlo svahu neopisovalo); runtime atlas 2048² skládaný **na GPU** (`SubViewport`), `pretek()` hlásí, že se nevešel (pak se kreslí původní cestou) |
+| `render.chunk_mesh` | `render/chunk_mesh.gd` | **M9, 2026-10-08:** celý viditelný seznam jako **jeden mesh** (1–2 draw cally místo 1324). `build(objects)->bool`, **`split_for_player(klic)`** (18. session: dělení podle CELÉHO klíče, ne podle diagonály — v klíči může `z` přebít 2,5 diagonály), `draw_before(view)`/`draw_after(view)`, `missing_art_ids()`, `stats()` (navíc `ceka` = kolik objektů se vynechalo, protože se stránka ještě načítá), `hold()`/`tick_hold()`, `invalidate()`, `klic_kvadru(i)`; statické `slope_polygon`/`slope_uv(sirka,vyska)`/**`je_svah`** + `SVAH_BARVA` (odtud je bere `app.world_view`, aby se pravidlo svahu neopisovalo); runtime atlas 2048² skládaný **na GPU** (`SubViewport`), `pretek()` hlásí, že se nevešel (pak se kreslí původní cestou). **18. session:** `slope_uv` mapuje ROHY textury na vrcholy diamantu (`(0,0),(1,0),(1,1),(0,1)` + půlpixelový inset) — starý tvar `(0.5,0)…` byl otočený o 45° a byl vadou „různobarevné svahy“; vynechané objekty (`ceka`) nejsou díry |
 | `render.anim` | `render/anim_player.gd` | `play(serial:int, action:int, dir:int, now_ms:int = -1)->Dictionary` → `{ok, texture, frame, count, anchor, mirror, mirror_x, sprite_dir}` (chybějící sprite = `ok:false` + `texture:null`); **číslo těla se bere z registru** — `body_of(serial)->int` (`-1`, když serial v registru není; bez registru je `serial` sám tělem, starší chování), registr jde předat konstruktorem `_init(manifest_path, registry)`; framy těl a worn artu podle `animdata`, časování 80 ms; zrcadlení 8 → 5 směrů a `mirror_x` viz §4.2.1 |
 | `render.names` | `render/name_plates.gd` | jména a HP pruhy nad mobily (jen na dosah/po kliku) |
 | `render.light` | `render/light_layer.gd` | úroveň světla z `world.time`, světelné zdroje (louče, okna) |
@@ -135,9 +135,9 @@ v `.forge/roadmap.json`.
 
 | id | soubor | zodpovědnost |
 |---|---|---|
-| `app.main` | `app/main.gd` | scéna, kostra, načtení dat, spuštění smyčky |
+| `app.main` | `app/main.gd` | scéna, kostra, načtení dat, spuštění smyčky. **18. session:** skládá i **černý pás pro GUI** (`GUI_PAS_VPRAVO = 320`, `GUI_PAS_DOLE = 120`, `CanvasLayer` s `layer = 1` pod HUD `layer = 2`) — starý způsob UO, na přání uživatele („aby mi journal nezakrýval výhled“); stavový pruh jde do dolního pásu, žurnál do pravého (`journal.velikost`), a kameru posune `view.gui_odsazeni = (160, 60)`, aby hráč stál ve středu **viditelného** světa |
 | `app.loop` | `app/loop.gd` | pumpuje `sim.tick(50)`, překládá vstup na `Command`, předává události UI; **čas vstupu je čas simulace** (`poll(..., sim.world_time())`, 2026-10-07) — prodleva kroku je pravidlo sim, ne nástěnných hodin (`REVIZE-POHYB` §2.1) |
-| `app.input` | `app/input_map.gd` | mapování kláves a myši na `Command` (jediné místo s `Input`); `poll(player, camera_offset, z=0, mouse_position=Vector2.ZERO, now_ms=-1)` — **držení kroky opakuje** (prodleva `step_delay_ms` = 400/200 ms), `walk_to` = držené pravé tlačítko: **směr je z pozice kurzoru vůči hráči na obrazovce** (`direction_from_screen(center, mouse)`, prahy `|dy| ≤ 0,4|dx|` a `|dy| ≥ 2,5|dx|` z ClassicUO `GameCursor.cs:670-754`; kurzor na hráči = `-1` a **prodleva se neSpotřebuje**), `run` podle `mouse_run()` = 190 px od středu okna; `player_screen_position(player, camera_offset, z)` je opačný převod k `click_at`; `now_ms` a `view_size` jsou vstupy kvůli měřitelnosti (2026-10-07) |
+| `app.input` | `app/input_map.gd` | mapování kláves a myši na `Command` (jediné místo s `Input`); `poll(player, camera_offset, z=0, mouse_position=Vector2.ZERO, now_ms=-1)` — **držení kroky opakuje** (prodleva `step_delay_ms` = 400/200 ms), `walk_to` = držené pravé tlačítko: **směr je z pozice kurzoru vůči hráči na obrazovce** (`direction_from_screen(center, mouse)`, prahy `|dy| ≤ 0,4|dx|` a `|dy| ≥ 2,5|dx|` z ClassicUO `GameCursor.cs:670-754`; kurzor na hráči = `-1` a **prodleva se neSpotřebuje**), `run` podle `mouse_run()` = 190 px od středu okna; `player_screen_position(player, camera_offset, z)` je opačný převod k `click_at`; `now_ms` a `view_size` jsou vstupy kvůli měřitelnosti (2026-10-07). **⚠ 18. session:** `always_run` je **výchozí `true`** (UO má běh jako výchozí pohyb, `PlayerMobile.cs:530`, `:532`; do 18. session byl `false` a nikdo ho nezapnul, takže klávesy chodily vždy 400 ms — vada „chybí běh jako rychlost pohybu“) a akce **`run_toggle`** (Shift, v `player_controller.TOGGLE_KEYS`) ho přepíná; přepnutí se **hlásí** do konzole |
 | `app.menu` | `app/menu.gd` | hlavní menu, výběr postavy, uložit/načíst |
 | `app.char_create` | `app/char_create.gd` | tvorba postavy: profese, staty, skilly, jméno, barvy |
 | `app.config` | `app/config.gd` | **M9, 2026-10-08:** typovaná konfigurace nad `data/balance.json` — `SCHEMA` (klíč + typ + default + rozsah/`values`), `value(key, default)`, `known_keys()`, `check()->Array chyb`, `all()` (surová data pro `SimWorld`), `values()`, `source(key)`, `stats()`. **Pozor: metoda se jmenuje `value`, ne `get`** (viz §4.2.1) |
@@ -245,14 +245,21 @@ změnil, je tu i **původní znění** — historie se nepřepisuje, jen doplňu
   commitu) — uživatel to viděl jako „prvně posune postavu a až potom animaci".
   Reference (`_src/classicuo` `Mobile.cs:776-782`, `:836-844`) dlaždici commitne až
   na konci kroku, ale do té doby kreslí postavu posunutou v pixelech o `Offset`
-  (`x = delay / 80`, `steps = maxDelay / 80`). Dnes: `update_step(krok)` řídí stav
-  (walk/run/idle) z `sim.movement.pending_step`, `step_fraction(elapsed, delay)`
-  kvantuje posun po `ANIM_FRAME_MS = 80 ms` a `player_pixel_offset()` vrací posun
-  v pixelech; `app.world_view.set_player_offset(px)` ho přičte ke kreslení
+  (`x = delay / 80` — **FLOAT**, `GetPixelOffset` jím násobí). Dnes: `update_step(krok)`
+  řídí stav (walk/run/idle) z `sim.movement.pending_step`, `step_fraction(elapsed, delay)`
+  vrací **plynulý** podíl `elapsed/delay` a `player_pixel_offset()` vrací posun
+  v pixelech **zaokrouhlený na celý pixel** (reference kreslí na celá čísla,
+  `GameObject.cs:152-153`); `app.world_view.set_player_offset(px)` ho přičte ke kreslení
   (`player_ground_position()`). **`process_priority = 1` je součást smlouvy**:
   `app.loop` je ve scéně až za controllerem, takže bez priority by controller četl
   stav před tickem a v rámci commitu přičetl posun k již posunuté dlaždici
   (naměřeno v běhu hry: skok obrazu **37,33 px** místo **6,23 px**).
+  **⚠ 18. session:** do té doby se `elapsed` zaokrouhloval DOLŮ na `ANIM_FRAME_MS = 80 ms`,
+  takže se posun měnil jen 5× za krok (400/80) — na 75 FPS ~6 framů bez pohybu a pak
+  skok ~8,8 px. Uživatel to popsal přesně: „vnímám trhavost, ale plynulou, ne náhodnou“.
+  Subpixelový posun se navíc **nesmí** používat vůbec: naměřeno
+  (`_analyza/p21-teren-sonda.gd`), že při posunu o **0,5 px** se změní **91,55 %**
+  pixelů obrazu (pixel-art se převzorkuje a krajina „šumí“).
 - **`sim.movement`: kde bere mobily.** Smlouva uváděla jen `request_step(m, ...)`
   a neříkala, odkud systém `m` vezme. Dnes si je drží **sám** (`register(mobile)`,
   `mobile(serial)`) a `SimWorld` dostane systém z integračního místa (`app/main.gd`).
@@ -407,10 +414,35 @@ změnil, je tu i **původní znění** — historie se nepřepisuje, jen doplňu
     celá čísla **normalizuje na `int`** (a jen když jsou skutečně celá).
   - **`render.chunk_mesh` je výchozí cesta kreslení** a `app.world_view` si drží
     i **původní** cestu jako fallback pro případ `pretek()` (runtime atlas se
-    nevešel). Rozhraní: `build`, `split(diagonal)`, `draw_before/draw_after`,
-    `hranice()`, `stats()`, `hold()/tick_hold()`. **`hold()` je součást smlouvy:**
+    nevešel). Rozhraní: `build`, **`split_for_player(klic)`**, `draw_before/draw_after`,
+    `stats()`, `hold()/tick_hold()`. **`hold()` je součást smlouvy:**
     atlas se skládá na GPU (`SubViewport`, `UPDATE_ONCE`), takže po změně stranky
     se `HOLD_FRAMU = 2` framy **nesmí** kreslit dávkou (četla by prázdnou texturu).
+  - **⚠ 18. session — STŘECHY/STROPY NAD HRÁČEM (`render.chunk`).** Uživatel:
+    „v budově nevidím vnitřek a postava jakoby chodí po střeše“. Reference to řeší
+    v `UpdateMaxDrawZ()` (`GameSceneDrawingSorting.cs:57-213`): na dlaždici hráče a na
+    `(x+1,y+1)` se hledá statik **výš než `playerZ + 14`**; když je to střecha
+    (`TileFlag.Roof = 0x10000000`, `TileDataLoader.cs:525`), nastaví se `_noDrawRoofs`
+    a střechy se nekreslí. **Naměřeno na našich datech:** flag `Roof` má jen 1 040
+    předmětů (hlavně „palm frond roof“), kdežto běžné střechy v Británii (art 17 792
+    `slate roof`, flags `0x04006201`) mají `Surface|Background` a `Roof` **nemají** —
+    proto se za strop považuje i `Surface & Background`, jinak by se v domě neuklidilo nic.
+    Smlouva: `je_strop(art_id)`, `pod_strechou(x,y,z)`, `nastav_hrace(x,y,z)->bool`
+    (vrátí true, když se stav ZMĚNIL → zahodí seznam), `skryt_strechy`, a `counts()["skryto"]`
+    (kolik statiků se skrylo — **ticho by byla vada**). Hotovo snímkem:
+    `_analyza/p21-uvnitr.png` (vidět postele a koberce v domě).
+  - **⚠ 18. session — STRÁNKY ATLASU SE NAČÍTAJÍ NA POZADÍ (`render.textures`).**
+    Uživatel v logu: „periodicky se při chůzi sekne obraz a je to ve stejnou chvíli,
+    kdy vyskočí WARNING: Loaded resource as image file“. Naměřeno
+    (`_analyza/p21-atlas-cena.gd`): jedna stránka 2048² = **~58 ms** (34 stránek = 1 982 ms),
+    a četla se `Image.load()` **synchronně uvnitř `build()`**. Dnes: stránky mají
+    `.import` (`compress/mode=0`, bez mipmap) → načítají se jako **resource** na pozadí
+    (`ResourceLoader.load_threaded_request`); kdo ji ještě nemá, dostane `null` a
+    `page_pending(art_id) == true`, takže se objekt **vynechá** (není to „chybějící art“ = magenta).
+    Smlouva: `page_pending(art_id)`, `tick_nacteni()` (volá se každý frame — bez toho
+    by stránka zůstala „čeká“ navždy), `pending()`, `verze()` (roste, když stránka doteče;
+    `app.world_view` podle ní přestaví dávku, ale **jen když `pending() == 0`**).
+    `stats()` má navíc `ceka` a `verze`. Stejná oprava je v `render.anim` (`load()`, když import existuje).
   - **Parita obrazu je měřená dvakrát:** geometrie v `tests/cases/chunk_mesh.gd`
     (rohy, pořadí, UV, díry, svahy, hranice, split, přetečení) a **obraz** v
     `_analyza/m9-parita.gd` + `m9-parita.py` (tři scény — stojí, uprostřed kroku,

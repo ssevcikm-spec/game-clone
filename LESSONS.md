@@ -24,6 +24,97 @@ Typy: `chyba` (moje vada) · `past-nástroje` (prostředí/nástroj, ne logika) 
 
 ---
 
+### 2026-10-08 — Klíč řazení: z reference se musí přečíst POMĚR, ne jen vzorec (chyba)
+**Co se stalo:** dvě vady ze snímků uživatele („zeď prosvítá přes střechu“, „svah
+prosvítá přes schody/most“) měly stejného viníka: klíč `render/sort.gd` sice byl
+„podle reference“, ale s **jinou váhou**: `K_PER_DIAGONAL = 769 > Z_SPAN * LAYERS = 765`,
+takže `z` nepřebilo ani jednu diagonálu. Reference (`View.cs:83`) má
+`(x + y) + (127 + z) * 0.01f` — krok mřížky `1.0`, krok `z` `0.01`, tedy `z`
+přebije **~2,55 diagonály**. Druhá polovina: reference kreslí **land ve zvláštním
+průchodu před statiky** (`RenderLists.cs:199-232`), my jsme je míchali do jednoho
+seznamu, takže svah (land s vysokým `z`) překreslil schody i most.
+**Doklad:** `render/sort.gd` (`K_PER_DIAGONAL = 300`, `PASS_LAND = 0`), testy
+`tests/cases/render_sort.gd` (3c: `z` přebije 1 i 2 kroky mřížky, **ne 3**;
+3d: land před statiky i s nejvyšším `z`), `docs/02 §2.4`; sonda
+`_analyza/p21-strecha-sonda.gd` (96 statiků nad hráčem v okně, 25 nad jeho výškou).
+**Ponaučení:** (1) Když z reference opisuješ **vzorec s vahami**, zapiš si k němu
+**poměr** a ten otestuj — „máme stejné členy jako reference“ nic neříká, dokud
+nesedí rozsah, o který se smí jeden člen prosadit. (2) „Vypůjčený“ vzorec může
+mít víc částí: reference kromě klíče měla i **pořadí průchodů** (land → statiky),
+a to je taky součást algoritmu.
+
+### 2026-10-08 — Test může pinovat VADU: „diagonála je prvotní klíč“ (chyba)
+**Co se stalo:** `tests/cases/render_sort.gd` kontroloval, že „všechny objekty
+diagonály 8 se kreslí před všemi z diagonály 9“. To v referenci **neplatí**
+(právě proto, že `z` přebije ~2,55 diagonály), takže test **chránil vadu** a nutil
+každou opravu řazení ke stejné chybě. Stejně tak `chunk_mesh.gd` pinoval seznam
+`hranice()` a `split(diagonala)`, což byla implementační drobnost staré chyby.
+**Doklad:** `git diff tests/cases/render_sort.gd`, `chunk_mesh.gd`, `world_view.gd`;
+nová znění kontrolují **vlastnost z reference** (poměr vah, land před statiky),
+ne tvar staré implementace.
+**Ponaučení:** (1) Test, který vznikl z **nepřečteného** vzorce, se stane
+„autoritou“ a příští session ho bude brát jako zadání — proto se u každé kontroly
+ptej, **jaké tvrzení** vlastně měří a odkud to tvrzení je. (2) Když se spec mění
+měřením, upravit test je legitimní — ale **musí k tomu být naměřený důvod**
+a nová kontrola musí být silnější, ne slabší (tady: oba směry, 1+2 kroky ano, 3 ne).
+
+### 2026-10-08 — Jedna příčina, dva příznaky: WARNING + zásek ze synchronního PNG (postup)
+**Co se stalo:** v logu uživatele byl zásek (`stavba 313,96 ms`) a ve stejné chvíli
+WARNING „Loaded resource as image file, this will not work on export:
+res://assets/uo/atlas/item_38.png“. Byla to **jedna** věc: stránka atlasu (2048²,
+16 MB) se četla `Image.load()` **synchronně uvnitř `build()`**. Přitom stránky
+`.import` **měly celou dobu** (`compress/mode=0`, bez mipmap), takže stačilo
+načítat je jako resource — a na pozadí (`ResourceLoader.load_threaded_request`).
+**Doklad:** `_analyza/p21-atlas-cena.gd` (34 stránek: `load()` 1 982 ms, tj. ~58 ms
+na stránku), `_analyza/p21-chuze.gd` před/po (WARNINGy zmizely, `ceka: 0`);
+`render/texture_cache.gd:_page`.
+**Ponaučení:** (1) Dva příznaky ve stejný okamžik jsou obvykle **jeden** mechanismus —
+hledej, co je spojuje, ne dva seznamy vad. (2) Než začneš optimalizovat načítání,
+podívej se, co **už na disku je** (`.import`) — řešení může být „použij hotové“,
+ne „zrychli pomalé“.
+
+### 2026-10-08 — Reference kreslí na CELÉ pixely; subpixelový posun rozbije 91,55 % obrazu (past-nástroje)
+**Co se stalo:** uživatel: „pohyb obrazu není plynulý, vnímám trhavost, ale
+plynulou, ne náhodnou“ a „krajina se neslévá, máme ji kostkovanou“. Dvě naměřené
+příčiny: (a) `step_fraction` zaokrouhloval čas DOLŮ na 80 ms, takže se posun měnil
+jen 5× za krok (400/80) — periodická trhavost; (b) svět se kreslil na
+**neceločíselné** pozice. Naměřeno: při posunu kamery o **0,5 px** se změní
+**91,55 %** pixelů obrazu (`_analyza/p21-teren-sonda.gd`) — u pixel-artu to
+znamená, že krajina „šumí“ a hrany dlaždic se rozjíždějí.
+**Doklad:** `_analyza/p21-teren-sonda.gd` (rozdíl A/B), `app/player_controller.gd`
+(`step_fraction` = `elapsed/delay`, `player_pixel_offset` = `round`),
+`app/world_view.gd` (`slope_uv` má půlpixelový inset), testy
+`tests/cases/player_controller.gd` (tabulka plynulého průběhu + `round`).
+**Ponaučení:** (1) Plynulost a ostrost nejsou protiklady: reference je **plynulá
+v čase a celočíselná v pixelech** — `x = delay / 80f` (float) se násobí vahami
+a na pixely se zaokrouhlí až při kreslení (`GameObject.cs:152-153`). (2) U pixel-artu
+je subpixelový posun **vada**, ne „vyhlazení“ — měř ho (posun o 0,5 px a rozdíl
+snímků), ne popisuj dojmem.
+
+### 2026-10-08 — Asynchronní načítání má smyčku: „čeká“ se musí vyzvednout každý frame (chyba)
+**Co se stalo:** po přesunu načítání stránek na pozadí se část objektů **nikdy
+neobjevila** (`ceka: 6`, 1 295 vynechaných objektů na konci chůze). Vznikl kruh:
+stránka se načítá → `texture()` vrátí `null` → objekt se vynechá → přestavba
+dávky se odkládá (čeká se na `pending() == 0`) → `texture()` se už nezavolá →
+hotový výsledek (`load_threaded_get`) nikdo nevyzvedne → stránka zůstane „čeká“.
+**Doklad:** `_analyza/p21-chuze.gd` (před: `ceka: 6`, `kvadru 11844` z 13143;
+po: `ceka: 0`, `kvadru 13139`), `render/texture_cache.gd:tick_nacteni()`
+(volá `app/world_view` každý frame).
+**Ponaučení:** U asynchronní operace musí být **někdo, kdo výsledek vyzvedne
+nezávisle na poptávce** — jinak se „čeká“ stane trvalým stavem. A když se kvůli
+čekání odkládá práce, musí se ta podmínka měřit (`ceka`, `pending()`), ne hádat.
+
+### 2026-10-08 — Falešné hlášení je horší než ticho: „nevešel se do atlasu“, když šlo o `hold` (chyba)
+**Co se stalo:** `app/world_view` hlásil `push_warning("render.chunk_mesh se nevesel
+do atlasu …")` vždy, když `build()` vrátil `false` — jenže `false` vrací i `hold()`
+(stránka se právě překresluje na GPU). V běhu se tak hlásil přetejk atlasu, který
+neproběhl (`pretek: false`), a kdo by podle hlášení hledal vadu, hledal by ji
+v špatném modulu.
+**Doklad:** `_analyza/p21-chuze.gd` (log `pretek: false` + hlášení), oprava
+v `app/world_view.gd` (hlásí se jen `if _mesh.pretek()`).
+**Ponaučení:** Hlášení musí být **navázané na konkrétní příčinu** (`pretek()`),
+ne na „funkce vrátila false“ — souhrnný příznak mívá víc příčin a hlášení pak lže.
+
 ### 2026-10-08 — `SubViewport.UPDATE_ONCE` se musí ZNOVU OZBROJIT, jinak se stránka atlasu už nikdy nepřekreslí (past-nástroje)
 **Co se stalo:** uživatel: „přibližně každým čtvrtým krokem se rozbíjí zobrazování…
 některé textury působí rozmazaně, jakoby byly zvětšené". Příčina byla v runtime

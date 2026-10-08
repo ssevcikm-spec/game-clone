@@ -60,6 +60,20 @@ const HOLE_COLOR := Color(1.0, 0.0, 1.0, 0.85)
 const BILA_VELIKOST: int = 2         # strana bileho ctverecku v atlase
 const VRCHOLU_NA_KVADR: int = 6      # dva trojuhelniky [0,1,2] a [2,3,0], bez indexu
 const HOLD_FRAMU: int = 2            # frame, nez se smi pouzit nova stranka
+# ⚠ BARVA SVAHU (18. session): reference pousti plochy land art rezimem
+# `SHADER_NONE` (bez stineni) a SVah (texmapu) rezimem `SHADER_LAND`, kde se
+# barva nasobi `get_light(normal)`; pro plochou normalu to je presne
+# **0.85355339** (`IsometricWorld.fx:60-69`, konstanta je tam proto, aby
+# `TerrainShadowsLevel` menil jen kontrast svahu, ne jas roviny). Bez tohoto
+# faktoru jsou nase svahy o ~15 % svetlejsi nez rovina a nez klientsky obraz.
+# ⚠ VEDOME OMEZENI: stinovani podle NORMALY (`Land.CalculateNormal`, 4 křízove
+# souciny v obrazovem prostoru) tu NENI - patri k `render.light` (rozhodnuti R10
+# v `ROZHODNUTI-2026-10-08.md`). Dnes tedy vsechny svahy ztmavneme stejne.
+const SVAH_JAS: float = 0.85355339
+const SVAH_BARVA := Color(SVAH_JAS, SVAH_JAS, SVAH_JAS, 1.0)
+# Pulpixelovy inset UV u TEXMAPY (`ChunkMesh.cs:458-462`: `rect.X + 0.5`,
+# `rect.Width - 1`) - bez nej se na sevech dlazdic proleva sousedni texel.
+const UV_INSET_PX: float = 0.5
 
 
 class Kreslic extends Node2D:
@@ -99,8 +113,13 @@ var _hold: int = 0                   # frame, po ktere se jeste kresli puvodne
 var _verts := PackedVector2Array()
 var _uvs := PackedVector2Array()
 var _barvy := PackedColorArray()
-var _diag := PackedInt32Array()      # diagonala (x+y) kazdeho kvadru
-var _hranice: Array = []             # objekty na diagonale hrace (kresli se zvlast)
+# ⚠ 18. session (2026-10-08): do teto session tu byla DIAGONALA kazdeho kvadru
+# a deleni se hledalo v ni. Jenze klic `render.sort` od teto session neni
+# `diagonala` (viz hlavicka `render/sort.gd`: pruchod -> diagonala -> `z` ->
+# vrstva) a hlavne `z` smi prebit az ~2,5 diagonály - deleni podle diagonaly by
+# tedy rozseklo seznam na spatnem miste. Drzi se proto CELY KLIC (`sort_key`),
+# ktery je v poli neklesajici, takze binarni hledani zustava.
+var _klic := PackedInt64Array()      # klic `render.sort` kazdeho kvadru
 var _diry: Array = []                # art id, ktere v atlase nejsou (hlasi se)
 var _mesh_pred: ArrayMesh = null
 var _mesh_po: ArrayMesh = null
@@ -158,10 +177,6 @@ func texture() -> Texture2D:
 	return _viewport.get_texture()
 
 
-func hranice() -> Array:
-	return _hranice
-
-
 func missing_art_ids() -> Array:
 	var out: Array = _diry.duplicate()
 	out.sort()
@@ -170,6 +185,11 @@ func missing_art_ids() -> Array:
 
 func stats() -> Dictionary:
 	return _stats.duplicate()
+
+
+func klic_kvadru(index: int) -> int:
+	# Klic `render.sort` kvadru na danem indexu (pro test a sondu deleni).
+	return _klic[index] if index >= 0 and index < _klic.size() else -1
 
 
 func invalidate() -> void:
@@ -204,11 +224,27 @@ static func slope_polygon(obj: Dictionary, pos: Vector2) -> PackedVector2Array:
 		pos + Vector2(0.0, krok + float(z - z_levy) * zs)])
 
 
-static func slope_uv() -> PackedVector2Array:
-	# UV rohu v texture (0..1), poradi jako `slope_polygon` (ClassicUO
-	# `Batcher2D.cs:263` `_cornerOffsetX/Y`).
+static func slope_uv(sirka: float = 0.0, vyska: float = 0.0) -> PackedVector2Array:
+	# UV rohu v texture (0..1), poradi jako `slope_polygon` = horni, pravy,
+	# dolni, levy.
+	#
+	# ⚠⚠ 18. session (2026-10-08) - VADA "SVAHY JSOU RUZNOBAREVNE / JINA
+	# SVETLOST" (uzivatel, fotky 4-6): do teto session tu bylo
+	# `(0.5,0) (1,0.5) (0.5,1) (0,0.5)` - tedy STREDY HRAN textury na vrcholy
+	# diamantu. Reference mapuje ROHY textury (`_cornerOffsetX = {0,1,0,1}`,
+	# `_cornerOffsetY = {0,0,1,1}`, `Batcher2D.cs:16-17` a `:263-270`; v meshi
+	# to same `ChunkMesh.cs:464-475`): UV(0,0)->horni, (1,0)->pravy,
+	# (1,1)->dolni, (0,1)->levy. Nase mapa byla vuci reference otocena o 45
+	# stupnu a jinak skalovana, takze kazdy svah vzorkoval jinou cast textury
+	# nez v klientu - presne "ruznobarevne svahy".
+	#
+	# Kdyz volajici zna velikost textury, prida se PULPIXELOVY INSET proti
+	# sevum (`ChunkMesh.cs:458-462`); bez velikosti se vrati rohy 0..1.
+	var ix: float = (UV_INSET_PX / sirka) if sirka > 0.0 else 0.0
+	var iy: float = (UV_INSET_PX / vyska) if vyska > 0.0 else 0.0
 	return PackedVector2Array([
-		Vector2(0.5, 0.0), Vector2(1.0, 0.5), Vector2(0.5, 1.0), Vector2(0.0, 0.5)])
+		Vector2(ix, iy), Vector2(1.0 - ix, iy),
+		Vector2(1.0 - ix, 1.0 - iy), Vector2(ix, 1.0 - iy)])
 
 
 static func je_svah(obj: Dictionary, textures) -> bool:
@@ -223,19 +259,19 @@ static func je_svah(obj: Dictionary, textures) -> bool:
 	return textures.texmap(texmap_id) != null
 
 
-func build(objects: Array, diagonal_hrace: int) -> bool:
+func build(objects: Array) -> bool:
 	# Projde seznam v PORADI a postavi z nej kvadry. Vraci false, kdyz se nema
 	# kreslit dávkou (stranka se prave preklada, nebo se neco neveslo).
 	var t0: int = Time.get_ticks_usec()
 	_pridano = 0
 	_pretek = false
-	var ok: bool = _stavba(objects, diagonal_hrace)
+	var ok: bool = _stavba(objects)
 	if not ok and not _pretek:
 		# Stranka byla plna: zacne se znovu (append-only by ji jinak jen
 		# zaplnil) a seznam se projde DRUHYM pruchodem. Je to drahe, ale deje
 		# se to jen kdyz se nasbirilo vic artu, nez se do stranky vejde.
 		_ocisti_stranku()
-		ok = _stavba(objects, diagonal_hrace)
+		ok = _stavba(objects)
 		if not ok:
 			_pretek = true
 			push_warning("render.chunk_mesh: runtime atlas %dx%d staci i po prekladu - "
@@ -265,9 +301,9 @@ func build(objects: Array, diagonal_hrace: int) -> bool:
 	var pouzito: int = 0
 	for r in _sloty.values():
 		pouzito += int(r.size.x) * int(r.size.y)
-	_stats = {"objektu": objects.size(), "kvadru": _diag.size(),
+	_stats = {"objektu": objects.size(), "kvadru": _klic.size(),
 		"svahu": _stats.get("svahu", 0), "der": _stats.get("der", 0),
-		"nodraw": _stats.get("nodraw", 0), "hranic": _stats.get("hranic", 0),
+		"nodraw": _stats.get("nodraw", 0), "ceka": _stats.get("ceka", 0),
 		"bez_slotu": _stats.get("bez_slotu", 0), "slotu": _sloty.size(),
 		"plocha_px": pouzito, "stranka": _velikost, "polozek": _polozky.size(),
 		"repakov": _repakov, "pretek": _pretek, "hold": _hold,
@@ -275,7 +311,7 @@ func build(objects: Array, diagonal_hrace: int) -> bool:
 	return is_built()
 
 
-func _stavba(objects: Array, diagonal_hrace: int) -> bool:
+func _stavba(objects: Array) -> bool:
 	# Jedna stavba: projde seznam, prida chybejici arty do stranky a postavi
 	# geometrii. Vraci false, kdyz se slot nevesel (a `_pretek` zustane false -
 	# rozhodnuti "prelozit, nebo se vzdát" dela `build`).
@@ -283,8 +319,7 @@ func _stavba(objects: Array, diagonal_hrace: int) -> bool:
 	_verts.resize(n * VRCHOLU_NA_KVADR)
 	_uvs.resize(n * VRCHOLU_NA_KVADR)
 	_barvy.resize(n * VRCHOLU_NA_KVADR)
-	_diag.resize(n)
-	_hranice = []
+	_klic.resize(n)
 	_diry = []
 	# ⚠⚠ 17. session (2026-10-08) - BALENI STRANKY: do teto session se arty
 	# pridavaly v PORADI SEZNAMU (jak prisly), coz u 2048² stranky promrhava
@@ -307,11 +342,12 @@ func _stavba(objects: Array, diagonal_hrace: int) -> bool:
 	var krok: float = float(Const.ISO_STEP)
 	var zs: float = float(Const.Z_SCALE)
 	var stranka_f: float = float(_velikost)
+	var vnitrek: float = UV_INSET_PX / stranka_f   # pulpixelovy inset UV u texmap
 	var q: int = 0
 	var svahu: int = 0
 	var der: int = 0
 	var nodraw: int = 0
-	var hranic: int = 0
+	var ceka: int = 0
 	var bez_slotu: int = 0
 	for obj in objects:
 		var kind: String = str(obj["kind"])
@@ -326,14 +362,6 @@ func _stavba(objects: Array, diagonal_hrace: int) -> bool:
 		if kind == "land" and art_id <= VOID_LAND_MAX:
 			nodraw += 1
 			continue
-		if kind == "mobile" or kind == "item":
-			if diagonala == diagonal_hrace:
-				# Objekty na TEZE diagonale jako hrac se musi kreslit jednotlive
-				# (rozhoduje az `sort_key`, ne diagonala) - v meshi by se poradi
-				# rozbilo. Dnes je to jen hrac sam; s NPC jich bude par.
-				_hranice.append({"obj": obj, "pozice": pozice, "klic": _sort.sort_key(obj)})
-				hranic += 1
-				continue
 		var slot := Rect2i()
 		var body0 := Vector2.ZERO
 		var body1 := Vector2.ZERO
@@ -356,9 +384,17 @@ func _stavba(objects: Array, diagonal_hrace: int) -> bool:
 			body3 = pozice + Vector2(0.0,
 				krok + float(z - int(obj["z_corners"][2])) * zs)
 			je_to_svah = true
+			barva = SVAH_BARVA       # viz `SVAH_JAS` v hlavicce
 			svahu += 1
 		else:
 			var tex: Texture2D = _textures.texture(art_id)
+			if tex == null and _textures.page_pending(art_id):
+				# ⚠ 18. session: stranka atlasu se nacita NA POZADI (16 MB, ~58 ms).
+				# Objekt se pro par framu VYNECHA - "jeste nenacteno" NENI
+				# "chybi" a kreslit za to magenta diru by byla lez. Kdyz stranka
+				# dotece, `app/world_view` davku prestavi (`textures.verze()`).
+				ceka += 1
+				continue
 			if tex == null:
 				# CHYBEJICI ART NENI TICHO (vada 61 z 5. session): vyrazna
 				# magenta, stejny tvar jako `app/world_view._draw_hole`.
@@ -423,25 +459,25 @@ func _stavba(objects: Array, diagonal_hrace: int) -> bool:
 			var uv2 := Vector2(ux + uw, uy + uh)
 			var uv3 := Vector2(ux, uy + uh)
 			if je_to_svah:
-				# SVAH: UV jdou na ROHY diamantu, ne na rohy obdelniku
-				# (`slope_uv`: horni 0.5/0, pravy 1/0.5, dolni 0.5/1, levy 0/0.5).
-				uv0 = Vector2(ux + 0.5 * uw, uy)
-				uv1 = Vector2(ux + uw, uy + 0.5 * uh)
-				uv2 = Vector2(ux + 0.5 * uw, uy + uh)
-				uv3 = Vector2(ux, uy + 0.5 * uh)
+				# SVAH: rohy TEXTURY na vrcholy diamantu (reference
+				# `ChunkMesh.cs:464-475`) + pulpixelovy inset proti sevum.
+				uv0 = Vector2(ux + vnitrek, uy + vnitrek)
+				uv1 = Vector2(ux + uw - vnitrek, uy + vnitrek)
+				uv2 = Vector2(ux + uw - vnitrek, uy + uh - vnitrek)
+				uv3 = Vector2(ux + vnitrek, uy + uh - vnitrek)
 			_uvs[b] = uv0
 			_uvs[b + 1] = uv1
 			_uvs[b + 2] = uv2
 			_uvs[b + 3] = uv2
 			_uvs[b + 4] = uv3
 			_uvs[b + 5] = uv0
-		_diag[q] = diagonala
+		_klic[q] = _sort.sort_key(obj)
 		q += 1
 	_verts.resize(q * VRCHOLU_NA_KVADR)
 	_uvs.resize(q * VRCHOLU_NA_KVADR)
 	_barvy.resize(q * VRCHOLU_NA_KVADR)
-	_diag.resize(q)
-	_stats = {"svahu": svahu, "der": der, "nodraw": nodraw, "hranic": hranic,
+	_klic.resize(q)
+	_stats = {"svahu": svahu, "der": der, "nodraw": nodraw, "ceka": ceka,
 		"bez_slotu": bez_slotu}
 	return bez_slotu == 0
 
@@ -461,9 +497,11 @@ func _predplnit_sloty(objects: Array) -> void:
 		if kind == "land" and je_svah(obj, _textures):
 			klic = int(obj["texmap"]) + TEXMAP_OFFSET
 			tex = _textures.texmap(int(obj["texmap"]))
-		elif kind == "mobile" or kind == "item":
-			continue                       # ty se radi do `_hranice`, ne do stranky
 		else:
+			# ⚠ 18. session: MOBILY A PREDMETY se predpocitavaji TAKY. Do teto
+			# session se vyjimaly (`continue` s komentarem o `hranice()`), jenze
+			# `hranice()` uz neexistuje a jejich art se tim nepredpocital - stranka
+			# se pak mohla naplnit az behem stavby (`_slot` uvnitr `_stavba`).
 			klic = int(obj["art_id"])
 			tex = _textures.texture(klic)
 		if tex == null or _sloty.has(klic) or potreba.has(klic):
@@ -496,27 +534,32 @@ func _ocisti_stranku() -> void:
 	_bily_slot()
 
 
-func split(diagonal: int) -> void:
-	# Rozdeli hotovou geometrii na "pred hracem" a "po hraci" podle diagonaly.
-	# `render.sort` radi PRVNE podle `x + y`, takze je to souvisly usek pole -
-	# staci binarni hledani. Kdyz se diagonala nezmenila, nic se nestavi
+func split_for_player(klic_hrace: int) -> void:
+	# Rozdeli hotovou geometrii na "pred hracem" a "po hraci" podle KLICE
+	# (`render.sort.sort_key`), ne podle diagonaly (18. session, viz hlavicka
+	# `_klic`). `render.sort` radi vzestupne podle klice, takze je to souvisly
+	# usek pole - staci binarni hledani. Kdyz se klic nezmenil, nic se nestavi
 	# (stojici hrac neplati nic; namEReno 0,9 ms pri zmene).
-	if not _hotovo or _pretek or diagonal == _posledni_split:
+	#
+	# Hranice: vse s klicem `<= klic_hrace` je PRED hracem. Stejny klic = hrac
+	# se kresli po nich (ClassicUO vklada novy objekt na shodny `PriorityZ` ZA
+	# existujici, `Chunk.cs:310-321`).
+	if not _hotovo or _pretek or klic_hrace == _posledni_split:
 		return
 	var t0: int = Time.get_ticks_usec()
 	var lo: int = 0
-	var hi: int = _diag.size()
+	var hi: int = _klic.size()
 	while lo < hi:
 		var stred: int = (lo + hi) / 2
-		if _diag[stred] <= diagonal:
+		if _klic[stred] <= klic_hrace:
 			lo = stred + 1
 		else:
 			hi = stred
 	_mesh_pred = _mesh_z_rozsahu(0, lo)
-	_mesh_po = _mesh_z_rozsahu(lo, _diag.size())
-	_posledni_split = diagonal
+	_mesh_po = _mesh_z_rozsahu(lo, _klic.size())
+	_posledni_split = klic_hrace
 	_stats["pred"] = lo
-	_stats["po"] = _diag.size() - lo
+	_stats["po"] = _klic.size() - lo
 	_stats["split_ms"] = (Time.get_ticks_usec() - t0) / 1000.0
 
 

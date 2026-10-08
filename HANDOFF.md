@@ -1,4 +1,4 @@
-# Předání — UO-klon (17. session: LADĚNÍ POHYBU A KRESLENÍ — 6 vad ze snímků, 5 opraveno; 2026-10-08)
+# Předání — UO-klon (18. session: ŠEST VAD Z FOTEK — řazení, terén, pohyb, běh, střechy, černý pás pro GUI; 2026-10-08)
 
 > **Co je tenhle soubor:** **stav projektu** pro další session agenta. Přepisuje
 > se celý; historie je v `git log`. **Současný stav se bere odtud** — a ověřuje
@@ -14,13 +14,93 @@
 > **Naměřený stav plánu je v `REVIZE-PLANU-2026-10-06.md`** a **stav granul
 > měří** `python tools/plan-status.py`.
 > **Kam pro co v referenčních zdrojích je `research/REJSTRIK-REFERENCI.md`**.
-> **Datum:** 2026-10-08 (17. session). **Poslední změna kódu:** tato session
-> (`app/world_view.gd` — posun kamery, okno seznamu, `set_view_dir`, tvrdý
-> fallback při přetečení atlasu; `app/player_controller.gd` — kamera každý frame
-> + smer kreslení; `render/sort.gd` — klíč řazení; `render/chunk_mesh.gd` —
-> re-arm `UPDATE_ONCE` + balení stránky podle výšky; `render/chunk_renderer.gd`
-> — úklid měření; `tests/cases/{render_sort,world_view,player_controller,chunk_mesh}.gd`;
+> **Datum:** 2026-10-08 (18. session). **Poslední změna kódu:** tato session
+> (`render/sort.gd` — klíč: váha diagonály 769 → 300, vlastní průchod pro land;
+> `render/chunk_mesh.gd` — `split_for_player(klic)`, `klic_kvadru`, UV svahů
+> z rohů textury + půlpixelový inset, `SVAH_BARVA`, vynechání čekajících artů;
+> `render/chunk_renderer.gd` — skrývání střech/stropů nad hráčem (`je_strop`,
+> `pod_strechou`, `nastav_hrace`, `counts["skryto"]`); `render/texture_cache.gd`
+> — stránky atlasu jako resource **na pozadí** (+ `page_pending`/`tick_nacteni`/
+> `pending`/`verze`); `render/anim_player.gd` — sprite animace přes import;
+> `app/world_view.gd` — `gui_odsazeni`, klíč hráče, čekání na stránky, falešné
+> hlášení přetečení; `app/player_controller.gd` — plynulý a celočíselný posun,
+> `run_toggle`; `app/input_map.gd` — `always_run = true` + přepínač;
+> `app/main.gd` — černý pás pro GUI (320/120) a umístění oken;
+> `ui/journal.gd` — `velikost` jako vstup; `sim/systems/movement.gd` —
+> `stam <= 1`; `tools/gates/mutace-tests.py` — vzory po změnách;
+> `tests/cases/{render_sort,chunk_mesh,chunk_renderer,world_view,player_controller,input,render_textures}.gd`;
 > `docs/02`, `docs/04`, `LESSONS.md`).
+
+## ✅ CO JE NOVÉHO (18. session) — ŠEST VAD Z FOTEK: řazení, terén, pohyb, běh, střechy, GUI
+
+**Zadání uživatele (doslova):** šest fotek („zeď prosvítá přes střechu“, „svah
+prosvítá přes schody“, „svah prosvítá přes most“, „naše hra vs. živý server —
+krajina se neslévá, máme ji kostkovanou, svahy jsou různobarevné, břehy se
+opakují a zobrazuje se špatně tráva“) + poslední body: občas zčerná obrazovka
+(u kopců), periodický zásek ve stejné chvíli jako WARNING
+`Loaded resource as image file`, trhavý ale pravidelný pohyb, chybějící běh,
+„postava se nadále zobrazuje přes střechu, takže v budově nevidím vnitřek“,
+a journal přes herní okno (žádost o starý způsob UO s černým pásem).
+**Každá oprava má naměřenou příčinu a doklad; co se naměřit nepodařilo, je
+níže v „Co se NEOPRAVILO / NEMĚŘILO“.**
+
+| Vada | Příčina (naměřená) | Oprava + doklad |
+|---|---|---|
+| **„zeď prosvítá přes střechu“ (foto 1)** | Klíč řazení měl **moc malou váhu `z`**: `K_PER_DIAGONAL = 769 > Z_SPAN*LAYERS = 765`, takže `z` nepřebilo **ani jednu** diagonálu. Reference má `(x + y) + (127 + z) * 0.01f` → `z` přebije **~2,55 diagonály** (`View.cs:83`) | `K_PER_DIAGONAL` **769 → 300** (= 765/2,55); test `render_sort` 3c („z přebije 1 i 2 kroky mřížky, **ne 3**“) + mutace „krok 300 → 769“ |
+| **„svah prosvítá přes schody/most“ (fota 2, 3)** | **Land byl ve stejném průchodu jako statiky.** Reference kreslí land ve **zvláštním průchodu před statiky** (`RenderLists.cs:199-232`), takže statik **nikdy** nemůže být překreslen půdou; u nás svah (land s vysokým `z`) překreslil schody i most | `PASS_LAND = 0` jako nejvyšší řád klíče; test `render_sort` 3d („land před statiky i s nejvyšším `z` na nejbližší diagonále“) + mutace „land ztratí vlastní průchod“ |
+| **Dělení dávky „před/po hráči“** | Bylo podle **diagonály** (`split(diagonala)`) — jenže od chvíle, kdy `z` přebije 2,5 diagonály, je diagonala špatná hranice. Navíc se mobily na diagonále hráče vyjímaly do seznamu `hranice()` | `split_for_player(klic)` = binární hledání v **neklesajícím poli celých klíčů** (`klic_kvadru(i)`); `hranice()` zrušeno. Testy `chunk_mesh` (dvojice 2+3 kvadry, „bez hráče je vše v po hráči“) |
+| **„svahy jsou různobarevné / jiná světlost“ (fota 4–6)** | **`slope_uv()` mapoval STŘEDY HRAN textury** na vrcholy diamantu (`(0.5,0) (1,0.5) (0.5,1) (0,0.5)`) — reference mapuje **ROHY** (`_cornerOffsetX/Y`, `Batcher2D.cs:16-17`, `ChunkMesh.cs:464-475`). Naše mapa byla vůči referenci **otočená o 45°** a jinak škálovaná, takže každý svah vzorkoval jinou část textury | `slope_uv(sirka, vyska)` = rohy `(0,0),(1,0),(1,1),(0,1)` + **půlpixelový inset** (`rect.X + 0.5`, `Width - 1`); navíc barva svahu `SVAH_BARVA` = **0.85355339** (reference stíní jen stretched land, `IsometricWorld.fx:60-69`). Testy `world_view` 11 + mutace v `chunk_mesh` |
+| **„kostkovaná krajina“ / trhavý obraz** | Dvě věci: (a) svět se kreslil na **neceločíselné** pozice (17. session zavedla posun každý frame), (b) `step_fraction` zaokrouhloval čas **dolů na 80 ms**, takže se posun měnil jen 5× za krok | Naměřeno (`_analyza/p21-teren-sonda.gd`): posun o **0,5 px** změní **91,55 %** pixelů obrazu. Oprava: `step_fraction` = `elapsed/delay` (float) a `player_pixel_offset()` = **`round`** na celý pixel (reference kreslí na celá čísla, `GameObject.cs:152-153`) |
+| **„chybí běh jako rychlost pohybu“** | `always_run` byl `false` a **nikdo** ho nezapnul → klávesy i numpad chodily vždy 400 ms; běh šel jen drženým pravým tlačítkem >190 px | `always_run = true` (UO má běh jako výchozí pohyb, `PlayerMobile.cs:530`) + **Shift** přepíná (`run_toggle`); `stam <= 1` zakáže běh (`:532`) místo `<= 0`. Testy `input` 7c + `player_controller` |
+| **„postava se zobrazuje přes střechu, v budově není vidět vnitřek“** | Na dlaždici hráče jsou statiky **60 jednotek nad ním** (naměřeno: 96 statiků v okně, 25 nad jeho výškou) a kreslily se; reference v `UpdateMaxDrawZ()` (`GameSceneDrawingSorting.cs:57-213`) v tom případě hlásí `_noDrawRoofs` a **střechy vůbec nekreslí** | `render.chunk.je_strop/pod_strechou/nastav_hrace`, `skryt_strechy`, `counts()["skryto"]`; snímek `_analyza/p21-uvnitr.png` (vidět postele a koberce v domě). ⚠ **Naměřeno:** `Roof` flag má jen 1 040 předmětů; běžné střechy (`slate roof`, flags `0x04006201`) mají `Surface|Background` — proto se za strop bere i to |
+| **Zásek + WARNING v logu** | Byla to **jedna** věc: stránka atlasu (2048², 16 MB) se četla `Image.load()` **synchronně uvnitř `build()`**. Naměřeno: **~58 ms na stránku** (`_analyza/p21-atlas-cena.gd`, 34 stránek = 1 982 ms) | Stránky se načítají jako **resource na pozadí** (`ResourceLoader.load_threaded_request`; mají `.import`, `compress/mode=0`, bez mipmap) a `render.anim` taky; kdo stránku nemá, dostane `page_pending()` → objekt se **vynechá** (není to „chybí art“ = magenta). `tick_nacteni()` vyzvedne hotové **každý frame** |
+| **„journal mi zakrývá výhled“** | Hra kreslila svět přes celé okno a GUI na něj | **Černý pás pro GUI** (starý způsob UO, na přání uživatele): `GUI_PAS_VPRAVO = 320`, `GUI_PAS_DOLE = 120` (`CanvasLayer` layer 1 pod HUD layer 2), žurnál v pravém pásu, stavový pruh v dolním; kamera se posune o `view.gui_odsazeni = (160, 60)`, aby hráč stál ve středu **viditelného** světa. Snímek `_analyza/p21-britain.png` |
+
+**Integrační čísla (naměřeno dnes):** sada **1 195 kontrol / 0 selhání** (44 case
+souborů, bylo 1 178/0); brány `run-all.py` **11 měřeno / 0 vad** (G10 měřeno na
+**čerstvém** snímku); `check-docs-refs` / `check-zadani` / `roadmap-gen --check`
+**exit 0**; **draw calls 5**. **Mutace (9 změněných modulů): 75 z 76 chyceno**
+a ta jedna (`ceka stranka se kresli jako dira`) odhalila **chybějící test** —
+doplněn (část F v `tests/cases/chunk_mesh.gd`), samostatný běh
+`--only chunk_mesh` = **13/13**; smlouva vstupu OK.
+**Chůze v běhu hry** (`_analyza/p21-chuze.gd`, 900 framů, běh): frame ms
+**median 0,47, max 147,29**, framů > 16 ms: **19**, > 33 ms: **15**,
+**žádný černý frame** (0 ze 16 snímků), `textures.stats()` `nacteni_stranek 34,
+ceka 0`, `mesh_stats()` `kvadru 13139` (všechny objekty), `pretek false`.
+**WARNINGy o `Loaded resource as image file` zmizely** (atlas i animace).
+
+**⚠ Co se NEOPRAVILO / NEMĚŘILO (nezamlčeno):**
+(`a`) **Přestavba seznamu i dávky je pořád jediný zásek** — naměřeno **~170 ms**
+(framů > 16 ms: 19 z 900). Zůstává to jako **R6** (stavět po částech); WARNING
+byl jen druhá polovina téže cesty a ta je opravená.
+(`b`) **Černá obrazovka se NEPODAŘILA reprodukovat** — 900 framů běhu, 0 černých
+snímků (nejčernější 4,2 %). Pravděpodobná příčina je už opravená cesta
+„přetečení atlasu → prázdný mesh“ ze 17. session. **Když se to vrátí, potřebuji
+snímek nebo místo** (bylo hlášeno „u kopců“).
+(`c`) **„Kostkovaná krajina“ je opravená jen v tom, co bylo naměřené** (subpixel,
+UV svahů). Jestli je rozdíl proti živému serveru vidět dál, je to **jiná věc** —
+potřebuji konkrétní místo (dlaždici) a dva snímky, jinak bych opravoval dojem.
+(`d`) **Postavu v budově může zakrýt PŘEDNÍ ZEĎ** (střecha se už skryje). Reference
+to řeší `TransparentTest`/Circle of Transparency (`View.cs:98-101`,
+`StaticView.cs:17-31`, referenční Z = **hráč + 5**; fade krok ±25) — **není
+implementováno**. Není to stejná vada jako „postava na střeše“: bez CoT se hráč
+schová za zdí i v živém klientu.
+(`e`) **Fotku 1 se nepodařilo reprodukovat přesně** (nemám k dispozici snímek od
+uživatele, jen popis). Oprava je ale **věrná referenci** (poměr vah klíče), takže
+platí i pro místo z fotky; kdyby přesto prosvítalo, je to nový nález.
+(`f`) **`nodraw` dlaždice (land id ≤ 2) zůstávají černé** (rozhodnutí do `docs/`).
+(`g`) **První frame hry stojí ~2 s** (načtení 34 stránek; R5) — teď asynchronně,
+takže se hra rozjede dřív a stránky dotékají za běhu (`ceka`), ale celková doba
+načtení se nezkrátila.
+
+**Nové sondy (všechny v `_analyza/`, spouštěcí příkaz v hlavičce):**
+`p21-teren-sonda.gd` (subpixel A/B), `p21-snimky.gd` (7 snímků míst),
+`p21-chuze.gd` (chůze: frame časy, černé framy, textury, dávka),
+`p21-atlas-cena.gd` (cena načtení stránky), `p21-strecha-sonda.gd` (co je nad
+hráčem), `p21-land-art.py` (alpha/bbox land artu), `p21-vyrez.py` (výřezy pro
+`read_image`).
+
+
 
 ## ✅ CO JE NOVÉHO (17. session) — ŠEST VAD ZE SNÍMKŮ: PĚT OPRAVENO, JEDNA ZMĚŘENA
 
@@ -664,8 +744,15 @@ každé 4 kroky chůze, nový art vidět o 2 frame později, mesh neorezává po
 > `entity.equipment`, obsah M3+ až M8, M9 granule `app.config`/`app.metrics`
 > **nejsou** blokované ničím (dají se udělat první a jsou levné).
 
-**⏭ CÍL 17. SESSION (rozhodnutí R6 z 2026-10-08) — ZÁSEK PŘI CHŮZI:**
+**⏭ CÍL 19. SESSION (R6 z 2026-10-08) — ZÁSEK PŘI CHŮZI:**
 
+> **⚠ Toto zadání se 18. session NESPLNILO** (session byla ladící: šest vad
+> z fotek). Změřený stav po 18. session: `_analyza/p21-chuze.gd` (900 framů běhu) —
+> frame ms **median 0,47, max 147,29**, framů **> 16 ms: 19**, `stavba_ms ≈ 170 ms`
+> na 13 143 objektů. **WARNING a načítání stránek atlasu už v tom nejsou** —
+> 18. session je přesunula na pozadí (`ResourceLoader.load_threaded_request`);
+> zbývá **stavba seznamu a dávky**.
+>
 > **Sundat největší zásek hry: přestavba dávky stojí 53,8 ms každé 4 kroky**
 > (max frame 149,8 ms, `_analyza/m9-vykon-po.gd`), tedy přesně to, co uživatel
 > 12. session nazval „seká se". **Přijímací kritérium (měřitelné):**
@@ -795,10 +882,13 @@ R2 barva pozadí), zbytek je buď odložený s měřitelným cílem, nebo uzavř
 
 | # | Věc | Kdy / čím je hotová |
 |---|---|---|
-| **R6** | **Přestavba seznamu objektů stojí 50–250 ms** (podle velikosti okna) a je **jediný zásek hry** — od 17. session se děje ~3× méně často (`RECENTER_TILES = 8`, okno od obrazovky), ale pořád je to 50–250 ms v jednom framu. Naměřeno: `_analyza/p20-kadence.gd`, rozpad ceny v `_analyza/p20-kadence2.txt` (`z_grid` 10–36, land 26–79, statiky 27–80, řazení 21–56 ms) | **Cíl 18. session:** stavět seznam **po částech** (time-sliced) nebo cachovat geometrii objektů mezi přestavbami (`chunk_mesh` staví celý mesh znovu); kritérium: **žádný frame > 16 ms při chůzi** + parita obrazu (hash jako `m9-parita.gd`) |
-| — | **⚠ Roof fade (roof fade / `TransparentTest`) NEEXISTUJE** — od 17. session je řazení věrné referenci, takže **statik nad hráčem ho může ÚPLNĚ zakrýt** (dům, strom, střecha). ClassicUO to řeší `TransparentTest` (`View.cs:98`, `ItemView`/`StaticView`) | Rozhodnout a implementovat: fade statiků, které překrývají hráče (ClassicUO má i `AlphaHue`). Do té doby je hráč pod střechou neviditelný — je to **věrnější** než „postava na střeše", ale horší pro hraní |
-| — | **⚠ `nodraw` dlaždice (land id ≤ 2) zůstávají ČERNÉ** — 4 dlaždice v Británii (1440..1441, 1660..1661) land=2 → souvislý blok 2×2 černé (~88×88 px). UO je taky nekreslí (`AllowedToDraw = graphic > 2`), ale UO pod nimi má podloží | Rozhodnout v `docs/`: nechat (věrnost) a zapsat jako omezení, nebo kreslit dlaždici „pod" (druhá vrstva landu z mapy) |
-| R5 | **První frame hry ~2 008 ms** (načtení 34 stránek atlasu) | Session po R6: první frame < 300 ms, měřeno `_analyza/m9-vykon-po.gd` |
+| **R6** | **Přestavba seznamu objektů i dávky je JEDINÝ zásek hry** — **18. session to změřila v běhu hry** (`_analyza/p21-chuze.gd`, 900 framů běhu): frame ms **median 0,47**, **max 147,29**, framů **> 16 ms: 19**, **> 33 ms: 15**; `mesh_stats().stavba_ms ≈ 170 ms` (13 143 objektů: 7 168 land + 5 975 statik). Děje se ~1× za 8 kroků (`RECENTER_TILES = 8`); **WARNING a načítání stránek už v tom nejsou** (načítají se na pozadí) | **Cíl 19. session:** stavět seznam i dávku **po částech** (time-sliced) nebo cachovat geometrii mezi přestavbami; kritérium: **žádný frame > 16 ms při chůzi** (dnes 19 z 900) + parita obrazu (hash jako `m9-parita.gd`). Rozpad ceny je v `_analyza/p20-kadence2.txt` |
+| — | **⚠ Circle of Transparency / `TransparentTest` NEEXISTUJE** — střechy/stropy nad hráčem se už **skryjí** (18. session), ale **přední zeď** budovy hráče zakryje (naměřeno: `_analyza/p21-uvnitr.png`, hráč za zdí). Reference: `View.cs:98-101` (základ `false`), `StaticView.cs:17-31`/`MultiView.cs:18-32` (test s `World.Player.Z + 5`), fade po **±25** (`CalculateAlpha`), `FOLIAGE_ALPHA = 76`, translucency **178** | Rozhodnout a implementovat (je to **nová vrstva**, ne oprava vady): fade statiků, které překrývají hráče. Do té doby je hráč za zdí neviditelný — **stejně jako v živém klientu bez CoT** (proto to není „vada“, ale chybějící funkce) |
+| — | **⚠ Černá obrazovka při chůzi se NEPODAŘILA reprodukovat** (18. session: 900 framů běhu, **0** černých snímků, nejčernější 4,2 %) | Když se vrátí, **potřebuji snímek nebo místo** („u kopců“). Pravděpodobně už opravená cesta „přetečení atlasu → prázdný mesh“ (17. session); 18. session k tomu přidala `pretek()`-only hlášení, aby se přetejk nehlásil, když jde jen o `hold` |
+| — | **⚠ Rozdíl terénu proti živému serveru (fota 4–6) je opravený jen v naměřeném**: UV svahů (byly otočené o 45°) a subpixelový posun (91,55 % pixelů při 0,5 px) | Jestli je rozdíl vidět dál, **potřebuji konkrétní dlaždici + dva snímky** (náš a živý). Opravovat „dojem“ by znamenalo hádat |
+| — | **⚠ Skrývání střech je ROZHODNUTÍ, které se může změnit**: reference skrývá jen `TileFlag.Roof = 0x10000000`, ale naměřeno, že běžné střechy v Británii (`slate roof`, flags `0x04006201`) ten flag **nemají** — proto se skrývá i `Surface & Background` nad hráčem (+16) | Když se to bude zdát moc agresivní (zmizí i strop, pod kterým hráč stojí jinde), změň prahy `PZ_NAD`/`PZ_SKRYT` v `render/chunk_renderer.gd` |
+| — | **⚠ `nodraw` dlaždice (land id ≤ 2) zůstávají ČERNÉ** — 4 dlaždice v Británii (1440..1441, 1660..1661) land=2 → souvislý blok 2×2 černé (~88×88 px). UO je taky nekreslí (`AllowedToDraw = graphic > 2`), ale UO pod nimi má podloží | Rozhodnout v `docs/`: nechat (věrnost) a zapsat jako omezení, nebo kreslit dlaždici „pod“ (druhá vrstva landu z mapy) |
+| R5 | **První frame hry ~2 008 ms** (načtení 34 stránek atlasu, ~58 ms/stránku — naměřeno `_analyza/p21-atlas-cena.gd`) | Session po R6: první frame < 300 ms, měřeno `_analyza/m9-vykon-po.gd`. ⚠ 18. session načítání **přesunula na pozadí** (hra se rozjede dřív, `ceka` to hlásí), ale **celkovou dobu nezkrátila** |
 | R7 | **Mesh neorezává podle kamery** (15 838 primitiv místo 9 310) | Až s R6 (stejný soubor); dvouframové zpoždění nového artu je vědomé omezení |
 | R11 | **Brány na chování v čase v CI** — část bez assetů (kadence kroků) | Do `tests/cases/movement.gd`; vizuální část zůstává lokální sonda |
 | R12 | **`sim.enhance`** (zpackaná dýka) | Po `sim.craft` (řemeslo je hotové → může být další samostatný cíl) |
@@ -925,10 +1015,9 @@ a viděl něco jiného, je to **nový nález**, ne oprava — ozvi se s ním.
 
 ## ⚠⚠ BLOKÁTORY
 
-**Žádný otevřený blokátor v kódu.** „Demo chodí, postava je barevná, **vlevo
-nahoře je stavový pruh**, **svět je kreslený dávkou** a **od 16. session je
-vidět žurnál a hráč umí kopat, tavit a vykovat nůž**" je naměřené
-(viz tabulky výš), brány jsou zelené (**11/0/0**), testy **1 160/0** (44 case
+**Žádný otevřený blokátor v kódu.** „Demo chodí, postava je barevná, **vlevo nahoře je stavový pruh**, **svět je kreslený dávkou** a **od 16. session je
+vidět žurnál a hráč umí kopat, tavit a vykovat nůž**“ je naměřené
+(viz tabulky výš), brány jsou zelené (**11/0/0**), testy **1 194/0** (44 case
 souborů) a **průchodnost, svahy i most jsou opravené** (6. session: statiky se
 čtou správnou tabulkou, schody svou výškou; 8. session: `world.doors` páruje
 `art` ↔ `art + 1`; 9. session: `entity.item` + `entity.container` hotové,
@@ -1121,15 +1210,19 @@ Dvě věci, které blokátor **nejsou**, ale je dobře je vědět:
 
 ## Stav kódu (počty řádků Pythonem `splitlines()`, bez `.uid` a `__pycache__`)
 
+*(⚠ **Přeměřeno 18. session** — `python _analyza/radky.py`; tabulka níže byla
+naposledy aktualizovaná v 10. session, čísla v závorkách jsou proto historická.)*
+
 | složka | souborů (kód) | řádků kódu | poznámka |
 |---|---|---|---|
 | `core/` | 7 | 339 | hotové a otestované |
-| `sim/` | **17** | **2 567** | 10. session: **`systems/interaction.gd` 461** (nad deklarací `<= 150` — věc 2, **3. největší překročení v projektu**); 9. session: **`entity/item.gd` 66** a **`entity/container.gd` 192** (obě nad deklarací — věc 2); dřív `world/doors.gd` 142 (8. session: konvence `art` ↔ `art + 1` a důkazy v hlavičce), `world/walk.gd` 222 (6. session: id prostor statiků, dveře, pásmo, výška schodů), `world/pathfind.gd` (5. session, 176), `entity/registry.gd`, `entity/skills.gd`, `entity/mobile.gd`, `systems/movement.gd` |
-| `render/` | 5 | **770** | `sort.gd`, **`texture_cache.gd`** (+48: cache oken a počítadlo načtení), `chunk_renderer.gd`, `anim_player.gd`, `hue_cache.gd`; `ui/` pořád neexistuje |
-| `app/` | 6 (5 kód) | 651 | `main.gd`, `world_view.gd`, `player_controller.gd` (bez granule) |
-| `tests/` | **45** (36 kód) | **5 605** | 10. session: **`cases/interaction.gd` 518** (+166 kontrol, 31 case souborů; v CI stavu **748/0**); 9. session: **`cases/item.gd` 84** a **`cases/container.gd` 272**; dřív `cases/doors.gd` přepsaný (8. session: 102 řádků, 25 kontrol, měří oba členy dvojice na všech 230 artech), `cases/walk.gd` 391; 3 soubory fixture (`tests/fixtures/{hues,anim}/`) |
-| `tools/uoextract/` | 38 | 6 278 | `anim.py` umí pixely, `--export`, `--export-check` |
-| `tools/gates/` | 22 | **5 147** | 10. session: **`mutace-tests.py` +57** (modul `interaction`, 13 mutací — celkem **94**); 9. session: **`mutace-tests.py` +62** (dva moduly: `item` 5 mutací, `container` 15 — celkem 81); dřív +32 (8. session: modul `doors`, 8 mutací); `mutace-anim.py` má baseline reálné sondy + `--install` |
+| `sim/` | **20** | **4 379** | 10. session: **`systems/interaction.gd` 461**; dřív `entity/item.gd`, `entity/container.gd`, `world/walk.gd`, `world/pathfind.gd`, `systems/movement.gd`; 16. session: `systems/harvest.gd`, `systems/craft.gd` |
+| `render/` | **6** | **1 731** | `sort.gd`, `texture_cache.gd`, `chunk_renderer.gd`, `chunk_mesh.gd` (M9), `anim_player.gd`, `hue_cache.gd` |
+| `ui/` | **3** | **283** | `hud.gd`, `status_bar.gd`, `journal.gd` (16. session; tabulka `_analyza/radky.py` je nepočítá, čísla jsou z `Path.glob`) |
+| `app/` | 8 (7 kód) | 1 906 | `main.gd`, `world_view.gd`, `player_controller.gd`, `input_map.gd`, `loop.gd`, `config.gd`, `metrics.gd` (bez granul) |
+| `tests/` | **58** (49 kód) | **9 845** | 44 case souborů; **1 194 kontrol / 0 selhání** (18. session) |
+| `tools/uoextract/` | 39 | 6 567 | `anim.py` umí pixely, `--export`, `--export-check` |
+| `tools/gates/` | 22 | **5 631** | 18. session: `mutace-tests.py` — vzory po změnách (sort, chunk_mesh, chunk_renderer, world_view, player_controller, movement, journal), nové mutace pro váhu diagonály, průchod landu, `round` posunu a černý pás |
 
 *(Počty jsou Pythonem `splitlines()` nad kódovými soubory `.gd`/`.py`/`.sh`/`.mjs`,
 bez `.uid` a `__pycache__` — `python _analyza/radky.py`.)*
@@ -1244,7 +1337,7 @@ a barva kůže.** Statiky nesou barvu ze záznamu mapy, ale **nikdo ji nepouží
 | **Obsah kroků CI (logy)** | **s PAT:** `$env:GH_TOKEN = (Get-Content 'E:\Workspaces\forge-orchestra\.secrets\github_pat.txt' -Raw).Trim()` a pak `node _analyza/ci-hledej.mjs <cislo_behu> ["vzor"...]` (hledá v logu podle vzorů) · `ci-log.mjs <id>` (posledních 60 řádků + „podezřelé“) — **bez PAT** → `ci-log.mjs` **HTTP 403**, `ci-artefakt.mjs` **401** | S PAT je ověřený **i obsah**: `#52` dal `932 kontrol, 0 selhání` (krok 7), `měřeno 9, čeká 2, chyb 0` (krok 8), **`149 z 149 mutaci chyceno`** (krok 9), `53 hotových, 0 rozporů` (krok 15). Bez PAT je ověřený jen **vznik a výsledek** běhu (a i ten jen mimo rate-limit okno: neautentizované API vrací **403**) |
 | Repo je veřejné | API bez tokenu | `visibility: public` |
 | **Oprávnění** | `whoami /groups \| Select-String Mandatory` | **⚠ 14. session začala v `Low`** (`workspace-write`): brány hlásily **2 falešné vady** (G3 `sim.world_loop` save a `render.textures`, protože podproces nesměl zapsat do `.cache`) a sada **9 selhání**; po přepnutí na **plný přístup** (`danger-full-access`, přepnul uživatel) je vše zelené. **Měř vždy pod plným přístupem** (`LESSONS` 14. session) |
-| Testy | `$env:APPDATA="$PWD\.cache\godot-appdata"` pak `godot --headless --path . --script res://tests/run_tests.gd` | **1 160 kontrol, 0 selhání**, **44 case souborů** (`case souboru spusteno: 44 z 44`), **`$LASTEXITCODE` = 0** (16. session; bylo 1 055 / 41). ⚠ exit kód ber z `$LASTEXITCODE` hned po Godotu — `exit code` celého `pwsh` s rourou je kód posledního příkazu v rouře |
+| Testy | `$env:APPDATA="$PWD\.cache\godot-appdata"` pak `godot --headless --path . --script res://tests/run_tests.gd` | **1 194 kontrol, 0 selhání**, **44 case souborů** (`case souboru spusteno: 44 z 44`), **`$LASTEXITCODE` = 0** (16. session; bylo 1 055 / 41). ⚠ exit kód ber z `$LASTEXITCODE` hned po Godotu — `exit code` celého `pwsh` s rourou je kód posledního příkazu v rouře |
 | **FPS (M9 hotová)** | `& .cache\godot\...console.exe --path . --rendering-driver opengl3 --resolution 1280x720 --script res://_analyza/m9-vykon-po.gd` (3 s stoj + 6 s chůze, čeká se **nástěnnými hodinami**) | **4 draw cally, frame 0,25 ms (stoj) / 0,26 ms (chůze), p90 0,33/0,34, Engine FPS 3 724/2 593**; přestavba dávky 53,8 ms, split 0,66 ms. **Před M9** (14. session / `m9-vykon-pred.gd`): 1 324 draw callů, 48,75 ms, 24 FPS. ⚠ `Performance.TIME_PROCESS` je klouzavý průměr — po 2s stavbě hlásí stará čísla; měř `delta` |
 | Brány | `python tools/gates/run-all.py` | **11 měřeno / 0 NEMĚŘENO / 0 vad**, `exit 0` (`_analyza/zaver16-brany.txt` = `.cache/zaver16-brany.txt` z 16. session) |
 | Self-testy | `python tools/gates/run-all.py --self-test` | **21 celkem (10 bran + 11 extrakčních nástrojů), 0 chyb**, `exit 0` |

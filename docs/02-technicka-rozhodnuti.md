@@ -102,13 +102,37 @@ s vadou, 71 nad vodou — `REVIZE-POHYB-2026-10-07.md` §2.6).
 takže statik na téže diagonále šel před mobilem, i když byl výš — uživatel to
 viděl jako „postavu, která stojí na střeše" (naměřeno: 5 dlaždic v Británii,
 kde střecha ≥ 8 jednotek nad hráčem překrývala jeho sprite a kreslila se před
-ním, `_analyza/p20a-nalez.md`). Dnes platí `diagonal*769 + (z−Z_MIN)*3 + layer`,
-což odpovídá referenci: ClassicUO `GameObject.CalculateDepthZ()`
-(`_src/classicuo/.../Views/View.cs:83`) = `(x + y) + (127 + z) * 0.01f` —
-diagonála, pak `z`, vrstva až za nimi. Konkrétní klíč řazení je v
-`render/sort.gd` a je **pokrytý testem** (dva objekty na stejné dlaždici
-různého `z` → pořadí; při stejném `z` rozhoduje vrstva; diagonála je prvotní
-klíč, protože na tom stojí binární dělení v `render.chunk_mesh.split`).
+ním, `_analyza/p20a-nalez.md`). Dnes platí
+`pruchod*PASS_SPAN + diagonal*K_PER_DIAGONAL + (z−Z_MIN)*LAYERS + layer`, což
+odpovídá referenci: ClassicUO `GameObject.CalculateDepthZ()`
+(`_src/classicuo/.../Views/View.cs:83`) = `(x + y) + (127 + z) * 0.01f`.
+Dvě věci se přitom **měřily proti referenci a do 18. session byly špatně**
+(obojí vadami ze snímků uživatele, `_analyza/p21-*`):
+
+1. **Váha `z` byla moc malá.** `K_PER_DIAGONAL = 769 > Z_SPAN * LAYERS = 765`,
+   takže `z` nepřebilo ani jednu diagonálu; reference má váhu `0.01` proti `1.0`,
+   tedy **`z` přebije ~2,55 diagonály**. Dnes je krok **300** (`765 / 2,55`) —
+   na tom stojí „zeď přes střechu“ (střecha o 1–2 diagonály dál a výš se kreslí
+   **po** bližší nízké zdi).
+2. **Land byl ve stejném průchodu jako statiky.** Reference kreslí land
+   ve **zvláštním průchodu před statiky** (`RenderLists.cs:199-232`: mesh land →
+   `_tiles` → `_stretchedTiles` → mesh statics → `_statics`), takže statik
+   **nikdy** nemůže být překreslen půdou. U nás šel svah (land s vysokým `z`)
+   ve stejném seznamu a **překresloval schody i most**. Dnes je průchod
+   (`PASS_LAND = 0`) nejvyšší řád klíče.
+
+**⚠ Vědomé omezení (zapsané, ne zamlčené):** reference má pod objekty
+**z-buffer**, takže kopec (land) vpředu schová statik za sebou; náš painter's
+algoritmus s landem vždy pod statiky statik za kopcem **nechá vidět**. Je to
+cena za to, že svah nepřekresluje schody ani most.
+
+Konkrétní klíč řazení je v `render/sort.gd` a je **pokrytý testem** (dva objekty
+na stejné dlaždici různého `z` → pořadí; při stejném `z` rozhoduje vrstva;
+`z` přebije 1 i 2 kroky mřížky, ale **ne 3**; land je před statiky i s nejvyšším
+`z` na nejbližší diagonále). Dělení dávky na „před hráčem“/„po hráči“ se dělá
+podle **celého klíče** (`render.chunk_mesh.split_for_player(klic)`, binární
+hledání v neklesajícím poli klíčů) — dělení podle diagonály by od 18. session
+řezalo na špatném místě.
 
 **Chunkový renderer:** svět se kreslí po blocích 8×8 dlaždic. Pro každý
 viditelný blok se sestaví seznam kreslení (land + statiky + mobilové v dosahu),

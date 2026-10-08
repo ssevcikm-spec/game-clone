@@ -71,6 +71,17 @@ class FakeTextures:
 	func texture(_art_id: int) -> Texture2D:
 		return null
 
+	func page_pending(_art_id: int) -> bool:
+		# ⚠ 18. session: `null` z `texture()` znamena "art CHYBI" (dira), ne
+		# "jeste se nacita" - fixture nic nenacita, takze pending je vzdy false.
+		return false
+
+	func verze() -> int:
+		return 0
+
+	func tick_nacteni() -> int:
+		return 0
+
 	func offset(art_id: int) -> Vector2i:
 		var v: Vector2i = offsets.get(art_id, Vector2i.ZERO)
 		return v
@@ -230,8 +241,9 @@ func run(t) -> void:
 				% [sirka, vyska, str(rozmer), pol_a, potreba_a, pol_b, potreba_b])
 	else:
 		print("[test]      NEMERENO: okno vs obrazovka - viewport nema rozmer (headless)")
-	t._check(counts.size() == 2 and counts.has("land") and counts.has("static"),
-		"app.world_view: counts() ma prave land a static (namEReno %s)" % str(counts.keys()))
+	t._check(counts.size() == 3 and counts.has("land") and counts.has("static")
+		and counts.has("skryto"),
+		"app.world_view: counts() ma land, static a skryto (namEReno %s)" % str(counts.keys()))
 	t._check(view.center_tile == Vector2i(1495, 1630),
 		"app.world_view: stred po setup() je BRITAIN (namEReno %s)" % str(view.center_tile))
 
@@ -294,8 +306,18 @@ func run(t) -> void:
 			% [str(cam.position), str(bez_posunu)])
 	view.look_at_tile(Vector2i(10, 20), 0)
 
-	# 6) presun pohledu ZAHODI cache: (3000,3000) je mimo land_rect, takze
-	#    spravny pocet je 0 - se starym seznamem by zustalo 3073.
+	# 5c) ⚠ 18. session - CERNY PAS PRO GUI: svet ma sve okno a vpravo/dole je
+	#     cerny pas, kde bydli GUI (stary zpusob UO). Stred sveta pak NENI stred
+	#     obrazovky, takze se kamera posune o `gui_odsazeni` - bez toho by hrac
+	#     stal pod cernym pasem (mimo viditelny svet).
+	view.gui_odsazeni = Vector2(160.0, 60.0)
+	view.look_at_tile(Vector2i(10, 20), 0)
+	var s_pasem: Vector2 = cam.position
+	view.gui_odsazeni = Vector2.ZERO
+	view.look_at_tile(Vector2i(10, 20), 0)
+	t._check(s_pasem == cam.position + Vector2(160.0, 60.0),
+		"app.world_view: gui_odsazeni se pricte ke kamere (s pasem %s, bez %s)"
+			% [str(s_pasem), str(cam.position)])
 	view.look_at_tile(Vector2i(3000, 3000), 0)
 	var objekty_jinde: int = view.visible_count()
 	var jinde: Dictionary = view.counts()
@@ -365,23 +387,32 @@ func run(t) -> void:
 		+ "(namEReno %d, mobil %d, cekano 2)" % [falesny.dir, int(hrac.dir)])
 	view.set_view_dir(0)
 
-	# 8) klic hrace SEDI MEZI STATIKY: vse na BLIZSI diagonale (x+y < 30) je pred
-	#    nim a vse na dalsi diagonale (31) za nim. ⚠ 17. session: poradi v ramci
-	#    diagonály je dnes podle `z` (a teprve pak vrstva) - hrac stoji na z=0,
-	#    takze statik s vyssim `z` na TEZE diagonale jde ZA hrace (to je oprava
-	#    vady "postava na strese"), na blizsi diagonale ale zustava pred nim.
+	# 8) ⚠ 18. session: klic hrace SEDI MEZI STATIKY sveho pruchodU. Pri STEJNEM
+	#    `z` jako hrac: statiky na blizsi diagonale (29) jsou pred nim, statiky
+	#    na dalsi diagonale (31) za nim. (Do 17. session tu bylo "vsechny na
+	#    diagonale 30 pred hracem" - to prestalo platit, protoze `z` dnes muze
+	#    prebit az 2,5 kroku mrizky, presne jako reference.)
 	var z_min: int = int(consts["Z_MIN"])
+	var z_max: int = int(consts["Z_MAX"])
 	var za_hracem: int = -1
 	for x in range(1, 30):
-		for kind in ["land", "static", "mobile"]:
-			za_hracem = maxi(za_hracem, _klic(sort, kind, x, 30 - x, z_min))
+		za_hracem = maxi(za_hracem, _klic(sort, "static", x, 29 - x, 0))
 	var pred_hracem: int = 0x7FFFFFFF
 	for x in range(0, 4):
-		for kind in ["land", "static", "mobile"]:
-			pred_hracem = mini(pred_hracem, _klic(sort, kind, x + 20, 31 - (x + 20), z_min))
+		pred_hracem = mini(pred_hracem, _klic(sort, "static", x + 20, 31 - (x + 20), 0))
 	t._check(int(klic) > za_hracem and int(klic) < pred_hracem,
-		"app.world_view: hrac je mezi statiky (vse na BLIZSI diagonale < %d < hrac %d < %d = diagonala 31)"
+		"app.world_view: hrac je mezi statiky sveho pruchodu (diag 29 < %d < hrac %d < %d = diag 31)"
 			% [za_hracem, int(klic), pred_hracem])
+	# 8a) ⚠ 18. session: LAND JE VZDY PRED HRACEM - ma vlastni pruchod
+	#     (reference `RenderLists.cs:199-232`), takze ani land s nejvyssim `z`
+	#     na blizsi diagonale nejde za hrace. Na tom stoji vada "svah
+	#     prosvita pres schody/most".
+	var land_max: int = -1
+	for x in range(0, 4):
+		land_max = maxi(land_max, _klic(sort, "land", x + 20, 31 - (x + 20), z_max))
+	t._check(land_max < int(klic),
+		"app.world_view: land je pred hracem i s nejvyssim `z` a nejblizsi diagonalou (%d < %d)"
+			% [land_max, int(klic)])
 	# 8b) statik na TEZE diagonale a VYSSI nez hrac jde ZA hrace (vada (a)).
 	#     Toto je vlastnost, kterou vidi uzivatel na snimku: strecha nad hracem
 	#     se nesmi kreslit pred nim, jinak to vypada, ze po ni chodi.
@@ -390,6 +421,15 @@ func run(t) -> void:
 	t._check(sort.sort_key(strecha) > sort.sort_key(hrac_obj),
 		"app.world_view: strecha (z=31) na TEZE diagonale jde ZA hracem (z=0) "
 		+ "(%d > %d)" % [sort.sort_key(strecha), sort.sort_key(hrac_obj)])
+	# 8c) ⚠ 18. session: statik o JEDNU diagonalou dal a VYSOKO jde ZA hracem -
+	#     presne to je "strecha, ktera hrace prekryje" (do 17. session sla pred
+	#     nim, proto byl hrac videt pres strechu). Zmereno na referencnim klíči
+	#     `(x + y) + (127 + z) * 0.01`: rozdil `z` (765) je vetsi nez krok
+	#     mrizky (300), takze 1-2 kroky se prebit daji.
+	var strecha_dal := {"kind": "static", "x": 9, "y": 20, "z": z_max}
+	t._check(sort.sort_key(strecha_dal) > int(klic),
+		"app.world_view: statik o 1 diagonalу dal s nejvyssim `z` jde ZA hracem (%d > %d)"
+			% [sort.sort_key(strecha_dal), int(klic)])
 
 	# 9) set_registry preda registr do render.anim (body_of ho pouzije)
 	view.set_registry(FakeRegistry.new())
@@ -453,9 +493,15 @@ func run(t) -> void:
 			% str(body))
 	# UV musi mit 4 body a sedet na rohy (jinak se textura rozjede)
 	var uv: PackedVector2Array = script.slope_uv()
-	t._check(uv.size() == 4 and uv[0] == Vector2(0.5, 0.0) and uv[1] == Vector2(1.0, 0.5)
-		and uv[2] == Vector2(0.5, 1.0) and uv[3] == Vector2(0.0, 0.5),
-		"app.world_view: slope_uv() ma rohy diamantu v texture (namEReno %s)" % str(uv))
+	t._check(uv.size() == 4 and uv[0] == Vector2(0.0, 0.0) and uv[1] == Vector2(1.0, 0.0)
+		and uv[2] == Vector2(1.0, 1.0) and uv[3] == Vector2(0.0, 1.0),
+		"app.world_view: slope_uv() mapuje ROHY textury na vrcholy diamantu (namEReno %s)" % str(uv))
+	# a s velikosti textury se prida pulpixelovy inset proti sevum (reference
+	# `ChunkMesh.cs:458-462`: `rect.X + 0.5`, `rect.Width - 1`)
+	var uv_inset: PackedVector2Array = script.slope_uv(64.0, 64.0)
+	t._check(uv_inset[0] == Vector2(0.5 / 64.0, 0.5 / 64.0)
+		and uv_inset[1] == Vector2(1.0 - 0.5 / 64.0, 0.5 / 64.0),
+		"app.world_view: slope_uv(64, 64) prida pulpixelovy inset (namEReno %s)" % str(uv_inset))
 	# Rozhodnuti `is_slope()`: svah ano, rovna plocha ne, bez textury ne.
 	# Tohle je vetev, ktera rozhoduje, zda v terenu zustane dira.
 	var obrazek2 := Image.create(4, 4, false, Image.FORMAT_RGBA8)

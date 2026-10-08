@@ -43,7 +43,15 @@ const MOUSE_RATIO_NUM: int = 2
 const MOUSE_RATIO_DEN: int = 5
 
 var bindings: Dictionary = {}
-var always_run: bool = false
+# ⚠⚠ 18. session (2026-10-08) - VADA UZIVATELE: "CHYBI BEH JAKO RYCHLOST
+# POHYBU". Do teto session bylo `always_run = false` a NIKDO ho nezapnul, takze
+# klavesy i numpad chodily vzdy 400 ms/krok; beh (200 ms) sel jen drzenym
+# pravym tlacitkem dal nez 190 px od stredu. UO ma beh jako VYCHOZI pohyb
+# (`PlayerMobile.cs:530` `run |= ProfileManager.CurrentProfile.AlwaysRun`
+# a `:532` `Stamina <= 1` beh zakaze) a prepina se priznakem/makrem
+# (`MacroType.AlwaysRun`, `MacroManager.cs:1189-1192`). Proto je vychozi stav
+# BEH a `run_toggle` (Shift) ho prepne na chuzi - stav se HLAST, ne tise.
+var always_run: bool = true
 # Velikost herniho okna v px - potrebuje ji prave tlacitko (`run` podle
 # vzdalenosti kurzoru od STREDU obrazovky). Nastavuje ji `app/player_controller`
 # (RefCounted nema pristup k viewportu); kdyz zustane nulova, `run` rozhoduje
@@ -199,6 +207,14 @@ func poll(player: Vector2i, camera_offset: Vector2, z: int = 0,
 			continue
 		if not Input.is_action_pressed(input_action):
 			_krok_ms.erase(action)
+			continue
+		if str(action) == "run_toggle":
+			# PREPINAC CHUZE/BEH (18. session): jedno zmacknuti = druhy rezim.
+			# Hlasi se do konzole - ticho by znamenalo, ze hrac nevi, jak jede.
+			if Input.is_action_just_pressed(input_action):
+				always_run = not always_run
+				print("[input] beh: ", "ZAPNUT" if always_run else "VYPNUT",
+					" (", step_delay_ms(always_run), " ms/krok)")
 			continue
 		if str(action) == "click_move":
 			# Jedno zmacknuti = jeden krok (klik-to-move). Drzeni leveho

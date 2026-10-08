@@ -85,6 +85,14 @@ MODULY = {
              "klice[i] = sort_key(obj) << shift"),
             ("spatny radix vrstev (LAYERS 3 -> 2)",
              "const LAYERS: int = 3", "const LAYERS: int = 2"),
+            # ⚠ 18. session: dve veci, na kterych stoji vady ze snimku
+            # ("zed pres strechu", "svah pres schody/most"). Obji museji byt
+            # chycene, jinak se vada vrati a testy zustanou zelene.
+            ("krok mrizky 300 -> 769 (z neprebije ani jednu diagonalou)",
+             "const K_PER_DIAGONAL: int = 300", "const K_PER_DIAGONAL: int = 769"),
+            ("land ztrati vlastni pruchod (svah muze pres schody)",
+             "pruchod * PASS_SPAN + diagonal * K_PER_DIAGONAL",
+             "diagonal * K_PER_DIAGONAL"),
         ],
     },
     "map": {
@@ -366,7 +374,7 @@ MODULY = {
             ("is_player se nepredava (kazdy je hrac)",
              "m == player_serial", "true"),
             ("bez staminy se porad bezi",
-             "if use_run and mob.stam <= 0:", "if false:"),
+             "if use_run and mob.stam <= 1:", "if false:"),
             # --- V2/V4 (14. session): krok musi klientovi rict, KDY zacal, a
             # stojna vyska se musi zapsat do `pos.z` (vada V4 - jinak se na
             # svahu kazdy dalsi krok meri proti stare vysce).
@@ -587,7 +595,9 @@ MODULY = {
         "prepinac": "--controller-script",
         "mutace": [
             ("vazba na drzene prave tlacitko chybi (mys nechodi)",
-             '"walk_to": "walk_to_cursor",\n', ""),
+             '"walk_to": "walk_to_cursor",', ""),
+            ("prepinac chuze/beh chybi (beh se neda vypnout)",
+             '"run_toggle": "run_toggle",', ""),
             ("prave tlacitko se zaregistruje jako klavesa",
              "var klik := InputEventMouseButton.new()\n\t\tklik.button_index = MOUSE[action]",
              "var klik := InputEventKey.new()\n\t\tklik.keycode = KEY_F1"),
@@ -595,11 +605,15 @@ MODULY = {
             ("krok v letu necha akci idle (animace startuje az po skoku)",
              '_action = ACTION_RUN if bool(_step["run"]) else ACTION_WALK',
              "_action = ACTION_IDLE"),
-            ("posun se nepocita po 80ms framech (linearni prubeh)",
-             "var zaokrouhleno: int = (maxi(elapsed_ms, 0) / ANIM_FRAME_MS) * ANIM_FRAME_MS",
-             "var zaokrouhleno: int = maxi(elapsed_ms, 0)"),
+            # ⚠ 18. session: posun se uz NEKVANTUJE po 80 ms (byla to vada
+            # "trhavost, ktera je plynula"). Mutace vadi 80ms kvantizaci ZPET.
+            ("posun se kvantuje po 80ms framech (trhavy pohyb)",
+             "return clampf(float(maxi(elapsed_ms, 0)) / float(delay_ms), 0.0, 1.0)",
+             "return clampf(float((maxi(elapsed_ms, 0) / ANIM_FRAME_MS) * ANIM_FRAME_MS) / float(delay_ms), 0.0, 1.0)"),
             ("posun postavy mezi dlazdicemi se nekresli (offset vzdy nula)",
-             "return (kam_px - od) * f", "return Vector2.ZERO"),
+             "return Vector2(roundf(posun.x), roundf(posun.y))", "return Vector2.ZERO"),
+            ("posun se nezaokrouhli na cely pixel (subpixelovy sum)",
+             "return Vector2(roundf(posun.x), roundf(posun.y))", "return posun"),
             ("controller bezi pred smyckou (cte stav pred tickem)",
              "\tprocess_priority = 1", "\tprocess_priority = 0"),
         ],
@@ -636,7 +650,12 @@ MODULY = {
             # Godot dovoli `draw_*` jen v NOTIFICATION_DRAW - takze se meri
             # PRIPRAVA dávky.)
             ("davka se nikdy nepostavi (mesh zustane prazdny)",
-             "if not _mesh.build(seznam, diagonala):", "if false:"),
+             "if not _mesh.build(seznam):", "if false:"),
+            # ⚠ 18. session: kamera se posouva o cerny pas pro GUI - bez toho by
+            # hrac stal pod pasem (mimo viditelny svet). Meri se klicem hrace
+            # v `tests/cases/world_view.gd` (sekce 5c).
+            ("kamera ignoruje cerny pas pro GUI (hrac pod pasem)",
+             "+ offset + gui_odsazeni", "+ offset"),
         ],
     },
     # M9 (15. session): davkove kresleni. Mutace miri na GEOMETRII, PORADI
@@ -667,14 +686,21 @@ MODULY = {
              "\"pos\": Vector2(r.position), \"tex\": null,"),
             ("po zmene stranky se dávka pouzije hned (prazdna textura)",
              "_hold = HOLD_FRAMU", "_hold = 0"),
-            ("mobil na diagonale hrace se do hranice nedava (rozbite poradi)",
-             "if diagonala == diagonal_hrace:", "if true:"),
             ("split radi podle spatne hranice (hrac je jinde)",
-             "if _diag[stred] <= diagonal:", "if _diag[stred] < diagonal:"),
+             "if _klic[stred] <= klic_hrace:", "if _klic[stred] < klic_hrace:"),
             ("pretek stranky se nehlasi (ticha degradace)",
              "if _y + vyska > _velikost:", "if _y + vyska > _velikost * 1000:"),
-            ("do `_diag` se zapise nula (split prestane fungovat)",
-             "_diag[q] = diagonala", "_diag[q] = 0"),
+            ("do klice kvadru se zapise nula (split prestane fungovat)",
+             "_klic[q] = _sort.sort_key(obj)", "_klic[q] = 0"),
+            # ⚠ 18. session: vynechany objekt kvuli NACTENI STRANKY neni dira -
+            # kdyby se to pletlo, kazda pomalejsi stranka by blikla magenta.
+            ("ceka stranka se kresli jako dira (magenta)",
+             "if tex == null and _textures.page_pending(art_id):",
+             "if false:"),
+            # ⚠ 18. session: barva svahu (reference stinuje jen stretched land).
+            ("svah se kresli bez ztmaveni (jina svetlost nez rovina)",
+             "barva = SVAH_BARVA       # viz `SVAH_JAS` v hlavicce",
+             "barva = Color.WHITE"),
         ],
     },
     # M9 (15. session): typovana konfigurace. Mutace miri na to, co ma byt
@@ -821,7 +847,7 @@ MODULY = {
             ("BBCode se neescapuje",
              'text.replace("[", "[lb]")', "text"),
             ("zurnal nema velikost (text se nevykresli)",
-             "label.custom_minimum_size = Vector2(SIRKA, VYSKA)\n\t\tlabel.size = Vector2(SIRKA, VYSKA)",
+             "label.custom_minimum_size = velikost\n\t\tlabel.size = velikost",
              "label.custom_minimum_size = Vector2.ZERO\n\t\tlabel.size = Vector2.ZERO"),
         ],
     },

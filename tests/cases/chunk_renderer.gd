@@ -78,11 +78,14 @@ class FakeTiledata:
 	var background: int = 0x00000001
 	var vysky: Dictionary = {}          # art_id -> vyska
 	var podlahy: Array = []             # art_id, ktere jsou podlaha
+	var strechy: Dictionary = {}        # art_id -> flagy strechy/stropu (18. session)
 
 	func texture(tile: int) -> int:
 		return tile + 100
 
 	func flags(art_id: int) -> int:
+		if strechy.has(art_id):
+			return int(strechy[art_id])
 		return background if podlahy.has(art_id) else 0
 
 	func height(art_id: int) -> int:
@@ -152,8 +155,10 @@ func run(t) -> void:
 		"render.chunk: 8x8 pohled da 9 land (3x3) + 2 statiky ve dvou blocich "
 		+ "(namEReno %d objektu, land %s, static %s)"
 			% [list.size(), str(counts.get("land")), str(counts.get("static"))])
-	t._check(counts.size() == 2 and counts.has("land") and counts.has("static"),
-		"render.chunk: counts() ma prave land a static (namEReno %s)" % str(counts.keys()))
+	t._check(counts.size() == 3 and counts.has("land") and counts.has("static")
+		and counts.has("skryto"),
+		"render.chunk: counts() ma land, static a skryto (18. session: pocita se i to, "
+		+ "co se skrylo kvuli strese; namEReno %s)" % str(counts.keys()))
 
 	# --- 2) oblast a filtr statiku --------------------------------------------
 	t._check(chunk.cover() == Rect2i(6, 6, 8, 8) and chunk.is_built(),
@@ -397,3 +402,56 @@ func run(t) -> void:
 	t._check(posun_neshoda == 0,
 		"render.chunk: offset realnych statiku je z manifestu (neshod %d z %d)"
 			% [posun_neshoda, statiku])
+
+	# --- 9) ⚠ 18. session: STŘECHA NAD HRÁČEM SE NEKRESLÍ --------------------
+	# Vada uzivatele: "v budove nevidim vnitrek a postava jakoby chodi po
+	# strese". Reference (`GameSceneDrawingSorting.cs:57-213`) hlasi
+	# `_noDrawRoofs`, kdyz je na dlazdici hrace statik VYS nez `playerZ + 14`;
+	# tady se meri, ze se takovy statik ze seznamu VYPUSTI a ze se to pozna
+	# v `counts()["skryto"]` (ticho by byla vada).
+	var f_roof: int = int(Lib.consts_at(cesta).get("F_ROOF", 0x10000000))
+	var f_surface: int = int(Lib.consts_at(cesta).get("F_SURFACE", 0x200))
+	var mapa3 := FakeMap.new()
+	mapa3.land_rect = Rect2i(0, 0, 8, 8)
+	mapa3.statics[Vector2i(0, 0)] = [
+		{"tile": 7, "x": 2, "y": 2, "z": 40, "hue": 0},      # strecha NAD hracem
+		{"tile": 8, "x": 5, "y": 5, "z": 40, "hue": 0},      # jina dlazdice
+	]
+	var td3 := FakeTiledata.new()
+	td3.strechy[7 + ITEM_OFFSET] = f_roof
+	td3.strechy[8 + ITEM_OFFSET] = f_surface | 0x1          # plocha s Background
+	var chunk_stres = script.new(mapa3, FakeTextures.new(), td3)
+	t._check(chunk_stres.je_strop(7 + ITEM_OFFSET) and chunk_stres.je_strop(8 + ITEM_OFFSET)
+		and not chunk_stres.je_strop(9 + ITEM_OFFSET),
+		"render.chunk: je_strop() = Roof flag nebo Surface|Background (namEReno %s/%s/%s)"
+			% [str(chunk_stres.je_strop(7 + ITEM_OFFSET)), str(chunk_stres.je_strop(8 + ITEM_OFFSET)),
+				str(chunk_stres.je_strop(9 + ITEM_OFFSET))])
+	# hrac stoji na (2,2) s `z` z FakeMap (`(2+2) % 7 - 3` = 1) - strecha je vys
+	var z_hrace: int = int(mapa3.z_at(2, 2))
+	t._check(not chunk_stres.pod_strechou(2, 2, z_hrace + 30),
+		"render.chunk: NAD strechou (z=%d) se nekryje" % (z_hrace + 30))
+	t._check(chunk_stres.pod_strechou(2, 2, z_hrace),
+		"render.chunk: pod strechou (z=%d, strecha z=40) se kryje" % z_hrace)
+	var zmena: bool = chunk_stres.nastav_hrace(2, 2, z_hrace)
+	var sez: Array = chunk_stres.visible(Vector2i(2, 2), 8, 8)
+	var statiku_v_seznamu: int = 0
+	for obj in sez:
+		if str(obj["kind"]) == "static":
+			statiku_v_seznamu += 1
+	# Kdyz je hrac pod strechou, skryji se VŠECHNY strechy/stropy nad nim v
+	# pohledu (reference `_noDrawRoofs` = "strechy se nekresli"): oba statiky
+	# v okne maji z=40 > hrac+16, takze oba vypadnou - a `skryto` to rekne.
+	t._check(zmena and chunk_stres.skryt_strechy and statiku_v_seznamu == 0
+		and int(chunk_stres.counts()["skryto"]) == 2,
+		"render.chunk: strechy/stropy nad hracem se ze seznamu VYPUSTI (statiku %d, skryto %s)"
+			% [statiku_v_seznamu, str(chunk_stres.counts()["skryto"])])
+	# a kdyz hrac odejde mimo, strecha se vrati
+	t._check(chunk_stres.nastav_hrace(5, 4, z_hrace) and not chunk_stres.skryt_strechy,
+		"render.chunk: mimo strechu se `skryt_strechy` vrati na false")
+	var sez2: Array = chunk_stres.visible(Vector2i(2, 2), 8, 8)
+	var statiku2: int = 0
+	for obj in sez2:
+		if str(obj["kind"]) == "static":
+			statiku2 += 1
+	t._check(statiku2 == 2 and int(chunk_stres.counts()["skryto"]) == 0,
+		"render.chunk: bez strechy nad hracem se kresli oba statiky (namEReno %d)" % statiku2)

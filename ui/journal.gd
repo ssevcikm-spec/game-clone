@@ -40,6 +40,11 @@ const COLORS: Dictionary = {
 }
 
 var label: RichTextLabel = null   # text kresli RichTextLabel (funguje i bez okna)
+# ⚠ 18. session: VELIKOST OKNA JE VSTUP. Uzivatel chce stary zpusob UO - svet
+# jako okno a GUI v cernem pase VEDLE nej, aby zurnal nezakryval vyhled
+# (`app/main.gd` proto dava zurnalu sirku pásu). Vychozi hodnota zustava
+# puvodni, aby testy a kdo si okno neprepne, dostali stejne chovani.
+var velikost: Vector2 = Vector2(SIRKA, VYSKA)
 var _lines: Array[Dictionary] = []
 var _dirty: bool = false
 var _rebuilds: int = 0
@@ -153,7 +158,7 @@ func _ensure_label() -> RichTextLabel:
 		# Testy to nepoznaji (ctou `label.text`) - namEReno 16. session: sada
 		# byla zelena a snimek ukazal prazdne misto; chytil to az `read_image`
 		# nad snimkem. Proto to ma i vlastni kontrolu v `tests/cases/journal.gd`.
-		label.custom_minimum_size = Vector2(SIRKA, VYSKA)
-		label.size = Vector2(SIRKA, VYSKA)
+		label.custom_minimum_size = velikost
+		label.size = velikost
 		add_child(label)
 	return label

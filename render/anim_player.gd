@@ -129,12 +129,21 @@ func _texture(file: String, f: Dictionary) -> Texture2D:
 		return _textures[key]
 	var page: Texture2D = _textures.get("page|" + file)
 	if page == null:
-		var image := Image.new()
-		if image.load(_prefix + file) != OK:
-			push_warning("render.anim: PNG %s se necte" % (_prefix + file))
-			_textures["page|" + file] = null
-			return null
-		page = ImageTexture.create_from_image(image)
+		# ⚠ 18. session: SPRITE ANIMACE SE NACTE PRES IMPORT, kdyz existuje
+		# (`load()`), ne `Image.load()` - to bylo v logu uzivatele jako
+		# "Loaded resource as image file, this will not work on export:
+		# 'res://assets/uo/anim/anim-400-0-0.png'" a v exportu by to
+		# nefungovalo vubec. Kdyz import chybi, padá se zpet na `Image.load`.
+		var cesta: String = _prefix + file
+		if ResourceLoader.exists(cesta):
+			page = load(cesta)
+		if page == null:
+			var image := Image.new()
+			if image.load(cesta) != OK:
+				push_warning("render.anim: PNG %s se necte" % cesta)
+				_textures["page|" + file] = null
+				return null
+			page = ImageTexture.create_from_image(image)
 		_textures["page|" + file] = page
 	var out := AtlasTexture.new()
 	out.atlas = page

@@ -90,13 +90,28 @@ var _list_center: Vector2i = Vector2i(-99999, -99999)   # stred postaveneho sezn
 var _player_offset: Vector2 = Vector2.ZERO  # posun postavy mezi dlazdicemi (V2)
 var _mesh = null                   # render.chunk_mesh (M9) - null = puvodni cesta
 var _mesh_seznam: Array = []       # seznam, pro ktery je mesh postaveny
-var _mesh_diagonala: int = -2147483647
+var _mesh_klic: int = -2147483647
 var _mesh_stats: Dictionary = {}
 var _mesh_pretek_hlasen: bool = false
+# Pocet dotecenych stranek atlasu pri posledni stavbe (18. session): kdyz se
+# zmeni, davka se prestavi, aby se do ni dostaly arty, ktere se jeste nacitaly.
+var _textures_verze: int = 0
+# Kolik framu se uz ceka na doteceni stranek atlasu (viz `_priprav_mesh`).
+var _cekani_verze: int = 0
+const _CEKANI_FRAMU: int = 120
 # VYCHOZI CESTA JE MESH (M9). Vypina se jen pro mereni parity a pro pripad, ze
 # se runtime atlas naplni - obe cesty musi umet to same (docs/08: modernizace
 # nesmi ubrat zadne mereni).
 var mesh_enabled: bool = true
+
+
+# POSUN SVETA KVULI CERNEMU PASU PRO GUI (18. session): uzivatel chce stary
+# zpusob UO - okno viditelneho sveta a VEDLE nej cerny pas, kde bydli GUI
+# (zurnal, stavovy pruh). Kdyz je pas vpravo a dole, stred "okna sveta" uz neni
+# stred obrazovky, takze se kamera posune o polovinu pásu - hrac pak stoji ve
+# stredu VIDITELNEHO sveta, ne pod cernym pasem. Vychozi hodnota je nulova
+# (testy i kdo si pas nezapne dostanou presne stare chovani).
+var gui_odsazeni: Vector2 = Vector2.ZERO
 
 
 func _ready() -> void:
@@ -224,9 +239,15 @@ func look_at_tile(tile: Vector2i, z: int = 0, offset: Vector2 = Vector2.ZERO) ->
 	#   drzi hrace ve stredu a posouva SVET: kamera proto dostava stejny posun
 	#   v pixelech jako postava a svet se valí plynule, po 80ms framech.
 	center_tile = tile
+	# ⚠ 18. session: stav "hrac je pod strechou" se predava seznamu objektu
+	# (`render.chunk_renderer.nastav_hrace`). Kdyz se zmeni, seznam se zahodi a
+	# strechy/stropy nad hracem se prekresli BEZ nich - v budove je pak videt
+	# vnitrek (reference `UpdateMaxDrawZ`, `GameSceneDrawingSorting.cs:57-213`).
+	if _chunk != null:
+		_chunk.nastav_hrace(tile.x, tile.y, z)
 	if _camera != null:
 		_camera.position = _iso.to_screen(tile.x, tile.y, z) \
-			+ Vector2(Const.ISO_STEP, Const.TILE_H / 2) + offset
+			+ Vector2(Const.ISO_STEP, Const.TILE_H / 2) + offset + gui_odsazeni
 	# POZOR: seznam se tady NEZAHOZUJE. `render.chunk` si ho prestavi sam, kdyz
 	# se zmeni stred (viz `_list` a RECENTER_TILES) - zahozeni pri kazdem kroku
 	# bylo namERene seknuti (44 ms x 2,5 za sekundu).
@@ -306,14 +327,8 @@ func _draw_puvodni() -> void:
 	player_drawn = false
 	# Postava se vklada do JIZ SETRIDENEHO seznamu. Poradi rozhoduje
 	# `render.sort.sort_key` (jedina funkce razeni, docs/04 §4.2) - ne vlastni
-	# porovnavani. Aby se `sort_key` nevolal 5 000x za frame, pouzije se jen
-	# tam, kde opravdu rozhoduje: na stejne diagonale (`x + y`), protoze
-	# pres diagonalu rozhoduje uz ten soucet.
-	var klic_hrace: int = 0
-	var diagonal: int = 999999
-	if _player != null:
-		diagonal = int(_player.pos.x) + int(_player.pos.y)
-		klic_hrace = _sort_key_of_player()
+	# porovnavani. Klic hrace se pocita JEDNOU za frame.
+	var klic_hrace: int = _klic_hrace()
 	# OREZANI MIMO OBRAZOVKU (namEReno 2026-10-07): seznam je
 	# (64 + 2*RECENTER) x (48 + 2*RECENTER) dlazdic (4 032 land + ~3 400 statiku),
 	# ale obrazovka 1280x720 jich ukazuje zlomek. Godot kresli i to, co je mimo
@@ -323,8 +338,11 @@ func _draw_puvodni() -> void:
 	var okno: Rect2 = _obrazovka(CULL_MARGIN)
 	for obj in _list():
 		if _player != null and not player_drawn:
-			var d: int = int(obj["x"]) + int(obj["y"])
-			if d > diagonal or (d == diagonal and _sort.sort_key(obj) > klic_hrace):
+			# ⚠ 18. session: rozhoduje CELY klic, ne diagonala - v klíči muze
+			# `z` prebit az ~2,5 diagonály (viz `render/sort.gd`). Do teto
+			# session tu bylo `d > diagonal or (d == diagonal and klic > ...)`,
+			# coz kreslilo hrace na spatnem miste vuci strecham o 2 diagonály dal.
+			if _sort.sort_key(obj) > klic_hrace:
 				_draw_player()
 		var pozice: Vector2 = _chunk.screen_position(obj)
 		if not okno.has_point(pozice):
@@ -339,6 +357,9 @@ func _draw_puvodni() -> void:
 			continue
 		var art: Texture2D = _textures.texture(art_id)
 		if art == null:
+			if _textures.page_pending(art_id):
+				# Stranka se jeste nacita (18. session) - "nenacteno" neni "chybi".
+				continue
 			# CHYBEJICI ART NENI TICHO (vada 61): vyrazna magenta + hlaseni
 			# (jednou na art id, aby log nezaplavilo 5 000 radku za frame).
 			holes += 1
@@ -383,22 +404,43 @@ func is_slope(obj: Dictionary) -> bool:
 	return MeshScript.je_svah(obj, _textures)
 
 
-func _diagonala_hrace() -> int:
-	if _player == null:
-		return -2147483647
-	return int(_player.pos.x) + int(_player.pos.y)
-
-
 func _priprav_mesh() -> bool:
-	# Postavi (nebo prekraji) davku pro AKTUALNI seznam a diagonalу hrace.
+	# Postavi (nebo prekraji) davku pro AKTUALNI seznam a klic hrace.
 	# Stavi se jen kdyz se seznam vymenil (`render.chunk` vraci porad TUTEZ
 	# instanci, dokud se neprestavi) - ne kazdy frame.
+	#
+	# ⚠ 18. session: stranky atlasu se nacitaji NA POZADI, takze se stava, ze
+	# se objekt pri stavbe VYNECHA (`page_pending`). Kdyz stranka dotece
+	# (`textures.verze()` se zmeni), davka se prestavi - jinak by art zustal
+	# nenakresleny, dokud se neprestavi cely seznam.
 	var seznam: Array = _list()
+	if _textures != null:
+		# Hotove stranky se prevzimaji KAZDY frame - bez toho by stranka
+		# zustala "ceka" a objekty by se neobjevily (viz `tick_nacteni`).
+		_textures.tick_nacteni()
+	if _textures != null and _textures.verze() != _textures_verze:
+		_textures_verze = _textures.verze()
+		# ⚠ 18. session: PRESTAVBA SE ODDALUJE, dokud nejsou stranky dotecene.
+		# NamerENo (`_analyza/p21-chuze.gd`): na startu prichazi 33 stranek
+		# postupne a kazda zmena verze spustila CELOU stavbu (166-1058 ms) -
+		# hra se na startu zasekavala 33x. Ceka se proto na `pending() == 0`;
+		# kdyby neco viselo, po `_CEKANI_FRAMU` se prestavi i tak (jinak by art
+		# zustal vynechany navzdy).
+		if _textures.pending() == 0:
+			_cekani_verze = 0
+			_mesh.invalidate()
+			_mesh_seznam = []
+		else:
+			_cekani_verze += 1
+			if _cekani_verze >= _CEKANI_FRAMU:
+				_cekani_verze = 0
+				_mesh.invalidate()
+				_mesh_seznam = []
 	return _priprav_mesh_vnitrni(seznam)
 
 
 func _priprav_mesh_vnitrni(seznam: Array) -> bool:
-	var diagonala: int = _diagonala_hrace()
+	var klic: int = _klic_hrace()
 	if _mesh.hold() > 0:
 		# Runtime atlas se prave prekresluje na GPU (`UPDATE_ONCE`): do te doby
 		# by davka cetla prazdnou texturu, takze se kresli puvodni cestou.
@@ -407,21 +449,25 @@ func _priprav_mesh_vnitrni(seznam: Array) -> bool:
 		return false
 	if not is_same(seznam, _mesh_seznam):
 		_mesh_seznam = seznam
-		if not _mesh.build(seznam, diagonala):
-			# Runtime atlas se naplnil: NEMLCET a kreslit puvodni cestou.
-			if not _mesh_pretek_hlasen:
+		if not _mesh.build(seznam):
+			# ⚠ 18. session: HLAST SE JEN PRI PRETEKU. Do teto session se tu
+			# hlasilo "nevesel se do atlasu" i kdyz byl duvod jen `hold()`
+			# (stranka se prave prekresluje) - to je FALESNE HLASENI a nuti
+			# hledat vadu, ktera neni (namEReno v `_analyza/p21-chuze.gd`:
+			# `pretek: false`, a pritom se hlasil pretek).
+			if _mesh.pretek() and not _mesh_pretek_hlasen:
 				_mesh_pretek_hlasen = true
 				push_warning("app.world_view: render.chunk_mesh se nevesel do atlasu ("
 					+ str(_mesh.stats()) + ") - kresli se puvodni cestou")
 			_nacti_mesh_stats()
 			return false
-		_mesh_diagonala = diagonala
-		_mesh.split(diagonala)
+		_mesh_klic = klic
+		_mesh.split_for_player(klic)
 		_nacti_mesh_stats()
 		return true
-	if diagonala != _mesh_diagonala:
-		_mesh_diagonala = diagonala
-		_mesh.split(diagonala)
+	if klic != _mesh_klic:
+		_mesh_klic = klic
+		_mesh.split_for_player(klic)
 		_nacti_mesh_stats()
 	# ⚠⚠ 17. session (2026-10-08) - VADA "SVET JE CELY CERNY": tady se do teto
 	# session vracelo `true` (tedy "davka je pripravena") i kdyz `build()`
@@ -433,6 +479,14 @@ func _priprav_mesh_vnitrni(seznam: Array) -> bool:
 	return _mesh.is_built()
 
 
+func _klic_hrace() -> int:
+	# Klic hrace pro deleni davky. Bez hrace plati SENTINELA: vsechno ma klic
+	# >= 0, takze `-1` da "pred hracem" prazdne a kresli se cela davka.
+	if _player == null:
+		return -1
+	return _sort_key_of_player()
+
+
 func _nacti_mesh_stats() -> void:
 	# Pocitadla se berou z POSTAVENE davky - jinak by `drawn`/`holes`/`nodraw`
 	# tvrdily neco jineho, nez co je na obrazovce (docs/08 §8.6).
@@ -440,7 +494,7 @@ func _nacti_mesh_stats() -> void:
 	slopes = int(_mesh_stats.get("svahu", 0))
 	holes = int(_mesh_stats.get("der", 0))
 	nodraw = int(_mesh_stats.get("nodraw", 0))
-	drawn = int(_mesh_stats.get("kvadru", 0)) - holes + int(_mesh_stats.get("hranic", 0))
+	drawn = int(_mesh_stats.get("kvadru", 0)) - holes
 	for art_id in _mesh.missing_art_ids():
 		if not _hlasene_diry.has(art_id):
 			_hlasene_diry[art_id] = true
@@ -448,40 +502,16 @@ func _nacti_mesh_stats() -> void:
 
 
 func _kresli_mesh() -> void:
-	# PORADI: (1) vse s `x + y <=` diagonala hrace, (2) objekty na TEZE
-	# diagonale a hrac podle `sort_key`, (3) vse s vetsi diagonalou. Presne
-	# to dela puvodni smycka - jen s 1-2 prikazy misto tisice.
+	# PORADI: (1) vse s klicem `<=` klic hrace, (2) hrac, (3) vse s vetsim
+	# klicem. Presne to dela puvodni smycka - jen se 3 prikazy misto tisice.
+	# ⚠ 18. session: land je od teto session v klíči PRVNI PRUCHOD, takze je
+	# cely v "pred hracem" casti - presne jako reference (`RenderLists.cs`
+	# kresli mesh land pred mesh statics); statik se tak nikdy nekresli pod pudu.
 	player_drawn = false
 	player_missing = false
-	var klic_hrace: int = 0
-	var hranice: Array = _mesh.hranice()
-	var ma_hranici: bool = hranice.size() > 0
-	if _player != null or ma_hranici:
-		klic_hrace = _sort_key_of_player() if _player != null else 0
 	_mesh.draw_before(self)
-	if ma_hranici:
-		hranice.sort_custom(func(a, b): return int(a["klic"]) < int(b["klic"]))
-		for item in hranice:
-			if _player != null and not player_drawn and int(item["klic"]) > klic_hrace:
-				_draw_player()
-			_kresli_hranicni(item)
+	_draw_player()
 	_mesh.draw_after(self)
-	if _player != null and not player_drawn:
-		_draw_player()
-
-
-func _kresli_hranicni(item: Dictionary) -> void:
-	# Objekt na diagonale hrace, ktery se do davky nedal (rozhoduje `sort_key`,
-	# ne diagonala) - kresli se jednotlive, protoze je ve vztahu k hraci
-	# "pred/po" pokazde jinak.
-	var obj: Dictionary = item["obj"]
-	var pozice: Vector2 = item["pozice"]
-	var art_id: int = int(obj["art_id"])
-	var tex: Texture2D = _textures.texture(art_id)
-	if tex == null:
-		_draw_hole(obj, pozice)
-		return
-	draw_texture(tex, pozice)
 
 
 func mesh_stats() -> Dictionary:
@@ -500,8 +530,16 @@ func _draw_slope(obj: Dictionary, pozice: Vector2) -> bool:
 		return false
 	var body: PackedVector2Array = slope_polygon(obj, pozice)
 	var tex: Texture2D = _textures.texmap(int(obj["texmap"]))
-	var barvy := PackedColorArray([Color.WHITE, Color.WHITE, Color.WHITE, Color.WHITE])
-	draw_polygon(body, barvy, slope_uv(), tex)
+	# ⚠ 18. session: barva svahu a UV jsou STEJNE jako v dávce (`chunk_mesh`),
+	# aby se obe cesty nerozesly (docs/08: modernizace nesmi ubrat mereni).
+	# `slope_uv` dostava velikost textury, aby sel pridat pulpixelovy inset
+	# proti sevum - `AtlasTexture.get_width()` vraci sirku regionu.
+	var barvy := PackedColorArray([MeshScript.SVAH_BARVA, MeshScript.SVAH_BARVA,
+		MeshScript.SVAH_BARVA, MeshScript.SVAH_BARVA])
+	if tex == null:
+		return false
+	draw_polygon(body, barvy,
+		MeshScript.slope_uv(float(tex.get_width()), float(tex.get_height())), tex)
 	return true
 
 
@@ -511,10 +549,13 @@ static func slope_polygon(obj: Dictionary, pos: Vector2) -> PackedVector2Array:
 	return MeshScript.slope_polygon(obj, pos)
 
 
-static func slope_uv() -> PackedVector2Array:
-	# UV rohu v texture (0..1): horni (0.5, 0), pravy (1, 0.5), dolni (0.5, 1),
-	# levy (0, 0.5) - stejne jako `_cornerOffsetX/Y` v ClassicUO (`Batcher2D.cs:263`).
-	return MeshScript.slope_uv()
+static func slope_uv(sirka: float = 0.0, vyska: float = 0.0) -> PackedVector2Array:
+	# UV rohu v texture (0..1): horni (0,0), pravy (1,0), dolni (1,1), levy (0,1)
+	# - ROHY textury, presne jako reference (`_cornerOffsetX/Y` v
+	# `Batcher2D.cs:16-17`; nas starsi tvar `(0.5,0) …` byl otoceny o 45 stupnu
+	# a je to vada "ruznobarevne svahy", viz hlavicka `render/chunk_mesh.gd`).
+	# Kdyz volajici zna velikost textury, prida se pulpixelovy inset.
+	return MeshScript.slope_uv(sirka, vyska)
 
 
 func _draw_hole(obj: Dictionary, pozice: Vector2) -> void:

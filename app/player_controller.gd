@@ -62,6 +62,14 @@ const KEYS := {
 	"move_se": [KEY_KP_3],
 }
 
+# ⚠ PREPINAC CHUZE/BEH (18. session, vada "chybi beh jako rychlost pohybu"):
+# UO ma beh jako vychozi pohyb a makro `AlwaysRun` ho prepina
+# (`MacroManager.cs:1189-1192`). Klavesa je volba KLIENTA (granule `ui.hotkeys`
+# jeste neexistuje), proto je tady - a je videt v konzoli pri kazdem prepnuti.
+const TOGGLE_KEYS := {
+	"run_toggle": [KEY_SHIFT],
+}
+
 # MYS: akce v InputMap -> tlacitko. DRZENE PRAVE TLACITKO = chuze kursoru
 # (uzivatel 2026-10-07: "chůze držením klávesy (včetně pravého tlačítka myši)");
 # UO to ma v `GameSceneInputHandler.cs:41`. LEVY klik tady ZAMERNE neni:
@@ -106,7 +114,7 @@ static func default_bindings() -> Dictionary:
 	return {
 		"east": "move_east", "ne": "move_ne", "north": "move_north", "nw": "move_nw",
 		"west": "move_west", "sw": "move_sw", "south": "move_south", "se": "move_se",
-		"walk_to": "walk_to_cursor",
+		"walk_to": "walk_to_cursor", "run_toggle": "run_toggle",
 	}
 
 
@@ -131,6 +139,15 @@ static func register_actions() -> int:
 		if not InputMap.action_has_event(action, klik):
 			InputMap.action_add_event(action, klik)
 			added += 1
+	for action in TOGGLE_KEYS.keys():
+		if not InputMap.has_action(action):
+			InputMap.add_action(action)
+		for code in TOGGLE_KEYS[action]:
+			var prepinac := InputEventKey.new()
+			prepinac.keycode = code
+			if not InputMap.action_has_event(action, prepinac):
+				InputMap.action_add_event(action, prepinac)
+				added += 1
 	return added
 
 
@@ -258,14 +275,22 @@ func view_dir() -> int:
 
 
 static func step_fraction(elapsed_ms: int, delay_ms: int) -> float:
-	# Jak daleko je krok v CASE (0..1), po ANIMACNICH framech (80 ms) - presne
-	# jako `delay / 80` v ClassicUO (`Mobile.cs:776-782`, `MovementSpeed.cs`).
-	# Kdo by pocital plynule kazdy frame, dostane jiny pocet pixelu na frame
-	# nez reference; kdo by nepocital vubec, dostane V2.
+	# Jak daleko je krok v CASE (0..1).
+	#
+	# ⚠⚠ 18. session (2026-10-08) - VADA "POHYB OBRAZU NENI PLYNUY, TRHAVE ALE
+	# PRAVIDELNE" (uzivatel: "vnímám trhavost, ale plynulou, ne náhodnou").
+	# Do teto session se `elapsed` zaokrouhloval DOLU na 80 ms
+	# (`(elapsed / ANIM_FRAME_MS) * ANIM_FRAME_MS`), takze se posun zmenil jen
+	# 5x za krok (400/80) - na 75 FPS to znamena ~6 framu BEZ pohybu a pak skok
+	# ~8,8 px. Presne to je "trhavost, ktera je plynula": neni nahodna, je
+	# periodicka. Reference pocita `x = delay / 80f` (FLOAT) a `GetPixelOffset`
+	# jím NASOBI (`Mobile.cs:776-782`, `MovementSpeed`), takze posun roste
+	# plynule kazdy frame. Na cely pixel ho zaokrouhluje az kresleni
+	# (`player_pixel_offset`) - reference kresli na celociselne pozice
+	# (`GameObject.cs:152-153`), takze je obraz plynuly A ostry zaroven.
 	if delay_ms <= 0:
 		return 1.0
-	var zaokrouhleno: int = (maxi(elapsed_ms, 0) / ANIM_FRAME_MS) * ANIM_FRAME_MS
-	return clampf(float(zaokrouhleno) / float(delay_ms), 0.0, 1.0)
+	return clampf(float(maxi(elapsed_ms, 0)) / float(delay_ms), 0.0, 1.0)
 
 
 func player_pixel_offset(now_ms: int = -1) -> Vector2:
@@ -284,7 +309,14 @@ func player_pixel_offset(now_ms: int = -1) -> Vector2:
 	var od: Vector2 = _iso.to_screen(player.pos.x, player.pos.y, int(player.pos.z))
 	# Cilova vyska je ta z `can_step` (krok nahoru se kresli jako krok nahoru).
 	var kam_px: Vector2 = _iso.to_screen(kam.x, kam.y, int(_step.get("z", player.pos.z)))
-	return (kam_px - od) * f
+	# ⚠ ZAOKROUHLENI NA CELY PIXEL (18. session): reference kresli vse na
+	# celociselne pozice (`GameObject.cs:152-153`: `(X - Y) * 22`, `int`), takze
+	# se svet hybe po JEDNOM pixelu. Subpixelovy posun u pixel-artu meni vzorkovani
+	# kazdeho pixelu (sonda `_analyza/p21-teren-sonda.gd`: pri posunu o 0,5 px se
+	# zmeni 91,55 % pixelu obrazu!) - krajina pak "sumi" a hrany dlazdic se
+	# rozjizdeji. Zaokrouhleny posun je plynuly (1 px) a pritom ostry.
+	var posun: Vector2 = (kam_px - od) * f
+	return Vector2(roundf(posun.x), roundf(posun.y))
 
 
 func _follow(offset: Vector2 = Vector2.ZERO) -> void:

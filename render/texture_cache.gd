@@ -54,7 +54,7 @@ const MAX_BYTES: int = 402653184   # 384 MB
 
 var _sprites: Dictionary = {}      # art_id -> {page: String, rect: Rect2i, offset: Vector2i}
 var _wrapped: Dictionary = {}      # art_id -> AtlasTexture (hotova "okna" do stranky)
-var _pages: Dictionary = {}        # page -> ImageTexture
+var _pages: Dictionary = {}        # page -> Texture2D
 var _sizes: Dictionary = {}        # page -> bajty
 var _order: Array = []             # LRU, nejnovejsi na konci
 var _limit: int = MAX_BYTES        # strop jde zmenit kvuli mereni (sonda)
@@ -63,6 +63,17 @@ var _missing: int = 0
 var _warned: bool = false
 var _nacteni_stranek: int = 0      # POCITADLO pro mereni: kolikrat se stranka nacetla z disku
 var _prefix: String = ATLAS_PREFIX # prefix cest ke strankam (viz `_init`)
+# --- ASYNCHRONNI NACITANI STRANEK (18. session) ---------------------------
+# Stranka atlasu je 2048x2048 = 16 MB a jeji nacteni stoji NAMERENE ~58 ms
+# (`_analyza/p21-atlas-cena.gd`: 34 stranek = 1982 ms). Kdyz se nacetla uvnitr
+# `build()`, byl to ZASEK OBRAZU presne ve chvili, kdy uzivatel v logu videl
+# WARNING o `Image.load` - a to je vada, kterou hlasil. Nacteni proto bezi
+# NA POZADI pres `ResourceLoader.load_threaded_request` (podporovana cesta
+# Godotu; `load()` ve vlastnim vlakne by sahalo na cache bez zamku) a kdo
+# stranku jeste nema, dostane `null` + `page_pending(art_id) == true`, takze
+# se objekt pro par framu VYNECHA (ne "chybejici art" = magenta).
+var _cekajici: Dictionary = {}     # path -> true (nacteni bezi na pozadi)
+var _verze: int = 0                # kolik stranek uz dotecelo (volajici podle ni prestavi davku)
 
 
 func _init(manifest_path: String = MANIFEST_PATH, max_bytes: int = MAX_BYTES,
@@ -130,7 +141,7 @@ func stats() -> Dictionary:
 	# thrashingu); používá to test `tests/cases/render_textures.gd`.
 	return {"loaded": _pages.size(), "bytes": _bytes, "limit": _limit,
 		"missing": _missing, "sprites": _sprites.size(), "wrapped": _wrapped.size(),
-		"nacteni_stranek": _nacteni_stranek}
+		"nacteni_stranek": _nacteni_stranek, "ceka": _cekajici.size(), "verze": _verze}
 
 
 func _index(sprite) -> void:
@@ -149,25 +160,108 @@ func _index(sprite) -> void:
 	}
 
 
-func _page(path: String) -> ImageTexture:
+func _page(path: String) -> Texture2D:
+	# ⚠⚠ 18. session (2026-10-08) - VADA Z LOGU UZIVATELE: "periodicky se
+	# pri chuzi sekne obraz a podle logu je to ve stejnou chvili, kdy vyskočí
+	# WARNING: Loaded resource as image file, this will not work on export".
+	# Dve veci se tim opravuji:
+	#   1. NACITANI BEZI NA POZADI (`_zadej`), takze frame neblokuje 58 ms.
+	#   2. Stranky atlasu MAJI `.import` (77 stranek, `compress/mode=0`
+	#      lossless, `mipmaps/generate=false`, `vram_texture=false`), takze se
+	#      nacitaji jako RESOURCE - presne ty same pixely a bez WARNINGu.
+	#      Kdyz import chybi (fixture v testu, cerstvy strom bez `--import`),
+	#      padá se zpet na synchronni `Image.load` (a jeho WARNING je pak
+	#      pravdivy: v exportu by to nefungovalo).
 	var cached = _pages.get(path)
 	if cached != null:
 		_touch(path)
 		return cached
+	if _cekajici.has(path):
+		var stav: int = ResourceLoader.load_threaded_get_status(path)
+		if stav == ResourceLoader.THREAD_LOAD_IN_PROGRESS:
+			return null                     # jeste se nacita - kdo to vidi, vynecha objekt
+		_cekajici.erase(path)
+		if stav == ResourceLoader.THREAD_LOAD_LOADED:
+			var hotova: Texture2D = ResourceLoader.load_threaded_get(path)
+			if hotova != null:
+				return _zarad(path, hotova)
+		# chyba nacteni: zkusit synchronni cestu (a rict to)
+		push_warning("render.textures: stranka %s se nenacetla na pozadi - zkousi se synchronne" % path)
+	elif ResourceLoader.exists(path):
+		var chyba: int = ResourceLoader.load_threaded_request(path)
+		if chyba == OK:
+			_cekajici[path] = true
+			return null
+		push_warning("render.textures: stranku %s nelze zadat k nacteni (err %d)" % [path, chyba])
 	var image := Image.new()
 	var err := image.load(path)
 	if err != OK:
 		push_warning("render.textures: strana %s se necte (err %d)" % [path, err])
 		return null
+	return _zarad(path, ImageTexture.create_from_image(image))
+
+
+func _zarad(path: String, page: Texture2D) -> Texture2D:
+	# Zaradi hotovou stranku do cache (bajty, LRU) a ZVEDNE `_verze` - volajici
+	# (`app/world_view`) podle ni pozna, ze ma prestavet davku, aby se nove arty
+	# objevily. Bez toho by se nacetla stranka nikdy neprojevila.
 	_nacteni_stranek += 1
-	var page := ImageTexture.create_from_image(image)
-	var size: int = image.get_width() * image.get_height() * 4
+	var size: int = page.get_width() * page.get_height() * 4
 	_pages[path] = page
 	_sizes[path] = size
 	_bytes += size
 	_touch(path)
 	_evict()
+	_verze += 1
 	return page
+
+
+func page_pending(art_id: int) -> bool:
+	# Ceka se na stranku tohoto artu? ("nenacteno" NENI "chybi" - kdo to plete,
+	# kresli magenta diry misto toho, aby pockal par framu.)
+	var entry = _sprites.get(art_id)
+	if entry == null:
+		return false
+	var path: String = str(entry["page"])
+	return _cekajici.has(path) or (not _pages.has(path) and ResourceLoader.exists(path))
+
+
+func tick_nacteni() -> int:
+	# ⚠ 18. session: HOTOVE STRANKY SE MUSI VYZVEDNOUT I BEZ DOTAZU NA ART.
+	# `load_threaded_request` se sice vyrizuje na pozadi, ale hotovy vysledek
+	# nekdo musi prevzit (`load_threaded_get`). Kdyz se prevzeti delalo jen
+	# uvnitr `texture()`, vznikl KRUH: stranka se nacitala -> `texture()` vratil
+	# null -> objekt se vynechal -> prestavba se odlozila (ceka se na
+	# `pending() == 0`) -> `texture()` se uz nezavolalo -> stranka zustala
+	# "ceka" NAVZDY a objekty se neobjevily (namEReno: `ceka: 6` na konci
+	# chuze, 1 295 objektu vynechanych). Tahle funkce se vola kazdy frame.
+	# Vraci pocet prave prevzatych stranek.
+	if _cekajici.is_empty():
+		return 0
+	var hotovo: int = 0
+	for path in _cekajici.keys():
+		var stav: int = ResourceLoader.load_threaded_get_status(path)
+		if stav == ResourceLoader.THREAD_LOAD_IN_PROGRESS:
+			continue
+		_cekajici.erase(path)
+		if stav != ResourceLoader.THREAD_LOAD_LOADED:
+			push_warning("render.textures: stranka %s se nenacetla na pozadi" % path)
+			continue
+		var tex: Texture2D = ResourceLoader.load_threaded_get(path)
+		if tex != null:
+			_zarad(path, tex)
+			hotovo += 1
+	return hotovo
+
+
+func pending() -> int:
+	# Kolik stranek se prave nacita (0 = vse, co je potreba, je v pameti).
+	return _cekajici.size()
+
+
+func verze() -> int:
+	# Pocet dotecenych stranek za cely beh - roste, kdyz neco doslo.
+	return _verze
 
 
 func _touch(path: String) -> void:

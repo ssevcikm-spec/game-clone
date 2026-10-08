@@ -37,10 +37,15 @@ func run(t) -> void:
 	var bindings: Dictionary = script.default_bindings()
 	const SMERY := ["east", "ne", "north", "nw", "west", "sw", "south", "se"]
 
-	t._check(bindings.size() == 9,
-		"player_controller: vazeb je 8 smeru + drzene prave tlacitko (namEReno %d)" % bindings.size())
+	t._check(bindings.size() == 10,
+		"player_controller: vazeb je 8 smeru + drzene prave tlacitko + prepinac behu "
+		+ "(namEReno %d)" % bindings.size())
 	for smer in SMERY:
 		t._check(bindings.has(smer), "player_controller: vazba pro smer '%s' existuje" % smer)
+	# ⚠ 18. session: prepinac chuze/beh (vada "chybi beh jako rychlost pohybu")
+	t._check(str(bindings.get("run_toggle", "")) == "run_toggle",
+		"player_controller: vazba 'run_toggle' -> 'run_toggle' (namEReno '%s')"
+			% str(bindings.get("run_toggle", "")))
 	# DRZENE PRAVE TLACITKO (uzivatel 2026-10-07: "chůze držením klávesy (včetně
 	# pravého tlačítka myši)") - `app/input_map.poll()` ho zpracuje vetví
 	# "walk_to"; kdyz vazba chybi, mys nikdy nechodi.
@@ -73,16 +78,29 @@ func run(t) -> void:
 		"player_controller: 'walk_to_cursor' ma v InputMap prave tlacitko mysi")
 
 	# 3) smer z vazby musi dat stejne cislo jako `core/const.gd` a `input_map`
+	#    ⚠ 18. session: BEH JE VYCHOZI (`app/input_map.always_run = true`, UO ma
+	#    beh jako vychozi pohyb) - proto se meri OBA rezimy. Kdyby se meril jen
+	#    jeden, rozbita vetev by prosla.
 	var mapper = mapper_script.new(bindings)
 	var dir_dx: Array = consts.get("DIR_DX", [])
 	t._check(dir_dx.size() == 8, "player_controller: DIR_DX ma 8 směru (namEReno %d)" % dir_dx.size())
+	mapper.always_run = false
 	for smer in SMERY:
 		var command: Dictionary = mapper.key_command(str(smer))
 		var dir: int = int(command.get("dir", -1))
 		var ok: bool = str(command.get("t", "")) == "move" and dir >= 0 and dir < 8 \
 			and command.get("run") == false
-		t._check(ok, "player_controller: '%s' -> Command{t:move, dir:%d, run:false} (namEReno %s)"
+		t._check(ok, "player_controller: '%s' -> Command{t:move, dir:%d, run:false} v chuzi (namEReno %s)"
 			% [smer, dir, str(command)])
+	mapper.always_run = true
+	var bez_behu: int = 0
+	for smer in SMERY:
+		if mapper.key_command(str(smer)).get("run") != true:
+			bez_behu += 1
+	t._check(bez_behu == 0,
+		"player_controller: pri behu (vychozi stav) maji vsechny smery run:true (chybi %d)"
+			% bez_behu)
+	mapper.always_run = false
 
 	# konkretni cisla smeru ze `core/const.gd` (0 = vychod, 2 = sever, 4 = zapad)
 	var vychod: Dictionary = mapper.key_command("east")
@@ -138,19 +156,22 @@ func run(t) -> void:
 	t._check(controller.action() == 4,
 		"player_controller: zadny krok = idle (akce %d, cekano 4)" % controller.action())
 
-	# 6) POSUN V PIXELECH: roste po 80ms framech (ClassicUO `delay / 80`), na
-	#    konci kroku je presne jedna dlazdice - a mezi framy se NEMENI
-	#    (linearni prubeh by dal jine cislo, proto se meri i 79 ms).
+	# 6) POSUN V PIXELECH: ⚠ 18. session - krok roste PLYNULE (reference
+	#    `x = delay / 80f`, `Mobile.cs:776-782`), na konci kroku je presne jedna
+	#    dlazdice a posun se zaokrouhluje na CELY PIXEL (`round`), aby obraz
+	#    zustal ostry (reference kresli na cela cisla, `GameObject.cs:152-153`).
+	#    Do 18. session se `elapsed` zaokrouhloval na 80 ms (5 skoku za krok) -
+	#    presne to uzivatel videl jako "trhavost, ktera je plynula".
 	var iso_step: int = int(consts.get("ISO_STEP", 22))
-	var tabulka := [[0, 0.0], [79, 0.0], [80, 0.2], [160, 0.4], [240, 0.6],
-		[320, 0.8], [400, 1.0], [9999, 1.0], [-5, 0.0]]
+	var tabulka := [[0, 0.0], [79, 0.1975], [80, 0.2], [160, 0.4], [200, 0.5],
+		[240, 0.6], [320, 0.8], [400, 1.0], [9999, 1.0], [-5, 0.0]]
 	var chyby: Array = []
 	for radek in tabulka:
 		var f: float = script.step_fraction(int(radek[0]), 400)
 		if absf(f - float(radek[1])) > 0.0001:
-			chyby.append("%d ms -> %.3f (cekano %.1f)" % [int(radek[0]), f, float(radek[1])])
+			chyby.append("%d ms -> %.4f (cekano %.4f)" % [int(radek[0]), f, float(radek[1])])
 	t._check(chyby.is_empty(),
-		"player_controller: krok se posouva po 80ms framech (odchylky: %s)" % str(chyby))
+		"player_controller: krok roste plynule v case (odchylky: %s)" % str(chyby))
 	controller.update_step(krok)
 	var o0: Vector2 = controller.player_pixel_offset(1000)
 	var o80: Vector2 = controller.player_pixel_offset(1080)
@@ -158,19 +179,21 @@ func run(t) -> void:
 	var o400: Vector2 = controller.player_pixel_offset(1400)
 	t._check(o0 == Vector2.ZERO,
 		"player_controller: na zacatku kroku je posun nulovy (namEReno %s)" % str(o0))
-	t._check(absf(o80.x - float(iso_step) * 0.2) < 0.001 and absf(o80.y - float(iso_step) * 0.2) < 0.001,
-		"player_controller: po 80 ms je posun 0,2 dlazdice (%s, ISO_STEP %d)" % [str(o80), iso_step])
-	t._check(absf(o320.x - float(iso_step) * 0.8) < 0.001,
+	# 0,2 dlazdice = 4,4 px -> zaokrouhleno na 4 (cely pixel)
+	t._check(absf(o80.x - roundf(float(iso_step) * 0.2)) < 0.001
+		and absf(o80.y - roundf(float(iso_step) * 0.2)) < 0.001,
+		"player_controller: po 80 ms je posun 0,2 dlazdice na cely pixel (%s, ISO_STEP %d)"
+			% [str(o80), iso_step])
+	t._check(absf(o320.x - roundf(float(iso_step) * 0.8)) < 0.001,
 		"player_controller: po 320 ms je posun 0,8 dlazdice (%s)" % str(o320))
 	t._check(absf(o400.x - float(iso_step)) < 0.001 and absf(o400.y - float(iso_step)) < 0.001,
 		"player_controller: na konci kroku je posun PRESNE jedna dlazdice (%s)" % str(o400))
 	# smer 1 = NE: v izometrii je to (2*ISO_STEP, 0) - jina velikost nez vychod.
-	# POZOR: 200 ms neni "0,5 kroku" - posun se dela po 80ms framech, takze
-	# 200 ms = frame 2 z 5 = 0,4 (presne to dela ClassicUO `delay / 80`).
+	# 200 ms = 0,5 kroku (plynule, ne "frame 2 z 5").
 	controller.update_step({"dir": 1, "run": false, "start_ms": 1000, "delay_ms": 400,
 		"due_ms": 1400, "z": 0})
 	var one: Vector2 = controller.player_pixel_offset(1200)
-	t._check(absf(one.x - float(iso_step) * 2.0 * 0.4) < 0.001 and absf(one.y) < 0.001,
+	t._check(absf(one.x - roundf(float(iso_step) * 2.0 * 0.5)) < 0.001 and absf(one.y) < 0.001,
 		"player_controller: smer NE se posouva po 2*ISO_STEP na ose X (namEReno %s)" % str(one))
 	# krok nahoru se kresli jako krok nahoru: cilove `z` meni i svislou slozku
 	controller.update_step({"dir": 0, "run": false, "start_ms": 1000, "delay_ms": 400,

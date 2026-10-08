@@ -123,7 +123,10 @@ func request_step(m: int, dir: int, run: bool) -> Dictionary:
 		# Jeden krok v letu staci (fronta 4 kroku z docs/05 §5.1.3 je na klientu).
 		return _no(0, "busy")
 	var use_run: bool = run
-	if use_run and mob.stam <= 0:
+	if use_run and mob.stam <= 1:
+		# ⚠ 18. session: reference zakazuje beh pri `Stamina <= 1`
+		# (`PlayerMobile.cs:532`), ne az pri nule - do teto session tu bylo
+		# `<= 0`, takze se behnul jeste krok s jedinym bodem staminy.
 		use_run = false               # bez staminy se jde (beh se nezkrati potichu)
 	var result: Dictionary = _walk.can_step(mob.pos, dir, Const.PERSON_HEIGHT, m == player_serial)
 	if not result["ok"]:

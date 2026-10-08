@@ -99,6 +99,10 @@ func run(t) -> void:
 		if not InputMap.has_action(akce):
 			InputMap.add_action(akce)
 	drzeny.view_size = Vector2(1280, 720)
+	# ⚠ 18. session: `always_run` je VYCHOZI (`true`), takze by se tu merila
+	# kadence behu (200 ms), ne chuze. Chuzi si test zapne explicitne - a beh
+	# se meri zvlast nize, aby zadna z vetvi nezustala nemerena.
+	drzeny.always_run = false
 	var stred := Vector2(640, 360)
 	Input.action_press("test_drzeni_east")
 	var h0: Array = drzeny.poll(Vector2i(10, 10), Vector2.ZERO, 0, stred, 0)
@@ -119,6 +123,21 @@ func run(t) -> void:
 	t._check(h5.size() == 1,
 		"app.input: DRZENI - po pusteni krokuje nove zmacknuti HNED (namEReno %d)" % h5.size())
 
+	# 7c) ⚠ 18. session: BEH - drzena klavesa krokuje po `RUN_MS` (200 ms), kdyz
+	#     je `always_run` zapnuty (vychozi stav klienta). Do teto session bezel
+	#     vzdy jen `WALK_MS`, takze uzivatel videl "chybi beh".
+	var run_ms: int = int(consts["RUN_MS"])
+	var bezec = script.new({"east": "test_drzeni_east"})
+	bezec.always_run = true
+	Input.action_press("test_drzeni_east")
+	var b0: Array = bezec.poll(Vector2i(10, 10), Vector2.ZERO, 0, stred, 0)
+	var b1: Array = bezec.poll(Vector2i(10, 10), Vector2.ZERO, 0, stred, run_ms - 1)
+	var b2: Array = bezec.poll(Vector2i(10, 10), Vector2.ZERO, 0, stred, run_ms)
+	Input.action_release("test_drzeni_east")
+	t._check(b0.size() == 1 and b0[0].get("run") == true and b1.is_empty() and b2.size() == 1,
+		"app.input: BEH - drzena klavesa krokuje po %d ms s run:true (namEReno %d/%d/%d)"
+			% [run_ms, b0.size(), b1.size(), b2.size()])
+
 	# 7b) jednorazove akce se drzenim NEOPAKUJI (war/peace/use)
 	var w1: Dictionary = drzeny.hold_command("war", 0)
 	var w2: Dictionary = drzeny.hold_command("war", walk_ms * 2)
@@ -132,6 +151,7 @@ func run(t) -> void:
 		and drzeny.mouse_run(stred + Vector2(190, 0)),
 		"app.input: prave tlacitko - 189 px = chuze, 190 px = beh (ClassicUO 190)")
 	var prazdna = script.new({"walk_to": "test_drzeni_mys"})
+	prazdna.always_run = false
 	var vzdy = script.new({"walk_to": "test_drzeni_mys"})
 	vzdy.always_run = true
 	t._check(prazdna.mouse_run(stred) == false and vzdy.mouse_run(stred) == true,

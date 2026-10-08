@@ -107,7 +107,8 @@ func run(t) -> void:
 
 	# 5) smlouva o vystupu: `stats()` ma vsechny slozky, ktere dokumentace slibuje
 	var chybi: Array = []
-	for klic in ["loaded", "bytes", "limit", "missing", "sprites", "wrapped", "nacteni_stranek"]:
+	for klic in ["loaded", "bytes", "limit", "missing", "sprites", "wrapped",
+			"nacteni_stranek", "ceka", "verze"]:
 		if not st.has(klic):
 			chybi.append(klic)
 	t._check(chybi.is_empty(),
@@ -126,7 +127,15 @@ func run(t) -> void:
 	var rs: Dictionary = real.stats()
 	t._check(int(rs["sprites"]) > 1000,
 		"render.textures: realny manifest ma tisice spritu (namEReno %d)" % int(rs["sprites"]))
-	var r1: Texture2D = real.texture(0)
+	var r1: Texture2D = null
+	# ⚠ 18. session: stranky atlasu se nacitaji NA POZADI (`load_threaded_request`),
+	# takze prvni dotaz muze vratit `null` a `page_pending(0)` je true. Test na
+	# nabeh POČKÁ (a kdyby se nikdy nenacetl, `r1` zustane null = chyba).
+	for i in 300:
+		r1 = real.texture(0)
+		if r1 != null:
+			break
+		OS.delay_msec(10)
 	var r2: Texture2D = real.texture(0)
 	t._check(r1 != null and is_same(r1, r2),
-		"render.textures: i nad realnym atlasem vraci stejne art_id tutez instanci")
+		"render.textures: i nad realnym atlasem vraci stejne art_id tutez instanci (po nabehu)")

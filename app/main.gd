@@ -43,6 +43,11 @@ const MetricsScript = preload("res://app/metrics.gd")
 const DEFAULT_SEED: int = 1234
 const BRITAIN := Vector2i(1495, 1630)   # namesti Britainu (docs/01 §1.4)
 const PLAYER_BODY: int = 400            # 400 = muz (tělo je jen v anim.mul)
+# ⚠ 18. session - CERNY PAS PRO GUI (prani uzivatele: stary zpusob UO): svet ma
+# sve okno a GUI bydli v cernem pase VPRAVO a DOLE, aby zurnal nezakryval
+# vyhled. Viz `_setup_ui()` a `app/world_view.gui_odsazeni`.
+const GUI_PAS_VPRAVO: int = 320
+const GUI_PAS_DOLE: int = 120
 # Co se nacita na start. Zbytek dat (items, recipes, monsters...) pribude
 # s granulemi M1+; kdyz soubor chybi, hra se musi ozvat, ne mlcet.
 const DATA_FILES := {
@@ -129,22 +134,56 @@ func _process(_delta: float) -> void:
 func _setup_ui() -> void:
 	# Slozeni UI (zadna herni logika): HUD je koren oken, status bar prvni okno.
 	# Kdyby UI chybelo, hra se o tom ozve - tiche "nic se nezobrazuje" je vada.
+	#
+	# ⚠⚠ 18. session - CERNY PAS PRO GUI (prani uzivatele): "Herni okno se
+	# sklada pouze z viditelneho sveta a journal ho prekryva. UO mela okno
+	# viditelneho sveta a pak cerny okraj, kde se daly posouvat prvky GUI."
+	# Je to tedy stary zpusob UO: vpravo a dole je CERNY PAS, ve kterem bydli
+	# zurnal a stavovy pruh - svet maji jen v okne, ktere zbylo, takze zurnal
+	# nezakryva vyhled. Pas kresli vlastni `CanvasLayer` (layer 1) POD HUD
+	# (layer 2); kamera se posune o polovinu pásu (`view.gui_odsazeni`), aby
+	# hrac stal ve stredu VIDITELNEHO sveta.
+	var rozm: Vector2 = get_viewport_rect().size
+	if rozm.x <= 0.0 or rozm.y <= 0.0:
+		rozm = Vector2(1280, 720)      # NEMERENO (bez okna): deklarovane okno
+	var pas := CanvasLayer.new()
+	pas.name = "GuiPas"
+	pas.layer = 1
+	add_child(pas)
+	var vpravo := ColorRect.new()
+	vpravo.name = "PasVpravo"
+	vpravo.color = Color(0.0, 0.0, 0.0, 1.0)
+	vpravo.position = Vector2(rozm.x - float(GUI_PAS_VPRAVO), 0.0)
+	vpravo.size = Vector2(float(GUI_PAS_VPRAVO), rozm.y)
+	pas.add_child(vpravo)
+	var dole := ColorRect.new()
+	dole.name = "PasDole"
+	dole.color = Color(0.0, 0.0, 0.0, 1.0)
+	dole.position = Vector2(0.0, rozm.y - float(GUI_PAS_DOLE))
+	dole.size = Vector2(rozm.x - float(GUI_PAS_VPRAVO), float(GUI_PAS_DOLE))
+	pas.add_child(dole)
 	hud = HudScript.new()
+	hud.layer = 2                      # GUI lezi NA cernem pásu, ne na svete
 	add_child(hud)
 	status_bar = StatusBarScript.new()
 	hud.add_child(status_bar)
-	if not hud.register_window("status_bar", status_bar, Vector2(8.0, 8.0)):
+	if not hud.register_window("status_bar", status_bar,
+			Vector2(8.0, rozm.y - float(GUI_PAS_DOLE) + 8.0)):
 		push_warning("app.main: status bar se nepodarilo zaregistrovat v HUD")
-	# Zurnal (granule `ui.journal`, 16. session): okno pod stavovym pruhem.
-	# Zpravy do nej predava `app/loop.gd:_deliver_events` - UI je tenky klient.
+	# Zurnal (granule `ui.journal`, 16. session): okno v pravem pásu. Zpravy do
+	# nej predava `app/loop.gd:_deliver_events` - UI je tenky klient.
 	journal = JournalScript.new()
 	journal.name = "Journal"
 	hud.add_child(journal)
-	if not hud.register_window("journal", journal, Vector2(8.0, 120.0)):
+	var sirka_zurnalu: float = float(GUI_PAS_VPRAVO) - 16.0
+	journal.velikost = Vector2(sirka_zurnalu, rozm.y - 24.0)
+	if not hud.register_window("journal", journal,
+			Vector2(rozm.x - float(GUI_PAS_VPRAVO) + 8.0, 8.0)):
 		push_warning("app.main: zurnal se nepodarilo zaregistrovat v HUD")
 	if loop != null:
 		loop.journal = journal
-	print("[main] UI: okna ", hud.layout().keys())
+	print("[main] UI: okna ", hud.layout().keys(), ", cerny pas vpravo ", GUI_PAS_VPRAVO,
+		" px, dole ", GUI_PAS_DOLE, " px (svet ", rozm - Vector2(GUI_PAS_VPRAVO, GUI_PAS_DOLE), ")")
 
 
 func _setup_world() -> void:
@@ -156,6 +195,9 @@ func _setup_world() -> void:
 		push_warning("app.main: ve scene chybi uzel WorldView - mapa se nevykresli")
 		return
 	world_view = view
+	# Kamera se posune o polovinu pásu, aby hrac stal ve stredu VIDITELNEHO
+	# sveta (ne pod cernym pásem) - viz `app/world_view.gui_odsazeni`.
+	view.gui_odsazeni = Vector2(float(GUI_PAS_VPRAVO) / 2.0, float(GUI_PAS_DOLE) / 2.0)
 	map = MapScript.new()
 	textures = TextureCache.new()
 	view.setup(map, textures)

@@ -97,15 +97,17 @@ func run(t) -> void:
 		"render.sort: priority_z mimo rozsah nepreskoci diagonalou (%s)"
 		% str(_tags(sort.draw_order(sveru))))
 
-	# 2) jedna dlazdice: DOLE az NAHORU podle `z`; pri stejnem `z` rozhoduje
-	# vrstva (land < static < mobile). Do 17. session byla vrstva pred `z`, takze
-	# statik nad hracem sel pred hracem (vada "postava na strese").
+	# 2) jedna dlazdice: ⚠ 18. session - LAND JE VZDY PRVNI (ma vlastni pruchod,
+	# reference `RenderLists.cs:199-232` kresli mesh land PRED statiky), pak
+	# statiky/mobilove podle `z` vzestupne a pri stejnem `z` podle vrstvy
+	# (land < static < mobile). Do 17. session byla vrstva pred `z`, takze statik
+	# nad hracem sel pred hracem (vada "postava na strese").
 	var smes := [_tag("mobile", 4, 4, 0), _tag("static", 4, 4, 5), _tag("land", 4, 4, 0),
 		_tag("mobile", 4, 4, -3), _tag("static", 4, 4, -1)]
-	t._check(_tags(sort.draw_order(smes)) == ["mobile@4,4,-3", "static@4,4,-1",
-		"land@4,4,0", "mobile@4,4,0", "static@4,4,5"],
-		"render.sort: jedna dlazdice = podle z vzestupne, pri shode vrstva "
-		+ "(namEReno %s)" % str(_tags(sort.draw_order(smes))))
+	t._check(_tags(sort.draw_order(smes)) == ["land@4,4,0", "mobile@4,4,-3",
+		"static@4,4,-1", "mobile@4,4,0", "static@4,4,5"],
+		"render.sort: land prvni (vlastni pruchod), pak podle z vzestupne, "
+		+ "pri shode vrstva (namEReno %s)" % str(_tags(sort.draw_order(smes))))
 
 	# 3) ⚠ 17. session (2026-10-08): `z` je SILNEJSI nez vrstva. Do teto session
 	#    to bylo obracene a byl to duvod, proc uzivatel videl postavu "stat na
@@ -139,6 +141,47 @@ func run(t) -> void:
 	# `item` je predmet na zemi - patri do mobilni vrstvy
 	t._check(sort.sort_key(_tag("item", 2, 2, 0)) == sort.sort_key(_tag("mobile", 2, 2, 0)),
 		"render.sort: `item` se radi jako mobilni")
+
+	# 3c) ⚠ 18. session: Z PREBIJE AZ ~2,5 KROKU MRIZKY (reference
+	#     `(x + y) + (127 + z) * 0.01f`), ale NE 3. Do 17. session tu byl
+	#     pozadavek "vsechny objekty diagonaly 8 pred vsemi z diagonaly 9" -
+	#     ten v reference NEPLATI a byl to duvod vady "zed prosvita pres
+	#     strechu": strecha o 1-2 diagonály dal a vys se musi kreslit PO nizke
+	#     zdi bliz. Testuje se OBEMA smery: prebit se MUSI dat 1 i 2 kroky,
+	#     3 kroky NESMI.
+	var d8: Array = []
+	var d9: Array = []
+	var d10: Array = []
+	var d11: Array = []
+	for z in [-128, 0, 127]:
+		d8.append(_tag("static", 5, 3, z))
+		d9.append(_tag("static", 6, 3, z))
+		d10.append(_tag("static", 7, 3, z))
+		d11.append(_tag("static", 8, 3, z))
+	var max8: int = sort.sort_key(d8[0])
+	for obj in d8:
+		max8 = maxi(max8, sort.sort_key(obj))
+	var min9: int = sort.sort_key(d9[0])
+	var min10: int = sort.sort_key(d10[0])
+	var min11: int = sort.sort_key(d11[0])
+	for obj in d9:
+		min9 = mini(min9, sort.sort_key(obj))
+	for obj in d10:
+		min10 = mini(min10, sort.sort_key(obj))
+	for obj in d11:
+		min11 = mini(min11, sort.sort_key(obj))
+	t._check(max8 > min9 and max8 > min10,
+		"render.sort: `z` prebije 1 i 2 kroky mrizky (max diag 8 %d > min diag 9 %d, > min diag 10 %d)"
+			% [max8, min9, min10])
+	t._check(max8 < min11,
+		"render.sort: `z` NEPREBIJE 3 kroky mrizky (max diag 8 %d < min diag 11 %d)"
+			% [max8, min11])
+
+	# 3d) ⚠ 18. session: LAND MA VLASTNI PRUCHOD - i land s nejvyssim `z` na
+	#     nejblizsi diagonale jde PRED statik s nejnizsim `z` na zacatku mapy.
+	#     Na tom stoji vada "svah prosvita pres schody/most".
+	t._check(sort.sort_key(_tag("land", 50, 50, 127)) < sort.sort_key(_tag("static", 0, 0, -128)),
+		"render.sort: land je pred statiky i pres nejvyssi `z` a nejblizsi diagonalou")
 
 	# 4) hlavni klic je x+y, ne x ani y
 	t._check(sort.sort_key(_tag("static", 0, 8, 0)) < sort.sort_key(_tag("static", 5, 5, 0)),
@@ -198,23 +241,16 @@ func run(t) -> void:
 	t._check(_tags(klicove) == _tags(vysledek),
 		"render.sort: razeni podle sort_key da stejne poradi jako draw_order")
 
-	# 9) zadna vrstva nesmi prelezt na sousedni diagonalou. Porovnava se
-	# NEJVETSI klic diagonaly 8 s NEJMENSIM klicem diagonaly 9 - na dvou
-	# zemich by vada v radixu vrstv (LAYERS 3 -> 2) prosla.
-	var d8: Array = []
-	var d9: Array = []
-	for kind in ["land", "static", "mobile"]:
-		for z in [-128, 0, 127]:
-			d8.append(_tag(kind, 5, 3, z))
-			d9.append(_tag(kind, 6, 3, z))
-	var max8: int = sort.sort_key(d8[0])
-	var min9: int = sort.sort_key(d9[0])
-	for obj in d8:
-		max8 = maxi(max8, sort.sort_key(obj))
-	for obj in d9:
-		min9 = mini(min9, sort.sort_key(obj))
-	t._check(max8 < min9, "render.sort: vsechny objekty diagonaly 8 pred vsemi "
-		+ "z diagonaly 9 (max %d < min %d)" % [max8, min9])
+	# 9) ⚠ 18. session: puvodni zneni teto kontroly ("vsechny objekty diagonaly 8
+	#    pred vsemi z diagonaly 9") je VYVRACENO referenci a nahradila ho
+	#    kontrola 3c (z prebije 1 i 2 kroky, ne 3). Tady zustava jen to, co plati
+	#    dal: RADIX VRSTEV se nesmi rozpadnout - kdyby `LAYERS` kleslo na 2,
+	#    prekryje se statik (1) a mobil (2) a `z` je neoddeli.
+	var stejna_dlazdice: Array = [
+		_tag("static", 5, 3, 0), _tag("mobile", 5, 3, 0)]
+	t._check(_tags(sort.draw_order(stejna_dlazdice)) == ["static@5,3,0", "mobile@5,3,0"],
+		"render.sort: na stejne dlazdici a stejnem `z` jde statik pred mobilem "
+		+ "(radix vrstev; namEReno %s)" % str(_tags(sort.draw_order(stejna_dlazdice))))
 
 	# 10) neznamy `kind` nesmi byt tichy: kresli se jako mobilni
 	var cizi := [{"kind": "vitr", "x": 1, "y": 1, "z": 0, "tag": "vitr"}]
