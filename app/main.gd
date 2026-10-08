@@ -34,6 +34,10 @@ const ItemScript = preload("res://sim/entity/item.gd")
 const HarvestScript = preload("res://sim/systems/harvest.gd")
 const CraftScript = preload("res://sim/systems/craft.gd")
 const JournalScript = preload("res://ui/journal.gd")
+# DEBUG OVERLAY (granule `ui.debug_overlay`, 2026-10-09): informace o lokaci
+# a stavu na obrazovce, aby se zachytily se screenshotem (navrh uzivatele:
+# "Staci mozna vlepit na obrazovku at se to zachyti se screenshotem").
+const DebugOverlayScript = preload("res://ui/debug_overlay.gd")
 # 20. session: BATOH (granule `ui.backpack`). UI je tenky klient - obsah mu plni
 # `app/main` z `entity.container` a ikony dostava INJEKCI z `render` (ui/ na
 # render/ sahat nesmi, docs/04 §4.1).
@@ -70,6 +74,13 @@ const ITEM_OFFSET: int = 0x4000         # tiledata id -> art id (docs/03 §3.4)
 # vyhled. Viz `_setup_ui()` a `app/world_view.gui_odsazeni`.
 const GUI_PAS_VPRAVO: int = 320
 const GUI_PAS_DOLE: int = 120
+# Jak casto se prekresluje DEBUG OVERLAY (s). Kazdy frame by zbytecne prehanel
+# text i `get_minimum_size()`; 0,2 s je pro hledani vady v obrazku dost.
+const DEBUG_OVERLAY_S: float = 0.2
+# Cislo animace pro CLOVEKA (`app/player_controller` / `sim.movement`) -> nazev
+# do overlaye. Cisla jsou ABSTRAKTNI ID; skupina v anim.mul je jina (beh = 2,
+# viz `render/anim_player.ACTION_GROUP`).
+const AKCE_NAZVY := {0: "walk", 1: "run", 4: "idle"}
 # Co se nacita na start. Zbytek dat (items, recipes, monsters...) pribude
 # s granulemi M1+; kdyz soubor chybi, hra se musi ozvat, ne mlcet.
 const DATA_FILES := {
@@ -89,6 +100,7 @@ var status_bar = null
 var journal = null
 var backpack = null              # `ui.backpack` (20. session)
 var craft_gump = null            # `ui.craft_gump` (20. session)
+var debug_overlay = null         # `ui.debug_overlay` (2026-10-09)
 var _batoh_klic: Array = []      # posledni obsah batohu (neplnit UI kazdy frame)
 var tiledata = null
 var container = null
@@ -102,6 +114,11 @@ var world_view = null            # `app.world_view` (pro metriky)
 var textures = null              # `render.textures` (pro metriky)
 var _last_status_text: String = ""
 var _metrics_s: float = 0.0
+var _debug_s: float = 0.0
+# NEJDELSI FRAME od posledniho prekresleni overlaye (ms): uzivatel hlasi
+# "zaseky 2 framy z ~2300 na ~130 ms" (2026-10-09) a klouzavy prumer
+# (`app.metrics`) takovy spickovy frame SCHOVA. Overlay ho ukaze a vynuluje.
+var _peak_ms: float = 0.0
 
 
 func _ready() -> void:
@@ -136,6 +153,17 @@ func _process(_delta: float) -> void:
 		if _metrics_s >= 1.0:
 			_metrics_s = 0.0
 			print("[metrics] ", metrics.text())
+	# DEBUG OVERLAY (2026-10-09): text pro SCREENSHOT - hodnoty se skladaji
+	# v `_debug_values()` a prekresluji kazdych `DEBUG_OVERLAY_S` s. Overlay
+	# muze byt vypnuty klavesou (F3) - hodnoty se pak pocitaji dal, jen se
+	# nekresli (vypnuti nesmi znamenat "nic se nemeri").
+	_peak_ms = maxf(_peak_ms, _delta * 1000.0)
+	if debug_overlay != null:
+		_debug_s += _delta
+		if _debug_s >= DEBUG_OVERLAY_S:
+			_debug_s = 0.0
+			debug_overlay.update(_debug_values())
+			_peak_ms = 0.0
 	# Stavovy pruh se aktualizuje JEN kdyz se text zmeni (ne kazdy frame).
 	# Hodnoty jdou z `entity.mobile` - `max_hp`/`max_stam`/`max_mana` plni
 	# `Mobile._init` ze statu (`entity.stats`), takze nejsou opsane cisla.
@@ -157,6 +185,60 @@ func _process(_delta: float) -> void:
 		return
 	_last_status_text = text
 	status_bar.update(values)
+
+
+func _debug_values() -> Dictionary:
+	# VSE, CO SE NA OBRAZOVCE VYPISUJE, NA JEDNOM MISTE (2026-10-09): hodnoty
+	# sbira `app.main` (jedine misto, kde se potkava sim a klient), text sklada
+	# `ui.debug_overlay.text_for` (UI je tenky klient, docs/04 §4.1).
+	# Chybejici hodnota se v textu pozna ("?" nebo 0/0) - vymyslena nula by
+	# vypadala jako namERene cislo.
+	var rozm: Vector2 = get_viewport_rect().size
+	var hodnoty: Dictionary = {
+		"loc": "",            # nazev lokace (Felucca/Britain) zatim nema kdo dat
+		"win": "%dx%d" % [int(rozm.x), int(rozm.y)],
+		"map": "%dx%d" % [int(map.width()), int(map.height())] if map != null else "?",
+	}
+	if player != null:
+		hodnoty["x"] = int(player.pos.x)
+		hodnoty["y"] = int(player.pos.y)
+		hodnoty["z"] = int(player.pos.z)
+		hodnoty["dir"] = int(player.dir)
+		hodnoty["hp"] = int(player.hp)
+		hodnoty["hp_max"] = int(player.max_hp)
+		hodnoty["stam"] = int(player.stam)
+		hodnoty["stam_max"] = int(player.max_stam)
+		hodnoty["mana"] = int(player.mana)
+		hodnoty["mana_max"] = int(player.max_mana)
+	if world_view != null:
+		hodnoty["zoom"] = float(world_view.zoom)
+		hodnoty["drawn"] = int(world_view.drawn)
+		hodnoty["holes"] = int(world_view.holes)
+		hodnoty["tiles"] = world_view.viditelne_dlazdice()
+		hodnoty["anim_frame"] = int(world_view.player_frame)
+		hodnoty["anim_count"] = int(world_view.player_frames)
+	if loop != null and loop.input_map != null:
+		# `player_screen` je stred, ze ktereho klient meri smer z mysi a prevadi
+		# klik na dlazdici (vada V14). Kdyz neni zmereny, posila se `Vector2.INF`
+		# - v textu to musi byt VIDET ("(?)"), ne jako souradnice (0,0).
+		var stred: Vector2 = loop.input_map.player_screen
+		if stred.is_finite():
+			hodnoty["pick"] = stred
+	if controller != null and controller.has_method("action"):
+		var akce: int = int(controller.action())
+		hodnoty["anim"] = AKCE_NAZVY.get(akce, str(akce))
+		var krok: Dictionary = controller.step_state() if controller.has_method("step_state") else {}
+		if not krok.is_empty():
+			hodnoty["step_run"] = bool(krok.get("run", false))
+			hodnoty["step_delay_ms"] = int(krok.get("delay_ms", 0))
+			var sim_cas: int = int(sim.world_time()) if sim != null else 0
+			hodnoty["step_elapsed_ms"] = maxi(0, sim_cas - int(krok.get("start_ms", sim_cas)))
+	if metrics != null:
+		var r: Dictionary = metrics.report()
+		hodnoty["fps"] = float(r.get("fps", 0.0))
+		hodnoty["frame_ms"] = float(r.get("frame_ms", 0.0))
+	hodnoty["peak_ms"] = _peak_ms
+	return hodnoty
 
 
 func _setup_ui() -> void:
@@ -230,6 +312,15 @@ func _setup_ui() -> void:
 		push_warning("app.main: okno vyroby se nepodarilo zaregistrovat v HUD")
 	if loop != null:
 		loop.gump_okna.append(craft_gump)
+	# DEBUG OVERLAY: neni to okno (nema titul ani se neposouva) - je to vrstva
+	# textu v levem hornim rohu, VIDITELNA od startu, aby ji zachytil screenshot.
+	# `F3` ji prepina (`app/player_controller`). Hodnoty plni `_debug_values()`.
+	debug_overlay = DebugOverlayScript.new()
+	debug_overlay.name = "DebugOverlay"
+	debug_overlay.position = Vector2(8.0, 8.0)
+	hud.add_child(debug_overlay)
+	print("[main] debug overlay: viditelny (F3 prepina, hodnoty kazdych ",
+		int(DEBUG_OVERLAY_S), " s)")
 	print("[main] UI: okna ", hud.layout().keys(), ", cerny pas vpravo ", GUI_PAS_VPRAVO,
 		" px, dole ", GUI_PAS_DOLE, " px (svet ", rozm - Vector2(GUI_PAS_VPRAVO, GUI_PAS_DOLE), ")")
 
@@ -364,6 +455,7 @@ func _setup_player(view) -> void:
 		return
 	controller.setup(player, sim, loop.input_map, movement, view, loop)
 	controller.backpack = backpack      # klavesa `B` prepina okno batohu
+	controller.debug_overlay = debug_overlay   # klavesa `F3` prepina overlay
 	print("[main] hrac: serial ", serial, " na ", player.pos, " (", map.land_at(player.pos.x, player.pos.y),
 		" land), hue ", player.hue, " (0 = bez barvy), barvy: ", view.hue_stats(),
 		", nastroju v batohu ", nastroju, ", pocatecnich skillu ", skillu,

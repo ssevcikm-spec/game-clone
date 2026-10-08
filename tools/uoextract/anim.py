@@ -51,6 +51,19 @@ CO JE OVERENE (a co ne) - docs/10 zada "nemERene = nestavet":
            Naked telo je proto sede; barvu kuze v UO dela az hue z `hues.mul`
            (granule `render.hue`).
 
+   CISLA AKCI (2026-10-09)  Export bere akce 0 = walk, **2 = run**, 4 = idle.
+           Do 2026-10-09 tu bylo `1:run`, coz je u CLOVEKA NECO JINEHO:
+           reference `_src/classicuo/src/ClassicUO.Assets/AnimationsLoader.cs:1721`
+           (`PeopleAnimationGroup`) dava 0 = WalkUnarmed, 1 = **WalkArmed**,
+           2 = **RunUnarmed**, 3 = RunArmed. ("0 = walk, 1 = run" plati jen pro
+           zvirata a monstra.) NAMERENO POHLEDEM (2026-10-09,
+           `_analyza/p25-groups-montaz.py` + export `_analyza/p25-groups`, telo
+           400, vsech 5 smeru): skupiny 2 a 3 jsou BEH (predklon, pokrcene
+           paze), 0 a 1 jsou CHUZE. Klientska strana ma stejne cislo
+           (`sim/systems/movement.gd` `ACTION_RUN`, `app/player_controller.gd`);
+           kdo ho zmeni, MUSI preexportovat `assets/uo/anim`, jinak beh nema
+           sprite a postava zmizi.
+
 Pouziti:
   python tools/uoextract/anim.py --verify            # zmer vsechna tela
   python tools/uoextract/anim.py --body 400          # detail jednoho tela
@@ -820,8 +833,8 @@ def main() -> int:
                     help="zkontroluje export bez instalace UO (PNG proti JSON)")
     ap.add_argument("--bodies", default="400,401",
                     help="tela pro --export (vychozi 400,401 = muz, zena)")
-    ap.add_argument("--actions", default="0:walk,1:run,4:idle",
-                    help="akce pro --export jako cislo:nazev,... (vychozi 0:walk,1:run,4:idle)")
+    ap.add_argument("--actions", default="0:walk,2:run,4:idle",
+                    help="akce pro --export jako cislo:nazev,... (vychozi 0:walk,2:run,4:idle)")
     ap.add_argument("--dirs", type=int, default=ANIM_SMERY,
                     help="kolik smeru exportovat (anim.mul ma 5)")
     args = ap.parse_args()

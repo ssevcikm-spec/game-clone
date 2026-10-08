@@ -58,6 +58,12 @@ const Iso = preload("res://core/iso.gd")
 # Akce animace: 0 = walk, 1 = run, 4 = idle (zmEReno v anim.mul: akce 0 i 1 maji
 # 10 framu, akce 4 ma 1 frame; jmena jsou v `assets/uo/anim/anim-sheets.json`).
 const ACTION_WALK: int = 0
+# ⚠⚠ 2026-10-09: `ACTION_RUN` je ABSTRAKTNI ID akce klienta (ne cislo skupiny
+# v anim.mul - viz `render/anim_player.gd` `ACTION_GROUP`). U CLOVEKA je beh
+# skupina 2, kdezto 1 je "WalkArmed" (`_src/classicuo/src/ClassicUO.Assets/
+# AnimationsLoader.cs:1721`); namEReno pohledem `_analyza/p25-groups-montaz.py`.
+# Cislo 1 tady zustava - je to hodnota, na ktere stoji `tests/cases/
+# player_controller.gd`, a preklad na skupinu dela klient (render).
 const ACTION_RUN: int = 1
 const ACTION_IDLE: int = 4
 
@@ -131,6 +137,10 @@ const MOUSE := {
 # Presna sada patri granuli `ui.hotkeys`; dokud neni, drzi ji tenhle soubor.
 const UI_KEYS := {
 	"backpack_toggle": [KEY_B],
+	# DEBUG OVERLAY (2026-10-09): prepnuti vrstvy s lokaci a stavem na obrazovce
+	# (navrh uzivatele, aby se info zachytilo se screenshotem). Je to DEBUG
+	# klavesa, ne herni - proto `F3` a ne pismeno, ktere hra pouziva.
+	"debug_overlay_toggle": [KEY_F3],
 }
 
 # Doba jednoho animacniho framu (docs/05 §5.1.1 = `core/const.gd` TURN_MS).
@@ -149,6 +159,7 @@ var camera: Camera2D = null
 # ⚠ 20. session: okno batohu (injektuje `app/main.gd`). Kontroller na nem jen
 # prepina viditelnost - obsah plni `app/main` (UI je tenky klient).
 var backpack = null
+var debug_overlay = null           # `ui.debug_overlay` - F3 ho prepina
 
 var _iso
 var _last_tile: Vector2i = Vector2i(-9999, -9999)
@@ -314,6 +325,13 @@ func _process(_delta: float) -> void:
 	if backpack != null and input_map != null and input_map.akce_just_pressed("backpack_toggle"):
 		var otevreny: bool = bool(backpack.toggle())
 		print("[controller] batoh: ", "OTEVREL" if otevreny else "ZAVREL")
+	# DEBUG OVERLAY (2026-10-09): `F3` ho schova/zapne. Stav se hlasi do
+	# konzole - ticho by znamenalo, ze hrac nevi, jestli neco zmackl.
+	# Overlay je jen pro cloveka; kdyz neni (test), klavesa nic nedeje.
+	if debug_overlay != null and input_map != null \
+			and input_map.akce_just_pressed("debug_overlay_toggle"):
+		var videt: bool = bool(debug_overlay.toggle())
+		print("[controller] debug overlay: ", "ZAPNUT" if videt else "VYPNUT")
 	# ⚠⚠ KAMERA SE POSOUVA KAZDY FRAME (17. session, 2026-10-08) - VADA
 	# "obraz se pohybuje skokove, ne plynule": do teto session se stred kamery
 	# prepsal JEN kdyz se zmenila DLAZDICE (`if tile != _last_tile: _follow()`),

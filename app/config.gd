@@ -47,8 +47,14 @@ const SCHEMA := {
 	"era.tooltips": {"type": TYPE_STRING, "default": "on", "values": ["on", "off"]},
 	"stat_gain.delay_ms": {"type": TYPE_INT, "default": 2000, "min": 0, "max": 60000},
 	"stat_gain.chance_percent": {"type": TYPE_INT, "default": 25, "min": 0, "max": 100},
+	# MODELY SPOTREBY STAMINY (docs/05 §5.1.4). ⚠ 2026-10-09: seznam hodnot tu
+	# byl ["run_only", "always", "never"], ale `sim.movement` znal jen
+	# "run_only" a "emulator" - hodnota "never" se tedy tise chovala jako
+	# "run_only" a `always` jako `emulator`. Kdo pride hodnotu, MUSI ji pridat
+	# i tam (`sim/systems/movement.gd`, `apply_step`/`consume_stamina`);
+	# "emulator" je model z emulatoru (1 bod za 16 kroku vcetne chuze).
 	"stamina_drain_model": {"type": TYPE_STRING, "default": "run_only",
-		"values": ["run_only", "always", "never"]},
+		"values": ["run_only", "always", "never", "emulator"]},
 	"ggs_on": {"type": TYPE_BOOL, "default": true},
 	"insurance_on": {"type": TYPE_BOOL, "default": false},
 	"anti_macro": {"type": TYPE_BOOL, "default": false},

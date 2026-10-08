@@ -35,6 +35,25 @@ const MANIFEST_PATH := "res://assets/uo/anim/anim-sheets.json"
 const DIR_MAP := [[1, true], [2, true], [3, true], [4, false],
 	[3, false], [2, false], [1, false], [0, false]]
 
+# ⚠⚠ MAPOVANI CISLA AKCE (co posila sim v `mobile_anim`) NA SKUPINU `anim.mul`.
+# Do 2026-10-09 tu ZADNE mapovani nebylo - cislo akce se bralo jako cislo
+# skupiny, a to u CLOVEKA NEPLATI:
+#   * reference `_src/classicuo/src/ClassicUO.Assets/AnimationsLoader.cs:1721`
+#     (`PeopleAnimationGroup`): 0 = WalkUnarmed, 1 = **WalkArmed**,
+#     2 = **RunUnarmed**, 3 = RunArmed. ("0 = walk, 1 = run" plati jen pro
+#     zvirata a monstra - `LowAnimationGroup`/`HighAnimationGroup`.)
+#   * NAMERENO POHLEDEM 2026-10-09 (`_analyza/p25-groups-montaz.py` nad
+#     exportem `_analyza/p25-groups`, telo 400, vsech 5 smeru): skupiny 2 a 3
+#     jsou BEH (predklon, pokrcene paze), 0 a 1 jsou CHUZE. Hra proto pri behu
+#     prehravala CHUZI SE ZBRANI - uzivatel to videl jako "postava jen chodi
+#     rychle nebo pomalu" (2026-10-09).
+#   * Art je prokazatelne jiny: prvni frame skupiny 2 ma 50x55 px, skupiny 0/1
+#     40x58 px (`_analyza/p25-walk-run.py`: 25-100 % pixelu se lisi).
+# Export je `tools/uoextract/anim.py --actions "0:walk,2:run,4:idle"`; kdo
+# zmeni tabulku, MUSI preexportovat `assets/uo/anim` - chybejici sprite se
+# hlasi (`ok:false`), netiší se.
+const ACTION_GROUP := {0: 0, 1: 2, 4: 4}
+
 var _sheets: Dictionary = {}     # "telo/akce/smer" -> {file, frames}
 var _textures: Dictionary = {}   # "soubor|rect" -> AtlasTexture, "page|soubor" -> ImageTexture
 var _state: Dictionary = {}      # serial -> {key, start} pro casovani
@@ -114,7 +133,16 @@ func play(serial: int, action: int, dir: int, now_ms: int = -1) -> Dictionary:
 		"mirror_x": int(f["w"]) - int(f["cx"]), "sprite_dir": int(map[0])}
 
 func _key(body: int, action: int, dir: int) -> String:
-	return "%d/%d/%d" % [body, action, int(DIR_MAP[((dir % 8) + 8) % 8][0])]
+	# Nezname cislo akce se bere jako cislo skupiny (starsi chovani): vymyslene
+	# mapovani by u nove akce tise vybralo CIZI art.
+	return "%d/%d/%d" % [body, sprite_group(action), int(DIR_MAP[((dir % 8) + 8) % 8][0])]
+
+
+func sprite_group(action: int) -> int:
+	# Skupina v `anim.mul` pro cislo akce z `mobile_anim` (viz `ACTION_GROUP`).
+	# Verejne schvalne: sonda i test se ptaji na TUTEZ hodnotu, kterou pouziva
+	# klic spritu - kdyby si ji pocitaly samy, merily by neco jineho.
+	return int(ACTION_GROUP.get(action, action))
 
 func _zadny(map: Array) -> Dictionary:
 	# Chybejici sprite se NESMI tvarit jako "ok": prazdno by splynulo s vadou.

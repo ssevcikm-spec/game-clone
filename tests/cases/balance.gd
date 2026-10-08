@@ -8,7 +8,14 @@ const Lib = preload("res://tests/lib.gd")
 
 const WANT := {
 	"combat_era": "aos",
-	"stamina_drain_model": "run_only",
+	# ⚠⚠ ZMENA SPECU 2026-10-09 (jedina v teto zmene, na pokyn uzivatele):
+	# uzivatel zadal "Zatim bych to vypnul, ledaze mas okamzite reseni" -
+	# spotreba staminy za kazdy krok behu byla proti referenci (beh sam staminu
+	# nebere; spotrebu vaze az PRETIZENI - `_src/servuo/Scripts/Misc/
+	# WeightOverloading.cs:111`) a bez `sim.regen` byla NEVRATNA.
+	# Do 2026-10-09 tu bylo "run_only" - hodnota odpovidala rozhodnuti
+	# docs/05 §5.16, ktere bylo v te dobe povazovano za overene.
+	"stamina_drain_model": "never",
 	"ggs_on": true,
 	"insurance_on": false,
 	"anti_macro": false,

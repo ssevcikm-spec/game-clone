@@ -141,6 +141,11 @@ var holes: int = 0                 # kolik objektu melo CHYBEJICI art (magenta)
 var nodraw: int = 0                # kolik land dlazdic je id <= 2 (UO je nekresli)
 var player_drawn: bool = false     # kreslila se naposledy postava?
 var player_missing: bool = false   # postava je, ale nema sprite (vada, ne ticho)
+# KTERY FRAME animace se naposledy kreslil (2026-10-09, pro debug overlay):
+# cisla se jinak meri jen okem a u vady "animace behu neexistuje" se musi dat
+# rict, KTERA skupina a KTERY frame se opravdu prehral. 0/0 = nekreslilo se.
+var player_frame: int = 0
+var player_frames: int = 0
 
 var _iso
 var _chunk = null
@@ -912,8 +917,12 @@ func _draw_player() -> void:
 	var clip: Dictionary = _anim.play(int(_player.serial), _action, _view_dir)
 	if not bool(clip.get("ok", false)) or clip.get("texture") == null:
 		player_missing = true
+		player_frame = 0
+		player_frames = 0
 		return
 	player_missing = false
+	player_frame = int(clip.get("frame", 0))       # pro debug overlay
+	player_frames = int(clip.get("count", 0))
 	drawn += 1
 	var anchor: Vector2 = clip["anchor"]
 	# Pozice vcetne posunu mezi dlazdicemi (V2) - jedna funkce pro kresleni

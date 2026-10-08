@@ -65,8 +65,24 @@ const ClockScript = preload("res://core/clock.gd")
 const RegistryScript = preload("res://sim/entity/registry.gd")
 
 const BALANCE_PATH := "res://data/balance.json"
-const ACTION_WALK := 0            # anim akce 0 = walk, 1 = run (mereno v anim.mul)
-const ACTION_RUN := 1
+# CISLO AKCE v eventu `mobile_anim` je ABSTRAKTNI ID KLIENTA, ne cislo skupiny
+# v `anim.mul` (docs/04 §4.2 cisla nepinuje; hodnoty 0/1/4 jsou dohodnute se
+# `app/player_controller.gd` a `render/anim_player.gd`).
+# ⚠⚠ 2026-10-09 - VADA "ANIMACE BEHU NEEXISTUJE" (uzivatel: "postava jen chodi
+# rychle nebo pomalu"): klient bral cislo akce jako cislo skupiny v `anim.mul`
+# a u CLOVEKA znamena 1 NECO JINEHO nez beh:
+#   * reference `_src/classicuo/src/ClassicUO.Assets/AnimationsLoader.cs:1721`
+#     (`PeopleAnimationGroup`): 0 = WalkUnarmed, 1 = **WalkArmed**,
+#     2 = **RunUnarmed**, 3 = RunArmed. ("0 = walk, 1 = run" plati jen pro
+#     zvirata a monstra - `LowAnimationGroup`/`HighAnimationGroup`.)
+#   * NAMERENO POHLEDEM 2026-10-09 (`_analyza/p25-groups-montaz.py` nad
+#     vlastnim exportem `_analyza/p25-groups`, telo 400, vsech 5 smeru):
+#     skupiny 2 a 3 jsou BEH (predklon, pokrcene paze), 0 a 1 jsou CHUZE.
+#     Export se proto predelal na `0:walk,2:run,4:idle` a KLIENT ma tabulku
+#     `render/anim_player.gd` `ACTION_GROUP` (1 -> 2). Tady se cislo NEMENI:
+#     je to abstraktni id a `tests/cases/player_controller.gd` na nem stoji.
+const ACTION_WALK := 0            # abstraktni id chuze (skupina anim.mul 0)
+const ACTION_RUN := 1             # abstraktni id behu (skupina anim.mul 2!)
 const EMULATOR_STEPS_PER_POINT := 16
 
 var player_serial: int = 0
@@ -205,8 +221,17 @@ func apply_step(m: int, dir: int) -> void:
 		_pending.erase(m)
 	mob.pos = Vector3i(mob.pos.x + Const.DIR_DX[dir], mob.pos.y + Const.DIR_DY[dir], z)
 	mob.dir = dir
-	# Model "emulator" pocita i chuzi (1 bod za 16 kroku), "run_only" jen beh.
-	if run or _drain_model == "emulator":
+	# MODEL SPOTREBY (docs/05 §5.1.4 + `app.config`): "never" nebere nic,
+	# "always" bere i za chuzi, "emulator" pocita i chuzi (1 bod za 16 kroku),
+	# "run_only" (vychozi) jen beh.
+	# ⚠ `stamina_drain_model: "never"` BYL DO 2026-10-09 NEFUNKCNI: hodnota byla
+	# v `app/config.gd` SCHEMA povolena, ale tenhle system ji neznal - tady se
+	# rozhodovalo jen mezi "emulator" a vsim ostatnim, takze "never" se tise
+	# chovalo jako "run_only" a stamina ubývala dal. Kdo menu meni na hodnotu,
+	# kterou kod nezna, dostane TICHE stare chovani - proto se testuje.
+	if _drain_model == "never":
+		pass
+	elif _drain_model == "always" or run or _drain_model == "emulator":
 		consume_stamina(m, 1)
 	_events_push("mobile_moved", {"serial": m, "x": mob.pos.x, "y": mob.pos.y,
 		"z": mob.pos.z, "dir": dir, "run": run})
@@ -215,6 +240,16 @@ func apply_step(m: int, dir: int) -> void:
 func consume_stamina(m: int, steps: int) -> void:
 	var mob = _registry.get_mobile(m)
 	if mob == null or steps <= 0:
+		return
+	if _drain_model == "never":
+		# "never" (rozhodnuti uzivatele 2026-10-09: "Zatim bych to vypnul"):
+		# stamina se nebere VUBEC. Je to docasne, dokud neexistuje `sim.regen` -
+		# reference spotrebu pri pohybu vaze na PRETIZENI, ne na kazdy krok
+		# (`_src/servuo/Scripts/Misc/WeightOverloading.cs:111`:
+		# `loss = 5 + overWeight / 25`, behem behu x2, na mountu /3; nepretizena
+		# postava neztraci za krok NIC) a regeneruje 1 bod za interval
+		# (`Server/Mobile.cs:1968-1976`). Nase "1 bod za krok behu" je tedy
+		# PROTI reference - a bez regenerace nevratne.
 		return
 	if _drain_model == "emulator":
 		# 1 bod za 16 kroku VCNETNE chuze - pocita se prirustkem, takze 15 kroku
