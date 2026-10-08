@@ -62,8 +62,79 @@ const CULL_MARGIN: float = 256.0
 # session: "chybejici art se kresli jako TICHO". Dira v mape ma byt videt na
 # prvni pohled, ne se schovat za barvu pozadi.
 const HOLE_COLOR := Color(1.0, 0.0, 1.0, 0.85)
+# --- ZOOM (19. session, V9 "CELA OBRAZOVKA JE TROCHU PIXELATA ... CHTELO BY TO
+# ODDALIT OBRAZOVKU, ZVETSIT ROZHLED") ------------------------------------
+# ZOOM JE VSTUP, ne konstanta (rozhodnuti v `ZADANI-19-VADY-ZE-SNIMKU.md` §4.2):
+# kolecko mysi a klavesy `+`/`-` (i numpad) meni rozhled za behu.
+#
+# CO JE NAMERENE (2026-10-08, `_analyza/p22-zoom-sonda.gd`, okno 1280x720 s
+# cernym pasem GUI 320 vpravo / 120 dole; "viditelne okno" = co hrac opravdu
+# vidi, "kreslena plocha" = co se jeste kresli pod pásem):
+#   * zoom 1,0 (stav pred 19. session): viditelne okno 960x600 px sveta = osy
+#     `a = x - y` 44 a `b = x + y` 28 dlazdic, tedy **36,0 dlazdice na osu
+#     sveta** (`(a + b) / 2`), v okne 579 land dlazdic,
+#   * zoom 0,75 (VYCHOZI): viditelne okno 1280x800 px = osy 59 / 37, tedy
+#     **48,0 dlazdice na osu sveta** (+33 % rozhledu), v okne 1081 land dlazdic;
+#     kazda dlazdice je 33x33 px misto 44x44,
+#   * zoom 0,5: 1920x1200 px = 71,5 dlazdice na osu (2344 land dlazdic),
+#   * zoom 1,5: 640x400 px = 24,5 dlazdice; zoom 2,0: 480x300 px = 18,0 dlazdice.
+#   * pri KAZDEM zoomu je hrac presne ve stredu viditelneho okna (odchylka
+#     < 0,001 px - mereno pres `player_ground_position()`), okno seznamu
+#     obrazovku pokryva (`pokryto true`) a davka se postavi bez der
+#     (`der 0`, `pretek false`, `missing art 0`; pri zoomu 0,5 ma 26 528 kvadru).
+#   * zoom < 1 ZVETSUJE rozhled, ale kazdy pixel artu se mapuje na MENE nez
+#     jeden pixel obrazovky - to je "pixelatost", kterou uzivatel vidi. Snimky
+#     (Nearest vs. Linear, zoom 0,5 / 0,75 / 1,0 / 1,5 / 2,0) a cisla jsou
+#     v `_analyza/p22-zoom-sonda.txt`; doporuceni k V10 je v HANDOFFu.
+#
+# ⚠ PAST (namERena): seznam objektu (`_list_okraj`) se musi pri oddaleni ZVETSIT
+# presne o `1 / zoom`, jinak obrazovka prestane byt pokryta a u okraju vzniknou
+# DIRY. Proto `_list_okraj()` i `_obrazovka()` deli rozmer viewportu zoomem
+# (`svet_rozmer()`), a `gui_odsazeni` (v px OBRAZOVKY) se naopak zoomem deli,
+# aby hrac zustal ve stredu viditelneho okna.
+#
+# ⚠⚠ V5 "PRI POHYBU CELA OBRAZOVKA ZRNI" - NAMERENE PRICINY (2026-10-08,
+# `_analyza/p22-teren-zrno.gd`, rizeny pokus: posun kamery o cely svetovy pixel
+# a rozdil snimku po nejlepsim posunu obrazovky):
+#   * PRI ZOOMU 1,0 JE POHYB OSTNY: zbytek **0,00 %** = obraz je jen posunuty
+#     o cely pixel. V klidu se nemeni vubec (0 pixelu, `p22-teren-grain.gd`).
+#     Behem 3 000 framu chuze: 0 framu pomalych (> 33 ms), 0 framu s `hold`,
+#     0 framu se stavem davky != 0, 0 framu s necelociselnou kamerou.
+#   * PRI ZOOMU != 1 JE POHYB ROZMAZANY: zbytek **52,27 %** (zoom 0,75) a
+#     **92,45 %** (zoom 0,5) - svetovy pixel je na obrazovce zlomek pixelu.
+#     Oprava `snap_na_pixely` to srazi na **0,23 %** / **0,01 %**.
+#   * NEZAVISLA PRICINA (mimo tento modul): kdyz okno NEMA zakladni velikost
+#     1280x720, `canvas_items` stretch skaluje canvas zlomkem (okno 1300x740 ->
+#     1,0156x) a prevzorkuje se CELY obraz i pri zoomu 1,0: zbytek **96,74 %**.
+#     To je vlastnost `project.godot` (`boot.project`), ne tohoto modulu; reseni
+#     je `display/window/stretch/scale_mode=integer` nebo hrat v 1280x720.
+#     Cisla a postup: `_analyza/p22-teren-zrno.txt`.
+const ZOOM_MIN: float = 0.5
+const ZOOM_MAX: float = 2.0
+# Nasobny krok (1 krok = +25 % / -20 %): stejny krok na obe strany, aby se
+# zoom dal vratit presne na vychozi hodnotu.
+const ZOOM_KROK: float = 1.25
+# Vychozi hodnota < 1 = VETSI rozhled nez pred 19. session (viz namerena cisla
+# v hlavicce). Cislo je rozhodnuti: 0,75 je nejmensi oddaleni, ktere je na
+# 1280x720 jeste citelne (0,5 uz je polovicni rozliseni artu).
+const ZOOM_VYCHOZI: float = 0.75
 
 var center_tile: Vector2i = BRITAIN
+# Aktualni zoom (1.0 = stav pred 19. session). Meni ho `nastav_zoom()`.
+var zoom: float = ZOOM_VYCHOZI
+# ⚠⚠ ZAOKROUHLENI NA MŘÍŽKU OBRAZOVKY (19. session, V5 "pri pohybu cela
+# obrazovka zrni"). NAMERENO (`_analyza/p22-teren-zrno.gd`): pri zoomu != 1 se
+# svetovy posun o CELY pixel projevi na obrazovce ZLOMKEM pixelu (0,75 px pri
+# zoomu 0,75), takze Nearest vzorkuje jine texely a obraz se kazdy frame
+# PREVZORKOVAVA - zrni. Cisla: zbytek po nejlepsim posunu obrazovky byl
+# **52,27 %** pri zoomu 0,75 a **92,45 %** pri zoomu 0,5 (pri zoomu 1,0 je to
+# **0,00 %** = cista translace). Kdyz se pozice kamery i postavy zaokrouhli na
+# CELOCISELNE pixely obrazovky (`round(p * zoom) / zoom`), je zbytek **0,23 %**
+# (zoom 0,75) a **0,01 %** (zoom 0,5) - svet se hybe po celych pixelech
+# obrazovky, presne jako reference (`GameObject.cs:152-153` kresli `int`).
+# Pri zoomu 1,0 je zaokrouhleni IDENTITA, takze se chovani pred 19. session
+# nemeni ani o pixel (proto `is_equal_approx(zoom, 1.0)`).
+var snap_na_pixely: bool = true
 var drawn: int = 0                 # kolik objektu se naposledy kreslilo
 var slopes: int = 0                # kolik z toho bylo svahu (texmap pres rohy)
 var holes: int = 0                 # kolik objektu melo CHYBEJICI art (magenta)
@@ -135,6 +206,10 @@ func _ready() -> void:
 	_camera = get_parent().get_node_or_null("Camera") as Camera2D
 	if _camera == null:
 		push_warning("app.world_view: ve scene chybi uzel Camera - svet bude mimo obrazovku")
+	else:
+		# ZOOM (V9) se na kameru nasadi HNED - bez toho by obraz do prvniho
+		# `nastav_zoom()` neodpovidal deklarovanemu vychozimu zoomu.
+		_aplikuj_zoom()
 	if not _anim.available():
 		push_warning("app.world_view: animace tela nejsou (chybi assets/uo/anim) - "
 			+ "postava se nevykresli, mapa ano")
@@ -197,15 +272,113 @@ func set_player_offset(offset: Vector2) -> void:
 	_player_offset = offset
 
 
+# --- ZOOM (19. session, V9) ----------------------------------------------
+func svet_rozmer() -> Vector2:
+	# VIDITELNA PLOCHA SVETA v px. Kamera ma `zoom`, takze svet se do viewportu
+	# vejde `1 / zoom` krat vetsi. Tohle cislo je VSTUP pro `_obrazovka()`
+	# (orezavani) i `_list_okraj()` (okno seznamu) - kdyz se na to zapomene,
+	# obrazovka prestane byt pokryta a u okraju vzniknou DIRY (namERena past).
+	#
+	# Kdyz viewport rozmer NEMA (headless beh bez okna), vezme se DEKLAROVANA
+	# velikost okna z `project.godot`: okno seznamu i pokryti se pak pocitaji
+	# STEJNYM vzorcem jako v hre. Vracet nulu by znamenalo "nic se nekresli"
+	# a to je horsi nez vetsi okno; vracet pevnou konstantu by zase znamenalo,
+	# ze se vliv zoomu v testu vubec nezmeri.
+	var rozmer: Vector2 = get_viewport_rect().size
+	if rozmer.x <= 0.0 or rozmer.y <= 0.0:
+		rozmer = Vector2(
+			float(ProjectSettings.get_setting("display/window/size/viewport_width", 1280)),
+			float(ProjectSettings.get_setting("display/window/size/viewport_height", 720)))
+	return rozmer / zoom
+
+
+func viditelne_dlazdice() -> Vector2i:
+	# Rozsah viditelne plochy v izometrickych osach (`core/iso.gd`):
+	# `a = x - y` (vodorovna osa obrazovky) a `b = x + y` (svisla). Pocet
+	# dlazdic na jednu osu SVETA je `(a + b) / 2`; tady se vraceji oba rozsahy,
+	# protoze z nich se pocita pokryti obrazovky.
+	var s: Vector2 = svet_rozmer()
+	var krok: float = float(Const.ISO_STEP)
+	return Vector2i(int(ceil(s.x / krok)), int(ceil(s.y / krok)))
+
+
+func snap_screen(p: Vector2) -> Vector2:
+	# Pozice ve SVETE -> pozice na CELOCISELNEM pixelu obrazovky (viz
+	# `snap_na_pixely` v hlavicce). Pri zoomu 1,0 vraci vstup beze zmeny.
+	if not snap_na_pixely or is_equal_approx(zoom, 1.0):
+		return p
+	return (p * zoom).round() / zoom
+
+
+func nastav_zoom(novy: float) -> void:
+	# ZOOM JE VSTUP (rozhodnuti v `ZADANI-19-VADY-ZE-SNIMKU.md` §4.2). Mimo
+	# rozsah se oreze; stejna hodnota nic nemeni (aby se seznam neprestavoval
+	# zbytecne - prestavba stoji desitky ms).
+	var omezene: float = clampf(novy, ZOOM_MIN, ZOOM_MAX)
+	if is_equal_approx(omezene, zoom):
+		return
+	zoom = omezene
+	_aplikuj_zoom()
+	# Zmena zoomu meni VIDITELNOU PLOCHU, takze stary seznam objektu ma maly
+	# okraj. Vynuti se prestavba (sentinel) - okno se pocita z `zoom`.
+	_list_center = Vector2i(-99999, -99999)
+	if _camera != null:
+		look_at_tile(center_tile, int(_player.pos.z) if _player != null else 0,
+			_player_offset)
+	print("[world_view] zoom ", zoom, ": viditelna plocha ", svet_rozmer(),
+		" px sveta, osy a/b ", viditelne_dlazdice(), " dlazdic, okno seznamu ",
+		_list_okraj())
+	queue_redraw()
+
+
+func zoom_krok(smer: int) -> void:
+	# Nasobny krok: 1 krok = ZOOM_KROK. Vetsi cislo = vetsi priblizeni (mensi
+	# rozhled), takze "oddalit" je `smer < 0`.
+	if smer > 0:
+		nastav_zoom(zoom * ZOOM_KROK)
+	elif smer < 0:
+		nastav_zoom(zoom / ZOOM_KROK)
+
+
+func _aplikuj_zoom() -> void:
+	if _camera != null:
+		_camera.zoom = Vector2(zoom, zoom)
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	# VSTUP PRO ZOOM: kolecko mysi (nahoru = priblizit, dolu = oddalit) a
+	# klavesy `+`/`-` vcetne numpadu a `=` (na nemecke/ceske klavesnici je `+`
+	# pres shift, takze samotne `=` je "priblizit").
+	if event is InputEventMouseButton and event.pressed:
+		if event.button_index == MOUSE_BUTTON_WHEEL_UP:
+			zoom_krok(1)
+			get_viewport().set_input_as_handled()
+		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+			zoom_krok(-1)
+			get_viewport().set_input_as_handled()
+	elif event is InputEventKey and event.pressed and not event.echo:
+		var k: int = event.keycode
+		if k == KEY_PLUS or k == KEY_EQUAL or k == KEY_KP_ADD:
+			zoom_krok(1)
+			get_viewport().set_input_as_handled()
+		elif k == KEY_MINUS or k == KEY_KP_SUBTRACT:
+			zoom_krok(-1)
+			get_viewport().set_input_as_handled()
+
+
 func player_ground_position() -> Vector2:
 	# KAM SE KRESLI POSTAVA (bez kresleni - da se merit testem i sondou).
-	# Je to stred dlazdice, na ktere postava stoji, plus posun kroku.
+	# Je to stred dlazdice, na ktere postava stoji, plus posun kroku - a pozice
+	# je ZAOKROUHLENA NA MRIZKU OBRAZOVKY (`snap_screen`), aby postava
+	# neprochazela prevzorkovanim pri zoomu != 1 (V5). Tim se take zachova, ze
+	# postava stoji PRESNE ve stredu viditelneho sveta: kamera je posunuta
+	# o `gui_odsazeni / zoom` a zaokrouhleni je pro obe strany stejne.
 	if _player == null:
 		return Vector2.ZERO
 	if _iso == null:
 		_iso = Iso.new()          # testy tvori uzel bez `_ready()` (N8)
-	return _iso.to_screen(int(_player.pos.x), int(_player.pos.y), int(_player.pos.z)) \
-		+ Vector2(Const.ISO_STEP, Const.TILE_H / 2) + _player_offset
+	return snap_screen(_iso.to_screen(int(_player.pos.x), int(_player.pos.y),
+		int(_player.pos.z)) + Vector2(Const.ISO_STEP, Const.TILE_H / 2) + _player_offset)
 
 
 func anim_available() -> bool:
@@ -259,8 +432,14 @@ func look_at_tile(tile: Vector2i, z: int = 0, offset: Vector2 = Vector2.ZERO) ->
 	if _chunk != null:
 		_chunk.nastav_hrace(tile.x, tile.y, z)
 	if _camera != null:
-		_camera.position = _iso.to_screen(tile.x, tile.y, z) \
-			+ Vector2(Const.ISO_STEP, Const.TILE_H / 2) + offset + gui_odsazeni
+		# ⚠ `gui_odsazeni` je v PIXELECH OBRAZOVKY (o kolik je stred viditelneho
+		# sveta vedle stredu okna), takze se do sveta prepocita pres `zoom`:
+		# pri oddaleni je tyz posun na obrazovce vetsi ve svete. Bez deleni by
+		# hrac pri zoomu != 1 stal mimo stred viditelneho sveta.
+		# ⚠ A pak se pozice zaokrouhli na mrizku OBRAZOVKY (`snap_screen`) -
+		# jinak by se pri zoomu != 1 obraz kazdy frame prevzorkoval (V5).
+		_camera.position = snap_screen(_iso.to_screen(tile.x, tile.y, z) \
+			+ Vector2(Const.ISO_STEP, Const.TILE_H / 2) + offset + gui_odsazeni / zoom)
 	# POZOR: seznam se tady NEZAHOZUJE. `render.chunk` si ho prestavi sam, kdyz
 	# se zmeni stred (viz `_list` a RECENTER_TILES) - zahozeni pri kazdem kroku
 	# bylo namERene seknuti (44 ms x 2,5 za sekundu).
@@ -301,10 +480,12 @@ func _list_okraj() -> Vector2i:
 	# pro `b`; kazda osa pridava `RECENTER_TILES` (kam se hrac muze vzdalit)
 	# a 2 dlazdice rezervy na zaokrouhleni a posun kroku.
 	# Kdyz okno obrazovku NEPOKRYJE, `_draw` ji prestane kreslit a vzniknou DIRY.
-	var rozmer: Vector2 = get_viewport_rect().size
+	# ⚠ 19. session (V9): rozmer je VIDITELNA PLOCHA SVETA (`svet_rozmer()`),
+	# tedy viewport / zoom - pri oddaleni okno roste presne o `1 / zoom`.
+	var rozmer: Vector2 = svet_rozmer()
 	if rozmer.x <= 0.0 or rozmer.y <= 0.0:
-		# NEMERENO (test bez okna): vrat deklarovane minimum, ne nulu - nula by
-		# znamenala "nekresli se nic" a to je horsi nez mensi okno.
+		# NEMERENO: neda se to ani z deklarovaneho okna - vrat deklarovane
+		# minimum, ne nulu (nula by znamenala "nekresli se nic").
 		return Vector2i(VIEW_TILES_X, VIEW_TILES_Y)
 	var krok: float = float(Const.ISO_STEP)
 	var pol_x: int = int(ceil((rozmer.x / 2.0 + rozmer.y / 2.0) / krok)) + 2
@@ -317,6 +498,24 @@ func _list_okraj() -> Vector2i:
 # ⚠ P20 MERENI BYLO ODSTRANENO (17. session): docasna pocitadla `p20_*` slouzila
 # sondam `_analyza/p20-*.gd`. Cisla jsou v `_analyza/p20-*.txt` a v HANDOFFu;
 # kdo chce merit znovu, prida pocitadla zpet (jsou popsana v `_analyza/p20-hlubka.gd`).
+
+
+func klic_hrace_stats() -> Dictionary:
+	# ROZKLAD klice hrace pro test a sondu (cisla, ne dojem): jaky objekt ho
+	# urcil a kolik objektu se do maxima pocitalo. Bez toho by se "hrac je vzadu"
+	# nedalo overit jinak nez okem.
+	if _player == null:
+		return {"klic": -1, "pocitano": 0, "nejvyssi": -1, "diagonala": 0}
+	var diagonal: int = int(_player.pos.x) + int(_player.pos.y)
+	var nejvyssi: int = -1
+	var pocitano: int = 0
+	for obj in _list():
+		if int(obj["x"]) + int(obj["y"]) > diagonal:
+			continue
+		pocitano += 1
+		nejvyssi = maxi(nejvyssi, _sort.sort_key(obj))
+	return {"klic": _klic_hrace(), "pocitano": pocitano, "nejvyssi": nejvyssi,
+		"diagonala": diagonal}
 
 
 func _draw() -> void:
@@ -402,7 +601,7 @@ func _obrazovka(margin: float) -> Rect2:
 	# Obdelnik, ktery se opravdu muze objevit na obrazovce (ve svetovych
 	# souradnicich). Bez kamery vraci obdelnik kolem stredu pohledu - pak se
 	# neorezava nic, protoze "nevim" nema znamenat "nevykresli se".
-	var velikost: Vector2 = get_viewport_rect().size
+	var velikost: Vector2 = svet_rozmer()
 	var stred := Vector2.ZERO
 	if _camera != null:
 		stred = _camera.position
@@ -495,9 +694,12 @@ func stavi_se() -> bool:
 func _klic_hrace() -> int:
 	# Klic hrace pro deleni davky. Bez hrace plati SENTINELA: vsechno ma klic
 	# >= 0, takze `-1` da "pred hracem" prazdne a kresli se cela davka.
+	# ⚠ 19. session: klic se pocita z REALNEHO seznamu objektu (`_list()`), proto
+	# si ho `_draw` a `_priprav_mesh` berou touhle funkci (ne primo
+	# `_sort_key_of_player`), aby se nemohly rozejit.
 	if _player == null:
 		return -1
-	return _sort_key_of_player()
+	return _sort_key_of_player(_list())
 
 
 func _nacti_mesh_stats() -> void:
@@ -607,10 +809,51 @@ func _draw_hole(obj: Dictionary, pozice: Vector2) -> void:
 	draw_rect(Rect2(pozice + Vector2(krok, 0.0), Vector2(krok, krok)), HOLE_COLOR)
 
 
-func _sort_key_of_player() -> int:
-	# Klid pro `render.sort`: mobil ma vlastni vrstvu (za statiky na teze dlazdici).
-	return _sort.sort_key({"kind": "mobile", "x": int(_player.pos.x),
-		"y": int(_player.pos.y), "z": int(_player.pos.z)})
+func _sort_key_of_player(seznam: Array = []) -> int:
+	# ⚠⚠ 19. session (2026-10-08) - V1 ZE ZADANI 19 ("propadam se do textury
+	# mostu"). Do teto session mel hrac klic `sort_key({mobile, x, y, z})`, tedy
+	# PRESNE klic mobila na sve dlazdici - jenze statik na TEZE dlazdici muze mit
+	# `priority_z` vyssi (podlaha -1, statik s vyskou +1) a tim i vetsi klic, takze
+	# se kreslil PO hracovi a prekryl ho.
+	# NAMERENO nezavislym overenim (task-4, `_analyza/p22-overeni-00-souhrn.md`):
+	# hrac na (1501,1599) ma klic 8 930 416, statik art 16585 na teze dlazdici
+	# 8 930 418 -> 2 jednotky PO hraci, hrac neni videt. Uprostred kroku pres most
+	# kryje hrace prkno o diagonalu vpred (23,3 % viditelnych pixelu hrace).
+	#
+	# Reference ma Z-BUFFER a mobilum pocita hloubku z `maxZ` dlazdice
+	# (`GameSceneDrawingSorting.cs:159-166`), takze je kresli jako NEJBLIZSI.
+	# Painter's algoritmus to umi jen poradim, a proto se klic hrace pocita
+	# z REALNYCH objektu: je to NEJVETSI klic objektu, ktere mohou hrace
+	# PREKRYT - tedy vsech, ktere jsou na diagonale hrace nebo BLIZ (diagonala
+	# `<= diagonala hrace`), ZVETSENY o 1. Tim plati oboji:
+	#   * hrac je ZA vsim na sve diagonale (i za statikem s nejvyssim `z`),
+	#   * hrac je ZA plosinami, ktere ma POD SEBOU a o 1-2 diagonaly vpred -
+	#     presne to je prkno mostu, ktere jinak "reze postavu v urovni stehen"
+	#     NAMERENO: kryto 187 px z 804 (23,3 %) viditelnych pixelu hrace.
+	# HRANICE, KTERA SE NESMI ZATAJIT: statik o 1-2 diagonaly dal s vysokym `z`
+	# (strecha, zed vepredu) se muze dostat PRED hrace, protoze jeho klic muze
+	# byt nizsi nez klic hrace. Je to cena za to, ze hrace neprekryva podlaha
+	# pod nim - a je to stejne chovani jako reference, ktera mobilum pocita
+	# hloubku z `maxZ` dlazdice hrace (`GameSceneDrawingSorting.cs:159-166`),
+	# tedy je kresli jako NEJBLIZSI. Meri to test `world_view` 7/8c na oba smery.
+	if _player == null:
+		return -1
+	var diagonal: int = int(_player.pos.x) + int(_player.pos.y)
+	var nejvyssi: int = -1
+	for obj in seznam:
+		var d: int = int(obj["x"]) + int(obj["y"])
+		if d > diagonal:
+			# Objekty BLIZ (diagonala hrace a nizsi) hrace mohou prekryt - jejich
+			# maximum rozhoduje. Objekty dal se preskakuji (ne `break`: seznam je
+			# setrideny podle klice a objekty o 1-2 diagonaly dal mohou mit nizsi
+			# klic, takze by `break` preskocil i objekty bliz).
+			continue
+		nejvyssi = maxi(nejvyssi, _sort.sort_key(obj))
+	if nejvyssi < 0:
+		# Prazdny seznam (test bez dat): zaloha je horni mez diagonaly - ne
+		# nula, ktera by hrace poslala pred vsechno.
+		return _sort.klic_nad_diagonalou(diagonal) + 1
+	return nejvyssi + 1
 
 func _draw_player() -> void:
 	# Vraci se i to, ze se postava NEKRESLILA (`player_missing`) - prazdno se

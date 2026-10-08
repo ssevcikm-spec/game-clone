@@ -40,6 +40,17 @@ extends Node
 # do stromu pridat NELZE. Skutecna pricina, proc klavesy nic nedelaly, je jina:
 # `bindings` byl prazdny slovnik a v `InputMap` nebyly zadne akce (namEReno
 # 2026-10-06).
+#
+# ⚠⚠ ZADANI 19 (2026-10-08) - v tomhle souboru pribyly TRI veci:
+#   * V14: `_publish_center()` posila `input_map.player_screen` PRESNOU pozici
+#     hrace na obrazovce (`player_ground_position() - camera_offset`) - klient
+#     jako jediny zna `gui_odsazeni` i posun kroku; namEReno 4 473 z 11 163
+#     pozic kurzoru vracelo kvuli stredove chybe jiny smer,
+#   * V15a: `TURN_KEYS` (Ctrl + smer) - vstup pro otoceni na miste; modifikator
+#     je zmereny (`_analyza/p22-pohyb-ctrl.gd`), bez nej by se otaceni a krok
+#     spoustely obe (nebo ani jedno),
+#   * V4: `CANCEL_KEYS` (Esc) - tvrdy stop auto-runu (auto-run sam rusi novy
+#     stisk praveho tlacitka, reference `GameSceneInputHandler.cs:827-828`).
 
 const Const = preload("res://core/const.gd")
 const Iso = preload("res://core/iso.gd")
@@ -68,6 +79,41 @@ const KEYS := {
 # jeste neexistuje), proto je tady - a je videt v konzoli pri kazdem prepnuti.
 const TOGGLE_KEYS := {
 	"run_toggle": [KEY_SHIFT],
+}
+
+# OTOCENI NA MISTE (V15, zadani 19): Ctrl + smerova klavesa. Smer v prikazu je
+# ABSOLUTNI (0..7), takze staci stejne klavesy jako pro pohyb - Ctrl je odlisuje.
+# Ze to takhle jde, je NAMERENE (`_analyza/p22-pohyb-ctrl.gd`): akce vazana na
+# `KEY_RIGHT` BEZ modifikatoru je stisknuta i s drzenym Ctrl, kdezto akce
+# s `ctrl_pressed = true` jen tehdy, kdyz Ctrl opravdu drzi. Bez toho by se
+# "otocit" a "krocit" spoustely obe (nebo ani jedno).
+const TURN_KEYS := {
+	"turn_east": [KEY_RIGHT, KEY_KP_6],
+	"turn_ne": [KEY_KP_9],
+	"turn_north": [KEY_UP, KEY_KP_8],
+	"turn_nw": [KEY_KP_7],
+	"turn_west": [KEY_LEFT, KEY_KP_4],
+	"turn_sw": [KEY_KP_1],
+	"turn_south": [KEY_DOWN, KEY_KP_2],
+	"turn_se": [KEY_KP_3],
+}
+
+# TVRDY STOP AUTO-RUNU (V4, zadani 19): Esc. Auto-run jinak rusi PRAVY klik
+# (reference `GameSceneInputHandler.cs:827-828`) - ale hrac, ktery se rozbehne
+# a nevi jak zastavit, potrebuje i klavesu. Vlastni ji granule `ui.hotkeys`
+# (jeste neexistuje), proto je tady.
+const CANCEL_KEYS := {
+	"auto_run_cancel": [KEY_ESCAPE],
+}
+
+# OBECNA INTERAKCE (20. session, pokyn uzivatele 2026-10-08: "tlacitko je nejen
+# na tezbu, ale vseobecne interaktivni"): jedno tlacitko posle CIL pod kurzorem
+# a sim rozhodne, co se s nim da delat (`Command{t:"interact"}`).
+# DVE KLAVESY ZAMERNE: `E` je dnes bezny "interaguj" ve hrach a `T` jsem uz
+# uzivateli rekl u prvniho navrhu - dve vazby na jednu akci nikomu nevadi
+# (stejne jako sipky + numpad u pohybu). Presna sada patri granuli `ui.hotkeys`.
+const INTERACT_KEYS := {
+	"interact": [KEY_E, KEY_T],
 }
 
 # MYS: akce v InputMap -> tlacitko. DRZENE PRAVE TLACITKO = chuze kursoru
@@ -115,6 +161,12 @@ static func default_bindings() -> Dictionary:
 		"east": "move_east", "ne": "move_ne", "north": "move_north", "nw": "move_nw",
 		"west": "move_west", "sw": "move_sw", "south": "move_south", "se": "move_se",
 		"walk_to": "walk_to_cursor", "run_toggle": "run_toggle",
+		"turn_east": "turn_east", "turn_ne": "turn_ne", "turn_north": "turn_north",
+		"turn_nw": "turn_nw", "turn_west": "turn_west", "turn_sw": "turn_sw",
+		"turn_south": "turn_south", "turn_se": "turn_se",
+		"auto_run_cancel": "auto_run_cancel",
+		# OBECNA INTERAKCE (20. session): klient posle jen cil, nástroj vybira sim.
+		"interact": "interact",
 	}
 
 
@@ -147,6 +199,39 @@ static func register_actions() -> int:
 			prepinac.keycode = code
 			if not InputMap.action_has_event(action, prepinac):
 				InputMap.action_add_event(action, prepinac)
+				added += 1
+	# OTOCENI NA MISTE (V15): stejne klavesy jako pohyb, ale s Ctrl
+	# (`ctrl_pressed = true`). Kdyby se modifikator neuvedl, byla by to táž
+	# vazba jako pohyb a otoceni by se spustilo i bez Ctrl (namEReno sondou
+	# `_analyza/p22-pohyb-ctrl.gd`).
+	for action in TURN_KEYS.keys():
+		if not InputMap.has_action(action):
+			InputMap.add_action(action)
+		for code in TURN_KEYS[action]:
+			var otoc := InputEventKey.new()
+			otoc.keycode = code
+			otoc.ctrl_pressed = true
+			if not InputMap.action_has_event(action, otoc):
+				InputMap.action_add_event(action, otoc)
+				added += 1
+	for action in CANCEL_KEYS.keys():
+		if not InputMap.has_action(action):
+			InputMap.add_action(action)
+		for code in CANCEL_KEYS[action]:
+			var stop := InputEventKey.new()
+			stop.keycode = code
+			if not InputMap.action_has_event(action, stop):
+				InputMap.action_add_event(action, stop)
+				added += 1
+	# OBECNA INTERAKCE (20. session): klavesy E a T na jednu akci.
+	for action in INTERACT_KEYS.keys():
+		if not InputMap.has_action(action):
+			InputMap.add_action(action)
+		for code in INTERACT_KEYS[action]:
+			var inter := InputEventKey.new()
+			inter.keycode = code
+			if not InputMap.action_has_event(action, inter):
+				InputMap.action_add_event(action, inter)
 				added += 1
 	return added
 
@@ -195,6 +280,11 @@ func _process(_delta: float) -> void:
 	# sam nezna (je to RefCounted). Kdyz se okno zmeni, hodnota se obnovi.
 	if input_map != null:
 		input_map.view_size = get_viewport().get_visible_rect().size
+		# ⚠ 20. session: CERNY PAS GUI je mimo svet - klient vi, kde konci
+		# viditelna plocha sveta (`gui_odsazeni` je POLOVINA pasu, proto 2x).
+		# Bez toho by obecna interakce (E/T) sahala i na dlazdici POD zurnalem.
+		if view != null:
+			input_map.gui_pas = view.gui_odsazeni * 2.0
 	# Krok v letu ridi STAV (akce) i posun v pixelech - viz hlavicka (V2).
 	update_step(_pending_of_player())
 	# ⚠⚠ KAMERA SE POSOUVA KAZDY FRAME (17. session, 2026-10-08) - VADA
@@ -224,6 +314,26 @@ func _process(_delta: float) -> void:
 	# by pri prepocitavani svet<->obrazovka (`app.input.click_at`) chybovala.
 	if loop != null:
 		loop.camera_offset = _camera_offset()
+	# ⚠ V14 (2026-10-08, zadani 19): PRESNA POZICE HRACE NA OBRAZOVCE pro smer
+	# z mysi. Smer se pocita z kurzoru VULCI hraci, ale klient ho do teto
+	# session skladal z `z = 0` (`app/loop.gd:39`) - na vysce (Britain z = 10)
+	# vysel stred o 40 px niz, nez kde hrac stoji (namEReno sondou
+	# `_analyza/p22-mys-sonda.gd`: 4 473 z 11 163 pozic kurzoru vratilo jiny
+	# smer). `player_ground_position() - camera_offset` je to, co hrac VIDI:
+	# `gui_odsazeni` i posun beziciho kroku jsou v obou clenech, takze se
+	# vykrati (`world_view.set_player_offset` i `look_at_tile` dostavaji tyz
+	# posun) a hodnota se v case nemeni.
+	_publish_center()
+
+
+func _publish_center() -> void:
+	# Vlastni metoda (ne jen radek v `_process`): test tak muze zmerit, ze
+	# klient stred opravdu posila - `_process` viewport v testu nema.
+	if input_map == null or view == null or camera == null:
+		return
+	if not view.has_method("player_ground_position"):
+		return
+	input_map.player_screen = view.player_ground_position() - _camera_offset()
 
 
 func action() -> int:
@@ -257,6 +367,20 @@ func update_step(krok: Dictionary) -> void:
 	_step = krok.duplicate()
 	if _step.is_empty():
 		_action = ACTION_IDLE
+		# ⚠⚠ 19. session (2026-10-08) - V15: OTOCENI NA MISTE SE MUSI NAKRESLIT.
+		# Nezavislym overenim (task-4, `_analyza/p22-overeni-*`) se naměřilo, ze
+		# v `app/` NEBYL ZADNY konzument eventu `mobile_turned` - klient kreslil
+		# smer jen z `_pending` kroku (`update_step`). Prikaz `turn` ale zadny
+		# krok nevytvari, takze by se `mob.dir` zmenil a postava by se porad
+		# kreslila starym smerem (uzivatel: "postava se neumi otocit").
+		# Kdyz krok NENI v letu, je `player.dir` jedINY zdroj pravdy o smeru -
+		# klient ho proto PREBIRA (ne aby si ho pocital sam; tim se drzi
+		# rozdeleni "sim vlastni stav, klient ho kresli").
+		if player != null and _view_dir != int(player.dir):
+			_view_dir = ((int(player.dir) % 8) + 8) % 8
+			if view != null and view.has_method("set_view_dir"):
+				view.set_view_dir(_view_dir)
+			_follow(player_pixel_offset())
 		return
 	_action = ACTION_RUN if bool(_step["run"]) else ACTION_WALK
 	# SMER KRESLENI SE MENI HNED SE ZAMEREM (17. session): `player.dir` se
@@ -331,6 +455,7 @@ func _follow(offset: Vector2 = Vector2.ZERO) -> void:
 			+ Vector2(Const.ISO_STEP, Const.TILE_H / 2) + offset
 	if loop != null:
 		loop.player_tile = _last_tile
+		loop.player_z = int(player.pos.z)
 		loop.camera_offset = _camera_offset()
 
 
@@ -339,5 +464,8 @@ func _camera_offset() -> Vector2:
 	# `world = screen + camera_offset`.
 	if camera == null:
 		return Vector2.ZERO
-	var size: Vector2 = get_viewport().get_visible_rect().size
+	# Testy tvori uzel bez sceny (N8) - viewport pak neni a velikost okna
+	# neznáme; bere se nula, ne vymysleny stred.
+	var vp := get_viewport()
+	var size: Vector2 = vp.get_visible_rect().size if vp != null else Vector2.ZERO
 	return camera.position - size / 2.0

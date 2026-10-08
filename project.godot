@@ -22,6 +22,17 @@ window/size/viewport_width=1280
 window/size/viewport_height=720
 window/stretch/mode="canvas_items"
 window/stretch/aspect="keep"
+; ⚠⚠ 19. session (2026-10-08) - VADA V5 ZE ZADANI 19: "pri pohybu cela obrazovka
+; jakoby zrni". NAMERENO (`_analyza/p22-teren-zrno.gd`): kdyz okno NENI presne
+; 1280x720 (napr. maximalizovane 1300x740), `canvas_items` stretch skaluje canvas
+; zlomkem (1,0156x) a **prevzorkovava CELY obraz i pri zoomu 1,0** - zbytek po
+; nejlepsim posunu obrazovky **96,74 %** pixelu (pri okne presne 1280x720 je to
+; 0,00 % = cista translace). `integer` skaluje jen na CELY nasobek, takze se
+; obraz neprevzorkovava; cenou je, ze pri okne, ktere neni nasobkem zakladni
+; velikosti, zustane cerny okraj (rozhodnuti uzivatele 2026-10-08: "zmenit
+; natrvalo"). Kdo bude merit, at vi, ze hodnota `integer` je v Godotu 4.7.2
+; platna (`hint_string 'fractional,integer'`, `_analyza/p22-stretch-sonda.gd`).
+window/stretch/scale_mode="integer"
 
 [rendering]
 

@@ -34,3 +34,13 @@ static func json_at(path: String) -> Variant:
 	if not FileAccess.file_exists(path):
 		return null
 	return JSON.parse_string(FileAccess.get_file_as_string(path))
+
+
+static func text_at(path: String) -> String:
+	# Text souboru pro STATICKE brany, ktere se musi zeptat na obsah (napr. "vola
+	# to `_start_stats()`?"). Chybejici soubor vraci prazdny retezec - volajici
+	# tim spadne (`contains` false), coz je spravne: chybejici soubor neni
+	# "v poradku". (Kdyby vracel null, padl by `contains` na type error.)
+	if not FileAccess.file_exists(path):
+		return ""
+	return FileAccess.get_file_as_string(path)

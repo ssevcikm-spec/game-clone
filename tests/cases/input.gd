@@ -226,3 +226,143 @@ func run(t) -> void:
 	t._check(mimo.size() == 1 and int(mimo[0].get("dir")) == 1,
 		"app.input: kurzor na hraci nespotreboval prodlevu a smer je z obrazovky"
 		+ " (namEReno %s)" % str(mimo))
+
+	# 9d) ⚠⚠ V14 (2026-10-08, zadani 19) - STRED JE POZICE HRACE, NE PRECET S `z = 0`.
+	#     Uzivatel: "kousek pod ni a kousek vlevo me to posle nahoru". NamEReno
+	#     sondou `_analyza/p22-mys-sonda.gd` na realne mape: `app/loop.gd:39`
+	#     posila `poll(..., z = 0)`, ale kamera je na `z * Z_SCALE`; na namesti
+	#     Britainu (z = 10) vysel stred o 40 px NIZ, nez kde hrac stoji.
+	#     Cisla nize jsou TA namERena: hrac na (480, 300) ve viditelnem okne
+	#     sveta (1280x720, cerny pas 320x120 -> stred 480,300) a stred, ktery
+	#     pocital klient (480, 340).
+	var stred_hrace := Vector2(480.0, 300.0)
+	var stred_spatny := Vector2(480.0, 340.0)
+	t._check(drzeny.direction_from_screen(stred_hrace, Vector2(480.0, 330.0)) == 7,
+		"app.input: kurzor 30 px POD hracem je jihovychod (7), ne sever (namEReno %d)"
+			% drzeny.direction_from_screen(stred_hrace, Vector2(480.0, 330.0)))
+	t._check(drzeny.direction_from_screen(stred_spatny, Vector2(480.0, 330.0)) == 3,
+		"app.input: se stredem o 40 px NIZ (vada V14) vyjde z téhoz kurzoru SEVER (3) -"
+		+ " presne to uzivatel videl (namEReno %d)"
+			% drzeny.direction_from_screen(stred_spatny, Vector2(480.0, 330.0)))
+	# "kousek vlevo dole" - uzivatelova slova: se spatnym stredem vyjde 4 = W
+	# (v izometrii vlevo NAHORU), se spravnym 7 = SE (dolu).
+	t._check(drzeny.direction_from_screen(stred_hrace, Vector2(470.0, 330.0)) == 7
+			and drzeny.direction_from_screen(stred_spatny, Vector2(470.0, 330.0)) == 4,
+		"app.input: kurzor vlevo a kousek dole = 7 (SE); se spatnym stredem 4 (W = nahoru)"
+		+ " (namEReno %d / %d)"
+			% [drzeny.direction_from_screen(stred_hrace, Vector2(470.0, 330.0)),
+				drzeny.direction_from_screen(stred_spatny, Vector2(470.0, 330.0))])
+	# Cesta HRY: kdyz klient pozici hrace posle (`player_screen`), `poll` ji
+	# pouzije - a proto vraci 7, ne 3.
+	var v14 = script.new({"walk_to": "test_drzeni_mys"})
+	v14.always_run = true
+	v14.player_screen = stred_hrace
+	Input.action_press("test_drzeni_mys")
+	var pod_hracem: Array = v14.poll(Vector2i(10, 10), Vector2.ZERO, 0, Vector2(480.0, 330.0), 0)
+	Input.action_release("test_drzeni_mys")
+	t._check(pod_hracem.size() == 1 and int(pod_hracem[0].get("dir")) == 7,
+		"app.input: poll() se stredem od klienta da kurzor 30 px pod hracem = 7 (namEReno %s)"
+			% str(pod_hracem))
+	# ...a `center_for` je JEDNO misto rozhodnuti: presna hodnota ma prednost,
+	# bez ni se pouzije zalozni vypocet (aby se daly merit obe cesty).
+	t._check(v14.center_for(Vector2i(10, 10), Vector2.ZERO, 0) == stred_hrace,
+		"app.input: center_for vraci pozici od klienta, kdyz je k dispozici")
+	var bez_stredu = script.new({"walk_to": "test_drzeni_mys"})
+	t._check(bez_stredu.player_screen == Vector2.INF,
+		"app.input: bez klienta je `player_screen` prazdna (INF), ne (0,0)")
+	t._check(bez_stredu.center_for(Vector2i(10, 10), Vector2(100.0, 0.0), 0)
+			== bez_stredu.player_screen_position(Vector2i(10, 10), Vector2(100.0, 0.0), 0),
+		"app.input: bez pozice od klienta se pouzije zalozni vypocet z kamery")
+
+	# 10) ⚠ V15a (2026-10-08, zadani 19): OTOCENI NA MISTE. `Command{t:"turn", dir}`
+	#     je ve smlouve (`sim/commands.gd:21`), ale klient ho nikdy neposilal -
+	#     postava se umela jen krocit. Uzivatel: "Postava se neumi otacet ...
+	#     pokud se chci jen otocit (kratkym klikem) nebo kdyz narazim do zdi."
+	var turn: Dictionary = mapper.turn_command("east")
+	t._check(turn.get("t") == "turn" and int(turn.get("dir", -1)) == 0,
+		"app.input: turn_command('east') = {t:turn, dir:0} (namEReno %s)" % str(turn))
+	t._check(validator.validate(turn).get("ok") == true,
+		"app.input: turn projde validaci sim.commands (%s)" % str(validator.validate(turn)))
+	t._check(mapper.turn_command("nesmysl").is_empty(),
+		"app.input: turn_command na nezname akci neudela nic")
+	# Cesta HRY: kdyz je stisknuty vstup pro otoceni, posle se `turn` a krok se
+	# PRESKOCI (dve akce v InputMap, `move_east` i `turn_east`, ale jen jeden
+	# prikaz). A prodleva KROKU se tim nespotrebuje - hned dalsi krok projde.
+	if not InputMap.has_action("test_turn_east"):
+		InputMap.add_action("test_turn_east")
+	var otac = script.new({"east": "test_drzeni_east", "turn_east": "test_turn_east"})
+	otac.always_run = false
+	Input.action_press("test_drzeni_east")
+	Input.action_press("test_turn_east")
+	var jen_turn: Array = otac.poll(Vector2i(10, 10), Vector2.ZERO, 0, stred, 0)
+	t._check(jen_turn.size() == 1 and str(jen_turn[0].get("t")) == "turn"
+			and int(jen_turn[0].get("dir", -1)) == 0,
+		"app.input: stisknute otoceni posle prave jeden prikaz 'turn' (namEReno %s)"
+			% str(jen_turn))
+	# Otoceni ma VLASTNI kadenci (TURN_MS): druhy poll ve stejnem case nic.
+	var turn_2: Array = otac.poll(Vector2i(10, 10), Vector2.ZERO, 0, stred, 0)
+	t._check(turn_2.is_empty(),
+		"app.input: otoceni se neopakuje rychleji nez TURN_MS (namEReno %s)" % str(turn_2))
+	Input.action_release("test_turn_east")
+	var hned_krok: Array = otac.poll(Vector2i(10, 10), Vector2.ZERO, 0, stred, 0)
+	Input.action_release("test_drzeni_east")
+	t._check(hned_krok.size() == 1 and str(hned_krok[0].get("t")) == "move",
+		"app.input: otoceni nespotrebovalo prodlevu kroku - krok projde HNED (namEReno %s)"
+			% str(hned_krok))
+
+	# 11) ⚠ V4 (2026-10-08, zadani 19): AUTO-RUN = "postava bezi za mysi, dokud
+	#     to nezrusis". Vstupy jsou ARGUMENTY (bez okna) - `Input` v testu
+	#     nefunguje. Pravidla z reference `_src/classicuo`
+	#     (`GameSceneInputHandler.cs`): START = levy klik pri drzenem pravem
+	#     (`:422-425`), STOP = NOVY stisk praveho (`:827-828`); Esc je navic
+	#     (tvrdy stop pro hrace, ktery se rozbehne).
+	var ar = script.new({"walk_to": "test_drzeni_mys", "auto_run_cancel": "test_ar_stop"})
+	ar.always_run = false
+	ar.view_size = Vector2(1280, 720)
+	var start: Dictionary = ar.auto_run_step({"left": true, "right": true,
+		"left_just": true, "right_just": true})
+	t._check(bool(start["on"]) and bool(start["changed"]),
+		"app.input: auto-run se zapne soucasnym stisknutim obou tlacitek (namEReno %s)"
+			% str(start))
+	var drzi: Dictionary = ar.auto_run_step({"left": true, "right": true})
+	t._check(bool(drzi["on"]) and not bool(drzi["changed"]),
+		"app.input: drzena tlacitka stav nemeni a nehlasi se znovu (namEReno %s)" % str(drzi))
+	# PUSTENA TLACITKA AUTO-RUN NERUSI - presne to je "bezi, dokud to nezrusis".
+	var pusteno: Dictionary = ar.auto_run_step({})
+	t._check(bool(pusteno["on"]) and not bool(pusteno["changed"]),
+		"app.input: pusteni tlacitek auto-run neukonci (namEReno %s)" % str(pusteno))
+	# NOVY stisk PRAVEHO tlacitka ho rusi (reference `:827-828`).
+	var pravy: Dictionary = ar.auto_run_step({"right": true, "right_just": true})
+	t._check(not bool(pravy["on"]) and bool(pravy["changed"])
+			and str(pravy["reason"]) == "right_click",
+		"app.input: novy stisk praveho tlacitka auto-run rusi (namEReno %s)" % str(pravy))
+	# Esc = tvrdy stop.
+	ar.auto_run_step({"left": true, "right": true, "left_just": true, "right_just": true})
+	var stop: Dictionary = ar.auto_run_step({"cancel": true})
+	t._check(not bool(stop["on"]) and str(stop["reason"]) == "cancel",
+		"app.input: Esc auto-run zastavi (namEReno %s)" % str(stop))
+	# LEVY klik sam auto-run nezapne (v UO to chce obe tlacitka).
+	var jen_levy: Dictionary = ar.auto_run_step({"left": true, "left_just": true})
+	t._check(not bool(jen_levy["on"]),
+		"app.input: levy klik bez praveho auto-run nezapne (namEReno %s)" % str(jen_levy))
+	# CESTA HRY: `poll` s predanymi tlacitky (test) - krokuje dal i po pusteni
+	# tlacitek a `cancel` ho zastavi.
+	if not InputMap.has_action("test_ar_stop"):
+		InputMap.add_action("test_ar_stop")
+	var ar2 = script.new({"walk_to": "test_drzeni_mys", "auto_run_cancel": "test_ar_stop"})
+	ar2.always_run = false
+	ar2.view_size = Vector2(1280, 720)
+	var kurzor := Vector2(700.0, 360.0)
+	var ar_p0: Array = ar2.poll(Vector2i(10, 10), Vector2.ZERO, 0, kurzor, 0,
+		{"left": true, "right": true, "left_just": true, "right_just": true})
+	t._check(ar_p0.size() == 1 and str(ar_p0[0].get("t")) == "move",
+		"app.input: auto-run krokuje hned pri startu (namEReno %s)" % str(ar_p0))
+	var ar_p1: Array = ar2.poll(Vector2i(10, 10), Vector2.ZERO, 0, kurzor, 400)
+	t._check(ar_p1.size() == 1 and str(ar_p1[0].get("t")) == "move",
+		"app.input: auto-run krokuje DAL bez drzeneho tlacitka (namEReno %s)" % str(ar_p1))
+	var ar_p2: Array = ar2.poll(Vector2i(10, 10), Vector2.ZERO, 0, kurzor, 450, {"cancel": true})
+	t._check(ar_p2.is_empty(),
+		"app.input: auto-run zastaveny (Esc) dalsi krok nevyda (namEReno %s)" % str(ar_p2))
+	var ar_p3: Array = ar2.poll(Vector2i(10, 10), Vector2.ZERO, 0, kurzor, 900)
+	t._check(ar_p3.is_empty(),
+		"app.input: po zastaveni auto-run uz nekrokuje (namEReno %s)" % str(ar_p3))

@@ -67,7 +67,8 @@ func run(t) -> void:
 		if str(klice[i - 1]) > str(klice[i]):
 			setridene = false
 	t._check(setridene, "app.config: known_keys() je setrideny (%s)" % str(klice.slice(0, 4)))
-	for klic in ["era.combat", "constants.SKILL_CAP", "ggs_on", "stat_gain.delay_ms"]:
+	for klic in ["era.combat", "constants.SKILL_CAP", "ggs_on", "stat_gain.delay_ms",
+			"player_start_stats.STR", "player_start_stats.DEX", "player_start_stats.INT"]:
 		t._check(klice.has(klic), "app.config: known_keys() obsahuje '%s'" % klic)
 
 	# 2) HODNOTA Z DAT + odkud je

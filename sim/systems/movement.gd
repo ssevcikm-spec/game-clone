@@ -50,6 +50,14 @@ extends RefCounted
 #     `is_action_just_pressed` (vlastni granule `app.input`, agent ji needituje),
 #   * mounty (MOUNT_WALK_MS/MOUNT_RUN_MS) tu jsou pripravene, ale `entity.mount`
 #     neexistuje.
+#
+# ⚠⚠ ZADANI 19 (2026-10-08) - V15a: `turn(m, dir)` (OTOCENI NA MISTE). Smlouva
+# prikaz `turn {dir}` znala (`sim/commands.gd:21`), ale system pro nej nemel
+# metodu, takze dispatch odpovidal "Not available yet" a postava se umela jen
+# krocit. Otoceni NENI krok: nemeni pozici, nebere staminu, a POVOLUJE se i
+# behem beziciho kroku (duvody a reference jsou v hlavicce `turn` nize).
+# Testy: `tests/cases/movement.gd` sekce 13 (vcetne mutacniho dusledku, ze krok
+# v letu si na konci zapise SVUJ smer).
 
 const Const = preload("res://core/const.gd")
 const WalkScript = preload("res://sim/world/walk.gd")
@@ -140,6 +148,49 @@ func request_step(m: int, dir: int, run: bool) -> Dictionary:
 	_events_push("mobile_anim", {"serial": m,
 		"action": ACTION_RUN if use_run else ACTION_WALK, "frame_ms": Const.TURN_MS})
 	return {"ok": true, "delay_ms": delay, "reason": ""}
+
+
+func turn(m: int, dir: int) -> Dictionary:
+	# OTOCENI NA MISTE (vada V15, zadani 19). Smlouva prikaz `turn {dir}` zná
+	# (`sim/commands.gd:21`), ale system pro nej nemel metodu, takze dispatch
+	# odpovidal "Not available yet: turn." Uzivatel: "Postava se neumi otacet,
+	# automaticky popojde smerem, ktery ji urcim. To je blbe, pokud se chci jen
+	# otocit (kratkym klikem) nebo kdyz narazim do zdi."
+	#
+	# OTOCENI SE POVOLUJE I BEHEM BEZICIHO KROKU ("jeden krok v letu" na nej
+	# NEPLATI). Duvody, kazdy dolozeny:
+	#   * otoceni NENI krok - nemeni pozici, nebere staminu ani prodlevu kroku,
+	#     takze fronta kroku (`_pending`) s nim nema co delit,
+	#   * klient uz dnes meni smer KRESLENI hned se zamerem kroku
+	#     (`app/player_controller.update_step` -> `_view_dir`); kdyby se otoceni
+	#     odmitlo, zustaly by obraz a simulace 400 ms v rozporu - presne vada,
+	#     kterou 17. session opravovala ("postava klouze do strany"),
+	#   * reference `_src/servuo` `Server/Mobile.cs:3120-3122` a `:3349` dela
+	#     otoceni TAKY nezavisle na kroku: `Move(d)` s jinym smerem se pohybem
+	#     vubec nezabyva ("We are actually moving (not just a direction change)")
+	#     a jen zavola `SetDirection(d)`. ClassicUO prikaz `turn` nezná vubec
+	#     (grep `_src/classicuo` na `Turn(`: 0 nalezu) - je to serverova vec.
+	#
+	# DUSLEDEK, ktery se musi rict nahlas: krok, ktery je prave v letu, zapise
+	# na svem konci SVUJ smer (`apply_step`), takze otoceni UPROSTRED kroku se
+	# po dokonceni kroku prekryje. To je spravne - smer jiz rozjeteho kroku
+	# menit nelze, menil by pozici, na kterou se dojde.
+	#
+	# Vraci `{ok, delay_ms, reason}` jako `request_step`; `delay_ms` je
+	# `TURN_MS` (80 ms = frame otoceni, `core/const.gd`).
+	if dir < 0 or dir > 7:
+		return _no(0, "bad_dir")
+	var mob = _registry.get_mobile(m)
+	if mob == null:
+		return _no(0, "no_mobile")
+	if mob.dir == dir:
+		# Uz stoji tim smerem: nic se nemeni a NIC SE NEHLASI - hlaska o
+		# "otoceni" do stejneho smeru by hrace jen mátla. `reason` zustava
+		# prazdny (smlouva: prazdny = provedeno).
+		return {"ok": true, "delay_ms": 0, "reason": ""}
+	mob.dir = dir
+	_events_push("mobile_turned", {"serial": m, "dir": dir})
+	return {"ok": true, "delay_ms": Const.TURN_MS, "reason": ""}
 
 
 func apply_step(m: int, dir: int) -> void:

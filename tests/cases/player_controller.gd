@@ -37,11 +37,24 @@ func run(t) -> void:
 	var bindings: Dictionary = script.default_bindings()
 	const SMERY := ["east", "ne", "north", "nw", "west", "sw", "south", "se"]
 
-	t._check(bindings.size() == 10,
+	# ⚠ 20. session: 19 -> 20 - pribyla OBECNA INTERAKCE ("interact"), kterou
+	# si vyzadal uzivatel 2026-10-08 ("tlacitko je nejen na tezbu, ale vseobecne
+	# interaktivni"). Vazba je to, co `app/input_map.poll` spousti - bez ni by
+	# klavesa E/T nic neposlala (vstup si vazbu nevymysli).
+	t._check(bindings.size() == 20,
 		"player_controller: vazeb je 8 smeru + drzene prave tlacitko + prepinac behu "
-		+ "(namEReno %d)" % bindings.size())
+		+ "+ 8 otoceni na miste + stop auto-runu + obecna interakce (namEReno %d)" % bindings.size())
 	for smer in SMERY:
 		t._check(bindings.has(smer), "player_controller: vazba pro smer '%s' existuje" % smer)
+	# ⚠ V15 (2026-10-08): OTOCENI NA MISTE ma vlastni vazbu (Ctrl + smer).
+	# Kdyby vazba chybela, `app/input_map.poll` vetev "turn_" vubec nespusti
+	# (vstup si vazbu nevymysli) a otoceni zustane mrtve.
+	var bez_turn: Array = []
+	for smer in SMERY:
+		if str(bindings.get("turn_" + smer, "")) != "turn_" + smer:
+			bez_turn.append(smer)
+	t._check(bez_turn.is_empty(),
+		"player_controller: vsech 8 smeru ma vazbu 'turn_*' (chybi %s)" % str(bez_turn))
 	# ⚠ 18. session: prepinac chuze/beh (vada "chybi beh jako rychlost pohybu")
 	t._check(str(bindings.get("run_toggle", "")) == "run_toggle",
 		"player_controller: vazba 'run_toggle' -> 'run_toggle' (namEReno '%s')"
@@ -52,6 +65,12 @@ func run(t) -> void:
 	t._check(str(bindings.get("walk_to", "")) == "walk_to_cursor",
 		"player_controller: vazba 'walk_to' -> 'walk_to_cursor' (namEReno '%s')"
 		% str(bindings.get("walk_to", "")))
+	# OBECNA INTERAKCE (20. session): jedno tlacitko na cokoliv. Klient posle
+	# JEN cil (`Command{t:"interact"}`) a nastroj vybira simulace - kdyby vazba
+	# chybela, tlacitko E/T by nedelalo nic a vypadalo by to jako hotova funkce.
+	t._check(str(bindings.get("interact", "")) == "interact",
+		"player_controller: vazba 'interact' -> 'interact' (namEReno '%s')"
+		% str(bindings.get("interact", "")))
 
 	# 2) akce se zakladaji ZA BEHU (project.godot vlastni jina granule)
 	var added: int = script.register_actions()
@@ -76,6 +95,24 @@ func run(t) -> void:
 			ma_prave = true
 	t._check(ma_prave,
 		"player_controller: 'walk_to_cursor' ma v InputMap prave tlacitko mysi")
+	# ...a vazba otoceni musi mit v InputMap MODIFIKATOR Ctrl (jinak je to táž
+	# vazba jako pohyb a otoceni se spusti i bez nej; namEReno
+	# `_analyza/p22-pohyb-ctrl.gd`).
+	var s_ctrl: int = 0
+	var bez_ctrl: Array = []
+	for smer in SMERY:
+		var akce: String = "turn_" + smer
+		var ma: bool = false
+		for event in InputMap.action_get_events(akce):
+			if event is InputEventKey and (event as InputEventKey).ctrl_pressed:
+				ma = true
+		if ma:
+			s_ctrl += 1
+		else:
+			bez_ctrl.append(akce)
+	t._check(s_ctrl == 8 and bez_ctrl.is_empty(),
+		"player_controller: vsech 8 akci 'turn_*' ma v InputMap Ctrl (namEReno %d, chybi %s)"
+			% [s_ctrl, str(bez_ctrl)])
 
 	# 3) smer z vazby musi dat stejne cislo jako `core/const.gd` a `input_map`
 	#    ⚠ 18. session: BEH JE VYCHOZI (`app/input_map.always_run = true`, UO ma
@@ -228,6 +265,25 @@ func run(t) -> void:
 		t._check(controller.view_dir() == 4 and int(controller.player.dir) == 0,
 			"player_controller: kresleny smer jde PRED simulaci (kresleni %d, mobil %d)"
 				% [controller.view_dir(), int(controller.player.dir)])
+		# ⚠⚠ 19. session (V15) - OTOCENI NA MISTE SE MUSI NAKRESLIT. Prikaz
+		# `turn` NEVYTVARI zadny krok, takze `pending_step` je prazdny - a do teto
+		# session klient v te chvili smer vubec neresil (event `mobile_turned`
+		# nemel v `app/` konzumenta), takze se otoceni v obraze neprojevilo.
+		# Kontrola je na OBA smery: smer se musi ZMENIT, kdyz se mobil otoci
+		# (nahore), a zustat, kdyz se neotoci (dole) - jinak by test prosel i pro
+		# klienta, ktery smer prebira z neceho jineho.
+		controller.player.dir = 6
+		controller.update_step({})
+		t._check(controller.view_dir() == 6 and sv.smer == 6,
+			"player_controller: pri prazdnem kroku se kresleny smer prevezme z mobilu "
+			+ "(kresleni %d, kreslic %d, mobil %d)"
+				% [controller.view_dir(), sv.smer, int(controller.player.dir)])
+		# Druhy smer: stejny smer mobilu nic nemeni (zadne zbytecne posilani).
+		sv.zaznamy = []
+		controller.update_step({})
+		t._check(controller.view_dir() == 6 and sv.zaznamy.is_empty(),
+			"player_controller: stejny smer mobilu se znovu neposila (zaznamu %d)"
+				% sv.zaznamy.size())
 
 	# 8) ⚠ 17. session - KAMERA SE POSOUVA KAZDY FRAME (ne jen po dlazdici).
 	#    Uzivatel: "obraz se pohybuje skokove, ne plynule - jakmile je postava
@@ -253,6 +309,58 @@ func run(t) -> void:
 		"player_controller: kamera dostava posun kroku (posun %s, predano %s)"
 			% [str(posun_80), str(druhy.get("offset", null))])
 	controller.view = null
+
+	# 9) ⚠⚠ V14 (2026-10-08, zadani 19): KLIENT POSILA PRESNOU POZICI HRACE pro
+	#    smer z mysi. `app/input_map` do te doby skladal stred z `z = 0`
+	#    (`app/loop.gd:39`), ale kamera je na `z * Z_SCALE` - na namesti
+	#    Britainu (z = 10) vysel stred o 40 px niz, nez kde hrac stoji
+	#    (namEReno: 4 473 z 11 163 pozic kurzoru vratilo jiny smer; sonda
+	#    `_analyza/p22-mys-sonda.gd`). Klient tu hodnotu zna presne:
+	#    `view.player_ground_position() - camera_offset`. Test meri tu IDENTITU
+	#    (ne konkretni cislo sceny) - kdyby se nekde pricetlo `gui_odsazeni`
+	#    dvakrat nebo se vynechal posun kroku, vyjde jina hodnota.
+	var sv3 = StubView.new()
+	sv3.pozice = Vector2(1470.0, 1690.0)
+	var kam := Camera2D.new()
+	kam.position = Vector2(1500.0, 1700.0)
+	var mapper3 = mapper_script.new()
+	controller.view = sv3
+	controller.camera = kam
+	controller.input_map = mapper3
+	controller._publish_center()
+	# Test bez sceny: `get_viewport()` je null, takze se velikost okna bere jako
+	# nula a `camera_offset == camera.position` (viz `_camera_offset`).
+	t._check(mapper3.player_screen == sv3.pozice - kam.position,
+		"player_controller: posila pozici hrace pro smer z mysi (%s, ocekavano %s)"
+			% [str(mapper3.player_screen), str(sv3.pozice - kam.position)])
+	# Bez kamery (klient bez sceny) se stred NEPOSLE - vymyslena hodnota by byla
+	# horsi nez "nevim" (v `input_map` pak plati zalozni vypocet).
+	var mapper4 = mapper_script.new()
+	controller.view = sv3
+	controller.camera = null
+	controller.input_map = mapper4
+	controller._publish_center()
+	t._check(mapper4.player_screen == Vector2.INF,
+		"player_controller: bez kamery stred neposila a nechava 'nevim' (namEReno %s)"
+			% str(mapper4.player_screen))
+	# ⚠ 19. session - STATICKA CAST DOKLADU (a proc jen staticka): `_process`
+	# MUSI `_publish_center()` volat, ale test bez sceny `_process` nespusti
+	# (potrebuje viewport). Chovani proto meri sonda `_analyza/p22-mys-sonda.gd`
+	# a tady se overuje to, co staticky overit lze: volani je V TĚLE `_process`.
+	# ⚠⚠ Cesta se bere ze STEJNEHO vstupu jako mereny skript (`_arg`), ne
+	# natvrdo `res://app/player_controller.gd` - jinak by se cetl ORIGINAL
+	# a mutacni test by tuhle kontrolu nikdy nechytil (namEReno 2026-10-08:
+	# s natvrdo zapsanou cestou vyslo "PROSLA - TEST JE SLEPY").
+	var cesta: String = _arg("controller-script", CONTROLLER_SCRIPT)
+	var zdroj: String = FileAccess.get_file_as_string(cesta)
+	var od: int = zdroj.find("func _process(")
+	var do_: int = zdroj.find("\nfunc ", od + 1)
+	var telo: String = zdroj.substr(od, (do_ - od) if do_ > od else -1)
+	t._check(od >= 0 and telo.contains("_publish_center()"),
+		"player_controller: `_process` vola `_publish_center()` (jinak by stred pro "
+		+ "smer z mysi nikdy neodesel; telo _process ma %d znaku)" % telo.length())
+	controller.view = null
+	kam.free()
 	controller.free()          # Node, ne RefCounted - jinak zustane viset
 
 
@@ -261,6 +369,11 @@ class StubView extends Node2D:
 	# mu controller poslal. Test tak meri SMLOUVU, ne cizi modul.
 	var smer: int = -1
 	var zaznamy: Array = []
+	# Kde se hrac kresli (vstup pro test V14).
+	var pozice: Vector2 = Vector2.ZERO
+
+	func player_ground_position() -> Vector2:
+		return pozice
 
 	func set_view_dir(dir: int) -> void:
 		smer = dir

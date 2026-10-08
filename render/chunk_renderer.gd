@@ -40,6 +40,52 @@ const ITEM_OFFSET: int = 0x4000
 # jeho zabradli - bez toho se na molu u Britannie kreslilo zabradli pod
 # dlazdicemi (namEReno 2026-10-07).
 const F_BACKGROUND: int = 0x00000001
+# ⚠⚠ 19. session (2026-10-08) - V12/V16/V17: "ZOBRAZUJE SE PATRO NADEMNOU,
+# ZDIVO Z PATROVI, ZABRADLI, STUL A POSTELE Z PATRA".
+#
+# Do teto session se skryvalo JEN to, co je `je_strop` (Roof flag nebo
+# Surface+Background) a vys nez `hrac_z + 16`. ZDIVO (`plaster wall`, `wooden
+# wall`), `window`, `wooden beam`, `wooden post`, `bed` ani zabradli tim
+# NEPROJDOU - takze se patro nad hracem kreslilo cele.
+#
+# Reference to resi JEDNIM CISLEM: `UpdateMaxDrawZ()`
+# (`GameSceneDrawingSorting.cs:57-213`) spocte strop `_maxZ` a kresli jen
+# objekty s `z < _maxZ` (radky 339 a 833). My ten strop pocitame stejne
+# (`strop_patra()`):
+#   * na dlazdici hrace a na (x+1,y+1) hleda statik VYS nez `pz + 14`
+#     (`PZ_NAD`, radek 87) a strop ponizi na jeho `z`, kdyz plati
+#     `(flags & (Transparent|Foliage)) == 0 && (!IsRoof || IsSurface)`
+#     (radky 121-136), resp. `(flags & (Transparent|Surface)) == 0 && IsRoof`
+#     (radky 168-198),
+#   * strop nikdy nejde pod `pz + 16` (`PZ_SKRYT`, radky 205-209),
+#   * kdyz se nad hracem nic nenajde, zustava `Const.Z_MAX` (127) = nic se
+#     neskryva (pocatek `_maxZ = 127`, radek 76).
+# Tim se schovaji VSECHNY objekty patra (zdivo, okno, trabec, postel, zabradli),
+# ne jen strechy - a dlazdice, po ktere hrac chodi, zustava: strop je vzdy
+# `>= hrac_z + 16`, takze vlastni podlaha hrace (`z <= hrac_z`) nikdy nezmizi.
+#
+# ⚠ CO ZUSTAVA Z 18. SESSION (`je_strop` + `hrac_z + PZ_SKRYT`) - NAMERENO
+# (`_analyza/p22-patra-sonda.txt`): reference kandidat na strop ma UZSI
+# podminku nez `je_strop` - strecha, ktera NEMA `Surface` (`wooden shingles`
+# flags 0x14002000, `thatch roof` 0x14006000), strop NENASTAVI. V Britanii je
+# takovych mist **204 z 2970** (6,9 %), kde stare pravidlo krylo a reference
+# by strechu nechala videt - tam by se vratila vada "postava se zobrazuje pres
+# strechu". Pravidlo je proto SJEDNOCENI:
+#   skryto = (z >= strop)                                # reference
+#          or (kryto and je_strop(art) and z > hrac_z + PZ_SKRYT)   # 18. session
+# a `kryto` je true, kdyz reference kandidata nasla NEBO kdyz plati stare
+# `pod_strechou()`. Podminka `z > hrac_z + PZ_SKRYT` u druhe casti je DULEZITA:
+# `je_strop` zahrnuje i pochuznou podlahu (`Surface+Background`), takze bez ni
+# by zmizela podlaha, po ktere hrac stoji.
+#
+# ⚠ CO SE NEDELA (zapsano, ne zamlcene): reference ma jeste vetev pro LAND
+# (radky 94-111: kdyz je na dlazdici hrace land vys nez `pz + 16`, strop se
+# snizi a land nad `_maxGroundZ` se take nevykresluje). U nas se land filtruje
+# SCHVALNE NIKDY - land je teren, po kterem se chodi, a jeho zmizeni by byla
+# horsi vada nez patro navic (docs/09: co se nedela, se pise). UO skladany
+# land (jeskynni patro) u nas zatim nema mapova data.
+#
+# Puvodni 18. session (strechy nad hracem):
 # ⚠ 18. session (2026-10-08) - STŘECHY NAD HRÁČEM (vada "v budově nevidím
 # vnitřek a postava chodí po střeše"). Reference to resi v `UpdateMaxDrawZ()`
 # (`GameSceneDrawingSorting.cs:57-213`): na dlazdici hrace a na (x+1,y+1) se
@@ -54,8 +100,15 @@ const F_BACKGROUND: int = 0x00000001
 # i `Surface & Background` - bez toho by se v dome neuklidilo nic.
 const F_SURFACE: int = 0x00000200
 const F_ROOF: int = 0x10000000
+const F_TRANSPARENT: int = 0x00000004
+const F_FOLIAGE: int = 0x00020000
 const PZ_NAD: int = 14               # `pz14 = playerZ + 14` (reference)
 const PZ_SKRYT: int = 16             # `pz16 = playerZ + 16` (reference)
+# Strop, kdyz nad hracem nic neni: reference zacina na 127 (`_maxZ = 127`,
+# radek 76) a necha ho tak, kdyz kandidata nenajde - tehdy se neskryva NIC.
+# Je to `Const.Z_MAX`, ale konstanta se vypisuje, aby bylo videt, ze to cislo
+# ma v referenci vyznam (a aby se nedalo splest s `hrac_z + 16`).
+const STROP_NIC: int = 127
 
 var _map = null
 var _textures = null
@@ -70,6 +123,10 @@ var _counts: Dictionary = {"land": 0, "static": 0}
 # nezavola, kresli se vsechno (chovani pred 18. session).
 var skryt_strechy: bool = false
 var _hrac_z: int = -9999
+# Strop patra (reference `_maxZ`): kresli se jen statiky s `z < _max_z`.
+# `STROP_NIC` = nad hracem nic neni a neskryva se.
+var _max_z: int = STROP_NIC
+
 
 
 func _init(map, textures, tiledata = null) -> void:
@@ -86,11 +143,20 @@ func invalidate() -> void:
 
 func je_strop(art_id: int) -> bool:
 	# Je dany art strecha nebo strop (nad hrace)? `Roof` flag nebo pochuzna
-	# plocha s `Background` (viz namEReno v hlavicce).
+	# plocha s `Background` (viz namEReno v hlavicce). Pouziva se na to, co se
+	# skryva nad hracem (18. session); strop patra pocita `strop_patra()`.
 	if _tiledata == null:
 		return false
 	var f: int = _tiledata.flags(art_id)
 	return (f & F_ROOF) != 0 or ((f & F_SURFACE) != 0 and (f & F_BACKGROUND) != 0)
+
+
+func je_roof(art_id: int) -> bool:
+	# `TileFlag.Roof` (`TileDataLoader.cs:525`, hodnota `F_ROOF`). Jen dotaz -
+	# rozhodnuti o kresleni je v `strop_patra()`/`_build()`.
+	if _tiledata == null:
+		return false
+	return (_tiledata.flags(art_id) & F_ROOF) != 0
 
 
 func pod_strechou(px: int, py: int, pz: int) -> bool:
@@ -107,17 +173,76 @@ func pod_strechou(px: int, py: int, pz: int) -> bool:
 	return false
 
 
+func strop_patra(px: int, py: int, pz: int) -> Dictionary:
+	# STROP PATRA - doslovny prepis `UpdateMaxDrawZ()`
+	# (`GameSceneDrawingSorting.cs:74-212`). Vraci
+	# `{maxz, kandidat}`: kresli se jen statiky s `z < maxz` a `kandidat` je
+	# true, kdyz se strop opravdu snizil (reference `_noDrawRoofs`).
+	#
+	# Poradi vetvi je z reference a NENI zamenne: druha smycka je jen pro
+	# STŘECHU bez `Surface` na (x+1,y+1) a jen ta meni `maxground` (radek 200).
+	var maxz: int = STROP_NIC
+	var kandidat: bool = false
+	if _tiledata == null:
+		return {"maxz": maxz, "kandidat": kandidat}
+	var pz14: int = pz + PZ_NAD
+	# 1) dlazdice hrace (radky 90-137)
+	for record in _statiky_na(px, py):
+		var tz: int = int(record["z"])
+		if tz <= pz14 or maxz <= tz:
+			continue
+		var f: int = _tiledata.flags(int(record["tile"]) + ITEM_OFFSET)
+		if (f & (F_TRANSPARENT | F_FOLIAGE)) == 0 \
+				and ((f & F_ROOF) == 0 or (f & F_SURFACE) != 0):
+			maxz = tz
+			kandidat = true
+	var maxground: int = maxz
+	var tempz: int = maxz
+	# 2) (x+1, y+1) - jen strecha bez `Surface` (radky 147-201)
+	for record in _statiky_na(px + 1, py + 1):
+		var tz2: int = int(record["z"])
+		if tz2 > pz14 and maxz > tz2:
+			var f2: int = _tiledata.flags(int(record["tile"]) + ITEM_OFFSET)
+			if (f2 & (F_TRANSPARENT | F_SURFACE)) == 0 and (f2 & F_ROOF) != 0:
+				maxz = tz2
+				maxground = tz2
+				kandidat = true
+		tempz = maxground
+	maxz = maxground
+	# 3) strop nikdy nejde pod `pz + 16` (radky 205-209)
+	if tempz < pz + PZ_SKRYT:
+		maxz = pz + PZ_SKRYT
+	return {"maxz": maxz, "kandidat": kandidat}
+
+
+func max_draw_z() -> int:
+	# Strop patra pro soucasny stav hrace (pro testy a sondy). `STROP_NIC`
+	# znamena "nad hracem nic neni" - tehdy se neskryva ani strecha.
+	return _max_z
+
+
+func no_draw_roofs() -> bool:
+	return skryt_strechy
+
+
 func nastav_hrace(px: int, py: int, pz: int) -> bool:
-	# Prebira stav hrace. Vraci TRUE, kdyz se zmenilo "je pod strechou" - tim se
-	# zahodi seznam (`invalidate`), aby se strechy prekreslily bez nich.
-	# Je to vzacna zmena (vstup/vystup z budovy), ne kazdy krok.
-	var novy: bool = pod_strechou(px, py, pz)
-	var zmena: bool = novy != skryt_strechy
-	skryt_strechy = novy
+	# Prebira stav hrace. Vraci TRUE, kdyz se zmenilo, co se skryva - tim se
+	# zahodi seznam (`invalidate`), aby se patro prekreslilo bez nich.
+	# Je to vzacna zmena (vstup/vystup z budovy, prechod patra), ne kazdy krok:
+	# `maxz` se meni jen tehdy, kdyz se zmeni kandidat na strop nad hracem.
+	var s: Dictionary = strop_patra(px, py, pz)
+	# `kryto` = reference nasla strop NEBO plati stare "pod strechou"
+	# (18. session). Kdyz kryto NENI, zustava strop `STROP_NIC`.
+	var kryto: bool = bool(s["kandidat"]) or pod_strechou(px, py, pz)
+	var novy_max_z: int = int(s["maxz"]) if kryto else STROP_NIC
+	var zmena: bool = novy_max_z != _max_z or kryto != skryt_strechy
+	_max_z = novy_max_z
+	skryt_strechy = kryto
 	_hrac_z = pz
 	if zmena:
 		invalidate()
 	return zmena
+
 
 
 func _statiky_na(x: int, y: int) -> Array:
@@ -198,9 +323,18 @@ func _build(area: Rect2i) -> Array:
 					continue
 				var art_id: int = int(record["tile"]) + ITEM_OFFSET
 				var z_statiku: int = int(record["z"])
+				# STROP PATRA (reference `_maxZ`): vsechno v urovni stropu a vys
+				# je patro nad hracem - zdivo, okno, trabec, postel, zabradli
+				# (V12/V16/V17). `_max_z >= hrac_z + PZ_SKRYT`, takze vlastni
+				# podlaha hrace (`z <= hrac_z`) tim nikdy neprojde.
+				if z_statiku >= _max_z:
+					counts["skryto"] += 1
+					continue
+				# STŘECHY/STROPY NAD HRÁČEM (18. session): i to, co je pod
+				# strojem patra, ale je to strecha/strop nad hlavou hrace.
+				# `z > hrac_z + PZ_SKRYT` je tu POVINNE - `je_strop` zahrnuje
+				# i pochuznou podlahu, po ktere hrac stoji.
 				if skryt_strechy and z_statiku > _hrac_z + PZ_SKRYT and je_strop(art_id):
-					# Hrac je pod strechou/stropem: tenhle statik ho jen zakryva
-					# (vada "v budove nevidim vnitrek"). Nekresli se.
 					counts["skryto"] += 1
 					continue
 				objects.append({"kind": "static", "x": sx, "y": sy,

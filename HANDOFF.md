@@ -1,4 +1,12 @@
-# Předání — UO-klon (18. session: ŠEST VAD Z FOTEK — řazení, terén, pohyb, běh, střechy, černý pás pro GUI; 2026-10-08)
+# Předání — UO-klon (19. session: SEDMNÁCT VAD ZE SNÍMKŮ — řazení hráče, zoom, patra, pohyb, otáčení, auto-run, staty; 2026-10-08)
+
+> ⚠⚠ **DVA AGENTI V JEDNOM WORKSPACE (2026-10-08): tenhle soubor přebírá ten,
+> kdo končí POZDĚJI — a NESMÍ při tom zmizet sekce toho prvního.**
+> Naměřeno dnes: session 19 sem přidala sekci „CO JE NOVÉHO (19. session)"
+> (hned za touhle hlavičkou), přepsala nadpis a do „Co čeká na tebe" vložila
+> blok `V5b`/`V1b`/`V3b`; session 20 (paralelně) sem přidala svoje.
+> **Kdo soubor přepisuje celý, ať tyhle bloky nechá** — nebo si je přesune;
+> zkontroluj to **hledáním**, ne pamětí (`docs/09 §9.7`).
 
 > **Co je tenhle soubor:** **stav projektu** pro další session agenta. Přepisuje
 > se celý; historie je v `git log`. **Současný stav se bere odtud** — a ověřuje
@@ -30,6 +38,123 @@
 > `stam <= 1`; `tools/gates/mutace-tests.py` — vzory po změnách;
 > `tests/cases/{render_sort,chunk_mesh,chunk_renderer,world_view,player_controller,input,render_textures}.gd`;
 > `docs/02`, `docs/04`, `LESSONS.md`).
+
+> **Co je tenhle soubor:** **stav projektu** pro další session agenta. Přepisuje
+> se celý; historie je v `git log`. **Současný stav se bere odtud** — a ověřuje
+> se živě (je tu k tomu sekce „Předletová kontrola").
+> **Zadání pro další vývoj je `ZADANI-DALSI-VYVOJ-2.md`** (etapa 2, Úkoly 1–9);
+> **Úkoly 1–4 a 6 (část) HOTOVÉ**, **Úkol 8 = M9 hotový** (15. session),
+> **16. session dodala `sim.harvest`, `sim.craft`, `ui.journal`**.
+> **17. a 18. session byly LADICÍ** (vady ze snímků, žádná nová mechanika).
+> **19. session je LADICÍ taky**: zadání je `ZADANI-19-VADY-ZE-SNIMKU.md`
+> (17 bodů od uživatele, doslovný přepis) a **všechna naměřená čísla jsou
+> v `_analyza/p22-*.txt`**.
+> **Rozhodnutí otevřených témat je v [`ROZHODNUTI-2026-10-08.md`](ROZHODNUTI-2026-10-08.md)**.
+> **Naměřený stav plánu je v `REVIZE-PLANU-2026-10-06.md`** a **stav granul
+> měří** `python tools/plan-status.py`.
+> **Kam pro co v referenčních zdrojích je `research/REJSTRIK-REFERENCI.md`**.
+> **Datum:** 2026-10-08 (19. session). **Poslední změna kódu:** tato session
+> (`render/chunk_renderer.gd` — filtr patra `z >= _max_z` podle reference
+> `UpdateMaxDrawZ()`; `render/sort.gd` — `klic_nad_diagonalou`; `app/world_view.gd`
+> — **zoom jako vstup** (kolečko, `+`/`-`, výchozí 0,75) + `snap_screen` proti
+> zrnění + **klic hrace z realnych objektu** (V1); `sim/commands.gd` — `case "turn"`;
+> `sim/systems/movement.gd` — `turn(m, dir)`; `sim/world/walk.gd` — `_start_top`
+> bere i statiky pod nohama (V11); `app/input_map.gd` — `auto_run_step`,
+> `center_for` (V14), `turn_command`; `app/player_controller.gd` — `_publish_center`,
+> `TURN_KEYS` (Ctrl+směr), `CANCEL_KEYS` (Esc), převzetí `player.dir` při otáčení;
+> `app/config.gd` + `data/balance.json` — `player_start_stats`; `app/main.gd` —
+> `_start_stats()`; `tools/gates/mutace-tests.py` — nové vzory;
+> `tests/cases/{world_view,chunk_renderer,movement,input,player_controller,walk,balance,config}.gd`;
+> `tests/lib.gd` — `text_at`; `LESSONS.md`).
+
+## ✅ CO JE NOVÉHO (19. session) — SEDMNÁCT VAD ZE SNÍMKŮ A Z HRY
+
+**Zadání uživatele:** 17 bodů (doslovný přepis je v `ZADANI-19-VADY-ZE-SNIMKU.md`)
++ 10 snímků. Rozděleno na tři tratě se **výhradními soubory** (aby se session
+nepobily) a jednu **ověřovací**: `pohyb` (task-1), `teren` (task-2),
+`patra` (task-3), `verifier` (task-4, nezávislé měření tvrzení) + Lead
+(staty, řazení hráče, dokumentace, brány).
+
+| Vada | Příčina (naměřená) | Oprava + doklad |
+|---|---|---|
+| **V1 „propadám se do textury mostu“** | Klič hrace byl `sort_key({mobile, x, y, z})` = klic mobila na jeho dlazdici. Statik na TEZE dlazdici ma ale `priority_z` vyssi (podlaha −1, statik s vyskou +1), takze mel **vetsi klic a kreslil se PO hracovi**. NAMERENO nezavisle (task-4): hrac na (1501,1599) klic 8 930 416 vs statik art 16585 **8 930 418** → hrac neni videt; na molu (1524,1485) ve stoje **0 px z 804**, ale statik art 18684 (key 8 903 418) ho kryl. | `world_view._sort_key_of_player(seznam)` = **maximum REALNYCH klíčů objektů na diagonale hráce a blíž, +1** (reference počítá mobilům hloubku z `maxZ` dlaždice hráče, `GameSceneDrawingSorting.cs:159-166`). Po opravě: ve stoje i na druhem miste **0 px kryto** (`p22-teren-most.gd`), snímek `p22-most-molo-krok.png`. **Vedomá hranice** (viz „Co se NEOPRAVILO“): statik o 1–2 diagonaly dal s vysokym `z` se muze dostat pred hrace. Testy `world_view` 7 a 8c meri oba smery. |
+| **V2/V8 „západní břeh nemá břeh“** | **Není to kreslení.** NAMERENO (`p22-voda-mapa.gd`): z **459** prechodu voda/pevnina ma **0** pisek na strane pevniny, ve vsech 4 smerech (V 166, S 76, J 118, Z 99); `holes 0`, `missing_art_ids []`, `VOID_LAND_MAX` se netýká (id 168–171 > 2). U Britannie pisek v datech JE (id 35, z 3–9) a je videt. | **Neopraveno** — chybějící břeh je vlastnost `map0.mul` (jiná data / jiný klient), ne kód. Snímky `p22-voda-hrana-{ocean,britain}.png`. |
+| **V3 „běží jen 3 políčka, stamina se neregeneruje“** | `sim.regen` **NEEXISTUJE** → stamina se nikdy nedoplní; `max_stam = DEX` a staty byly **10/10/10** = 10 kroku behu. | Uzivatel rozhodl: staty z `data/balance.json` (`player_start_stats`) → **75/130/20** = `max_hp 87`, `max_stam 130`, `max_mana 20` (soucet 225 = `STAT_CAP`). NAMERENO (`p22-staty-sonda.gd`): **129 kroku behu (25,8 s)**, pak chuze; nezavisly verifier to potvrdil a overil, ze se hodnota opravdu bere z DAT (DEX 130→60 dalo max_stam 60). |
+| **V4 „auto-run za myší“** | Chybel uplne. | `input_map.auto_run_step(vstup)` (cista funkce, meritelna bez okna): START = levy klik pri drzenem pravem (`GameSceneInputHandler.cs:422-425`), STOP = novy stisk praveho (`:827-828`) nebo Esc; hlas do konzole. Verifier: 7/7 stavu, 20/20 kroku. |
+| **V5 „při pohybu celá obrazovka zrní“** | Dve nezavisle priciny, obe namerene: (a) pri zoomu != 1 je svetovy pixel **zlomek** pixelu obrazovky → zbytek po nejlepsim posunu **52,27 %** (zoom 0,75) a **92,45 %** (0,5); (b) okno != 1280x720 → `canvas_items` stretch skaluje zlomkem (1300x740 → 1,0156x) → zbytek **96,74 %** i pri zoomu 1,0. | (a) opraveno `snap_screen` (kamera i postava na mrizku obrazovky): **0,23 % / 0,01 %** (`p22-teren-zrno.gd`). (b) **NEOPRAVENO** — je to `project.godot`; navrh `stretch/scale_mode="integer"` (viz „Co čeká na tebe“). |
+| **V6 „po ~10 polích zásek na půl sekundy“** | 18. session zmerila 2 framy z 2 319 na ~130 ms pri **prekresleni runtime atlasu na GPU** (`hold`). | V teto session **NEMERENO znovu** (teren meril 4 000 framu synteticke chuze: 0 framu s prazdnou davkou, 62 framu `hold`, 89 framu > 33 ms, max 483,8 ms — ale synteticka chuze je ~4x rychlejsi nez realna). Zustava otevrene. |
+| **V7 „divně se zobrazuje most, břeh a voda“** | Kanál u Britannie: pisek jen na severozapadni strane (1 dlazdice, z 3–9); „voda“ v kanalu je land 79–95/100 (bez WET, z −15), jeji art vypada jako voda; hrac stojici tam je na z=−15 = **POD** mostem (paluba z=10) → kryty 37,6 %. | Kresleni je verne (0 der, 0 chybejiciho artu). To, ze se hrac na most nedostane, byla **V11** (opraveno). **NEMERENO**: srovnani s zivym UO klientem (na stanici neni). |
+| **V9 „je to moc přiblížené, chce to oddálit“** | Zmereny vychozi stav: kamera **nemela zoom**, viditelna plocha sveta 960x600 px = **36,0 dlazdice/osu**. | **Zoom jako vstup** (kolecko mysi, `+`/`-`/numpad/`=`, meze 0,5–2,0, krok 1,25, vychozi **0,75**): **48,0 dlazdice/osu (+33 %)**, 1280x800 px; okno seznamu roste s oddalenim (112x64 → 142x64 → 202x72), obrazovka zustava pokryta pri kazdem zoomu, 0 der, `pretek false` i pri zoomu 0,5 (26 528 kvadru), hrac presne ve stredu (odchylka < 0,001 px). Cisla: `p22-zoom-sonda.txt`, `p22-rozhled-sonda.txt`. |
+| **V10 „můžeme to uhladit / zlepšit assety?“** | Nearest vs Linear zmereno na stejnem vyrezu: ostrost 0,22 (Nearest) vs **0,18 (Linear = −18 %, rozmazane)**. | **Doporuceni**: vychozi filtr NEMENIT (Linear maze pixely); rozhled resi zoom; kvalitu artu nezvedne zadny prepinac (44px pixel-art z originalnich dat; HD = jiny zdroj). Detail v `p22-zoom-srovnani-filtr.png`. |
+| **V11 „neumožní mi jít na most“** | **NENI diagonala** (molo je 4 dlazdice siroke). `_start_top` ignoroval statiky POD NOHAMI: dlazdice (1522,1468) prkno art 2173 z=0 (Surface+Bridge, vyska 4) → stojna vyska 2; dalsi prkno z=5 → nas strop `2+2=4` < `itemTop 5` → **„height“** na vsech 4 sloupcich paluby. | `_start_top` bere i statiky (`GetStartZ`, `Movement.cs:617-641`, pro strop kroku PLNA vyska). NAMERENO: bloku „height“ v koridoru 52 → **44**, chuze sondou **76 dlazdic** z nabrezi na konec mola (59 kroku na palube z=11). |
+| **V12/V16/V17 „zobrazuje se patro nademnou“** | Stara podminka skryvala jen `je_strop` (Roof nebo Surface+Background) nad `hrac+16`, takze **zdivo, okno, trabec, postel ani zabradli** se neskryly. Reference (`GameSceneDrawingSorting.cs:57-213` `UpdateMaxDrawZ()`) pocita **jeden strop `_maxZ`** (kandidat = statik nad `hrac+14` s `(flags & (Transparent\|Foliage))==0 && (!Roof \|\| Surface)`, nikdy pod `hrac+16`, bez kandidata 127) a kresli jen `z < _maxZ`. | Filtr `z_statiku >= _max_z` **sjednoceny** s pravidlem 18. session (strecha bez `Surface` strop nenastavi — v Britanii 204 z 2 970 dlazdic, 6,9 %). NAMERENO: skryto 963→**1354**, 1248→**1664**, 1394→**1971**, 1163→**2075** (vsechno zdivo/okna/trabce/postele), na otevrenem miste **0** a strop 127. V behu hry Δobjektu == Δskryto (2895/3792/3721) — overil nezavisly verifier. **Kadence: 120 kroku ulici i vystup po schodisti → 0 prestaveb navic.** |
+| **V13 „vzácně problikne obrazovka“** | Nereprodukovano: 4 000 framu synteticke chuze → 0 framu s prazdnou davkou, 5 podezrelych snimku v poradku (`p22-teren-problik-0..4.png`). | **NEMERENO** — potrebuji snimek nebo misto od uzivatele. |
+| **V14 „špatně detekuje, kam mířím myší“** | Stred pro smer z mysi se pocital z `z = 0` (`app/loop.gd:39`), ale kamera je na `z * Z_SCALE` → na z=10 byl stred o **40 px niz**. NAMERENO: **4 473 z 11 163** pozic kurzoru (40 %) vracelo jiny smer. Podezreni na `gui_odsazeni` se **NEPOTVRDILO** (vykrati se). | Klient posila PRESNOU pozici hrace (`player_controller._publish_center()` → `input_map.player_screen`, `center_for`). Po oprave 0 spatnych sektoru; nezavisly verifier: **24/24** referencnich bodu, stary vypocet by se rozesel v **17/24** (meridlo tedy neni slepe). |
+| **V15 „neumí se otáčet / odmítá se hýbat“** | (a) `sim/commands.gd` **nemel `case "turn"`** → dispatch odpovidal „Not available yet“ a `movement.turn()` se nikdy nezavolal; (b) ani po doplneni se otoceni **nekreslilo** — `mobile_turned` nemel v `app/` zadneho konzumenta. | (a) doplnen `case "turn"` (Lead); (b) `player_controller.update_step` pri prazdnem kroku **prebira `player.dir`** (Lead). Overeno `p22-turn-sonda.gd`: dir 2/4/6/0 → sim i kresleni sedi, pozice se nemeni, 0 selhani ze 4; nezavisly verifier to potvrdil. **Otáčení je na `Ctrl + šipka`/numpad.** |
+| **V15b „měl by jít podél zdi“** | **Není vada**: reference neklouze — ClassicUO `MoveCharacterByMouseInput` posila presny smer, ServUO `Mobile.Move` pri neuspechu jen `return false`; wall-slide ma POUZE AI (ModernUO `AIMovement.cs:668-700`). Diagonalni pravidlo (obe ortogonalni dlazdice) je verne (`Movement.cs:550-554`), hlaska „You cannot move there.“ do zurnalu zustava (zadny tichy stav). | Bez zmeny kodu; uzivateli vysvetlit slovy: **drz smer PODEL zdi, ne do ni.** |
+| **V17b „nedaří se mi vystoupat“** | **Není pravidlo chuze.** NAMERENO (BFS pres `can_step`, `p22-pohyb-schody-sonda.gd`): z namesti (1495,1630,z=10) na 1. patro (z>=40) se **DOJDE** — 1 470 stavu, cesta **29 kroku**. „Nevyjde“ byla past: `surface_z` na dlazdici se schodem vraci **60** (strop patra, art 1407), ne vysku, po ktere se chodi (21..40). Navrzena zmena `_blokuje_statik` (`_height` misto `_calc_height`) byla **otestovana a ZAMITNUTA** (5 testu FAIL + sonda „nedojde“); reference ma `checkZ + CalcHeight` (`Movement.cs:84`). | Pravidlo se NEMENILO; opraven **nepravdivy komentar** u `surface_z` (tvrdil „nejnizsi povrch“, funkce vraci maximum) + novy test `walk` 2h, ktery vadu zamkne. |
+
+**Integrační čísla (naměřeno dnes):** sada **1 320 kontrol / 0 selhání** (45 case
+souborů; bazově 1 201/0 → 1 212/0 po statých → 1 278/0 po tratích B a C →
+1 283/0 po V1 → 1 320/0 po uzavření slepých míst z mutací). Brány `run-all.py`:
+**11 měřeno / 0 vad** (G10 na čerstvém snímku). Mutace **84 z 84 chyceno**
+(6 modulů, které jsem měnil: `sort`, `walk`, `world_view`, `input`,
+`player_controller`, `chunk_renderer`; běh `--only`,
+`_analyza/p22-mutace-trate6.txt`); `player_controller` zvlášť 10/10 po opravě
+testu níže. `p22-rozhled-sonda.gd`: viewport 1280x720, viditelná plocha světa
+960x600 px, **43 dlaždic na ose (x−y) a 27 na (x+y)** při zoomu 1,0 (při
+výchozím 0,75 je to 48,0 dlaždice/osu).
+
+**⚠ Co našel až mutační běh (a co se opravilo) — to je dnešní nejcennější nález:**
+1. **Slepé místo ve `walk`:** kontrola „voda vrací `blocked`“ prošla i s vymazanou
+   kontrolou flagu `F_WET`, protože voda byla **jediný kandidát na povrch** a
+   `blocked` vyšlo samo. Opraveno testem, který staví hráče **vysoko nad vodu**
+   (krok DOLŮ, kde reference žádný limit nemá) — bez `F_WET` je pak voda
+   kandidátem a krok vyjde `ok`.
+2. **Slepé místo v `player_controller`:** test volal `_publish_center()` přímo,
+   takže nepoznal, když se volání **vyhodilo z `_process`** (skutečná cesta).
+   Doplněna statická kontrola těla `_process` — **a ta sama byla slepá**, protože
+   četla cestu natvrdo (`res://app/player_controller.gd`) místo vstupu `_arg`;
+   teprve po opravě mutace spadne (10/10).
+3. **Tři mrtvé mutační vzory** (`walk`, `input` ×2): kód se při V14/V11 přepsal,
+   takže vzory cílily text, který v souboru už není. Nahrazeny vzory na totéž
+   v novém kódu. **Jeden vzor byl smazán jako neměřitelný** (`sort`: záloha
+   `klic_nad_diagonalou` — nemá test, který by ji odlišil).
+4. **Test hráčova klíče prošel dvakrát ze špatného důvodu** (jednou volal funkci
+   bez seznamu, podruhé tvrdil hranici, která v klíči neplatí) — viz `LESSONS.md`
+   „Pasti, které mě dnes chytily“ body 3 a 5.
+
+**Nezávislé ověření (task-4, teammate `verifier`) — všechny revize na SHA-256:**
+14 tvrzení měřeno vlastním během, **12 SEDÍ**, 1 ČÁSTEČNĚ (snímek
+`-kandidat-1501-1599` je syntetický stav — hráč na té dlaždici **není vidět**,
+protože ho kryl statik s klíčem o 2 vyšším, a dlaždice je nedosažitelná; to je
+**N1**, stejná příčina jako V1) a nález N2/N3 (`turn` dispatch i kreslení —
+oba byly opraveny). Verifier doložil i to, že staty se opravdu berou z DAT
+(DEX 130→60 v `data/balance.json` dalo `max_stam` 60 a 59 kroků běhu; po
+navrácení byl soubor **bajtově shodný**, SHA-256 `5450367D…`).
+Souhrn: `_analyza/p22-overeni-00-souhrn.md`.
+
+**⚠ Co se NEOPRAVILO / NEMĚŘILO (nezamlčeno):**
+(`a`) **V1 má vědomou hranici**: hráč se kreslí ZA vším, co ho může překrýt, takže
+statik o 1–2 diagonály dal s vysokým `z` (zeď/strom vepředu) se může dostat před
+něj — to je cena za to, že ho nepřekrývá podlaha pod ním, a je to stejné chování
+jako reference. Testy `world_view` 7/8c měří oba směry;
+(`b`) **V5 druhá příčina** (okno != 1280x720, zlomkové škálování canvasu, zbytek
+**96,74 %**) je **neopravená** — patří do `project.godot` (viz „Co čeká na tebe“);
+(`c`) **V2/V8 = chybějící břeh v datech mapy** (0 písku z 459 přechodů) — kód
+s tím nic neudělá;
+(`d`) **V13 probliknutí nereprodukováno** (4 000 framů, 0 prázdných dávek);
+(`e`) **V6 zásek** se v této session neměřil znovu (18. session: 2 framy z 2 319
+na ~130 ms při překreslení runtime atlasu na GPU);
+(`f`) **schody shluku #2 z dlaždice schodu samotné** nejdou (7 statiků v jednom
+sloupci) — ale **z ulice se na patro dojde** (29 kroků), takže to není blokace hry;
+(`g`) **NEMĚŘENO**: srovnání s živým UO klientem, chování na jiných facetách než
+Britannie, přesný počet kroků, které hráč ujde v běhu hry (měřil se `can_step`
+a BFS, ne chůze), vliv zoomu 0,5 na cenu přestavby seznamu;
+(`h`) **`stretch/scale_mode="integer"`** ověřeno jen tak, že Godot 4.7.2 tu hodnotu
+zná (`hint_string 'fractional,integer'`, `p22-stretch-sonda.gd`) — **vliv na obraz
+jsem naměřit nedokázal** (moje metrika ostrosti oba režimy nerozlišila: 72,65 %
+vs 72,66 % hran), takže se **neměnilo nic**.
 
 ## ✅ CO JE NOVÉHO (18. session) — ŠEST VAD Z FOTEK: řazení, terén, pohyb, běh, střechy, GUI
 
@@ -918,6 +1043,15 @@ Všechna otevřená témata jsou rozhodnutá v
 [`ROZHODNUTI-2026-10-08.md`](ROZHODNUTI-2026-10-08.md)** (15 rozhodnutí R1–R15,
 každé s naměřeným důvodem a cestou zpět). Dvě se provedla hned (R1 `era.skill_gain`,
 R2 barva pozadí), zbytek je buď odložený s měřitelným cílem, nebo uzavřený.
+
+**⚠ 2026-10-08 (19. session): tři NOVÉ věci k rozhodnutí (obě první jsou vratné
+jedním řádkem, třetí je práce agenta):**
+
+| # | Na co se čeká | Co to blokuje | Cena / cesta zpět |
+|---|---|---|---|
+| **V5b** | **Okno jiné než 1280x720 převzorkovává CELÝ obraz** — `canvas_items` stretch škáluje canvas zlomkem (okno 1300x740 → 1,0156×), takže i při zoomu 1,0 se změní **96,74 %** pixelů při čistém posunu obrazu. To je druhá, nezávislá příčina vady „při pohybu celá obrazovka zrní“ (první byla opravená `snap_screen`). | vada V5 u uživatele, pokud nehraje v přesně 1280x720 | `display/window/stretch/scale_mode="integer"` v `project.godot` (u pixel-artu obvyklé, ale při neceločíselném poměru okna vzniknou okraje) **nebo** hrát v 1280x720. ⚠ **Nezměřil jsem, že to pomůže** — Godot 4.7.2 tu hodnotu zná (`p22-stretch-sonda.gd`), ale moje metrika ostrosti oba režimy nerozlišila (72,65 % vs 72,66 % hran). Kdo to zkusí, ať udělá snímek PŘED/PO a změří to. |
+| **V1b** | **Hranice opravy V1 (řazení hráče)**: hráč se kreslí za vším, co ho může překrýt, takže **statik o 1–2 diagonály dal s vysokým `z`** (zeď/strom vepředu) se může dostat před něj. Je to cena za to, že ho nepřekrývá podlaha pod ním (most, schody) — a stejné chování jako reference (mobilům počítá hloubku z `maxZ` dlaždice hráče). | věrnost u zdi vepředu; plný soulad umí jen **Z-buffer** (velký zásah do `render/`) | Vrátit se dá změnou `world_view._sort_key_of_player` (testy `world_view` 7/8c měří oba směry). Nová vrstva „fade statiků, které překrývají hráče“ (CoT, viz R-věc výš) je **správné dlouhodobé řešení** a je to nová funkce, ne oprava. |
+| **V3b** | **`sim.regen` (doplnění staminy) NEEXISTUJE** — 19. session to jen obešla staty `DEX = 130` (`player_start_stats` v `data/balance.json`), takže postava po ~26 s běhu už jen chodí. Do té doby je to **PROZATIMNI** náhrada, ne oprava. | dlouhé běhání ve hře; návrat statů na normál (10/10/10) | Napsat `sim.regen` (v `SYSTEM_ORDER` už je, `app/main.gd` ho neregistruje) a vrátit staty; kritérium: po N sekundách chůze se stamina doplní a `p22-staty-sonda.gd` to změří. |
 
 **Co z toho zůstává jako práce agenta (ne rozhodnutí):**
 

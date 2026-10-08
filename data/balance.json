@@ -30,6 +30,19 @@
     "note": "singleplayer: 1-3 s / 20-30 % (rozhodnutí uživatele); UO default je 500 ms / 5 %"
   },
   "stamina_drain_model": "run_only",
+  "player_start_stats": {
+    "STR": 75,
+    "DEX": 130,
+    "INT": 20,
+    "note": "PROZATIMNI (19. session, 2026-10-08): sim.regen neexistuje, takze se stamina nikdy nedoplni - pri vychozich 10/10/10 usla po 10 krocich behu. DEX 130 = 130 bodu staminy; trvala oprava je sim.regen."
+  },
+  "player_start_skills": {
+    "Blacksmithy": 300,
+    "Tinkering": 300,
+    "Mining": 300,
+    "Tailoring": 300,
+    "note": "PROZATIMNI (20. session, 2026-10-08): hrac zacinal se VSEMI skilly 0 a sance sberu je `skill/1000`, takze by tezba byla nehratelna - namEReno sondou _analyza/p23-interakce.gd: se skillem 0.0 ani kus rudy za 30 uderu, se skillem 30.0 ruda za 2 udery. Hodnoty jsou sablona Blacksmith z research/profese.json (30.0 = 300 desetin), protoze jako jedina klasicka sablona obsahuje Mining; trvaly mechanismus je vyber profese pri tvore postavy. POZOR NA JMENO: nas skills.mul ma 'Blacksmithy', kdezto profesni sablona 'Blacksmith' - kdyby tu stalo 'Blacksmith', skill by se TISE nepridal (hlasi to `app.main.start_skills` i test)."
+  },
   "ggs_on": true,
   "insurance_on": false,
   "anti_macro": false,
@@ -45,6 +58,10 @@
     "stat_gain.delay_ms": "rozhodnutí uživatele 2026-10-06 (pásmo 1-3 s, zvoleno 2 s); UO default je 500 ms, protože `EnablePlayerStatTimeDelay=false` (`_src/servuo/Scripts/Misc/SkillCheck.cs:52-53`); 15 min platí jen při zapnuté prodlevě (`:46`)",
     "stat_gain.chance_percent": "rozhodnutí uživatele 2026-10-06 (pásmo 20-30 %, zvoleno 25 %); UO default je 5 % (`_src/servuo/Scripts/Misc/SkillCheck.cs:49`)",
     "stamina_drain_model": "docs/05 §5.16 (stamina se spotřebovává jen při běhu)",
+    "player_start_stats.STR": "rozhodnutí uživatele 2026-10-08 (19. session): „nastavil výchozí staty na 130, aby se to zatím nedělo“ - STR 75 kvůli rozumnému max_hp (50 + 75/2 = 87)",
+    "player_start_stats.DEX": "rozhodnutí uživatele 2026-10-08 (19. session): DEX = max_stam = 130. PROZATIMNI - trvala oprava je `sim.regen` (doplnovani staminy), ktera jeste neni hotova",
+    "player_start_stats.INT": "rozhodnutí uživatele 2026-10-08 (19. session): INT 20 = max_mana (magie jeste neni, hodnota je jen start)",
+    "player_start_skills": "rozhodnutí uživatele 2026-10-08 (20. session): hráč začne se skilly šablony Blacksmith z research/profese.json (Blacksmith 30, Tinkering 30, Mining 30, Tailoring 30). Důvod je NAMĚŘENÝ: se skillem 0 je sance sberu 0 % a tezba nefunguje (viz note u klice); sablona Blacksmith je jediná klasická, která obsahuje Mining. Trvale to nahradí výběr profese při tvorbě postavy.",
     "ggs_on": "docs/05 §5.16 + ZADANI §2 (GGS zapnutý, krok +0.1)",
     "insurance_on": "docs/05 §5.16 (pojištění předmětů je vypnuté)",
     "anti_macro": "docs/05 §5.16 (žádné anti-macro kontroly, jsme offline)",

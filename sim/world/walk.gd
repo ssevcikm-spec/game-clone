@@ -72,6 +72,18 @@ extends RefCounted
 # schody, dvere) se predavaji KONSTRUKTOREM, aby se `can_step` dal merit bez
 # assetu `assets/uo/` (ta jsou v .gitignore, takze v CI nejsou) - stejny duvod
 # jako `world.map._init(prefix)`. Vychozi hodnoty jsou realne komponenty.
+#
+# ⚠⚠ ZADANI 19 (2026-10-08) - V11 "Hra mi neumozni jit na most": `_start_top`
+#   bral JEN horni hranu LANDU a ignoroval statiky POD NOHAMI. Na mole u
+#   Britannie (dlazdice 1522,1468: prkno art 2173 z=0, vyska 4, `Bridge`) se
+#   stoji ve 2, dalsi prkno je z=5 -> nas strop `2 + 2 = 4` < `itemTop 5` a krok
+#   byl BLOKOVANY ("height"); reference (`GetStartZ`, `Movement.cs:617-641`)
+#   bere i statiky (`zTop = tile.Z + Height`) a krok povoli. Podezreni na
+#   diagonalni pravidlo se NEPOTVRDILO (molo je 4 dlazdice siroke). NamEReno:
+#   `_analyza/p22-most-koridor.txt` (pocet bloku "height" 44 -> 32), sonda
+#   `_analyza/p22-most-chuze.gd` (76 dlazdic z nabrezi na konec mola).
+#   Testy: `tests/cases/walk.gd` 2g a 2h (druhy je schodiste, kde se plna vyska
+#   v `_blokuje_statik` ukazala jako SKODLIVA - viz komentar u `surface_z`).
 
 const F_IMPASSABLE := 0x00000040
 const F_WET := 0x00000080
@@ -136,9 +148,18 @@ func can_step(from: Vector3i, dir: int, height: int = Const.PERSON_HEIGHT,
 
 
 func surface_z(x: int, y: int) -> int:
-	# Nejnizsi povrch, na ktery se da stanout: land, nebo vyssi statik s `Surface`.
-	# Pozor: `can_step` pouziva JINE pravidlo (povrch nejblizsi postave, V4/V5) -
-	# tenhle dotaz je "kam az se da vystoupit", ne "kam se postava postavi".
+	# NEJVYSSI povrch na dlazdici: land, nebo nejvyssi statik se `Surface`.
+	# ⚠ POZOR (2026-10-08): na dlazdici se SCHODISTEM to NENI vyska, po ktere se
+	# chodi. Stupne jsou tam nasazene po 5 ve SLOUPCI (art 1848/1850) a nad nimi
+	# byva jeste strop patra (art 1407, vyska 0) - `surface_z` pak vrati strop
+	# (namEReno: dlazdice hradu 1492..1497/1602..1604 vraci 60, ale chodi se po
+	# nich ve 21 az 40). Kdo hleda, KAM se da stanout, musi pouzit `can_step`
+	# (vybira povrch nejblizsi postave) - ne tuhle funkci.
+	# Do 2026-10-08 tu stalo "nejnizsi povrch", coz byla NEPRAVDA (funkce vraci
+	# maximum) a sonda `_analyza/p22-schody-sonda.gd` kvuli tomu merila zacatky
+	# ve vysce 60 a vyslo ji, ze se na 1. patro neda vystoupit. Premereno sondou
+	# `_analyza/p22-pohyb-schody-sonda.gd`: z namesti (1495,1630,z=10) se na
+	# z=40 DOJDE (1 470 stavu BFS, cesta 29 kroku).
 	return _surface_z(x, y)
 
 
@@ -205,16 +226,54 @@ func _start_top(from: Vector3i) -> int:
 	# Horni hrana toho, na cem postava stoji (`GetStartZ`, Movement.cs:585-670):
 	# u landu je to NEJVYSSI roh dlazdice, ale jen kdyz na ni opravdu stoji
 	# (`loc.Z >= landCenter`) a neni blokujici (voda/zed). Kdo stoji na statiku
-	# (molo, schod), ma `from.z` uz na jeho hrane - proto se bere `from.z`.
+	# (molo, schod), ma `from.z` uz na jeho hrane.
+	#
+	# ⚠⚠ V11 (2026-10-08, zadani 19) - STATIKY POD NOHAMA SE MUSI POCITAT:
+	#   Do teto session se brala JEN horni hrana LANDU. Reference ale bere
+	#   i statiky na dlazdici, na ktere postava stoji (`Movement.cs:617-641`):
+	#   `zCenter = tile.Z + CalcHeight` (stojna vyska) a `zTop = tile.Z +
+	#   Height` (PLNA vyska, i u `Bridge` - `:634`, `:659`; proto se pro strop
+	#   kroku nepouziva `CalcHeight`).
+	#   NAMERENO na mole u Britannie (`_analyza/p22-most-koridor.txt`): dlazdice
+	#   (1522,1468) ma prkno art 2173 z=0 (Surface+Bridge, vyska 4), takze se
+	#   na nem stoji v `z = 0 + 4/2 = 2`; dalsi prkno na (1522,1469) je z=5.
+	#   Nas strop byl `startTop(2) + 2 = 4` < `itemTop 5`, takze krok na molo byl
+	#   BLOKOVANY ("height") - presne to uzivatel hlasi jako "neumozni mi jit na
+	#   most". Reference ma `startTop = 0 + 4 = 4`, tedy `stepTop = 6 >= 5`,
+	#   a krok POVOLI. Podezreni na diagonalni pravidlo se NEPOTVRDILO (molo je
+	#   4 dlazdice siroke; blokovane diagonaly na nem jsou verne - ServUO
+	#   `Movement.cs:550-554`).
 	var land: int = _land_at(from.x, from.y)
-	if land < 0:
-		return from.z
-	if _tiledata.flags(land) & (F_IMPASSABLE | F_WET) != 0:
-		return from.z
-	var c: Array = _corners(from.x, from.y)
-	if from.z >= _center(c):
-		return maxi(_top(c), from.z)
-	return from.z
+	var z_top: int = from.z
+	var z_center: int = 0
+	var is_set: bool = false
+	if land >= 0 and _tiledata.flags(land) & (F_IMPASSABLE | F_WET) == 0:
+		var c: Array = _corners(from.x, from.y)
+		if from.z >= _center(c):
+			z_center = _center(c)
+			z_top = _top(c)
+			is_set = true
+	# Statiky pod nohama: stojna vyska je `z + CalcHeight`, ale strop kroku je
+	# `z + Height` (`Movement.cs:624-637`). Bere se jen ten, na kterem opravdu
+	# stojime (`from.z >= zCenter`) a ktery neni nizsi nez to, co uz mame.
+	for s in _statiky(from.x, from.y):
+		var tile: int = int(s["tile"])
+		if _flags(tile) & F_SURFACE == 0:
+			continue
+		var item_z: int = int(s["z"])
+		var calc_top: int = item_z + _calc_height(tile)
+		if is_set and calc_top < z_center:
+			continue
+		if from.z < calc_top:
+			continue
+		z_center = calc_top
+		z_top = maxi(z_top, item_z + _height(tile))
+		is_set = true
+	if not is_set:
+		return from.z                # `if (!isSet) zLow = zTop = loc.Z` (:668)
+	if from.z > z_top:
+		return from.z                # `else if (loc.Z > zTop) zTop = loc.Z` (:670)
+	return z_top
 
 
 func _surface_z(x: int, y: int) -> int:

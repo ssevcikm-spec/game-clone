@@ -251,6 +251,69 @@ func run(t) -> void:
 		t._check(mv3s.mobile(0x40009999) == null,
 			"sim.movement: nezaregistrovany serial vraci pres mobile() null")
 
+	# 13) ⚠ V15a (2026-10-08, zadani 19): OTOCENI NA MISTE. Smlouva prikaz
+	#     `turn {dir}` zná (`sim/commands.gd:21`), ale system pro nej nemel
+	#     metodu - dispatch odpovidal "Not available yet". Uzivatel: "Postava se
+	#     neumi otacet, automaticky popojde smerem, ktery ji urcim ... pokud se
+	#     chci jen otocit (kratkym klikem) nebo kdyz narazim do zdi."
+	#     Meri se: smer se zmeni, pozice NE, event `mobile_turned` odejde,
+	#     neplatny smer/neznamy mobil vraci `{ok:false, reason}` a otoceni jde
+	#     i BEHEM beziciho kroku (rozhodnuti je v hlavicce `turn`).
+	var otoc = MobileScript.new(0x40000051, 400, Vector3i(5, 5, 0))
+	mv.register(otoc)
+	otoc.dir = 0
+	events.drain()                       # at se meri jen to, co posle `turn`
+	var o1: Dictionary = mv.turn(otoc.serial, 4)
+	t._check(o1["ok"] == true and otoc.dir == 4 and otoc.pos == Vector3i(5, 5, 0),
+		"sim.movement: turn nastavi smer 4 a NEKROCI (dir %d, pos %s, vysledek %s)"
+			% [otoc.dir, str(otoc.pos), str(o1)])
+	t._check(int(o1["delay_ms"]) == Const.TURN_MS,
+		"sim.movement: otoceni trva TURN_MS = %d (namEReno %s)" % [Const.TURN_MS, str(o1)])
+	var jmena_turn := _jmena(events)
+	t._check(jmena_turn.has("mobile_turned"),
+		"sim.movement: otoceni posila event mobile_turned (namEReno %s)" % str(jmena_turn))
+	# `mobile_turned` musi nest SERIAL i SMER - klient z nej kresli orientaci;
+	# event bez `dir` by prosel kontrolou "jmeno existuje", ale nic by nerekl.
+	var data_turn: Dictionary = {}
+	events.drain()
+	mv.turn(otoc.serial, 6)
+	for e in events.drain():
+		if str(e["name"]) == "mobile_turned":
+			data_turn = e["data"]
+	t._check(int(data_turn.get("serial", -1)) == otoc.serial and int(data_turn.get("dir", -1)) == 6,
+		"sim.movement: mobile_turned nese serial i dir (namEReno %s)" % str(data_turn))
+	# Otoceni do STEJNEHO smeru nic nemeni a nic nehlasi (jinak by klient
+	# dostaval prazdne udalosti pri kazdem stisku).
+	events.drain()
+	var stejny: Dictionary = mv.turn(otoc.serial, 6)
+	t._check(stejny["ok"] == true and _jmena(events).is_empty(),
+		"sim.movement: otoceni do stejneho smeru nic nehlasi (jmena %s)" % str(_jmena(events)))
+	# neplatny smer a nezaregistrovany mobil
+	var spatny: Dictionary = mv.turn(otoc.serial, 8)
+	t._check(spatny["ok"] == false and str(spatny["reason"]) == "bad_dir",
+		"sim.movement: turn s dir 8 vraci 'bad_dir' (namEReno %s)" % str(spatny))
+	var neznamy: Dictionary = mv.turn(0x40009999, 0)
+	t._check(neznamy["ok"] == false and str(neznamy["reason"]) == "no_mobile",
+		"sim.movement: turn neznameho mobilu vraci 'no_mobile' (namEReno %s)" % str(neznamy))
+	# ⚠ ROZHODNUTI: otoceni se POVOLUJE i behem beziciho kroku (otoceni neni
+	# krok). Krok v letu pritom zustava - a na svem konci zapise SVUJ smer.
+	otoc.dir = 0
+	otoc.pos = Vector3i(5, 5, 0)
+	walk.vysledky[3] = {"ok": true, "z": 0, "reason": ""}
+	var rozjety: Dictionary = mv.request_step(otoc.serial, 3, false)
+	t._check(rozjety["ok"] == true and not mv.pending_step(otoc.serial).is_empty(),
+		"sim.movement: krok smerem 3 je v letu (namEReno %s)" % str(rozjety))
+	var behem: Dictionary = mv.turn(otoc.serial, 5)
+	t._check(behem["ok"] == true and otoc.dir == 5 and not mv.pending_step(otoc.serial).is_empty(),
+		"sim.movement: otoceni behem kroku projde a krok v letu zustava (dir %d, v letu %s, %s)"
+			% [otoc.dir, str(not mv.pending_step(otoc.serial).is_empty()), str(behem)])
+	clock.advance(Const.WALK_MS)
+	mv.tick(Const.TICK_MS)
+	t._check(mv.pending_step(otoc.serial).is_empty() and otoc.pos == Vector3i(4, 4, 0)
+			and otoc.dir == 3,
+		"sim.movement: dokonceny krok zapise SVUJ smer (dir %d, pos %s) - otoceni"
+		% [otoc.dir, str(otoc.pos)] + " uprostred kroku se jim prekryje (viz hlavicka `turn`)")
+
 	# 12) PORADI V TICKU (vada V1 z `REVIZE-POHYB-2026-10-07.md` §2.1): prikaz
 	#     podany v TOM SAMEM ticku, kdy je krok na rade, nesmi dostat 'busy'.
 	#     Cas v ticku plyne "nejdriv svet (timery), pak cizi zamery" - kdyby to

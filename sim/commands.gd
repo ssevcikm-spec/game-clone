@@ -2,14 +2,26 @@ extends RefCounted
 # Prikazy klient -> simulace (docs/04 §4.3). Jedina cesta, jak menit stav.
 #
 # Neplatny prikaz se ZAHODI s hláškou do žurnálu - nikdy nespadne (prompt
-# granule). Tabulka nize je doslovny prepis §4.3; nic se nepridava.
+# granule). Tabulka nize je doslovny prepis §4.3 - JEDNA VYJIMKA: `interact`
+# (obecna interakce, 20. session 2026-10-08) je NAD RÁMEC smlouvy a patri do
+# docs/04; je tu proto, ze si to vyžadal uživatel ("tlacitko je nejen na tezbu,
+# ale vseobecne interaktivni") a bez nej by vyber nastroje delal klient = herni
+# pravidlo v UI (docs/05 §5.3 to zakazuje).
 #
 # CO SMLOUVA NEPOKRYVA (nalezeno pri implementaci, patri do docs/04):
-#   * `turn`, `skill`, `target_reply`, `drag`, `drop`, `equip`, `say` nemaji
+#   * `skill`, `target_reply`, `drag`, `drop`, `equip`, `say` nemaji
 #     v §4.2 zadnou metodu systemu, ktera by je vyridila - dispatch je proto
 #     hlasi jako "zatim nedostupne" (VIDITELNE, ne tise),
 #   * `resurrect` ma jen `accept:bool`, ale `sim.death.resurrect(m, hp)` chce hp,
 #   * `save`/`load` jsou v §4.3 oznacene "mimo simulaci (app)" - sim je odmita.
+#
+# ⚠ `turn` UZ NENI MRTVY PRIKAZ (19. session, 2026-10-08 - vada V15 ze zadani
+# 19): do teto session tu chybelo `case "turn"`, takze se prikaz zaradil a
+# dispatch odpovedel "Not available yet" - a `movement.turn()` (ktery uz
+# existoval) se nikdy nezavolal. Uzivatel to videl jako "postava se neumi
+# otocit". NamEReno nezavislym overenim (task-4): 0 konzumentu eventu
+# `mobile_turned` v `app/`, takze se klient na otoceni NEDIVAL eventem, ale
+# cte `player.dir` primo (viz `app/player_controller.update_step`).
 
 const Const = preload("res://core/const.gd")
 
@@ -21,6 +33,7 @@ const REQUIRED := {
 	"turn": {"dir": TYPE_INT},
 	"use": SERIAL_ONLY,
 	"use_on": {"serial": TYPE_INT, "target": TYPE_DICTIONARY},
+	"interact": {"target": TYPE_DICTIONARY},
 	"skill": {"skill": TYPE_INT},
 	"target_reply": {"cursor": TYPE_INT},
 	"drag": {"serial": TYPE_INT, "amount": TYPE_INT},
@@ -90,10 +103,19 @@ func dispatch(sim, c: Dictionary) -> void:
 	match t:
 		"move":
 			_route(sim, t, "movement", "request_step", [_player(sim), c["dir"], c["run"]])
+		"turn":
+			# Otoceni na miste (V15): krok zadny, jen `mob.dir` + event
+			# `mobile_turned`. Chybejici vetev byla vada - viz hlavicka.
+			_route(sim, t, "movement", "turn", [_player(sim), c["dir"]])
 		"use":
 			_route(sim, t, "interaction", "use", [_player(sim), c["serial"]])
 		"use_on":
 			_route(sim, t, "interaction", "use_on", [_player(sim), c["serial"], c["target"]])
+		"interact":
+			# OBECNA INTERAKCE (20. session, pokyn uzivatele 2026-10-08): klient
+			# posle jen cil a sim vybere, co se na nej hodi. NAD RÁMEC §4.3 -
+			# v tabulce smlouvy tenhle prikaz neni, patri do docs/04.
+			_route(sim, t, "interaction", "interact", [_player(sim), c["target"]])
 		"attack":
 			_route(sim, t, "combat", "attack", [_player(sim), c["serial"]])
 		"war":

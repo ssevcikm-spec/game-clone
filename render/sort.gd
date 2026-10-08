@@ -54,6 +54,37 @@ const PASS_SPAN: int = 8_000_000
 # znamena, ze `z` prebije ~2,55 kroku mrizky. `Z_SPAN * LAYERS = 765` je
 # rozpeti `z` v klíči, takze krok mrizky je `765 / 2,55 = 300`.
 const K_PER_DIAGONAL: int = 300
+# ⚠⚠ 19. session (2026-10-08) - V1 ZE ZADANI 19: "pri pohybu se propadam do
+# textury mostu" (a nezavisle overeni k tomu naslo, ze hrac je na 4 z 5
+# zkousenych dlazdic PREKRYTY statikem na VLASTNI dlazdici).
+#
+# NAMERENO (`_analyza/p22-teren-most.gd`): na mole u Britannie stoji hrac na
+# (1524,1485) s `z = 11` (paluba 10 + vyska prkna 1) a prkno na TEZE dlazdici
+# ma `priority_z` 9 (10 - 1 za `IsBackground`) - klic hrace 8 903 119 vs prkno
+# 8 903 115, takze prkno je pred hracem SPRAVNE. Problem je jiny: statik na
+# TEZE dlazdici, ktery ma `priority_z` VYSSI nez hrac (napr. art 16585 na
+# (1501,1599): statik z=10 -> klic 8 930 418 vs hrac 8 930 416, tedy 2 jednotky
+# PO hracovi), hrace prekryje - a uprostred kroku kryje hrace i prkno
+# o diagonalu vpred (23,3 % viditelnych pixelu hrace).
+#
+# Reference to neresi klíčem, ale Z-BUFFEREM + pravidlem `mobile.Depth`:
+# `GameSceneDrawingSorting.cs:159-166` pocita hloubku mobilu z `maxZ` dlazdice
+# hrace, tedy ho kresli jako NEJBLIZSI. My mame painter's algoritmus, takze
+# jedina cesta je poslat hrace na KONEC sve diagonaly - a to je presne to, co
+# dela `klic_na_konci_diagonaly`: klic hrace je `diagonala * K_PER_DIAGONAL +
+# PASS_SPAN - 1`, tedy uvnitr sveho pruchodU (PASS_OBJEKTY = 1) a sve diagonaly
+# ZA VSEMI statiky i mobily na te dlazdici, ale stale PRED dalsi diagonalou.
+# Invariant, ktery se tim nemení: statik o diagonalu dal ma vetsi klic, takze
+# "zed prosvita pres strechu" ani "svah prosvita pres schody/most" se nevraci
+# (testy `render_sort` 3c/3d meri presne tohle).
+static func klic_nad_diagonalou(diagonal: int) -> int:
+	# NEJVETSI klic, ktery muze mit objekt na dane diagonale (bez ohledu na `z`
+	# a vrstvu). Pouziva se jako ZALOHA, kdyz volajici nema po ruce seznam
+	# objektu (klic hrace se jinak pocita z REALNYCH maxim, viz
+	# `app/world_view._sort_key_of_player`).
+	return PASS_OBJEKTY * PASS_SPAN + diagonal * K_PER_DIAGONAL \
+		+ (Const.Z_MAX - Const.Z_MIN) * LAYERS + (LAYERS - 1)
+
 const KIND_LAYER := {"land": LAYER_LAND, "static": LAYER_STATIC,
 	"mobile": LAYER_MOBILE, "item": LAYER_MOBILE}
 const KIND_PASS := {"land": PASS_LAND, "static": PASS_OBJEKTY,

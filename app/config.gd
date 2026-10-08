@@ -52,6 +52,33 @@ const SCHEMA := {
 	"ggs_on": {"type": TYPE_BOOL, "default": true},
 	"insurance_on": {"type": TYPE_BOOL, "default": false},
 	"anti_macro": {"type": TYPE_BOOL, "default": false},
+	# POCATECNI STATY HRACE (19. session, 2026-10-08 - vada V3 ze zadani 19).
+	# Uzivatel: "Postava bezi jen asi 3 policka ... dosla stamina a neregeneruje
+	# se. Prozatim bych to vypnul nebo nastavil vychozi staty na 130."
+	# NAMERENO: `sim.regen` (doplnovani staminy) NEEXISTUJE, takze pri vychozich
+	# statech 10/10/10 je `max_stam = DEX = 10` a po 10 krocich behu uz postava
+	# jen chodi - NAPOZADY. Vyssi DEX je PROZATIMNI reseni, ne oprava modelu:
+	# trvala oprava je `sim.regen` (viz "Co se NEOPRAVILO" v HANDOVERu).
+	# `max_hp = 50 + STR/2` a `max_mana = INT` plati dal (README vzorce).
+	"player_start_stats.STR": {"type": TYPE_INT, "default": 75, "min": 10, "max": 225},
+	"player_start_stats.DEX": {"type": TYPE_INT, "default": 130, "min": 10, "max": 225},
+	"player_start_stats.INT": {"type": TYPE_INT, "default": 20, "min": 10, "max": 225},
+	# POCATECNI SKILLY HRACE (20. session, 2026-10-08 - pokyn uzivatele "dej
+	# hracovi skill z profesni sablony"). Hodnoty jsou v DESETINACH (30.0 = 300).
+	# ⚠ NAMERENO (`_analyza/p23-interakce.gd`): se vsemi skilly 0 je sance sberu
+	# `skill/1000` = 0 %, takze hrac za 30 uderu nevytěžil NIC; se skillem 30.0
+	# dala zila rudu za 2 udery. Sablona je z `research/profese.json`
+	# (Blacksmith: Blacksmith 30, Tinkering 30, Mining 30, Tailoring 30) a je
+	# PROZATIMNI - trvaly mechanismus je vyber profese pri tvore postavy.
+	# ⚠ JMENO JE Z NASICH DAT, NE ZE SABLONY: `skills.mul` ma "Blacksmithy",
+	# kdezto profesni sablona "Blacksmith" - s druhym jmenem by se skill TISE
+	# nepridal (`app.main.start_skills` to hlasi a case `interact` to chyti).
+	# Kdo prida dalsi skill, prida sem radek: `app.main.start_skills()` cte
+	# VSECHNY klice `player_start_skills.*` ze SCHEMA, ne z kódu.
+	"player_start_skills.Blacksmithy": {"type": TYPE_INT, "default": 300, "min": 0, "max": 1200},
+	"player_start_skills.Tinkering": {"type": TYPE_INT, "default": 300, "min": 0, "max": 1200},
+	"player_start_skills.Mining": {"type": TYPE_INT, "default": 300, "min": 0, "max": 1200},
+	"player_start_skills.Tailoring": {"type": TYPE_INT, "default": 300, "min": 0, "max": 1200},
 }
 # Klice, ktere v datech byt MAJI, ale nejsou nastaveni: dokumentace a zdroje.
 # Kdyby se pocitaly jako "neznamy klic", hlasila by se vada u spravnych dat.

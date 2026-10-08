@@ -48,6 +48,19 @@ SOUHRN = re.compile(r"(\d+)\s+kontrol,\s*(\d+)\s+selh")
 
 # klic -> soubor, ktery se mutuje, prefix FAIL radku a prepinac testu
 MODULY = {
+    # ⚠ POZOR PRI SLOUČOVÁNÍ DVOU SESSION (namEReno 2026-10-08): tenhle soubor
+    # edituje VÍC session najednou a je snadné si vzory navzájem smazat.
+    # Pravidla:
+    #   * před zápisem soubor ZNOVU PŘEČTI (ne jen `git diff`) a hledej, jestli
+    #     tam už není vzor od někoho jiného,
+    #   * vzory se PŘIDÁVAJÍ na konec seznamu `mutace` daného modulu, nikdy se
+    #     nepřepisuje celý seznam,
+    #   * nový vzor musí být OVĚŘENÝ, že s ním testy spadnou (bez toho je to
+    #     jen text v souboru).
+    # A druhá věc: **brány se NESMÍ pouštět souběžně se zápisem do `sim/` nebo
+    # `app/`.** Nástroj to pozná (kontrola na konci běhu, řádek ~1058) a skončí
+    # hláškou "original se zmenil u …" - to je SPRÁVNĚ fungující self-check,
+    # ne vada nástroje. Výsledek takového běhu je nepoužitelný a musí se zopakovat.
     "sort": {
         "soubor": ROOT / "render" / "sort.gd",
         "prefix": "render.sort",
@@ -93,6 +106,14 @@ MODULY = {
             ("land ztrati vlastni pruchod (svah muze pres schody)",
              "pruchod * PASS_SPAN + diagonal * K_PER_DIAGONAL",
              "diagonal * K_PER_DIAGONAL"),
+            # ⚠ 19. session: `klic_nad_diagonalou` je ZALOHA klice hrace pro
+            # pripad, ze volajici nema seznam objektu. ZKOUSENO a ODSTRANENO:
+            # mutace "vraci nulu" vychazela jako **SLEPA** (namEReno pri behu
+            # mutaci 2026-10-08) - zadny test ji neodhali, protoze klic hrace se
+            # v realnem kode pocita z REALNYCH objektu a fallback nastane jen pri
+            # prazdnem seznamu, kde se neda overit nic jineho nez "je to kladne".
+            # Mrtva metrika se NEMÁ nechat lezet (budi dojem pokryti); az bude
+            # mit fallback vlastni test s presnym cislem, vzor se vrati.
         ],
     },
     "map": {
@@ -141,9 +162,18 @@ MODULY = {
             # hlasil jako "PATRANA VETA SE NENASLA". Nahrazuji je mutace nize.
             ("krok nahoru jen o 1 (STEP_HEIGHT ignorovan)",
              "var vyska: int = Const.STEP_HEIGHT", "var vyska: int = 1"),
+            # ⚠ 19. session - POZOR NA KONTEKST TOHOHLE VZORU (namEReno): stejny
+            # text je v souboru DVAKRAT (`_start_top` a `_vyber_povrch`), takze
+            # `replace(..., 1)` mutoval jen ten PRVNI - a test na "do vody se
+            # nesmi" pak mutaci NEODHALIL (kandidat na povrch dal vodu porad
+            # blokoval). Vzor proto obsahuje nasledujici radek z `_vyber_povrch`,
+            # aby byl jednoznacny. Kdo trosku zmeni okolni kod, uvidí to jako
+            # "PATRANA VETA SE NENASLA" - a to je spravne, ne tise.
             ("voda neblokuje (mokry land je kandidat)",
-             "if land >= 0 and _tiledata.flags(land) & (F_IMPASSABLE | F_WET) == 0:",
-             "if land >= 0:"),
+             "if land >= 0 and _tiledata.flags(land) & (F_IMPASSABLE | F_WET) == 0:\n"
+             "\t\tvar c: Array = _corners(to.x, to.y)\n\t\tif strop >= _low(c):",
+             "if land >= 0:\n"
+             "\t\tvar c: Array = _corners(to.x, to.y)\n\t\tif strop >= _low(c):"),
             ("diagonala symetricka i pro hrace",
              "if dx != 0 and dy != 0 and is_player:", "if false:"),
             ("statik s Impassable neblokuje",
@@ -178,8 +208,15 @@ MODULY = {
              "if strop >= _low(c):", "if strop >= _top(c):"),
             ("stojna vyska svahu je z dlazdice, ne prumer rohu",
              "return _floor_avg(z_top, z_bottom)", "return z_top"),
-            ("vzestup se pocita z MEHO z, ne z horni hrany (startTop)",
-             "return maxi(_top(c), from.z)", "return from.z"),
+            # ⚠ 19. session - VZOR BYL MRTVY (namEReno pri behu mutaci): cílil
+            # `return maxi(_top(c), from.z)`, ktery po oprave V11 v souboru uz
+            # NENI (`_start_top` dnes sklada `z_top` z landu I ze statiku pod
+            # nohama). Nahrazeny vzorem, ktery meri TOTEZ na novem kode: kdyz se
+            # horni hrana pocita jen z landu (a statiky pod nohama se ignoruji),
+            # krok na molo je blokovany ("height") - presne vada V11.
+            ("vzestup se pocita jen z landu (statik pod nohama se ignoruje)",
+             "\t\tif from.z >= _center(c):\n\t\t\tz_center = _center(c)\n\t\t\tz_top = _top(c)\n\t\t\tis_set = true",
+             "\t\tif from.z >= _center(c):\n\t\t\tz_center = _center(c)\n\t\t\tz_top = from.z\n\t\t\tis_set = true"),
             ("dolu se vraci limit (krok dolu je omezeny)",
              "var ber: bool = true",
              "var ber: bool = from_z - _center(c) <= Const.STEP_HEIGHT"),
@@ -195,6 +232,11 @@ MODULY = {
              "if true:\n\t\t\tcontinue"),
             ("pruchozi povrch se pri IsOk ignoruje (land pod schodem projde)",
              "if flags & F_SURFACE != 0 and flags & F_IMPASSABLE == 0:", "if false:"),
+            # --- V11 (19. session): "Hra mi neumozni jit na most." NAMERENO:
+            # `_start_top` ignoroval statiky POD NOHAMI (prkno mostu), takze strop
+            # kroku vysel o 2 niz a krok na molo byl blokovany ("height").
+            ("statiky pod nohama se do startTop nepocitaji (na most se nevejde)",
+             "for s in _statiky(from.x, from.y):", "for s in []:"),
         ],
     },
     "doors": {
@@ -304,10 +346,24 @@ MODULY = {
              "return unit_weight * amount", "return unit_weight"),
             ("mnozstvi se z konstruktoru neprevezme (vzdy 1)",
              "amount = amount_value", "amount = 1"),
+            # ⚠ 20. session: `same_pile` uz neporovnava `tile`, ale `type`
+            # (identita z `data/items.json`); vzor proto miri na novy text.
+            # Kdyby zustal stary, mutace by se TISE neprovedla (a to je slepe
+            # misto, ne zelena) - presne to harness sam pozna a hlasi.
             ("same_pile ignoruje hue (sloucil by ruzne barvy)",
-             "tile == other.tile and hue == other.hue", "tile == other.tile"),
+             "hue == other.hue and amount > 0", "amount > 0"),
+            ("same_pile porovnava ART misto TYPU (hromady tehoz predmetu s jinou grafikou se nesliji)",
+             'var muj: String = type if type != "" else str(tile)',
+             'var muj: String = str(tile)'),
             ("same_pile vraci true i pro prazdnou hromadu",
              "and other.amount > 0", "and true"),
+            # ⚠ 20. session: ID PROSTORY (art id vs tiledata id) prebiral
+            # `sim.interaction._record`; ten je pryc a prevadi je `Item.type_of`.
+            # Vzor se sem presunul s nim - jinak by platilo, ze se "id prostor
+            # neprevadi", a nikdo by to nemeril.
+            ("id prostor se neprevadi (tiledata id se nenajde)",
+             "\tif tile_hodnota < ITEM_OFFSET and _typ_podle_artu.has(tile_hodnota + ITEM_OFFSET):",
+             "\tif false:"),
         ],
     },
     "container": {
@@ -385,6 +441,12 @@ MODULY = {
             ("stojna vyska se do pos.z nezapise (vada V4)",
              'z = int(_pending[m]["z"])       # stojna vyska z `can_step` (vada V4)',
              "z = int(mob.pos.z)"),
+            # --- V15a (19. session): OTOCENI NA MISTE. `turn` je jedina cesta,
+            # jak zmenit smer bez kroku - kdyz se `mob.dir` nezapise, klient
+            # vykresli stary smer (vada "postava se neumi otacet").
+            ("turn nezapise smer (otoceni se neprovede)",
+             "\tmob.dir = dir\n\t_events_push(\"mobile_turned\"",
+             "\t_events_push(\"mobile_turned\""),
         ],
     },
     "interaction": {
@@ -428,9 +490,9 @@ MODULY = {
             # Prepnuti dveri je `toggle` z world.doors (konvence z 8. session).
             ("dvere se prepnou na opacny clen dvojice",
              "\tvar novy: int = int(_doors.toggle(tile))", "\tvar novy: int = int(tile) - 1"),
-            # Id prostory: `entity.item.tile` je ART ID, data maji TILEDATA ID.
-            ("id prostor se neprevadi (art id se hleda jako tiledata id)",
-             "\t\tvar rec = _by_tile.get(tile - ITEM_OFFSET)", "\t\tvar rec = _by_tile.get(tile)"),
+            # Id prostory (art vs tiledata id) se od 20. session prevadeji
+            # v `sim/entity/item.gd` (`type_of`) - vzor se tam presunul, tady
+            # by uz nemel co mutovat (a harness to hlasi jako mrtvy vzor).
             # Neznamy cil NESMI skoncit jako uspech.
             ("neznamy cil se tvari jako uspech",
              '\treturn _fail("unknown")\n\n\nfunc _toggle_door',
@@ -533,6 +595,21 @@ MODULY = {
             ("podlaha se pozna podle spatneho flagu",
              "const F_BACKGROUND: int = 0x00000001",
              "const F_BACKGROUND: int = 0x00000004"),
+            # --- 19. session, zadani 19 (V12/V16/V17) -----------------------------------
+            # Patra: filtr patra je SJEDNOCENI dvou pravidel - `z >= strop_patra`
+            # (reference `UpdateMaxDrawZ`, GameSceneDrawingSorting.cs:57-213) NEBO
+            # stara podminka "jsem pod strechou a je to strop". Vsechny ctyri
+            # mutace jsou overene, ze testy spadnou (zaznam v `_analyza/p22-patra-mutace.txt`).
+            ("strop patra propusti objekt na sve urovni (patro zustane videt)",
+             "if z_statiku >= _max_z:", "if z_statiku > _max_z:"),
+            ("krytí se pozna jen z kandidata (strecha bez Surface nad hracem zustane)",
+             "bool(s[\"kandidat\"]) or pod_strechou(px, py, pz)",
+             "bool(s[\"kandidat\"])"),
+            ("zadny kandidat = strop 0 (skryje se vsechno)",
+             "const STROP_NIC: int = 127", "const STROP_NIC: int = 0"),
+            ("Surface+Background uz neni strop (schod na mem patre zmizi)",
+             "((f & F_SURFACE) != 0 and (f & F_BACKGROUND) != 0)",
+             "((f & F_SURFACE) != 0 and true)"),
         ],
     },
     # CHUZE DRZENIM (12. session, rozhodnuti uzivatele 2026-10-07). Testy meri
@@ -542,9 +619,17 @@ MODULY = {
         "prefix": "app.input",
         "prepinac": "--input-script",
         "mutace": [
+            # ⚠ 19. session - DVA VZORY BYLY MRTVE (namEReno pri behu mutaci):
+            # kod se pri V14 prepsal, takze puvodni texty (`if not
+            # Input.is_action_pressed(...)` a `player_screen_position(...)` ve
+            # volani `direction_from_screen`) v souboru uz nejsou. Nahrazuji je
+            # vzory na TOTEZ v novem kode, aby pokryti nezmizelo.
             ("drzeni se neopakuje (pta se jen na just_pressed)",
-             "if not Input.is_action_pressed(input_action):",
-             "if not Input.is_action_just_pressed(input_action):"),
+             "var stisknuto: bool = Input.is_action_pressed(input_action)",
+             "var stisknuto: bool = Input.is_action_just_pressed(input_action)"),
+            ("stred pro smer je stred okna, ne hrac na obrazovce",
+             "center_for(player, camera_offset, z), mouse_position)",
+             "view_size / 2.0, mouse_position)"),
             ("krok se vyda pri kazdem pollu (prodleva se ignoruje)",
              "if now_ms - minule < prodleva:",
              "if false:"),
@@ -567,12 +652,23 @@ MODULY = {
             ("rovina svisla se nikdy nevybere (vse je uhlopricka)",
              "if ay * float(MOUSE_RATIO_NUM) >= ax * float(MOUSE_RATIO_DEN):",
              "if false:"),
-            ("stred pro smer je stred okna, ne hrac na obrazovce",
-             "player_screen_position(player, camera_offset, z), mouse_position)",
-             "view_size / 2.0, mouse_position)"),
+            # ⚠ 19. session - vzor vyse (puvodni text `player_screen_position(
+            # player, camera_offset, z), mouse_position)`) byl MRTVY: V14 zavedla
+            # `center_for(...)`, ktery presnou pozici hrace dostava od klienta.
+            # Vzor na TOTEZ v novem kode je u modulu vyse.
             ("kurzor na hraci se posle jako krok (a spali prodlevu)",
              "if smer < 0:\n\t\t\t\tcontinue\n",
              ""),
+            # --- 19. session, zadani 19 -------------------------------------------------
+            # V14: klient posila PRESNOU pozici hrace (`player_screen`); kdyz se
+            # ignoruje, pocita se stred z `z = 0`, ktery je o 40 px jinde
+            # (namEReno: 4 473 z 11 163 pozic kurzoru vratilo jiny smer).
+            ("presna pozice hrace se ignoruje (stred z z=0)",
+             "if player_screen != Vector2.INF:", "if false:"),
+            # V4: auto-run se rusi NOVYM stiskem praveho tlacitka; bez te vetve
+            # neexistuje cesta, jak bezet zastavit (Esc je jen doplnkovy).
+            ("auto-run se neda zastavit pravym klikem",
+             'elif bool(vstup.get("right_just", false)):', "elif false:"),
         ],
     },
     # PORADI V TICKU (vada V1, `REVIZE-POHYB-2026-10-07.md` §2.1). Modul je tu
@@ -616,6 +712,15 @@ MODULY = {
              "return Vector2(roundf(posun.x), roundf(posun.y))", "return posun"),
             ("controller bezi pred smyckou (cte stav pred tickem)",
              "\tprocess_priority = 1", "\tprocess_priority = 0"),
+            # --- 19. session, zadani 19 -------------------------------------------------
+            # V14: klient musi poslat PRESNOU pozici hrace pro smer z mysi.
+            ("klient neposila pozici hrace pro smer z mysi",
+             "\t_publish_center()\n", ""),
+            # V15a: otoceni na miste se musi projevit i v KRESLENI - kdyz klient
+            # pri prazdnem kroku neprebere `player.dir`, nakresli stary smer.
+            ("otoceni na miste se v kresleni neprojevi",
+             "if player != null and _view_dir != int(player.dir):",
+             "if false:"),
         ],
     },
     "world_view": {
@@ -662,6 +767,44 @@ MODULY = {
             # v `tests/cases/world_view.gd` (sekce 5c).
             ("kamera ignoruje cerny pas pro GUI (hrac pod pasem)",
              "+ offset + gui_odsazeni", "+ offset"),
+            # --- 19. session, zadani 19 (V1, V5, V9) ------------------------------------
+            # V5 "pri pohybu cela obrazovka zrni": NAMERENO, ze pri zoomu != 1 se
+            # svetovy pixel mapuje na ZLOMEK pixelu obrazovky (52,27 % pixelu se
+            # zmeni i pri cistem posunu; `snap_na_pixely` to srazi na 0,23 %).
+            ("snap na mrizku obrazovky vypnuty (pri zoomu != 1 obraz zrni)",
+             "if not snap_na_pixely or is_equal_approx(zoom, 1.0):", "if true:"),
+            ("snap vraci vstup (zaokrouhleni se neprovede)",
+             "return (p * zoom).round() / zoom", "return p"),
+            # V9: okno seznamu objektu MUSI rust s oddalenim, jinak obrazovka
+            # prestane byt pokryta a u okraju vzniknou DIRY.
+            ("okno seznamu ignoruje zoom (pri oddaleni vzniknou diry)",
+             "\t# tedy viewport / zoom - pri oddaleni okno roste presne o `1 / zoom`.\n"
+             "\tvar rozmer: Vector2 = svet_rozmer()",
+             "\t# tedy viewport / zoom - pri oddaleni okno roste presne o `1 / zoom`.\n"
+             "\tvar rozmer: Vector2 = get_viewport_rect().size"),
+            ("zoom se oreze na spatne meze (hodnota utece)",
+             "var omezene: float = clampf(novy, ZOOM_MIN, ZOOM_MAX)",
+             "var omezene: float = novy"),
+            ("kamera nedostane zoom (svet se nezmensi)",
+             "\t\t_camera.zoom = Vector2(zoom, zoom)\n", ""),
+            ("vychozi zoom je 1,0 (rozhled se nezvetsi)",
+             "const ZOOM_VYCHOZI: float = 0.75", "const ZOOM_VYCHOZI: float = 1.0"),
+            ("cerny pas se deli spatnym zoomem (hrac mimo stred)",
+             "+ offset + gui_odsazeni / zoom", "+ offset + gui_odsazeni"),
+            # V1 "propadam se do textury mostu": klic hrace musi byt ZA vsim,
+            # co ho muze prekryt (statik na jeho dlazdici, plosina pod nim).
+            # Kdyz se bere jen klic mobila na jeho dlazdici, kryje hrace
+            # statik s vetsim `priority_z` (namEReno: 187 px z 804).
+            ("klic hrace se pocita jen z jeho dlazdice (prekryje ho statik)",
+             "return nejvyssi + 1", "return _sort.sort_key({\"kind\": \"mobile\", \"x\": int(_player.pos.x), \"y\": int(_player.pos.y), \"z\": int(_player.pos.z)})"),
+            # ⚠ 19. session - text `return nejvyssi + 1` je v souboru DVAKRAT
+            # (v `_sort_key_of_player` a v `klic_hrace_stats`), takze vzor vyse
+            # mutuje jen PRVNI vyskyt - a ten druhy se v novem kodu ani nepouzije.
+            # Tenhle vzor cili ZALOHU pro prazdny seznam; text musi byt
+            # jednoznacny, jinak je mutace ticha (namEReno: s obecnym textem
+            # vyslo "SLEPY", protoze se zaloha nemutovala).
+            ("zaloha klice hrace vraci nulu (pri prazdnem seznamu je hrac pred vsim)",
+             "return _sort.klic_nad_diagonalou(diagonal) + 1", "return 0"),
         ],
     },
     # M9 (15. session): davkove kresleni. Mutace miri na GEOMETRII, PORADI

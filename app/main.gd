@@ -34,6 +34,10 @@ const ItemScript = preload("res://sim/entity/item.gd")
 const HarvestScript = preload("res://sim/systems/harvest.gd")
 const CraftScript = preload("res://sim/systems/craft.gd")
 const JournalScript = preload("res://ui/journal.gd")
+# 20. session (2026-10-08): obecna interakce. `sim.interaction` se registruje
+# TADY (integraci misto) - do teto session nebyl v behu hry vubec, takze kazdy
+# prikaz `use`/`use_on`/`interact` skoncil hlaskou "Not available yet".
+const InteractionScript = preload("res://sim/systems/interaction.gd")
 # M9 (15. session): typovana konfigurace a mereni vykonu. Config se ptá na
 # `data/balance.json` (kontrola typu/rozsahu), metrics sbira frame cas, pocet
 # kreslenych objektu, textury a stavbu davky.
@@ -43,6 +47,16 @@ const MetricsScript = preload("res://app/metrics.gd")
 const DEFAULT_SEED: int = 1234
 const BRITAIN := Vector2i(1495, 1630)   # namesti Britainu (docs/01 §1.4)
 const PLAYER_BODY: int = 400            # 400 = muz (tělo je jen v anim.mul)
+# VSECHNY NASTROJE DO BATOHU (pokyn uzivatele 2026-10-08: "do pytliku pridej
+# vsechny nastroje"). Seznam je z DAT (`data/items.json`, `category == "tool"`),
+# ne z kodu - kdyz data pribudou, pribudnou i ve hre. Dva zaznamy s kategorii
+# `tool` jsou CILE, ne nastroje (`TARGET_ROLES` v `sim.interaction`): kovadlina
+# a vyhen. Cisla se odsud neopisuji.
+const ITEMS_DATA := "res://data/items.json"
+const SKILLS_DATA := "res://data/skills.json"
+const TOOL_CATEGORY := "tool"
+const TOOL_TARGET_ROLES: Array[String] = ["anvil", "forge"]
+const ITEM_OFFSET: int = 0x4000         # tiledata id -> art id (docs/03 §3.4)
 # ⚠ 18. session - CERNY PAS PRO GUI (prani uzivatele: stary zpusob UO): svet ma
 # sve okno a GUI bydli v cernem pase VPRAVO a DOLE, aby zurnal nezakryval
 # vyhled. Viz `_setup_ui()` a `app/world_view.gui_odsazeni`.
@@ -70,6 +84,7 @@ var container = null
 var items: Dictionary = {}       # serial -> Item (smelt/repair hledaji podle serialu)
 var harvest = null
 var craft = null
+var interaction = null           # `sim.interaction` - obecna interakce (20. session)
 var config = null
 var metrics = null
 var world_view = null            # `app.world_view` (pro metriky)
@@ -214,6 +229,26 @@ func _setup_player(view) -> void:
 	var walk = WalkScript.new(map)
 	var serial: int = sim.next_serial()
 	player = MobileScript.new(serial, PLAYER_BODY, Vector3i(BRITAIN.x, BRITAIN.y, 0))
+	# ⚠⚠ 19. session (2026-10-08) - VADA V3 ZE ZADANI 19: "Postava bezi jen asi
+	# 3 policka ... dosla stamina a neregeneruje se." NAMERENO: `sim.regen`
+	# (doplnovani staminy) NEEXISTUJE, takze pri vychozich statech 10/10/10
+	# (`sim/entity/stats.gd`) je `max_stam = DEX = 10` a po 10 krocich behu
+	# postava jen chodi - NAPOZADY. Uzivatel rozhodl: "nastavil vychozi staty na
+	# 130, aby se to zatim nedelo". Staty jsou VSTUP z `data/balance.json`
+	# (klic `player_start_stats`), ne opsana cisla v kodu - a hodnota je
+	# PROZATIMNI: trvala oprava je `sim.regen` (viz HANDOFF, "Co se NEOPRAVILO").
+	var staty: Dictionary = _start_stats()
+	player.stats.str_ = int(staty["STR"])
+	player.stats.dex = int(staty["DEX"])
+	player.stats.int_ = int(staty["INT"])
+	# Maxima a aktualni hodnoty se MUSI prebrat z novych statu: `Mobile._init`
+	# je nastavil z vychozich 10/10/10 (bez toho by status bar ukazoval 10/130).
+	player.max_hp = player.stats.hits_max()
+	player.max_stam = player.stats.stam_max()
+	player.max_mana = player.stats.mana_max()
+	player.hp = player.max_hp
+	player.stam = player.max_stam
+	player.mana = player.max_mana
 	player.pos = Vector3i(BRITAIN.x, BRITAIN.y, walk.surface_z(BRITAIN.x, BRITAIN.y))
 	player.dir = 0
 	# TABULKA DLAZDIC a KONTEJNER: jedina instance pro cely svet (docs/04 §4.2
@@ -229,6 +264,9 @@ func _setup_player(view) -> void:
 	batoh.layer = 0
 	batoh.parent = serial
 	items[int(player.backpack)] = batoh
+	# Nastroje (20. session): do batohu jde KAZDY nastroj z `data/items.json`.
+	# Bez nich by obecna interakce nemela co vybrat a vracela by `no_pair`.
+	var nastroju: int = _give_tools()
 	# Barva kuze (granule `render.hue`, sada `HUE_SKIN` z `hues.json`). Bez ni je
 	# telo 400 sedive: art z `anim.mul` je jen rampa jasu, barvu dava hue.
 	# V UO znamena `hue == 0` "zadna barva", proto se sada dava jen kdyz je 0.
@@ -258,6 +296,16 @@ func _setup_player(view) -> void:
 	craft = CraftScript.new(container, items, map, tiledata, sim.systems["skill_gain"],
 		sim, sim.rng(), sim.clock(), sim.events(), registry)
 	sim.systems["craft"] = craft
+	# Obecna interakce (20. session): `sim.interaction` dostava STEJNY kontejner,
+	# registr a slovnik predmetu jako sber/vyroba (dve instance = duplikaty).
+	# `world.doors` zatim neexistuje, proto `null` - `use` na dvere odpovi
+	# `not_available` (viditelne), dokud je nekdo nezalozi.
+	interaction = InteractionScript.new(sim, sim.events(), null, container, registry, items)
+	sim.systems["interaction"] = interaction
+	# POCATECNI SKILLY (20. session): bez nich je sber nehratelny (viz
+	# `data/balance.json` -> `player_start_skills`). Az po `interaction`, aby se
+	# jmena skillu prekladala JEDNIM zdrojem (`data/skills.json`).
+	var skillu: int = _apply_start_skills()
 
 	# `world.time` se musi napojit na clock simulace (vada F6 z etapy 1: do
 	# 2026-10-06 `world_time_ms` plnily jen testy, takze `hour()` vratilo ve hre
@@ -275,7 +323,126 @@ func _setup_player(view) -> void:
 	controller.setup(player, sim, loop.input_map, movement, view, loop)
 	print("[main] hrac: serial ", serial, " na ", player.pos, " (", map.land_at(player.pos.x, player.pos.y),
 		" land), hue ", player.hue, " (0 = bez barvy), barvy: ", view.hue_stats(),
+		", nastroju v batohu ", nastroju, ", pocatecnich skillu ", skillu,
 		", systemu v sim: ", sim.systems.keys())
+
+
+func _give_tools() -> int:
+	# VSECHNY NASTROJE DO BATOHU (pokyn uzivatele 2026-10-08). Vraci pocet
+	# vydanych predmetu; kdyz data chybi, HLASI to - ticha nula by znamenala
+	# "obecna interakce nic nedela" a vypadalo by to jako vada interakce.
+	if not FileAccess.file_exists(ITEMS_DATA):
+		push_warning("app.main: chybi " + ITEMS_DATA + " - hrac nedostane zadny nastroj")
+		return 0
+	var parsed = JSON.parse_string(FileAccess.get_file_as_string(ITEMS_DATA))
+	if not (parsed is Array):
+		push_warning("app.main: " + ITEMS_DATA + " neni seznam - hrac nedostane zadny nastroj")
+		return 0
+	var pocet: int = 0
+	var jmena: Array[String] = []
+	var videne_typy: Dictionary = {}     # type -> true (jeden nastroj od kazdeho typu)
+	for rec in parsed:
+		if not (rec is Dictionary):
+			continue
+		if str(rec.get("category", "")) != TOOL_CATEGORY:
+			continue
+		var role: String = str(rec.get("role", ""))
+		if role in TOOL_TARGET_ROLES:
+			continue                     # kovadlina a vyhen jsou CILE, ne nastroje
+		if not rec.has("tile"):
+			continue
+		# ⚠ 20. session: JEDEN NASTROJ OD KAZDEHO TYPU, ne od kazdeho artu.
+		# Typ je identita (`data/items.json` -> `type`) a jeden typ ma casto vic
+		# grafik: krumpac 2 arty, sekera 3, kladivo 2. Do teto session se bral
+		# kazdy zaznam, takze hrac dostal 28 predmetu misto 16 (dva krumpace,
+		# tri sekery...) - nasla to sonda `_analyza/p23-interakce.gd`.
+		var typ: String = str(rec.get("type", ""))
+		if typ == "":
+			typ = "art:" + str(rec["tile"])     # stara data bez typu - neztracej je
+		if videne_typy.has(typ):
+			continue
+		videne_typy[typ] = true
+		# `data/items.json` ma TILEDATA ID; `entity.item.tile` je ART ID (docs/03 §3.4).
+		var predmet = ItemScript.new(sim.next_serial(), int(rec["tile"]) + ITEM_OFFSET, 1)
+		if not container.add(int(player.backpack), predmet):
+			push_warning("app.main: nastroj '" + str(rec.get("name", role))
+				+ "' se do batohu nevesel (plno nebo vaha)")
+			continue
+		items[int(predmet.serial)] = predmet
+		jmena.append(str(rec.get("name", role)))
+		pocet += 1
+	print("[main] nastroje v batohu: ", pocet, " (", ", ".join(PackedStringArray(jmena)), ")")
+	return pocet
+
+
+static func start_skills(balance_skills: Dictionary, skills_data) -> Dictionary:
+	# Nazev skillu -> `id` (z `data/skills.json`) a hodnota v desetinach.
+	# Vraci `{id: hodnota}`; nezname jmeno se NAHLASI a preskoci - ticha nula by
+	# vypadala jako "skill se pridal", i kdyz se preklepl nazev.
+	var podle_jmena: Dictionary = {}
+	if skills_data is Array:
+		for rec in skills_data:
+			if rec is Dictionary and rec.has("name") and rec.has("id"):
+				podle_jmena[str(rec["name"])] = int(rec["id"])
+	var out: Dictionary = {}
+	for jmeno in balance_skills.keys():
+		if not podle_jmena.has(str(jmeno)):
+			push_warning("app.main: skill '" + str(jmeno)
+				+ "' z `player_start_skills` neni v " + SKILLS_DATA)
+			continue
+		out[int(podle_jmena[str(jmeno)])] = int(balance_skills[jmeno])
+	return out
+
+
+func _start_skills_map() -> Dictionary:
+	# Vsechny klice `player_start_skills.*` ze SCHEMA `app.config` (ne z kódu):
+	# kdo prida skill do schematu a do dat, tomu se objevi i ve hre.
+	var out: Dictionary = {}
+	if config == null:
+		return out
+	var prefix := "player_start_skills."
+	for klic in config.known_keys():
+		var cesta: String = str(klic)
+		if cesta.begins_with(prefix):
+			out[cesta.substr(prefix.length())] = int(config.value(cesta, 0))
+	return out
+
+
+func _apply_start_skills() -> int:
+	# POCATECNI SKILLY HRACE (20. session). Duvod je namereny: se vsemi skilly 0
+	# je sance sberu `skill/1000` = 0 % a tezba nefunguje (`_analyza/p23-interakce.gd`).
+	var mapa: Dictionary = _start_skills_map()
+	if mapa.is_empty():
+		push_warning("app.main: zadne `player_start_skills` ve SCHEMA - hrac zacne se skilly 0")
+		return 0
+	var data = null
+	if FileAccess.file_exists(SKILLS_DATA):
+		data = JSON.parse_string(FileAccess.get_file_as_string(SKILLS_DATA))
+	else:
+		push_warning("app.main: chybi " + SKILLS_DATA + " - pocatecni skilly se nepridaji")
+		return 0
+	var hodnoty: Dictionary = start_skills(mapa, data)
+	for id in hodnoty.keys():
+		player.skills.set_value(int(id), int(hodnoty[id]))
+	var jmena: Array[String] = []
+	for jmeno in mapa.keys():
+		jmena.append("%s %s" % [str(jmeno), str(float(int(mapa[jmeno])) / 10.0)])
+	print("[main] pocatecni skilly: ", ", ".join(PackedStringArray(jmena)))
+	return hodnoty.size()
+
+
+func _start_stats() -> Dictionary:
+	# Pocatecni staty hrace z `data/balance.json` (`player_start_stats`), ne z
+	# kodu (docs/08 §8.3: hodnotu nesmi tvrdit dva zdroje). Kdyz data nejsou
+	# nactena (chybi soubor), pouzije se SCHEMA default z `app.config` - nikdy
+	# "tise nula", ktera by postavu nechala bez staminy.
+	var out := {"STR": 10, "DEX": 10, "INT": 10}
+	if config == null:
+		return out
+	out["STR"] = int(config.value("player_start_stats.STR", 75))
+	out["DEX"] = int(config.value("player_start_stats.DEX", 130))
+	out["INT"] = int(config.value("player_start_stats.INT", 20))
+	return out
 
 
 func _load_data() -> Dictionary:

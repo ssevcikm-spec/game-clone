@@ -156,16 +156,23 @@ func run(t) -> void:
 	var sort = sort_script.new()
 
 	# Mapa: land na cele plose pohledu, ktery `setup()` hned zmeri. Stred je
-	# `BRITAIN` (1495,1630) a pohled 64x48, takze oblast je x 1463..1526,
-	# y 1606..1653 - a presne tolik dlazdic se musi namERit (3072 = 64*48).
+	# `BRITAIN` (1495,1630); okno seznamu zavisi na ZOOMU (19. session), proto
+	# je land plocha s rezervou vetsi nez nejvetsi okno a pocet statiku se
+	# v kontrole POCITA z dat (opsane cislo by pri zoomu lhalo).
 	var map := FakeMap.new()
-	map.land_rect = Rect2i(1400, 1560, 300, 200)
+	map.land_rect = Rect2i(1360, 1520, 400, 300)
 	# Statik v bloku (182,200) = zaklad (1456,1600); lokalni (7,7) je svetove
-	# (1463,1607) a to je V oblasti. Dva dalsi jsou mimo a nesmi se pocitat.
+	# (1463,1607) a to je V okne. Dalsi dva v TEMZ bloku jsou mimo obrazovku
+	# i pri oddaleni a nesmi se pocitat (stejne jako statik z jineho bloku).
 	map.statics[Vector2i(182, 200)] = [
 		{"tile": 500, "x": 7, "y": 7, "z": 3, "hue": 0},
 		{"tile": 501, "x": 0, "y": 0, "z": 3, "hue": 0},
 		{"tile": 502, "x": 60, "y": 0, "z": 3, "hue": 0},
+	]
+	# Blok (182,199) se pri okne porad prochazi, ale jeho statik lezi NAD oknem
+	# (y = 1592) - tak se meri, ze se statiky mimo oblast SKUTECNE vynechavaji.
+	map.statics[Vector2i(182, 199)] = [
+		{"tile": 503, "x": 0, "y": 0, "z": 3, "hue": 0},
 	]
 	var textures := FakeTextures.new()
 	textures.offsets[500 + 0x4000] = Vector2i(2, 3)
@@ -219,28 +226,46 @@ func run(t) -> void:
 	var okraj: Vector2i = view.call("_list_okraj")
 	var sirka: int = okraj.x
 	var vyska: int = okraj.y
+	# Kolik statiku z fixture lezi v okne: POCITA se z DAT. Okno je od 19.
+	# session zavisle na zoomu, takze opsane "1 statik" by pri jinem zoomu
+	# lhalo - a kontrola by merila neco jineho, nez co je v kodu.
+	var okno_rect := Rect2i(1495 - sirka / 2, 1630 - vyska / 2, sirka, vyska)
+	var statiku: int = 0
+	for klic in map.statics.keys():
+		var zaklad_bloku := Vector2i(int(klic.x) * 8, int(klic.y) * 8)
+		for zaznam in map.statics[klic]:
+			if okno_rect.has_point(zaklad_bloku + Vector2i(int(zaznam["x"]), int(zaznam["y"]))):
+				statiku += 1
 	var objekty: int = view.visible_count()
 	var counts: Dictionary = view.counts()
-	t._check(sirka > 0 and vyska > 0 and objekty == sirka * vyska + 1
+	t._check(sirka > 0 and vyska > 0 and objekty == sirka * vyska + statiku
 		and int(counts.get("land", -1)) == sirka * vyska
-		and int(counts.get("static", -1)) == 1,
-		"app.world_view: pohled %dx%d = %d land + 1 statik v oblasti "
-		% [sirka, vyska, sirka * vyska]
+		and int(counts.get("static", -1)) == statiku,
+		"app.world_view: pohled %dx%d = %d land + %d statiku v okne "
+		% [sirka, vyska, sirka * vyska, statiku]
 		+ "(namEReno %d objektu, land %s, static %s, RECENTER %d)"
 			% [objekty, str(counts.get("land")), str(counts.get("static")), recenter])
 	# 3a) OKNO POKRYVA OBRAZOVKU: polomer okna v izometrickych osach musi byt
-	#     vetsi nez polovina obrazovky + to, kam hrac muze odjit (`RECENTER`).
+	#     vetsi nez polovina VIDITELNE PLOCHY SVETA + to, kam hrac muze odjit
+	#     (`RECENTER`). Viditelna plocha je `svet_rozmer()` = viewport / zoom
+	#     (19. session, V9) - pri oddaleni je vetsi, takze okno musi byt vetsi.
+	#     Kdyz okno obrazovku NEPOKRYJE, `_draw` ji prestane kreslit a vzniknou
+	#     DIRY (namERena past).
 	var rozmer: Vector2 = view.get_viewport_rect().size
-	if rozmer.x > 0.0 and rozmer.y > 0.0:
+	if rozmer.x <= 0.0 or rozmer.y <= 0.0:
+		print("[test]      POZOR: viewport nema rozmer (headless) - pokryti se meri ",
+			"s deklarovanym oknem z projektu: ", view.svet_rozmer(), " px sveta")
+	var svet: Vector2 = view.svet_rozmer()
+	if svet.x > 0.0 and svet.y > 0.0:
 		var pol_a: float = float(sirka) / 2.0 - float(recenter)
 		var pol_b: float = float(vyska) / 2.0 - float(recenter)
-		var potreba_a: float = (rozmer.x / 2.0 + rozmer.y / 2.0) / float(consts["ISO_STEP"])
-		var potreba_b: float = absf(rozmer.x / 2.0 - rozmer.y / 2.0) / float(consts["ISO_STEP"])
+		var potreba_a: float = (svet.x / 2.0 + svet.y / 2.0) / float(consts["ISO_STEP"])
+		var potreba_b: float = absf(svet.x / 2.0 - svet.y / 2.0) / float(consts["ISO_STEP"])
 		t._check(pol_a >= potreba_a and pol_b >= potreba_b,
-			"app.world_view: okno %dx%d pokryva obrazovku %s (osa a %.1f >= %.1f, osa b %.1f >= %.1f)"
-				% [sirka, vyska, str(rozmer), pol_a, potreba_a, pol_b, potreba_b])
+			"app.world_view: okno %dx%d pokryva svet %s pri zoomu %s (osa a %.1f >= %.1f, osa b %.1f >= %.1f)"
+				% [sirka, vyska, str(svet), str(view.zoom), pol_a, potreba_a, pol_b, potreba_b])
 	else:
-		print("[test]      NEMERENO: okno vs obrazovka - viewport nema rozmer (headless)")
+		print("[test]      NEMERENO: okno vs svet - nelze zjistit viditelnou plochu")
 	t._check(counts.size() == 3 and counts.has("land") and counts.has("static")
 		and counts.has("skryto"),
 		"app.world_view: counts() ma land, static a skryto (namEReno %s)" % str(counts.keys()))
@@ -266,6 +291,91 @@ func run(t) -> void:
 			+ "vzdaleny novy seznam %s)" % str(not is_same(seznam_pred, seznam_daleko)))
 		view.look_at_tile(Vector2i(1495, 1630), 0)
 		view.call("_list")
+
+	# 3c) ⚠⚠ 19. session (2026-10-08) - ZOOM JE VSTUP (V9: "cela obrazovka je
+	#     jakoby trochu pixelata ... chtelo by to oddalit obrazovku, zvetsit
+	#     rozhled"). Do teto session kamera `zoom` VUBEC nemela, takze vsechno
+	#     bylo 1:1. Kontroluje se CHOVANI (ne jen hodnota konstanty):
+	#       * vychozi zoom je < 1 = vetsi rozhled nez pred 19. session a je
+	#         nasazeny na kamere,
+	#       * `svet_rozmer()` = viewport / zoom (viditelna plocha sveta),
+	#       * okno seznamu (`_list_okraj`) pri ODDALENI ROSTE - jinak by u okraju
+	#         vznikly DIRY (namERena past),
+	#       * okno obrazovku pokryva i pri nejvetsim oddaleni (ZOOM_MIN),
+	#       * zoom se oreze na ZOOM_MIN / ZOOM_MAX,
+	#       * `gui_odsazeni` (cerny pas GUI) je v px OBRAZOVKY, takze se do sveta
+	#         deli zoomem - hrac zustane ve stredu viditelneho sveta.
+	var zoom_vychozi: float = float(view_consts.get("ZOOM_VYCHOZI", 1.0))
+	var zoom_min: float = float(view_consts.get("ZOOM_MIN", 1.0))
+	var zoom_max: float = float(view_consts.get("ZOOM_MAX", 1.0))
+	t._check(zoom_vychozi < 1.0 and is_equal_approx(float(view.zoom), zoom_vychozi),
+		"app.world_view: vychozi zoom je < 1 (vetsi rozhled) a je nasazen (zoom %s, konstanta %s)"
+			% [str(view.zoom), str(zoom_vychozi)])
+	var rozmer_vp: Vector2 = view.get_viewport_rect().size
+	var deklarovane := Vector2(
+		float(ProjectSettings.get_setting("display/window/size/viewport_width", 1280)),
+		float(ProjectSettings.get_setting("display/window/size/viewport_height", 720)))
+	var zaklad_okna: Vector2 = rozmer_vp if rozmer_vp.x > 0.0 else deklarovane
+	t._check(view.svet_rozmer().is_equal_approx(zaklad_okna / view.zoom),
+		"app.world_view: svet_rozmer() = okno / zoom (namEReno %s, ocekavano %s)"
+			% [str(view.svet_rozmer()), str(zaklad_okna / view.zoom)])
+	var osy: Vector2i = view.viditelne_dlazdice()
+	t._check(osy.x >= 1 and osy.y >= 1,
+		"app.world_view: viditelne_dlazdice() vraci kladny rozsah os a/b (namEReno %s)" % str(osy))
+	# okno seznamu: pri zoomu 1 vs pri ZOOM_MIN
+	view.nastav_zoom(1.0)
+	var svet_1: Vector2 = view.svet_rozmer()
+	var okno_1: Vector2i = view.call("_list_okraj")
+	var osy_1: Vector2i = view.viditelne_dlazdice()
+	view.nastav_zoom(zoom_min)
+	var svet_min: Vector2 = view.svet_rozmer()
+	var okno_min: Vector2i = view.call("_list_okraj")
+	var osy_min: Vector2i = view.viditelne_dlazdice()
+	t._check(svet_min.x > svet_1.x and svet_min.y > svet_1.y,
+		"app.world_view: oddaleni zvetsi viditelnou plochu (%s pri zoomu 1 -> %s pri %s)"
+			% [str(svet_1), str(svet_min), str(zoom_min)])
+	t._check(osy_min.x > osy_1.x and osy_min.y > osy_1.y,
+		"app.world_view: oddaleni zvetsi rozsah os (%s -> %s dlazdic)" % [str(osy_1), str(osy_min)])
+	t._check(okno_min.x > okno_1.x and okno_min.y >= okno_1.y,
+		"app.world_view: oddaleni zvetsi okno seznamu (%s pri zoomu 1 -> %s pri %s)"
+			% [str(okno_1), str(okno_min), str(zoom_min)])
+	var pol_a_min: float = float(okno_min.x) / 2.0 - float(recenter)
+	var pol_b_min: float = float(okno_min.y) / 2.0 - float(recenter)
+	var pot_a_min: float = (svet_min.x / 2.0 + svet_min.y / 2.0) / float(consts["ISO_STEP"])
+	var pot_b_min: float = absf(svet_min.x / 2.0 - svet_min.y / 2.0) / float(consts["ISO_STEP"])
+	t._check(pol_a_min >= pot_a_min and pol_b_min >= pot_b_min,
+		"app.world_view: okno pokryva obrazovku i pri zoomu %s (osa a %.1f >= %.1f, osa b %.1f >= %.1f)"
+			% [str(zoom_min), pol_a_min, pot_a_min, pol_b_min, pot_b_min])
+	t._check(is_equal_approx(cam.zoom.x, zoom_min) and is_equal_approx(cam.zoom.y, zoom_min),
+		"app.world_view: nastav_zoom nasadi zoom na kameru (namEReno %s, cekano %s)"
+			% [str(cam.zoom), str(zoom_min)])
+	view.nastav_zoom(zoom_max * 4.0)
+	t._check(is_equal_approx(float(view.zoom), zoom_max),
+		"app.world_view: zoom se oreze nahoru na ZOOM_MAX (namEReno %s, konstanta %s)"
+			% [str(view.zoom), str(zoom_max)])
+	view.nastav_zoom(0.001)
+	t._check(is_equal_approx(float(view.zoom), zoom_min),
+		"app.world_view: zoom se oreze dolu na ZOOM_MIN (namEReno %s, konstanta %s)"
+			% [str(view.zoom), str(zoom_min)])
+	# `gui_odsazeni` je v px obrazovky -> do sveta se deli zoomem. Bez toho by
+	# hrac pri oddaleni "usel" z centra viditelneho sveta pod cerny pas.
+	view.gui_odsazeni = Vector2(160.0, 60.0)
+	view.look_at_tile(Vector2i(10, 20), 0)
+	var s_pasem_zoom: Vector2 = cam.position
+	view.gui_odsazeni = Vector2.ZERO
+	view.look_at_tile(Vector2i(10, 20), 0)
+	var bez_pasu_zoom: Vector2 = cam.position
+	t._check((s_pasem_zoom - bez_pasu_zoom).is_equal_approx(Vector2(160.0, 60.0) / zoom_min),
+		"app.world_view: gui_odsazeni se pri zoomu %s deli zoomem (rozdil %s, ocekavano %s)"
+			% [str(zoom_min), str(s_pasem_zoom - bez_pasu_zoom),
+				str(Vector2(160.0, 60.0) / zoom_min)])
+	view.nastav_zoom(zoom_vychozi)
+	view.look_at_tile(Vector2i(1495, 1630), 0)
+
+	# --- 4)-5c) meri PRESNY vzorec kamery, proto se tu prechazi na zoom 1,0:
+	#     pri nem je `snap_screen` identita a nic se nezaokrouhluje (puvodni
+	#     kontrakt zustava mereny presne). Chovani pri zoomu != 1 meri 5d.
+	view.nastav_zoom(1.0)
 
 	# 4) kamera stoji presne podle `core.iso` a `core.const` (z = 0)
 	var stred := Vector2i(1495, 1630)
@@ -315,9 +425,36 @@ func run(t) -> void:
 	var s_pasem: Vector2 = cam.position
 	view.gui_odsazeni = Vector2.ZERO
 	view.look_at_tile(Vector2i(10, 20), 0)
-	t._check(s_pasem == cam.position + Vector2(160.0, 60.0),
-		"app.world_view: gui_odsazeni se pricte ke kamere (s pasem %s, bez %s)"
-			% [str(s_pasem), str(cam.position)])
+	# ⚠ 19. session: pas je v px OBRAZOVKY, do sveta se deli zoomem (viz 3c).
+	t._check(s_pasem == cam.position + Vector2(160.0, 60.0) / view.zoom,
+		"app.world_view: gui_odsazeni se pricte ke kamere pres zoom (s pasem %s, bez %s, zoom %s)"
+			% [str(s_pasem), str(cam.position), str(view.zoom)])
+	# 5d) ⚠⚠ 19. session (V5 "pri pohybu cela obrazovka zrni"): pri zoomu != 1
+	#     se pozice kamery i postavy ZAOKROUHLUJI NA MRIZKU OBRAZOVKY
+	#     (`snap_screen`). Bez toho je svetovy pixel na obrazovce zlomek pixelu
+	#     a obraz se kazdy frame prevzorkovava (namEReno zbytek 52,27 % pixelu
+	#     pri zoomu 0,75; `_analyza/p22-teren-zrno.gd`). Meri se:
+	#       (a) pri zoomu 1,0 je `snap_screen` IDENTITA (chovani pred 19.
+	#           session se nesmi zmenit ani o pixel),
+	#       (b) pri vychozim zoomu je pozice kamery na CELOCISELNEM pixelu
+	#           obrazovky (posun o cely svetovy pixel = cely pixel obrazovky),
+	#       (c) zaokrouhleni neposune kameru o vic nez jeden pixel obrazovky.
+	view.nastav_zoom(1.0)
+	var presna: Vector2 = iso.to_screen(10, 20, 0) \
+		+ Vector2(int(consts["ISO_STEP"]), int(consts["TILE_H"]) / 2)
+	t._check(view.snap_screen(presna) == presna and view.snap_screen(presna + Vector2(0.5, 0.5)) == presna + Vector2(0.5, 0.5),
+		"app.world_view: snap_screen je pri zoomu 1,0 identita (i s necelym posunem)")
+	view.nastav_zoom(zoom_vychozi)
+	view.look_at_tile(Vector2i(10, 20), 0)
+	var kam_zoom: Vector2 = cam.position
+	var obrazova: Vector2 = kam_zoom * view.zoom
+	t._check(absf(obrazova.x - roundf(obrazova.x)) < 0.001 \
+			and absf(obrazova.y - roundf(obrazova.y)) < 0.001,
+		"app.world_view: pri zoomu %s je pozice kamery na celociselnem pixelu obrazovky (%s -> %s)"
+			% [str(view.zoom), str(kam_zoom), str(obrazova)])
+	t._check((kam_zoom - presna).length() <= 1.0 / view.zoom + 0.001,
+		"app.world_view: zaokrouhleni na mrizku obrazovky neposune kameru vic nez o pixel obrazovky (odchylka %.3f, mez %.3f)"
+			% [(kam_zoom - presna).length(), 1.0 / view.zoom])
 	view.look_at_tile(Vector2i(3000, 3000), 0)
 	var objekty_jinde: int = view.visible_count()
 	var jinde: Dictionary = view.counts()
@@ -346,31 +483,95 @@ func run(t) -> void:
 		"app.world_view: set_view_dir normalizuje smer > 7 (namEReno %s)"
 			% str(view.get("_view_dir")))
 
-	# 7) klic hrace je klic z render.sort pro mobil (ne vlastni aritmetika)
+	# 7) klic hrace je klic z `render.sort` - a od 19. session (V1) je to
+	#    NEJVETSI klic objektu na diagonale hrace (a blizsi) ZVETSENY o 1, aby
+	#    hrace neprekryl statik na jeho vlastni dlazdici (namEReno: statik art
+	#    16585 ma na teze dlazdici klic o 2 vyssi a hrace prekryl).
+	#    Meri se to na REALNEM seznamu: do `_chunk` se vlozi vlastni objekty,
+	#    mezi kterymi hrac stoji. Kontrola je na OBA smery - kdyby klic hrace
+	#    byl jen "hodne velky", prosla by i vada "hrac je nad vsechno" a
+	#    "zed prosvita pres strechu" by se vratila.
 	var hrac := FakeMobile.new()
 	hrac.pos = Vector3i(10, 20, 0)
 	view.set_player(hrac)
-	var klic = view.call("_sort_key_of_player")
-	var ocekavany: int = sort.sort_key({"kind": "mobile", "x": 10, "y": 20, "z": 0})
-	t._check(typeof(klic) == TYPE_INT and klic == ocekavany,
-		"app.world_view: klic hrace == sort_key(mobile 10,20,0) (namEReno %s, ocekavano %d)"
-			% [str(klic), ocekavany])
+	var sb: Dictionary = {
+		"na_dlazdici": {"kind": "static", "x": 10, "y": 20, "z": 40, "art_id": 500 + 0x4000},
+		"o_diag_dal": {"kind": "static", "x": 11, "y": 20, "z": 0, "art_id": 500 + 0x4000},
+		"o_dva_diag": {"kind": "static", "x": 12, "y": 20, "z": 40, "art_id": 500 + 0x4000},
+		"o_tri_diag": {"kind": "static", "x": 13, "y": 20, "z": 0, "art_id": 500 + 0x4000},
+	}
+	view._chunk._list = [sb["o_tri_diag"], sb["o_dva_diag"], sb["o_diag_dal"], sb["na_dlazdici"]]
+	view._chunk._built = true
+	var klic = view.call("_klic_hrace")
+	var k_na: int = sort.sort_key(sb["na_dlazdici"])
+	# TVRZENI, KTERE PLATI VZDY (a je to jadro opravy V1): klic hrace je vetsi
+	# nez klic VSECH objektu na diagonale hrace a bliz - proto ho neprekryje
+	# statik na jeho dlazdici ani plosina, na ktere stoji.
+	# Druha strana je merena testem 8c: statik o 2 diagonaly dal s nejvyssim `z`
+	# ma klic vyssi nez hrac, takze "strecha vepredu" se nezhorsila.
+	var k_dva: int = sort.sort_key(sb["o_dva_diag"])
+	var k_tri: int = sort.sort_key(sb["o_tri_diag"])
+	# Rozklad klice (cisla, ne dojem): do maxima se pocital prave 1 objekt
+	# (hracova diagonala 30) a nejvyssi z nich je statik na jeho dlazdici.
+	var rozklad: Dictionary = view.klic_hrace_stats()
+	t._check(int(rozklad["pocitano"]) == 1 and int(rozklad["nejvyssi"]) == k_na
+		and int(rozklad["diagonala"]) == 30,
+		"app.world_view: klic hrace pocita z REALNYCH objektu bliz (pocitano %d, nejvyssi %d, diag %d)"
+			% [int(rozklad["pocitano"]), int(rozklad["nejvyssi"]), int(rozklad["diagonala"])])
+	t._check(typeof(klic) == TYPE_INT and int(klic) > k_na,
+		"app.world_view: klic hrace je ZA statikem na sve dlazdici (hrac %d > statik %d)"
+			% [int(klic), k_na])
+	# 3 diagonaly dal se stejnym `z` = 0 uz je ZA hracem (hranice pravidla).
+	t._check(int(klic) < sort.sort_key({"kind": "static", "x": 13, "y": 20, "z": 0}),
+		"app.world_view: klic hrace je PRED statikem o 3 diagonaly dal se z=0")
+	# 7a) ⚠ 19. session - ZALOHA PRO PRAZDNY SEZNAM. Kdyz seznam nema ani jeden
+	#     objekt, klic hrace se pocita z `render.sort.klic_nad_diagonalou` (horni
+	#     mez diagonaly). Kdyby vracel nulu (nebo cokoli nizkeho), poslal by hrace
+	#     PRED vsechno, co se teprve objevi. Meri se to na PRAZDNEM seznamu a na
+	#     OBOU stranach: vysledek musi byt vetsi nez kazdy objekt na diagonale
+	#     hrace a mensi nez objekt o 3 diagonaly dal.
+	view._chunk._list = []
+	view._chunk._built = true
+	var klic_prazdny = view.call("_klic_hrace")
+	t._check(int(klic_prazdny) > sort.sort_key({"kind": "static", "x": 10, "y": 20, "z": 127}),
+		"app.world_view: pri prazdnem seznamu je klic hrace nad celou svoji diagonalou (%d > %d)"
+			% [int(klic_prazdny), sort.sort_key({"kind": "static", "x": 10, "y": 20, "z": 127})])
+	t._check(int(klic_prazdny) < sort.sort_key({"kind": "static", "x": 13, "y": 20, "z": -128}),
+		"app.world_view: pri prazdnem seznamu zustava klic hrace pred vzdalenou diagonalou (%d < %d)"
+			% [int(klic_prazdny), sort.sort_key({"kind": "static", "x": 13, "y": 20, "z": -128})])
 
 	# 7b) ⚠ V2 (2026-10-07): POSUN POSTAVY MEZI DLAZDICEMI. `set_player_offset`
 	#     posune KRESLENI postavy, i kdyz `player.pos` je porad stara dlazdice
 	#     (presne to dela reference: `Mobile.cs:776-782` kresli `Offset`,
 	#     `:836-844` commitne dlazdici az na konci kroku). Meri se to na
 	#     `player_ground_position()` - to je funkce, kterou `_draw_player` vola.
+	#     ⚠ 19. session: pri zoomu != 1 se pozice zaokrouhluje na mrizku
+	#     obrazovky (V5), takze se meri PRESNE pri zoomu 1,0 a jinak vlastnost
+	#     "posun je cely pocet pixelu obrazovky a velikost zustava".
+	view.nastav_zoom(1.0)
 	var zakladni: Vector2 = view.player_ground_position()
 	view.set_player_offset(Vector2(11.0, -7.0))
 	var posunuty: Vector2 = view.player_ground_position()
 	t._check(posunuty - zakladni == Vector2(11.0, -7.0),
-		"app.world_view: posun kroku se pricte ke kresleni postavy (%s -> %s, rozdil %s)"
+		"app.world_view: posun kroku se pricte ke kresleni postavy pri zoomu 1,0 (%s -> %s, rozdil %s)"
 			% [str(zakladni), str(posunuty), str(posunuty - zakladni)])
+	view.nastav_zoom(zoom_vychozi)
+	view.set_player_offset(Vector2.ZERO)
+	var zakladni_z: Vector2 = view.player_ground_position()
+	view.set_player_offset(Vector2(11.0, -7.0))
+	var posunuty_z: Vector2 = view.player_ground_position()
+	var rozdil_z: Vector2 = posunuty_z - zakladni_z
+	var obrazovy_rozdil: Vector2 = rozdil_z * view.zoom
+	t._check(absf(obrazovy_rozdil.x - roundf(obrazovy_rozdil.x)) < 0.001 \
+			and absf(obrazovy_rozdil.y - roundf(obrazovy_rozdil.y)) < 0.001 \
+			and absf(rozdil_z.x - 11.0) <= 1.0 / view.zoom \
+			and absf(rozdil_z.y + 7.0) <= 1.0 / view.zoom,
+		"app.world_view: pri zoomu %s je posun postavy cely pocet pixelu obrazovky (%s -> %s) a zustava v mezich"
+			% [str(view.zoom), str(rozdil_z), str(obrazovy_rozdil)])
 	t._check(int(hrac.pos.x) == 10 and int(hrac.pos.y) == 20,
 		"app.world_view: pri posunu se dlazdice postavy NEMENI (pos %s)" % str(hrac.pos))
 	view.set_player_offset(Vector2.ZERO)
-	t._check(view.player_ground_position() == zakladni,
+	t._check(view.player_ground_position() == zakladni_z,
 		"app.world_view: vynulovany posun vraci kresleni na dlazdici")
 
 	# 7d) ⚠ 17. session (2026-10-08) - `_draw_player` kresli SMER KRESLENI.
@@ -421,15 +622,19 @@ func run(t) -> void:
 	t._check(sort.sort_key(strecha) > sort.sort_key(hrac_obj),
 		"app.world_view: strecha (z=31) na TEZE diagonale jde ZA hracem (z=0) "
 		+ "(%d > %d)" % [sort.sort_key(strecha), sort.sort_key(hrac_obj)])
-	# 8c) ⚠ 18. session: statik o JEDNU diagonalou dal a VYSOKO jde ZA hracem -
-	#     presne to je "strecha, ktera hrace prekryje" (do 17. session sla pred
-	#     nim, proto byl hrac videt pres strechu). Zmereno na referencnim klíči
-	#     `(x + y) + (127 + z) * 0.01`: rozdil `z` (765) je vetsi nez krok
-	#     mrizky (300), takze 1-2 kroky se prebit daji.
-	var strecha_dal := {"kind": "static", "x": 9, "y": 20, "z": z_max}
-	t._check(sort.sort_key(strecha_dal) > int(klic),
-		"app.world_view: statik o 1 diagonalу dal s nejvyssim `z` jde ZA hracem (%d > %d)"
-			% [sort.sort_key(strecha_dal), int(klic)])
+	# 8c) ⚠ 19. session (V1) - HRANICE TOHOTO PRAVIDLA, MERENA NA OBA SMERY.
+	#     Klic hrace je od teto session "nejvetsi klic objektu na diagonale hrace
+	#     a blizsi, +1" (aby ho neprekryl statik na jeho vlastni dlazdici a aby
+	#     pres nej neslo prkno mostu o diagonalu vpred). To ma dusledek, ktery se
+	#     NESMI zamlcet: statik o JEDNU diagonalou dal se muze dostat PRED hrace
+	#     uz pri strednim `z` (namEReno: hrac 8 009 506 vs statik o 1 diagonalou
+	#     dal se `z = 127` ma 8 009 466, tedy je PRED hracem). Proto se tady meri
+	#     to, co plati vzdy: statik na TEZE diagonale je pred hracem a statik
+	#     o DVA diagonaly dal se stejnym `z` je za nim.
+	var strecha_dva := {"kind": "static", "x": 11, "y": 21, "z": z_max}
+	t._check(sort.sort_key(strecha_dva) > int(klic),
+		"app.world_view: statik o 2 diagonaly dal s nejvyssim `z` jde ZA hracem (%d > %d)"
+			% [sort.sort_key(strecha_dva), int(klic)])
 
 	# 9) set_registry preda registr do render.anim (body_of ho pouzije)
 	view.set_registry(FakeRegistry.new())

@@ -49,6 +49,9 @@ const NIZKO := 0x0009       # statik, Impassable, ale z = -40 (pod nohama)
 const VYSOKO := 0x000A      # statik, Impassable, z = 60 (nad hlavou)
 const PRKNO := 0x000B       # statik, Surface + height 1 (prkno mostu/mola)
 const MOST := 0x000C        # statik, Surface + Bridge + height 4 (puli vysku)
+const PODLAHA := 0x000D     # statik, Surface, height 0 (podlaha patra ve vysce z)
+const SCHOD_A := 0x000E     # statik, Surface + Bridge + height 10, je v `world.stairs`
+const SCHOD_B := 0x000F     # statik, Surface + Bridge + height 5, je v `world.stairs`
 
 
 class FakeTiledata:
@@ -80,7 +83,7 @@ class FakeMap:
 class FakeStairs:
 	# `world.stairs` v testu: schod je jen ten jedny art (bez assetu).
 	func is_stair(tile: int) -> bool:
-		return tile == SCHOD
+		return tile == SCHOD or tile == SCHOD_A or tile == SCHOD_B
 
 
 class FakeDoors:
@@ -116,6 +119,13 @@ func _fake() -> Array:
 	td.h[PRKNO + ITEM_OFFSET] = 1
 	td.f[MOST + ITEM_OFFSET] = F_SURFACE | F_BRIDGE
 	td.h[MOST + ITEM_OFFSET] = 4
+	# Podlaha patra (vyska 0) a dva druhy stupnu (Bridge = CalcHeight je pulka).
+	td.f[PODLAHA + ITEM_OFFSET] = F_SURFACE
+	td.h[PODLAHA + ITEM_OFFSET] = 0
+	td.f[SCHOD_A + ITEM_OFFSET] = F_SURFACE | F_BRIDGE
+	td.h[SCHOD_A + ITEM_OFFSET] = 10
+	td.f[SCHOD_B + ITEM_OFFSET] = F_SURFACE | F_BRIDGE
+	td.h[SCHOD_B + ITEM_OFFSET] = 5
 
 	var map = FakeMap.new()
 	for y in 8:
@@ -222,7 +232,31 @@ func run(t) -> void:
 	var voda: Dictionary = walk.can_step(Vector3i(5, 5, 0), 0, Const.PERSON_HEIGHT, true)
 	t._check(voda["ok"] == false and str(voda["reason"]) == "blocked",
 		"world.walk: voda vraci reason 'blocked' (namEReno %s)" % str(voda))
+	# 2-c) ⚠ 19. session - VODA NENI KANDIDAT ANI PRI CHUZI DOLU. Kontrola 2
+	#     ("voda vraci 'blocked'") projde i bez kontroly flagu, protoze voda je
+	#     pri ni JEDINY kandidat: `_vyber_povrch` nic nevybere a "blocked" vrati
+	#     samo. Aby kontrola flagu vubec mela jak selhat, musi existovat kandidat,
+	#     ktereho by se "dolu" pravidlo chytilo: `from.z` je VYSOKO (10) nad
+	#     vodou (z = 0), takze bez `F_WET` by se voda vybrala (reference nema pro
+	#     krok dolu zadny limit) a krok by vysel `ok`.
+	#     ⚠ Vedlejsi NAMERENE chovani, ktere se NESMI zamlcet: kdyz na vode stoji
+	#     statik se `Surface` (plosina, prkno mola), vybere se STATIK - voda pod
+	#     nim krok neblokuje. To je verne (`_vyber_povrch` bere statiky pred
+	#     landem), takze se to testuje jako "plosina nad vodou staci".
+	map.zs[Vector2i(5, 5)] = 10
+	map.land[Vector2i(6, 5)] = VODA
+	map.zs[Vector2i(6, 5)] = 0
+	var voda_dolu: Dictionary = walk.can_step(Vector3i(5, 5, 10), 0, Const.PERSON_HEIGHT, true)
+	t._check(voda_dolu["ok"] == false and str(voda_dolu["reason"]) == "blocked",
+		"world.walk: na vodu se neda ani krokem DOLU (namEReno %s)" % str(voda_dolu))
+	# Druhy smer: na TRAVU o stejne vysce se dolu dojde - kdyby pravidlo blokovalo
+	# vsechno, tahle kontrola spadne.
 	map.land[Vector2i(6, 5)] = TRAVA
+	var trava_dolu: Dictionary = walk.can_step(Vector3i(5, 5, 10), 0, Const.PERSON_HEIGHT, true)
+	t._check(trava_dolu["ok"] == true and int(trava_dolu["z"]) == 0,
+		"world.walk: na travu o stejne vysce se dolu dojde (namEReno %s)" % str(trava_dolu))
+	map.zs[Vector2i(5, 5)] = 0
+	map.zs[Vector2i(6, 5)] = 0
 	# 2a) ZED ma v tiledata vysku 0 (jako 645 druhu Impassable artu) - i tak blokuje.
 	map.statics[Vector2i(6, 5)] = [_statik(ZED, 6, 5, 0)]
 	var zed: Dictionary = walk.can_step(Vector3i(5, 5, 0), 0, Const.PERSON_HEIGHT, true)
@@ -303,6 +337,77 @@ func run(t) -> void:
 	map.zs[Vector2i(5, 5)] = 0
 	map.zs[Vector2i(5, 6)] = 0
 	map.zs[Vector2i(6, 6)] = 0
+
+	# 2h) ⚠ V17/SCHODY (2026-10-08, zadani 19) - "nedari se mi vystoupat vzhuru".
+	#     NAMERENO na hrade u Britannie (`_analyza/p22-pohyb-schody-sonda.gd`):
+	#     na JEDNE dlazdici je SLOPEC stupnu po 5 (art 1848 vyska 10 a 1850
+	#     vyska 5, oba `Bridge`), nad nimi strop patra (art 1407, vyska 0, z=60).
+	#     Podlaha hradu je statik z=21 s vyskou 0 (art 2803) - `surface_z` na
+	#     tech dlazdicich vraci 60 (strop), ale chodi se po nich ve 21 az 40.
+	#     Tenhle test opakuje TY SAME kroky bez assetu: z podlahy (21) na prvni
+	#     maly stupen (22), z nej na vetsi (27) a nakonec na VRCHOL (40).
+	#     Kdyby se v `_blokuje_statik` vzala plna vyska misto `CalcHeight`,
+	#     spadne krok na vrchol (40) - presne ta "oprava", ktera by schody
+	#     rozbila (reference pocita `checkZ + CalcHeight`, Movement.cs:84).
+	var SCHODISTE := [
+		{"x": 5, "y": 5, "statiky": [_statik(SCHOD_B, 5, 5, 20)]},
+		{"x": 6, "y": 5, "statiky": [_statik(SCHOD_A, 6, 5, 20), _statik(SCHOD_B, 6, 5, 25)]},
+		{"x": 7, "y": 5, "statiky": [_statik(SCHOD_A, 7, 5, 20), _statik(SCHOD_A, 7, 5, 25),
+			_statik(SCHOD_A, 7, 5, 30), _statik(SCHOD_A, 7, 5, 35)]},
+	]
+	for bunka in SCHODISTE:
+		map.statics[Vector2i(int(bunka["x"]), int(bunka["y"]))] = bunka["statiky"]
+	map.statics[Vector2i(4, 5)] = [_statik(PODLAHA, 4, 5, 21)]
+	for bod in [Vector2i(4, 5), Vector2i(5, 5), Vector2i(6, 5), Vector2i(7, 5)]:
+		map.zs[bod] = 10
+	var p1: Dictionary = walk.can_step(Vector3i(4, 5, 21), 0, Const.PERSON_HEIGHT, true)
+	t._check(p1["ok"] == true and int(p1["z"]) == 22,
+		"world.walk: z podlahy hradu (21) se vstoupi na prvni stupen (22) (namEReno %s)" % str(p1))
+	var p2: Dictionary = walk.can_step(Vector3i(5, 5, 22), 0, Const.PERSON_HEIGHT, true)
+	t._check(p2["ok"] == true and int(p2["z"]) == 27,
+		"world.walk: z prvniho stupne (22) se jde na dalsi (27) - stupen vys ve sloupci"
+		+ " NEBLOKUJE (namEReno %s)" % str(p2))
+	var p3: Dictionary = walk.can_step(Vector3i(6, 5, 27), 0, Const.PERSON_HEIGHT, true)
+	t._check(p3["ok"] == true and int(p3["z"]) == 40,
+		"world.walk: ze schodiste se dojde na VRCHOL (40) (namEReno %s)" % str(p3))
+	for bunka in SCHODISTE:
+		map.statics.erase(Vector2i(int(bunka["x"]), int(bunka["y"])))
+	map.statics.erase(Vector2i(4, 5))
+	for bod in [Vector2i(4, 5), Vector2i(5, 5), Vector2i(6, 5), Vector2i(7, 5)]:
+		map.zs[bod] = 0
+
+	# 2g) ⚠⚠ V11 (2026-10-08, zadani 19) - "Hra mi neumozni jit na most."
+	#     NAMERENO na mole u Britannie (`_analyza/p22-most-koridor.txt`):
+	#     uzivatel stoji na prkne (art 2173: `Surface`+`Bridge`, vyska 4) v z=0,
+	#     tedy ve vysce 2, a dalsi prkno paluby je v z=5. Nas strop kroku byl
+	#     `startTop(2) + STEP_HEIGHT(2) = 4` < `itemTop 5` -> reason "height" a na
+	#     molo se nedalo vstoupit (blokovane byly vsechny 4 sloupce paluby).
+	#     Reference (`Movement.cs:617-641`) bere do `startTop` i STATIKY POD
+	#     NOHAMI: `zTop = tile.Z + Height` (plna vyska, i u Bridge) = 0 + 4 = 4,
+	#     takze `stepTop = 6 >= 5` a krok POVOLI. Fixture je proto prkno pod
+	#     nohama; kdyby se statiky zase ignorovaly, krok spadne na "height".
+	map.statics[Vector2i(5, 5)] = [_statik(MOST, 5, 5, 0)]
+	map.statics[Vector2i(6, 5)] = [_statik(MOST, 6, 5, 5)]
+	map.land[Vector2i(6, 5)] = VODA       # pod prknem je voda (jako u mola)
+	map.zs[Vector2i(6, 5)] = -5
+	t._check(walk.surface_z(5, 5) == 2,
+		"world.walk: prkno s Bridge (vyska 4) v z=0 ma stojnou vysku 2 (namEReno %d)"
+			% walk.surface_z(5, 5))
+	var na_most: Dictionary = walk.can_step(Vector3i(5, 5, 2), 0, Const.PERSON_HEIGHT, true)
+	t._check(na_most["ok"] == true and int(na_most["z"]) == 7,
+		"world.walk: z prkna (startTop = z + plna vyska prkna) se na dalsi prkno v z=5"
+		+ " DOJDE (namEReno %s)" % str(na_most))
+	# KONTROLA, ze se pravidlo nerozvolnilo: bez statiku POD NOHAMI (stojim ve
+	# stejne vysce 2, ale na zemi) je tyz krok porad "height" - rozhoduje to,
+	# co je pod nohama, ne vetsi tolerance.
+	map.statics.erase(Vector2i(5, 5))
+	var bez_prkna: Dictionary = walk.can_step(Vector3i(5, 5, 2), 0, Const.PERSON_HEIGHT, true)
+	t._check(bez_prkna["ok"] == false and str(bez_prkna["reason"]) == "height",
+		"world.walk: bez statiku pod nohami je krok o 5 nahoru dal 'height' (namEReno %s)"
+			% str(bez_prkna))
+	map.statics.erase(Vector2i(6, 5))
+	map.land[Vector2i(6, 5)] = TRAVA
+	map.zs[Vector2i(6, 5)] = 0
 
 	# 3) statik s `Surface` ZVEDNE povrch; `Wall` (dekor) ho nezvysuje
 	map.statics[Vector2i(6, 5)] = [_statik(PLOSINA, 6, 5, 10)]

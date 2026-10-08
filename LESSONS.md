@@ -24,6 +24,150 @@ Typy: `chyba` (moje vada) · `past-nástroje` (prostředí/nástroj, ne logika) 
 
 ---
 
+# 19. session (2026-10-08) — SEDMNÁCT VAD ZE SNÍMKŮ (řazení hráče, zoom, patra, pohyb, staty)
+
+## Pasti, které mě dnes chytily (a co z nich platí dál)
+
+1. **⚠ „Vada zmizela“ může být SYNTAX ERROR v testu, ne oprava (chyba).**
+   Po opravě klíče hráče (V1) hlásila sada **1283 kontrol / 1 selhání** — jenže
+   jedno z těch „selhání“ bylo `case soubor tests/cases/world_view.gd nelze
+   nacist (parse error?)` (řádek 614: proměnná `hrac_obj` deklarovaná dvakrát),
+   takže **celý case soubor se přeskočil** a sada měřila o ~50 kontrol méně.
+   Harness to naštěstí hlásí (to je oprava z 8. session) — ale kdo čte jen
+   „1283 kontrol / 1 selhání“, myslí si, že problém je v jedné kontrole.
+   **Ponaučení:** při každém běhu čti i `case souboru spusteno: N z 44`; když je
+   N < 44, je to **parse error**, ne nález. A po editaci testu si pusť
+   `--check-only --script <case>`, než ho pustíš v sadě.
+
+2. **⚠ Nepravdivý komentář u funkce je horší než chybějící komentář — a je to
+   past na DALŠÍ sondu (chyba).** `sim/world/walk.surface_z` měl v hlavičce
+   „vrací NEJNIŽŠÍ povrch“ a vrací **maximum** (nejvyšší statik se `Surface`).
+   Důsledek naměřený: sonda teammate „patra“ postavila hráče na `surface_z`
+   a dostala **z = 60** (strop patra, art 1407 s výškou 0) místo výšky, po které
+   se chodí (21..40) — a z toho vzniklo tvrzení „na schody se nedá vystoupat“.
+   Skutečnost (BFS přes `can_step` z náměstí): na 1. patro se **dojde, 29 kroků**.
+   Druhá polovina téže pasti: i návrh opravy (`_height` místo `_calc_height`
+   v `_blokuje_statik`) byl **otestován a zamítnut** — 5 testů FAIL a sonda
+   „nedojde“; reference má `checkZ + CalcHeight` (`Movement.cs:84`).
+   **Ponaučení:** než podle komentáře stavíš sondu, přečti **tělo** funkce;
+   a návrh opravy se **testuje**, i když zní logicky (zvlášť když je z něj cítit
+   „takhle to musí být“).
+
+3. **⚠ Klič hráče byl měřený jen na `z` a přehlédlo se `priority_z` (chyba).**
+   Do 19. session byl klíč hráče `sort_key({mobile, x, y, z})` — tedy klíč mobila
+   na jeho dlaždici. Statik na **téže** dlaždici má ale `priority_z` jinak
+   (podlaha −1, statik s výškou +1), takže **překryl hráče** (naměřeno: klic
+   8 930 416 vs 8 930 418; ve stoje 0 px kryto, ale statik art 18684 na molu
+   hráče kryl). Oprava: klíč hráče = **maximum reálných klíčů objektů na jeho
+   diagonale a blíž, +1**. **Ponaučení:** klíč, který závisí na `z`, musí projít
+   i přes `priority_z` — dvě různé výšky téhož objektu (`z` z mapy vs `priority_z`
+   pro řazení) se nesmí plést. A vedlejší důsledek se musí říct nahlas: hráč je
+   teď za vším, co ho může překrýt, takže statik o 1–2 diagonály dal s vysokým
+   `z` se dostane před něj (testy 7/8c měří oba směry).
+
+4. **⚠ Mrtvá větev vzniká i tím, že chybí JEDEN `case` v cizím souboru (chyba).**
+   `sim/commands.gd` znal `turn` v tabulce `REQUIRED` a validoval ho, ale
+   v `match t:` neměl `case "turn"` — takže příkaz prošel validací a dispatch
+   odpověděl „Not available yet“. Metoda `movement.turn()` přitom **existovala**.
+   Druhá polovina: ani po doplnění se otáčení neprojevilo, protože event
+   `mobile_turned` **neměl v `app/` žádného konzumenta** (klient kreslil směr jen
+   z běžícího kroku). **Ponaučení:** u nové funkce se ptej na **celou cestu**
+   (vstup → dispatch → sim → klient → obraz), ne na to, že „metoda existuje“;
+   a hledej konzumenta eventu (`grep` na název eventu v `app/`), ne jen jeho
+   producenta.
+
+5. **⚠ Zelený test, který měří sám sebe, je slepý — a je to snadné udělat
+   znovu (past-nástroje).** První verze mého testu klíče hráče volala
+   `_sort_key_of_player()` s prázdným seznamem, a **ta hodnota se náhodou
+   rovnala** hodnotě, kterou jsem očekával od jiného objektu — test prošel, aniž
+   by měřil to, co tvrdil. Druhá verze navíc tvrdila hranici („hrac je pred
+   statikem o 1-2 diagonaly dal“), která **neplatí** (v klíči může `z` přebít
+   2,5 diagonály). **Ponaučení:** u klíče se kontroluje **relace k reálným
+   objektům** (je za tím na své dlaždici, je před tím o 3 diagonály dal),
+   a když se test musí opravit, patří do záznamu původní (nesprávné) tvrzení.
+
+6. **⚠ `python -c "…"` s vloženým skriptem v PowerShellu nejde — a heredit
+   `<<` taky ne (past-nástroje).** PowerShell nemá `<<`; `python -c` s `#` uvnitř
+   řetězce rozbije i komentáře. **Ponaučení:** delší Python se píše do souboru
+   v `_analyza/` a spouští se `python _analyza/x.py`; krátké výrazy se dají
+   do `python -c` **bez** `#` a bez složených uvozovek.
+
+7. **⚠ `Path.read_text(newline="")` v Pythonu 3.12 NEEXISTUJE (past-nástroje).**
+   Kdo potřebuje zachovat konce řádků, musí `open(..., newline="")`. U velkého
+   souboru (`HANDOFF.md`, 229 kB) se to vyplatí: místo přepisu celého souboru
+   `write` toolem se dělá **přesná operace** (nahradit nadpis, vložit sekci před
+   kotvu) a s **kontrolou počtu sekcí** před i po. **Ponaučení:** velké stavové
+   dokumenty se needitují celé — ale každá taková operace musí mít kontrolu
+   („sekci bylo 17, je 18; kotvy `## Co čeká na tebe`/`## BLOKÁTORY`/`## Další
+   kroky` zůstaly“).
+
+8. **⚠ Test, který projde i bez měřené podmínky, je slepý — a pozná se to jen
+   spuštěním mutací (past-nástroje).** `tests/cases/walk.gd` měl kontrolu
+   „voda vrací `blocked`“ — jenže v tom stavu byla voda **jediný kandidát na
+   povrch**, takže `_vyber_povrch` vrátil `blocked` SÁM a kontrola flagu `F_WET`
+   se vůbec neuplatnila. Mutace „voda neblokuje“ proto **prošla** (zeleně).
+   Oprava testu: postavit hráče **vysoko nad vodu** (krok DOLŮ, kde reference
+   nemá žádný limit) — pak bez `F_WET` voda kandidátem JE a krok vyjde `ok`,
+   takže mutace spadne. **Ponaučení:** u kontroly „X se nesmí“ se ptej, jestli
+   by prošla i tehdy, kdyby se pravidlo o X vyhodilo; když ano, netestuje X.
+   A druhá věc: „není kandidát“ a „je zakázaný“ jsou dvě různé věty, i když
+   vracejí stejný výsledek.
+
+9. **⚠ Mutační vzor, jehož text je v souboru DVAKRÁT, mutuje jen první výskyt
+   (past-nástroje).** `mutace-tests.py` dělá `zdroj.replace(stare, nove, 1)`.
+   Vzor „voda neblokuje“ cílil text, který je v `sim/world/walk.gd` **dvakrát**
+   (`_start_top` a `_vyber_povrch`) — mutoval tedy jen `_vyber_povrch`, který
+   testy nevidí. **Ponaučení:** vzor musí obsahovat dost okolního kontextu, aby
+   byl v souboru jednoznačný; a když se okolní kód změní, harness to hlásí jako
+   „PATRANA VETA SE NENASLA“ — což je správné chování, ne chyba.
+
+10. **⚠ Mutační vzory ZTRÁCEJÍ PLATNOST, když se kód přepíše (past-nástroje).**
+    V běhu 2026-10-08 se našly tři: `walk` „vzestup se počítá z MÉHO z, ne
+    z horní hrany“ (řádek se přepsal na `return maxi(_top(c), from.z)`, který
+    v souboru už není), `input` „držení se neopakuje“ a `input` „střed pro směr
+    je střed okna“ (obojí se přepsalo při V14). **Ponaučení:** při každém běhu
+    mutací se čte i řádek `PATRANA VETA SE NENASLA`; mrtvý vzor **není zelená**
+    (nástroj ho nepočítá), ale v reportu vypadá jako splněný — patří nahradit
+    nebo smazat.
+
+11. **⚠ Testy v sandboxu `workspace-write` hlásí FALEŠNÁ selhání (past-nástroje,
+    už podruhé).** Tentýž příkaz dal **1 200 kontrol / 13 selhání** (sandbox)
+    a **1 201 / 0** (plný přístup); vada byla v `globalize_path` → prázdná cesta
+    (`app.config: data se nectou: `) a v `render.textures` (manifest dal 0 spritů).
+    **Ponaučení:** než začneš hledat vadu v kódu, ověř **přístup**; 13 selhání
+    najednou v souborech, které spolu nesouvisí, je podpis prostředí, ne logiky.
+
+12. **⚠ Dvě session v jednom workspace: brány a mutace se NESMÍ pouštět
+    souběžně se zápisem (past-nástroje).** Naměřeno 2026-10-08: `mutace-tests.py`
+    skončil hláškou `original se zmenil u interaction, input, player_controller,
+    config, harvest` — protože v témže stromě psala **paralelní session 20**.
+    Nástroj to poznal sám (kontrola hashů na konci, řádek ~1058) a **výsledek byl
+    nepoužitelný**; nebylo to vadou nástroje. **Ponaučení:** než pustíš brány nebo
+    mutace, ověř `git status` a `LastWriteTime` **cizích** souborů; když někdo
+    píše, běh odlož nebo ho omez `--only` na moduly, do kterých nikdo nesahá.
+    A do `HANDOFF.md`/`LESSONS.md` patří na začátek upozornění, že je přebírá
+    ten, kdo končí později a **nesmí smazat sekci druhého** (`docs/09 §9.7`).
+
+ Tentýž příkaz dal **1 200 kontrol / 13 selhání** (sandbox)
+   a **1 201 / 0** (plný přístup); vada byla v `globalize_path` → prázdná cesta
+   (`app.config: data se nectou: `) a v `render.textures` (manifest dal 0 spritů).
+   **Ponaučení:** než začneš hledat vadu v kódu, ověř **přístup**; 13 selhání
+   najednou v souborech, které spolu nesouvisí, je podpis prostředí, ne logiky.
+
+## Vytvořené nástroje (19. session)
+
+| Nástroj | K čemu | Ověření |
+|---|---|---|
+| `_analyza/p22-staty-sonda.gd` | počáteční staty hráče ve hře + výdrž běhu (kroky, než `stam <= 1`) | `75/130/20`, `max_hp 87`, **129 kroků běhu (25,8 s)**, pak chůze |
+| `_analyza/p22-turn-sonda.gd` | celá cesta otáčení: příkaz → dispatch → `mob.dir` → `view_dir` (co se kreslí) | dir 2/4/6/0 → sim i kreslení sedí, pozice se nemění, 0 selhání ze 4 |
+| `_analyza/p22-rozhled-sonda.gd` | kolik dlaždic je vidět (z viewportu a zoomu, dvěma cestami) | 960x600 px, zoom 1,0 → **43 dlaždic na (x−y) a 27 na (x+y)**; zoom 0,75 → 48,0/osu |
+| `_analyza/p22-klic-sonda.gd` | konstanty a klíče `render.sort` za běhu (odhalil, že `PASS_SPAN` je aditivní, ne multiplikativní) | `klic_nad_diagonalou(10,20)=8009765`, statik `priority_z 127` na té dlaždici = 8009766 |
+| `_analyza/p22-stretch-sonda.gd` | přijímá Godot 4.7.2 `stretch/scale_mode=integer`? | ano (`hint_string 'fractional,integer'`); **vliv na obraz NEMĚŘEN** (metrika nerozlišila) |
+| `_analyza/p22-handoff-splice.py` | přesná operace na velkém `HANDOFF.md` (nadpis + vložení sekce) s kontrolou počtu sekcí | `sekci 17 → 18`, kotvy zůstaly, 2 200 → 2 294 řádků |
+| `_analyza/p22-overeni-00-souhrn.md` (verifier) | nezávislé ověření 14 tvrzení ostatních tratí vlastním během, revize na SHA-256 | 12 SEDÍ, 1 ČÁSTEČNĚ (N1 = překrytý hráč) — a to vedlo k opravě V1 |
+
+## Pasti, které mě dnes chytily (a co z nich platí dál) — 18. session
+
 ### 2026-10-08 — Časové dělení má tři povinnosti: držet předchozí výsledek, dokončit fázi, nemít mrtvou bránu (postup)
 **Co se stalo:** přestavba dávky (13 000 objektů, ~150 ms) se rozdělila na
 `zacni()` + `krok(8 ms)`. První verze měřila **hůř než předtím** (46 framů
