@@ -129,6 +129,32 @@ func _textury() -> FakeTextures:
 	return t
 
 
+func _hash_stranky(mesh) -> String:
+	# HASH pixelu runtime stranky na GPU. `render_target_update_mode` neni
+	# dukaz (cte porad 1) - dukaz je ZMENENY OBSAH. Kdyz se obrazek neda precist,
+	# vraci "NEMERENO" (ne prazdny retezec, ktery by vypadal jako namerena nula).
+	var tex: Texture2D = mesh.texture()
+	if tex == null:
+		return "NEMERENO"
+	var img: Image = tex.get_image()
+	if img == null:
+		# V headless rezimu se render target necte - zkusime ho vynutit.
+		RenderingServer.force_draw(false)
+		img = tex.get_image()
+	if img == null:
+		return "NEMERENO"
+	var data: PackedByteArray = img.get_data()
+	if data.is_empty():
+		return "NEMERENO"
+	if data.is_empty():
+		return "NEMERENO"
+	var h: int = 1469598103934665603
+	for i in range(0, data.size(), 13):
+		h = (h ^ int(data[i])) * 1099511628211
+		h = h & 0x7FFFFFFFFFFFFFFF
+	return "%x" % h
+
+
 func _obj(kind: String, x: int, y: int, art: int, ostatni: Dictionary = {}) -> Dictionary:
 	var o := {"kind": kind, "x": x, "y": y, "z": 0, "art_id": art, "offset": Vector2i.ZERO}
 	for k in ostatni.keys():
@@ -364,6 +390,45 @@ func run(t) -> void:
 	t._check(int(mesh3.stats()["nodraw"]) == 1 and int(mesh3.stats()["svahu"]) == 1,
 		"render.chunk_mesh: realna mapa ma 1 nodraw a 1 svah (namEReno %s)"
 			% str([mesh3.stats()["nodraw"], mesh3.stats()["svahu"]]))
+
+	# --- F) ⚠ 17. session: STRANKA SE NA GPU PREKRESLI PRI KAZDE ZMENE ------
+	# Uzivatel: "priblizne kazdym ctvrtým krokem se rozbiji zobrazovani ...
+	# nektere textury působí rozmazaně, jakoby byly zvětšené". Pricina
+	# (namERena, `_analyza/p20b-nalez.md`): `SubViewport.UPDATE_ONCE` znamena
+	# "vykresli se JEDNOU PO PRIZNACENI rezimu", ne "pri kazdem queue_redraw()".
+	# Stranka se proto prekreslila jen pri PRVNI stavbe a kazda dalsi zmena
+	# `_sloty` nechala na strance STARE rozvrzeni, zatimco UV uz mirila jinam.
+	# Hodnota `render_target_update_mode` pritom cte porad 1 - proto vada nebyla
+	# v zadnem logu videt. Dukaz je ZMENENY OBSAH stranky.
+	#
+	# ⚠ MERITELNOST: v `--headless` se render target NECTE (`get_image()` vraci
+	# null i po `RenderingServer.force_draw`), takze se tu obsah stranky zmerit
+	# NEDA - a test to REKNE (NEMERENO), nez aby predstiral zelenou. Obsah
+	# stranky je zmereny v behu S OKNEM: `_analyza/p20b2-stranka.gd` (hash pred
+	# 465af1115c5608ae, po 283d4ac1cef3358d) a MUTACNI DUKAZ týmz telem bez
+	# re-armu (hash pred == po == 3755e0ff80725c54). Tady se meri to, co meret
+	# jde: ze stavba stranku posklada a ze druha stavba prida nove sloty.
+	var textury3 := _textury()
+	var chunk3 = ChunkScript.new(mapa, textury3, tiledata)
+	var sez_a: Array = chunk3.visible(Vector2i(3, 3), 3, 3)
+	var mesh_c = script.new(FakeChunk.new(), textury3, STRANKA)
+	mesh_c.build(sez_a, 10)
+	var hash_c1: String = _hash_stranky(mesh_c)
+	chunk3.invalidate()
+	var sez_b: Array = chunk3.visible(Vector2i(1, 1), 2, 2)
+	mesh_c.build(sez_b, 10)
+	var hash_c2: String = _hash_stranky(mesh_c)
+	t._check(int(mesh_c.stats().get("slotu", 0)) > 0 and int(mesh_c.stats().get("kvadru", 0)) > 0,
+		"render.chunk_mesh: stavba posklada stranku i kvadry (slotu %s, kvadru %s)"
+			% [str(mesh_c.stats().get("slotu")), str(mesh_c.stats().get("kvadru"))])
+	if hash_c1 == "NEMERENO" or hash_c2 == "NEMERENO":
+		print("[test]      NEMERENO: obsah stranky na GPU se v headless necte - "
+			+ "dukaz je v `_analyza/p20b2-stranka.gd` (okno): s re-armem se hash "
+			+ "zmeni, bez re-armu zustane stejny")
+	else:
+		t._check(hash_c1 != hash_c2,
+			"render.chunk_mesh: druha stavba PREKRESLI stranku na GPU "
+			+ "(hash pred %s, po %s)" % [hash_c1, hash_c2])
 
 	# --- E) PRETEK: co se nevejde, se NAHLASI ------------------------------
 	# Zamerne se bere JEN maly art (4x4) a stranka 6x6: art se vejde SAM, ale

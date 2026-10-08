@@ -39,7 +39,16 @@ const VIEW_TILES_Y: int = 48
 # az kdyz se hrac vzdali o `RECENTER_TILES` dlazdic; okno je o tolik vetsi,
 # aby obrazovka zustala pokryta. Vykresluje se z nej jen to, co je videt
 # (orezavani v `_draw`), takze vetsi okno neznamena vic draw callu.
-const RECENTER_TILES: int = 4
+#
+# ⚠⚠ 17. session (2026-10-08) - UZIVATEL: "pri plynulem pohybu nastane po
+# 4 krocich pauza a pak se jde dal". NAMERENO (`_analyza/p20-kadence.gd`):
+# prestavba seznamu stoji **85-98 ms** a `RECENTER_TILES = 4` ji spousti PRESNE
+# po 4 krocich (krok = 1 dlazdice) - tedy petkrat za sekundu. Rozpad ceny
+# (7 872 objektu): `z_grid` 10-15 ms, land 26-31 ms, statiky 27-33 ms,
+# razeni 21-25 ms. Proto je dnes margin VETSI a odvozuje se od obrazovky
+# (`_list_okraj`): prestavba se deje ~5x mene casto. Cena jednoho okna roste
+# jen mirne (okno obsahuje porad jen to, co muze byt videt).
+const RECENTER_TILES: int = 8
 const BRITAIN := Vector2i(1495, 1630)
 # Land id <= 2 UO VUBEC nekresli (ClassicUO `Land.Create`:
 # `AllowedToDraw = graphic > 2`; id 0 = "UNUSED", 1 = "VOID!!!!!!", 2 = "NODRAW").
@@ -69,6 +78,7 @@ var _tiledata = null               # world.tiledata: TexID pro texturu svahu
 var _camera: Camera2D = null
 var _player = null
 var _action: int = 4               # 4 = idle (viz app/player_controller.gd)
+var _view_dir: int = 0             # smer KRESLENI postavy (viz `set_view_dir`)
 var _anim = null
 var _sort = null                   # render.sort (jedina funkce razeni)
 var _hues = null                   # render.hue (barva kuze; bez nej je postava seda)
@@ -130,10 +140,23 @@ func set_registry(registry) -> void:
 func set_player(mobile) -> void:
 	_player = mobile
 	player_missing = false
+	# Start smeru kresleni = smer, ve kterem mobil stoji (jinak by prvni frame
+	# po spusteni kreslil smer 0).
+	if _player != null:
+		_view_dir = ((int(_player.dir) % 8) + 8) % 8
 
 
 func set_action(action: int) -> void:
 	_action = action
+
+
+func set_view_dir(dir: int) -> void:
+	# SMER KRESLENI POSTAVY (17. session, 2026-10-08): `mob.dir` zapisuje
+	# `sim.movement.apply_step` az na KONCI kroku (400 ms), takze se pri zmene
+	# smeru uprostred kroku kreslil jeste stary smer ("postava klouze do
+	# strany"). Klient posila smer ZAMERU hned (`app/player_controller._view_dir`
+	# ve `update_step`); tady se jen pouzije pri kresleni.
+	_view_dir = ((dir % 8) + 8) % 8
 
 
 func set_player_offset(offset: Vector2) -> void:
@@ -186,15 +209,24 @@ func player_hue(base: Texture2D, hue: int) -> Texture2D:
 	return _hue_last_hued
 
 
-func look_at_tile(tile: Vector2i, z: int = 0) -> void:
+func look_at_tile(tile: Vector2i, z: int = 0, offset: Vector2 = Vector2.ZERO) -> void:
 	# `z` je VSTUP, ne konstanta: `iso.to_screen` odecita `z * Z_SCALE`, takze
 	# kamera na `z = 0` postavi hrace stojiciho na `z = 10` o 40 px nad stred
 	# obrazovky (namEReno 2026-10-06 prvnim snimkem s hracem). Kdo kameru
 	# posouva, musi dat vysku, na ktere postava stoji.
+	#
+	# ⚠⚠ `offset` (17. session, 2026-10-08) - VADA "OBRAZ SE POHYBUJE SKOKOVE":
+	#   Do teto session se stred kamery prepsal JEN pri zmene dlazdice
+	#   (`app/player_controller._follow`), takze obraz stal a pak skocil o CELOU
+	#   dlazdici (namEReno 44,00 px na frame; sonda `_analyza/p20-kadence.gd`).
+	#   Postava se pritom posouvala plynule (`player_pixel_offset`), takze
+	#   postava a svet se rozesly. Reference (`_src/classicuo` `Mobile.cs:776-782`)
+	#   drzi hrace ve stredu a posouva SVET: kamera proto dostava stejny posun
+	#   v pixelech jako postava a svet se valí plynule, po 80ms framech.
 	center_tile = tile
 	if _camera != null:
 		_camera.position = _iso.to_screen(tile.x, tile.y, z) \
-			+ Vector2(Const.ISO_STEP, Const.TILE_H / 2)
+			+ Vector2(Const.ISO_STEP, Const.TILE_H / 2) + offset
 	# POZOR: seznam se tady NEZAHOZUJE. `render.chunk` si ho prestavi sam, kdyz
 	# se zmeni stred (viz `_list` a RECENTER_TILES) - zahozeni pri kazdem kroku
 	# bylo namERene seknuti (44 ms x 2,5 za sekundu).
@@ -215,12 +247,42 @@ func _list() -> Array:
 	# Seznam plati pro `_list_center` (viz RECENTER_TILES v hlavicce): kdyz se
 	# hrac vzdali, stred se posune a `render.chunk` seznam prestavi (cache
 	# `render.chunk` se ptá na `cover`, takze staci zmenit stred).
+	# ⚠ P20 (17. session): seznam se stavi pro `_list_center` a prestavi se, az
+	# kdyz se hrac vzdali o `RECENTER_TILES` dlazdic - na tom stoji oprava vady
+	# "po 4 krocich pauza" (viz hlavicka). Mereni: `_analyza/p20-kadence.gd`.
 	if _list_center.x < -9999 \
 			or absi(center_tile.x - _list_center.x) >= RECENTER_TILES \
 			or absi(center_tile.y - _list_center.y) >= RECENTER_TILES:
 		_list_center = center_tile
-	return _chunk.visible(_list_center, VIEW_TILES_X + 2 * RECENTER_TILES,
-		VIEW_TILES_Y + 2 * RECENTER_TILES)
+	var okraj := _list_okraj()
+	return _chunk.visible(_list_center, okraj.x, okraj.y)
+
+
+func _list_okraj() -> Vector2i:
+	# VELIKOST OKNA pro seznam objektu. Neni to konstanta: musi pokryt obrazovku
+	# pro KAZDOU pozici kamery, kterou pripousti `RECENTER_TILES`. V izometrii
+	# zabira obrazovka na osach `a = x - y` a `b = x + y` polovinu sve sirky
+	# a vysky (viz `core/iso.gd`), takze polomer v dlazdicich je
+	# `(sirka/2 + vyska/2) / ISO_STEP` pro `a` a `(sirka/2 - vyska/2) / ISO_STEP`
+	# pro `b`; kazda osa pridava `RECENTER_TILES` (kam se hrac muze vzdalit)
+	# a 2 dlazdice rezervy na zaokrouhleni a posun kroku.
+	# Kdyz okno obrazovku NEPOKRYJE, `_draw` ji prestane kreslit a vzniknou DIRY.
+	var rozmer: Vector2 = get_viewport_rect().size
+	if rozmer.x <= 0.0 or rozmer.y <= 0.0:
+		# NEMERENO (test bez okna): vrat deklarovane minimum, ne nulu - nula by
+		# znamenala "nekresli se nic" a to je horsi nez mensi okno.
+		return Vector2i(VIEW_TILES_X, VIEW_TILES_Y)
+	var krok: float = float(Const.ISO_STEP)
+	var pol_x: int = int(ceil((rozmer.x / 2.0 + rozmer.y / 2.0) / krok)) + 2
+	var pol_y: int = int(ceil((rozmer.x / 2.0 - rozmer.y / 2.0) / krok)) + 2
+	pol_x = maxi(pol_x, VIEW_TILES_X / 2) + RECENTER_TILES
+	pol_y = maxi(pol_y, VIEW_TILES_Y / 2) + RECENTER_TILES
+	return Vector2i(2 * pol_x, 2 * pol_y)
+
+
+# ⚠ P20 MERENI BYLO ODSTRANENO (17. session): docasna pocitadla `p20_*` slouzila
+# sondam `_analyza/p20-*.gd`. Cisla jsou v `_analyza/p20-*.txt` a v HANDOFFu;
+# kdo chce merit znovu, prida pocitadla zpet (jsou popsana v `_analyza/p20-hlubka.gd`).
 
 
 func _draw() -> void:
@@ -228,6 +290,8 @@ func _draw() -> void:
 		return
 	# M9: nejdriv se zkusi davka (1-2 draw cally). Kdyz neni postavena (runtime
 	# atlas se naplnil), kresli se puvodni cestou - obraz musi byt spravny vzdy.
+	# POZOR: `_priprav_mesh()` vraci `_mesh.is_built()` - dokud dávka postavena
+	# NENI, kresli se puvodni cestou (jinak by se kreslil prazdny mesh = cerno).
 	if mesh_enabled and _mesh != null and _priprav_mesh():
 		_kresli_mesh()
 		return
@@ -330,6 +394,10 @@ func _priprav_mesh() -> bool:
 	# Stavi se jen kdyz se seznam vymenil (`render.chunk` vraci porad TUTEZ
 	# instanci, dokud se neprestavi) - ne kazdy frame.
 	var seznam: Array = _list()
+	return _priprav_mesh_vnitrni(seznam)
+
+
+func _priprav_mesh_vnitrni(seznam: Array) -> bool:
 	var diagonala: int = _diagonala_hrace()
 	if _mesh.hold() > 0:
 		# Runtime atlas se prave prekresluje na GPU (`UPDATE_ONCE`): do te doby
@@ -355,7 +423,14 @@ func _priprav_mesh() -> bool:
 		_mesh_diagonala = diagonala
 		_mesh.split(diagonala)
 		_nacti_mesh_stats()
-	return true
+	# ⚠⚠ 17. session (2026-10-08) - VADA "SVET JE CELY CERNY": tady se do teto
+	# session vracelo `true` (tedy "davka je pripravena") i kdyz `build()`
+	# SELHAL a nechal `_mesh_pred`/`_mesh_po` na `null` - `_kresli_mesh()` pak
+	# nekreslil NIC (jenz pozadi je cerne). NamEReno: rozdil proti puvodni
+	# ceste 909 618 px (98,70 %); sonda `_analyza/p20b-pretek-blank.gd`.
+	# `_pretek` (atlas se nevesel) je proto TVRDY vypinac: kresli se puvodni
+	# cestou, dokud se stranka neprelozi a `is_built()` neplatí.
+	return _mesh.is_built()
 
 
 func _nacti_mesh_stats() -> void:
@@ -460,7 +535,6 @@ func _sort_key_of_player() -> int:
 	return _sort.sort_key({"kind": "mobile", "x": int(_player.pos.x),
 		"y": int(_player.pos.y), "z": int(_player.pos.z)})
 
-
 func _draw_player() -> void:
 	# Vraci se i to, ze se postava NEKRESLILA (`player_missing`) - prazdno se
 	# nesmi tvarit jako " hotovo" (docs/08 §8.6).
@@ -468,7 +542,7 @@ func _draw_player() -> void:
 	if _player == null or _anim == null:
 		return
 	player_drawn = true
-	var clip: Dictionary = _anim.play(int(_player.serial), _action, int(_player.dir))
+	var clip: Dictionary = _anim.play(int(_player.serial), _action, _view_dir)
 	if not bool(clip.get("ok", false)) or clip.get("texture") == null:
 		player_missing = true
 		return

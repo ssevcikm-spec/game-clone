@@ -1,26 +1,64 @@
-# Předání — UO-klon (16. session: `sim.harvest` + `sim.craft` + `ui.journal` HOTOVÉ; řemeslo funguje; 2026-10-08)
+# Předání — UO-klon (17. session: LADĚNÍ POHYBU A KRESLENÍ — 6 vad ze snímků, 5 opraveno; 2026-10-08)
 
 > **Co je tenhle soubor:** **stav projektu** pro další session agenta. Přepisuje
 > se celý; historie je v `git log`. **Současný stav se bere odtud** — a ověřuje
 > se živě (je tu k tomu sekce „Předletová kontrola").
 > **Zadání pro další vývoj je `ZADANI-DALSI-VYVOJ-2.md`** (etapa 2, Úkoly 1–9);
 > **Úkoly 1–4 a 6 (část) HOTOVÉ**, **Úkol 8 = M9 hotový** (15. session),
-> a **16. session dodala `sim.harvest`, `sim.craft`, `ui.journal`** — tím je
-> smyčka „umět pracovat" (BIG WIN č. 1) postavená a měřená.
+> a **16. session dodala `sim.harvest`, `sim.craft`, `ui.journal`**.
+> **17. session byla LADICÍ** (uživatel zadal „Tohle debugovací session" se
+> šesti vadami ze snímků) — **žádná nová mechanika**, jen opravy a měření;
+> nálezy dvou teammateů jsou v `_analyza/p20a-nalez.md` a `_analyza/p20b-nalez.md`.
 > **Rozhodnutí otevřených témat (co dřív čekalo na uživatele) je v
-> [`ROZHODNUTI-2026-10-08.md`](ROZHODNUTI-2026-10-08.md)** — uživatel 2026-10-08
-> zadal „Pokračuj a témata čekající na mě rozhodni podle svého úsudku".
+> [`ROZHODNUTI-2026-10-08.md`](ROZHODNUTI-2026-10-08.md)**.
 > **Naměřený stav plánu je v `REVIZE-PLANU-2026-10-06.md`** a **stav granul
 > měří** `python tools/plan-status.py`.
 > **Kam pro co v referenčních zdrojích je `research/REJSTRIK-REFERENCI.md`**.
-> **Datum:** 2026-10-08 (16. session). **Poslední změna kódu:** tato session
-> (`sim/systems/harvest.gd` — nový, `sim/systems/craft.gd` — nový,
-> `ui/journal.gd` — nový, `sim/systems/skill_gain.gd` (`span`, `era.skill_gain`),
-> `app/main.gd` (registrace obou systémů, žurnál, batoh, barva pozadí),
-> `app/loop.gd` (události do žurnálu), `app/config.gd` (SCHEMA `era.skill_gain`),
-> `data/balance.json` (`era.skill_gain`), `tests/cases/{harvest,craft,journal}.gd`,
-> `tools/gates/mutace-tests.py` (3 nové moduly, 24 vzorů), `docs/04`, `docs/05`,
-> `docs/06`, nová sonda `_analyza/vlna16-sber-vyroba.gd`).
+> **Datum:** 2026-10-08 (17. session). **Poslední změna kódu:** tato session
+> (`app/world_view.gd` — posun kamery, okno seznamu, `set_view_dir`, tvrdý
+> fallback při přetečení atlasu; `app/player_controller.gd` — kamera každý frame
+> + smer kreslení; `render/sort.gd` — klíč řazení; `render/chunk_mesh.gd` —
+> re-arm `UPDATE_ONCE` + balení stránky podle výšky; `render/chunk_renderer.gd`
+> — úklid měření; `tests/cases/{render_sort,world_view,player_controller,chunk_mesh}.gd`;
+> `docs/02`, `docs/04`, `LESSONS.md`).
+
+## ✅ CO JE NOVÉHO (17. session) — ŠEST VAD ZE SNÍMKŮ: PĚT OPRAVENO, JEDNA ZMĚŘENA
+
+**Zadání uživatele (doslova):** „Tohle debugovací session" + šest pozorování při
+hře (pauza po 4 krocích, skokový obraz, animace nemění orientaci, postava na
+střeše, černé čtverce u stoupání, rozbité textury každým ~4. krokem).
+**Každá vada má naměřenou příčinu** (ne dohad) a opravené mají i snímek/test.
+
+| Vada uživatele | Příčina (naměřená) | Oprava + doklad |
+|---|---|---|
+| **„Po 4 krocích pauza"** | `RECENTER_TILES = 4` + pevné okno `VIEW_TILES_X/Y`: přestavba seznamu objektů vyšla **přesně po 4 krocích** a stála **85–98 ms** (7 872 objektů: `z_grid` 10–15, land 26–31, statiky 27–33, řazení 21–25 ms). `_analyza/p20-kadence.gd` | Okno se **odvozuje od obrazovky** (`_list_okraj()`) a `RECENTER_TILES = 8` → přestavba ~3× méně často. Naměřeno: dlouhých framů ≥ 33 ms **13 → 4** (RECENTER 4 → 14), cena jednoho okna 50–250 ms. **Zbývá: přestavba je pořád jediný zásek (viz „Co čeká na tebe")** |
+| **„Obraz se pohybuje skokově"** | Kamera se posouvala **jen při změně dlaždice** (`_follow`): skok **44,00 px na frame** (= celá dlaždice). Postava se přitom posouvala plynule, takže se obě rozešly. `_analyza/p20-finalni.gd` | `look_at_tile(tile, z, offset)` + kamera každý frame → **MAX skok 6,23 px** a hráč je **0,00 px** od středu. Reference: ClassicUO `Mobile.cs:776-782` |
+| **„Animace nemění orientaci"** | Směr kreslení se bral z `player.dir`, který `apply_step` přepíše **až na konci kroku (400 ms)** → naměřeno **1 295 framů**, kdy se kreslil jiný směr, než jakým se postava posouvala | Smer kresleni je stav **klienta** (`_view_dir`): mění se **hned se záměrem** kroku. Test `player_controller` 7 + `world_view` 7d |
+| **„Postava je vidět na střeše"** | Klíč řazení měl **vrstvu PŘED `z`** (`(diag*3+layer)*256+z`): statik (vrstva 1) na téže diagonále šel PŘED mobilem (vrstva 2), i když byl o 11 jednotek výš — naměřeno **5 dlaždic** v Británii, kde střecha plně překrývala sprite hráče a kreslila se před ním. Chůze **vyloučena** (205 framů: `pos.z − z_at = 0`). `_analyza/p20a-nalez.md` | Klíč = `diagonal*769 + (z−Z_MIN)*3 + layer` (**diagonála → `z` → vrstva**), přesně jako ClassicUO `CalculateDepthZ()` (`View.cs:83`). Snímky: `.cache/render/p20a2/strecha_*.png` |
+| **„Černé čtverce u stoupání"** | **Runtime atlas se na GPU nikdy nepřekreslil**: `UPDATE_ONCE` se přiřadí jednou v `_init` a `queue_redraw()` ho znovu neoživí (vlastnost přitom čte 1). Po přeložení stránky zůstalo staré rozvržení na nových UV → 60,3 % kvadrů s průhledným středem (černo). `_analyza/p20b-nalez.md` | Re-arm `UPDATE_ONCE` před každým `queue_redraw()`. **Mutační důkaz** (okno): s re-armem se hash stránky změní, bez něj zůstane stejný (`_analyza/p20b2-stranka.gd`) |
+| **„Každým ~4. krokem se rozbíjí zobrazování"** | Totéž co černé čtverce (přestavba seznamu = přeložení stránky) **plus** atlas 2048² se po zvětšení okna už nevešel (`pretek=true`, `bez_slotu=39`) a v tom stavu se **svět nekreslil vůbec** (909 618 px / 98,70 % rozdíl), protože `_priprav_mesh_vnitrni` vracelo `true`, i když dávka postavená nebyla | (a) balení stránky **podle výšky sestupně** (`_predplnit_sloty`) → `pretek=false`, `slotu 573 → 596`, `bez_slotu 39 → 0`; (b) `return _mesh.is_built()` → při přetečení se kreslí **původní cesta** |
+
+**⚠ Vědomé omezení, které je potřeba zapsat (ne zamlčet):** oprava řazení
+znamená, že **statik nad hráčem ho může ÚPLNĚ ZAKRYT** (dům/strom) — v referenci
+to řeší „roof fade" (`TransparentTest`, `View.cs:98`), který **nemáme**. Je to
+věrnější stav než „postava na střeše", ale hráč se pod střechou ztratí.
+
+**Integrační čísla (naměřeno dnes):** sada **1 178 kontrol / 0 selhání**
+(44 case souborů, bylo 1 163/0), brány `run-all.py` **11 měřeno / 0 vad**,
+self-testy **21 / 0 chyb**, `check-docs-refs` / `check-zadani` /
+`roadmap-gen --check` **exit 0**, mutace `sort` **12/12**, `chunk_mesh` a
+`chunk_renderer` **vše chyceno** (na zamrzlé revizi).
+
+**⚠ Co tato session NEOPRAVILA (měřené, ne zamlčené):**
+(`a`) **`nodraw` dlaždice (land id ≤ 2) zůstávají černé** — 4 dlaždice
+(1440..1441, 1660..1661) land=2 → blok 2×2 černé (~88×88 px). Je to věrné UO
+(`AllowedToDraw = graphic > 2`), ale **rozhodnutí, co s tím, patří do `docs/`**.
+(`b`) **Roof fade neexistuje** (viz výše). (`c`) **Přestavba seznamu (50–250 ms)
+je pořád zásek** — jen méně častý; další krok je stavět ji po částech (viz „Co
+čeká na tebe"). (`d`) **Přesné pokrytí okna** je ověřené jen výpočtem
+(`_list_okraj` + test), ne průchodem celé mapy.
+
+
 
 ## ✅ CO JE NOVÉHO (16. session) — ŘEMESLO JE CELÉ: sběr + výroba + žurnál
 
@@ -757,7 +795,9 @@ R2 barva pozadí), zbytek je buď odložený s měřitelným cílem, nebo uzavř
 
 | # | Věc | Kdy / čím je hotová |
 |---|---|---|
-| R6 | **Zásek 53,8 ms při přestavbě dávky** (max frame 149,8 ms) | **Cíl 17. session** (viz „CÍL 17. SESSION" výš): žádný frame > 8 ms při chůzi + parita obrazu |
+| **R6** | **Přestavba seznamu objektů stojí 50–250 ms** (podle velikosti okna) a je **jediný zásek hry** — od 17. session se děje ~3× méně často (`RECENTER_TILES = 8`, okno od obrazovky), ale pořád je to 50–250 ms v jednom framu. Naměřeno: `_analyza/p20-kadence.gd`, rozpad ceny v `_analyza/p20-kadence2.txt` (`z_grid` 10–36, land 26–79, statiky 27–80, řazení 21–56 ms) | **Cíl 18. session:** stavět seznam **po částech** (time-sliced) nebo cachovat geometrii objektů mezi přestavbami (`chunk_mesh` staví celý mesh znovu); kritérium: **žádný frame > 16 ms při chůzi** + parita obrazu (hash jako `m9-parita.gd`) |
+| — | **⚠ Roof fade (roof fade / `TransparentTest`) NEEXISTUJE** — od 17. session je řazení věrné referenci, takže **statik nad hráčem ho může ÚPLNĚ zakrýt** (dům, strom, střecha). ClassicUO to řeší `TransparentTest` (`View.cs:98`, `ItemView`/`StaticView`) | Rozhodnout a implementovat: fade statiků, které překrývají hráče (ClassicUO má i `AlphaHue`). Do té doby je hráč pod střechou neviditelný — je to **věrnější** než „postava na střeše", ale horší pro hraní |
+| — | **⚠ `nodraw` dlaždice (land id ≤ 2) zůstávají ČERNÉ** — 4 dlaždice v Británii (1440..1441, 1660..1661) land=2 → souvislý blok 2×2 černé (~88×88 px). UO je taky nekreslí (`AllowedToDraw = graphic > 2`), ale UO pod nimi má podloží | Rozhodnout v `docs/`: nechat (věrnost) a zapsat jako omezení, nebo kreslit dlaždici „pod" (druhá vrstva landu z mapy) |
 | R5 | **První frame hry ~2 008 ms** (načtení 34 stránek atlasu) | Session po R6: první frame < 300 ms, měřeno `_analyza/m9-vykon-po.gd` |
 | R7 | **Mesh neorezává podle kamery** (15 838 primitiv místo 9 310) | Až s R6 (stejný soubor); dvouframové zpoždění nového artu je vědomé omezení |
 | R11 | **Brány na chování v čase v CI** — část bez assetů (kadence kroků) | Do `tests/cases/movement.gd`; vizuální část zůstává lokální sonda |

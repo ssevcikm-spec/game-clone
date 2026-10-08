@@ -19,6 +19,22 @@ const LAYER_STATIC: int = 1
 const LAYER_MOBILE: int = 2
 const LAYERS: int = 3
 const Z_SPAN: int = Const.Z_MAX - Const.Z_MIN + 1
+# ⚠⚠ 17. session (2026-10-08) - VADA "POSTAVA JE VIDET NA STRESE" (uzivatel:
+# "prisel jsem z leveho horniho rohu z ulice ... hra nepoznala, na jake
+# rovine/vysce se pohybuji"): do teto session mel klic tvar
+# `(diagonal * LAYERS + layer) * Z_SPAN + (z - Z_MIN)`, tedy **VRSTVA PREDCILA
+# `z`** - statik na TEZE diagonale (vrstva 1) se nakreslil PRED mobilem
+# (vrstva 2), i kdyz byl o 11 jednotek vys. NamEReno (`_analyza/p20a-nalez.md`):
+# 5 dlazdic v okoli (1491..1510, 1636..1645), kde je strecha nad hracem
+# a sprite se prekryva z 40x44 px z 40x66 - a ve vsech peti sla strecha PRED
+# hracem, takze hrac "stal na ni".
+# Reference to ma obracene: ClassicUO `GameObject.CalculateDepthZ()`
+# (`_src/classicuo/src/ClassicUO.Client/Game/GameObjects/Views/View.cs:83`)
+# vraci `(x + y) + (127 + z) * 0.01f` - **diagonala, pak `z`**, a teprve pak
+# (v nasem klíči) vrstva. `K` proto musi byt VETSI nez `Z_SPAN * LAYERS` (=768),
+# aby zustala PRVOTNI diagonala (na ni stoji binarni deleni v
+# `render/chunk_mesh.split`) a `z` rozhodoval uvnitr ni.
+const K_PER_DIAGONAL: int = Z_SPAN * LAYERS + 1        # 769
 const KIND_LAYER := {"land": LAYER_LAND, "static": LAYER_STATIC,
 	"mobile": LAYER_MOBILE, "item": LAYER_MOBILE}
 
@@ -40,11 +56,17 @@ func sort_key(obj: Dictionary) -> int:
 	# Jedno cislo NA POROVNAVANi - ne pro `z_index`: klic neni male cislo a Godot
 	# bere z_index jen -4096..4096. `z` jde do Z_MIN..Z_MAX, protoze mimo rozsahu
 	# by objekt posunul o par celych diagonaly. Klic 0 = (0, 0) ve vrstve land.
+	#
+	# ⚠ PORADI KLICU (17. session, viz `K_PER_DIAGONAL` v hlavicce):
+	#   1. `x + y` (diagonala, krok K_PER_DIAGONAL),
+	#   2. `z` (krok LAYERS) - stejne jako ClassicUO `CalculateDepthZ`,
+	#   3. vrstva (land < static < mobile) - nejmensi vaha.
+	# Kdo prehodi 2 a 3, dostane stav, kdy strecha nad hracem jde PRED hrace.
 	var kind := str(obj.get("kind", ""))
 	var layer: int = int(KIND_LAYER[kind]) if KIND_LAYER.has(kind) else LAYER_MOBILE
 	var diagonal: int = int(obj.get("x", 0)) + int(obj.get("y", 0))
 	var z: int = clampi(priority_z(obj), Const.Z_MIN, Const.Z_MAX)
-	return (diagonal * LAYERS + layer) * Z_SPAN + (z - Const.Z_MIN)
+	return diagonal * K_PER_DIAGONAL + (z - Const.Z_MIN) * LAYERS + layer
 
 
 func draw_order(objects: Array) -> Array:

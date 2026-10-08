@@ -94,6 +94,30 @@ class FakeRegistry:
 		return null
 
 
+class FakeAnim:
+	# Nahrazuje `render.anim` v testu smeru kresleni: zapise, s jakym smerem se
+	# `play()` volalo, a vrati platny klip (jinak by `_draw_player` skoncil
+	# uvnitr a smer by se nedal zmerit).
+	var dir: int = -1
+	var akce: int = -1
+
+	func available() -> bool:
+		return true
+
+	func play(_serial: int, action: int, direction: int, _now_ms: int = -1) -> Dictionary:
+		akce = action
+		dir = direction
+		return {"ok": true, "texture": _textura(), "frame": 0, "count": 10,
+			"anchor": Vector2.ZERO, "mirror": false, "mirror_x": 0, "sprite_dir": direction}
+
+	func frame_count(_body: int, _action: int, _dir: int) -> int:
+		return 10
+
+	func _textura() -> Texture2D:
+		var img := Image.create(2, 2, false, Image.FORMAT_RGBA8)
+		return ImageTexture.create_from_image(img)
+
+
 func _arg(name: String, fallback: String) -> String:
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--" + name + "="):
@@ -171,23 +195,41 @@ func run(t) -> void:
 		"app.world_view: VIEW_TILES_X/Y je 64x48 (namEReno %sx%s)"
 			% [str(view_consts.get("VIEW_TILES_X")), str(view_consts.get("VIEW_TILES_Y"))])
 
-	# 3) setup() postavi seznam: (64 + 2*RECENTER) x (48 + 2*RECENTER) land
-	#    + 1 statik v oblasti (2 mimo). Vetsi okno je ZAMERNE: seznam se
-	#    prestavuje az po `RECENTER_TILES` krocich (namEReno 44 ms na prestavbu,
-	#    viz hlavicka modulu), takze musi pokryt i to, kam hrac muze odjit.
+	# 3) setup() postavi seznam: okno ze `_list_okraj()` (land + 1 statik
+	#    v oblasti, 2 mimo). Vetsi okno je ZAMERNE: seznam se prestavuje az po
+	#    `RECENTER_TILES` krocich (namEReno 85-98 ms na prestavbu, viz hlavicka
+	#    modulu), takze musi pokryt i to, kam hrac muze odjit.
+	#    ⚠ 17. session (2026-10-08): okno se odvozuje od VELIKOSTI OBRAZOVKY
+	#    (`_list_okraj()`), proto se nebere z konstant - jinak by test meril
+	#    cislo, ktere uz v kodu neni. Zaroven se meri, ze okno obrazovku
+	#    opravdu pokryva (kdyz ne, `_draw` ji prestane kreslit a vzniknou DIRY).
 	var recenter: int = int(view_consts.get("RECENTER_TILES", 0))
-	var sirka: int = int(view_consts.get("VIEW_TILES_X", 0)) + 2 * recenter
-	var vyska: int = int(view_consts.get("VIEW_TILES_Y", 0)) + 2 * recenter
 	view.setup(map, textures)
+	var okraj: Vector2i = view.call("_list_okraj")
+	var sirka: int = okraj.x
+	var vyska: int = okraj.y
 	var objekty: int = view.visible_count()
 	var counts: Dictionary = view.counts()
-	t._check(sirka > 0 and objekty == sirka * vyska + 1
+	t._check(sirka > 0 and vyska > 0 and objekty == sirka * vyska + 1
 		and int(counts.get("land", -1)) == sirka * vyska
 		and int(counts.get("static", -1)) == 1,
 		"app.world_view: pohled %dx%d = %d land + 1 statik v oblasti "
 		% [sirka, vyska, sirka * vyska]
 		+ "(namEReno %d objektu, land %s, static %s, RECENTER %d)"
 			% [objekty, str(counts.get("land")), str(counts.get("static")), recenter])
+	# 3a) OKNO POKRYVA OBRAZOVKU: polomer okna v izometrickych osach musi byt
+	#     vetsi nez polovina obrazovky + to, kam hrac muze odjit (`RECENTER`).
+	var rozmer: Vector2 = view.get_viewport_rect().size
+	if rozmer.x > 0.0 and rozmer.y > 0.0:
+		var pol_a: float = float(sirka) / 2.0 - float(recenter)
+		var pol_b: float = float(vyska) / 2.0 - float(recenter)
+		var potreba_a: float = (rozmer.x / 2.0 + rozmer.y / 2.0) / float(consts["ISO_STEP"])
+		var potreba_b: float = absf(rozmer.x / 2.0 - rozmer.y / 2.0) / float(consts["ISO_STEP"])
+		t._check(pol_a >= potreba_a and pol_b >= potreba_b,
+			"app.world_view: okno %dx%d pokryva obrazovku %s (osa a %.1f >= %.1f, osa b %.1f >= %.1f)"
+				% [sirka, vyska, str(rozmer), pol_a, potreba_a, pol_b, potreba_b])
+	else:
+		print("[test]      NEMERENO: okno vs obrazovka - viewport nema rozmer (headless)")
 	t._check(counts.size() == 2 and counts.has("land") and counts.has("static"),
 		"app.world_view: counts() ma prave land a static (namEReno %s)" % str(counts.keys()))
 	t._check(view.center_tile == Vector2i(1495, 1630),
@@ -237,6 +279,21 @@ func run(t) -> void:
 		"app.world_view: kamera na z=5 je to_screen(10,20,5) + pulka dlazdice "
 		+ "(namEReno %s, ocekavano %s)" % [str(pri_peti), str(ocekavana5)])
 
+	# 5b) ⚠ 17. session (2026-10-08) - KAMERA SE POSOUVA O POSUN KROKU.
+	#     Uzivatel: "obraz se pohybuje skokove, ne plynule - jakmile je postava
+	#     na novem tile, poskoci i obrazovka". NamEReno pred opravou: skok
+	#     kamery **44,00 px** na frame; po oprave **6,23 px** a hrac je presne
+	#     ve stredu (`_analyza/p20-overeni.txt`). Kontroluje se, ze treti
+	#     argument `look_at_tile` kameru posune PRESNE o dodany vektor - jinak
+	#     by svet stal a pak skocil.
+	view.look_at_tile(Vector2i(10, 20), 0)
+	var bez_posunu: Vector2 = cam.position
+	view.look_at_tile(Vector2i(10, 20), 0, Vector2(8.8, 8.8))
+	t._check(cam.position == bez_posunu + Vector2(8.8, 8.8),
+		"app.world_view: look_at_tile pricte posun kroku ke kamere (namEReno %s, bez posunu %s)"
+			% [str(cam.position), str(bez_posunu)])
+	view.look_at_tile(Vector2i(10, 20), 0)
+
 	# 6) presun pohledu ZAHODI cache: (3000,3000) je mimo land_rect, takze
 	#    spravny pocet je 0 - se starym seznamem by zustalo 3073.
 	view.look_at_tile(Vector2i(3000, 3000), 0)
@@ -247,6 +304,25 @@ func run(t) -> void:
 		"app.world_view: look_at_tile zahodi cache seznamu "
 		+ "(namEReno %d objektu, land %s, static %s)"
 			% [objekty_jinde, str(jinde.get("land")), str(jinde.get("static"))])
+
+	# 7c) ⚠ 17. session (2026-10-08) - SMER KRESLENI POSTAVY SE MENI HNED.
+	#     Uzivatel: "animace nezmeni orientaci, takze postava jakoby klouze do
+	#     strany". Pricina (namERena): `_draw_player` bral smer z `player.dir`,
+	#     ktery `sim.movement.apply_step` prepise az na KONCI kroku (400 ms).
+	#     Dnes ho bere z `_view_dir` (`set_view_dir`) - takze se smer animace
+	#     zmeni hned se zamerem.
+	view.set_view_dir(4)
+	t._check(int(view.get("_view_dir")) == 4,
+		"app.world_view: set_view_dir nastavi smer kresleni (namEReno %s)"
+			% str(view.get("_view_dir")))
+	view.set_view_dir(-1)
+	t._check(int(view.get("_view_dir")) == 7,
+		"app.world_view: set_view_dir normalizuje zaporny smer na 0..7 (namEReno %s)"
+			% str(view.get("_view_dir")))
+	view.set_view_dir(9)
+	t._check(int(view.get("_view_dir")) == 1,
+		"app.world_view: set_view_dir normalizuje smer > 7 (namEReno %s)"
+			% str(view.get("_view_dir")))
 
 	# 7) klic hrace je klic z render.sort pro mobil (ne vlastni aritmetika)
 	var hrac := FakeMobile.new()
@@ -275,21 +351,45 @@ func run(t) -> void:
 	t._check(view.player_ground_position() == zakladni,
 		"app.world_view: vynulovany posun vraci kresleni na dlazdici")
 
-	# 8) klic hrace SEDI MEZI STATIKY: na sve diagonale (x+y=30) je za kazdym
-	#    statikem i landem, a pred vsim, co zacina dalsi diagonala (31).
+	# 7d) ⚠ 17. session (2026-10-08) - `_draw_player` kresli SMER KRESLENI.
+	#     Podstrci se falesny animator, ktery si zapise, s jakym smerem se
+	#     volalo: mobil pritom stoji na STARSIM smeru (presne stav, kdy
+	#     uzivatel videl "klouani do strany"). Meri se smlouva, ne cizi modul.
+	hrac.dir = 0
+	view.set_view_dir(2)
+	var falesny := FakeAnim.new()
+	view.set("_anim", falesny)
+	view.call("_draw_player")
+	t._check(falesny.dir == 2,
+		"app.world_view: _draw_player kresli SMER KRESLENI, ne `player.dir` "
+		+ "(namEReno %d, mobil %d, cekano 2)" % [falesny.dir, int(hrac.dir)])
+	view.set_view_dir(0)
+
+	# 8) klic hrace SEDI MEZI STATIKY: vse na BLIZSI diagonale (x+y < 30) je pred
+	#    nim a vse na dalsi diagonale (31) za nim. ⚠ 17. session: poradi v ramci
+	#    diagonály je dnes podle `z` (a teprve pak vrstva) - hrac stoji na z=0,
+	#    takze statik s vyssim `z` na TEZE diagonale jde ZA hrace (to je oprava
+	#    vady "postava na strese"), na blizsi diagonale ale zustava pred nim.
 	var z_min: int = int(consts["Z_MIN"])
-	var z_max: int = int(consts["Z_MAX"])
 	var za_hracem: int = -1
 	for x in range(1, 30):
-		for kind in ["land", "static"]:
-			za_hracem = maxi(za_hracem, _klic(sort, kind, x, 30 - x, z_max))
+		for kind in ["land", "static", "mobile"]:
+			za_hracem = maxi(za_hracem, _klic(sort, kind, x, 30 - x, z_min))
 	var pred_hracem: int = 0x7FFFFFFF
 	for x in range(0, 4):
 		for kind in ["land", "static", "mobile"]:
 			pred_hracem = mini(pred_hracem, _klic(sort, kind, x + 20, 31 - (x + 20), z_min))
 	t._check(int(klic) > za_hracem and int(klic) < pred_hracem,
-		"app.world_view: hrac je mezi statiky (vse na diagonale 30 <= %d < hrac %d < %d <= diagonala 31)"
+		"app.world_view: hrac je mezi statiky (vse na BLIZSI diagonale < %d < hrac %d < %d = diagonala 31)"
 			% [za_hracem, int(klic), pred_hracem])
+	# 8b) statik na TEZE diagonale a VYSSI nez hrac jde ZA hrace (vada (a)).
+	#     Toto je vlastnost, kterou vidi uzivatel na snimku: strecha nad hracem
+	#     se nesmi kreslit pred nim, jinak to vypada, ze po ni chodi.
+	var hrac_obj := {"kind": "mobile", "x": 10, "y": 20, "z": 0}
+	var strecha := {"kind": "static", "x": 10, "y": 20, "z": 31}
+	t._check(sort.sort_key(strecha) > sort.sort_key(hrac_obj),
+		"app.world_view: strecha (z=31) na TEZE diagonale jde ZA hracem (z=0) "
+		+ "(%d > %d)" % [sort.sort_key(strecha), sort.sort_key(hrac_obj)])
 
 	# 9) set_registry preda registr do render.anim (body_of ho pouzije)
 	view.set_registry(FakeRegistry.new())

@@ -24,6 +24,81 @@ Typy: `chyba` (moje vada) · `past-nástroje` (prostředí/nástroj, ne logika) 
 
 ---
 
+### 2026-10-08 — `SubViewport.UPDATE_ONCE` se musí ZNOVU OZBROJIT, jinak se stránka atlasu už nikdy nepřekreslí (past-nástroje)
+**Co se stalo:** uživatel: „přibližně každým čtvrtým krokem se rozbíjí zobrazování…
+některé textury působí rozmazaně, jakoby byly zvětšené". Příčina byla v runtime
+atlasu `render/chunk_mesh.gd`: `SubViewport.UPDATE_ONCE` znamená **„vykresli se
+JEDNOU po přiřazení režimu"**, ne „při každém `queue_redraw()`" — stránka se tedy
+na GPU překreslila jen při PRVNÍ stavbě a každá další změna `_sloty` (nový art
+i přeložení stránky) nechala na stránce **staré rozvržení**, zatímco UV v meshi už
+mířila jinam. Vlastnost `render_target_update_mode` přitom celou dobu **četla 1**,
+takže vada nebyla vidět v hodnotě ani v žádném logu.
+**Doklad:** minimální repro `_analyza/p20b-update-once.gd` (2×2 pokus: samotné
+`queue_redraw()` pixel nezmění, re-arm + `queue_redraw()` ano); in-game
+`_analyza/p20b-vejde-se-log.txt` (MD5 stránky identický přes `repakov=2`, nové
+sloty `MATCH=0 EMPTY=2 DIFF=38` z 504; 60,3 % kvadrů s průhledným středem = černé
+čtverce). Oprava = `_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE`
+před každým `queue_redraw()`.
+**Ponaučení:** (1) **Úspěch/přítomnost vlastnosti není měření chování** — dokud
+vadu nezměříš na VÝSTUPU (obsah stránky, hash pixelů), „režim je nastavený" nic
+netvrdí. (2) `UPDATE_ONCE` je jednorázová akce, ne trvalý stav — kdo ho použije,
+musí ho ozbrojit před KAŽDÝM překreslením. (3) Sonda, která vadu hledá, musí
+umět i **poznat, že vada zmizela** (mutant bez re-armu: hash před == po).
+
+### 2026-10-08 — Dvě sondy nad jedním `.cache` adresářem si navzájem smazaly důkazy (chyba)
+**Co se stalo:** dvě paralelní sondy (Lead a teammate) psaly do
+`.cache/render/p20b/`; jedna z nich adresář před během čistila, takže **cizí
+snímky zmizely** uprostřed měření (teammate si toho všiml, když mu „parita*",
+„atlas_b001" a „vejde*" zmizely v 09:46). Druhá sonda navíc měřila proti
+`app/world_view.gd`, který se v tu dobu dvakrát změnil (09:39, 09:46) — čísla
+řádků platila pro jinou revizi, než jaká byla na disku.
+**Doklad:** zpráva teammatea `textury-atlas` (P20-B) bod 5; `_analyza/p20b-nalez.md`
+hlavička s hashi revizí; snímky přesunuté do `_analyza/p20b-obrazky/`.
+**Ponaučení:** (1) Každá paralelní sonda si drží **VLASTNÍ adresář**
+(`.cache/render/p20a/`, `p20b/`, …) a nikdy nečistí cizí. (2) Nález musí
+v hlavičce nést **hash revize**, na které se měřilo — jinak je „řádek 475"
+tvrzení o souboru, který mezitím může vypadat jinak. (3) Kdo píše do produkčního
+kódu během cizího měření, musí to napsat do zadání (tady to bylo: „soubory se
+mění, ověř klíčová místa znovu").
+
+### 2026-10-08 — Vrstva v klíči řazení PŘEDČILA `z`: uživatel to viděl jako „postavu na střeše" (chyba)
+**Co se stalo:** `render/sort.gd` měl klíč `(diagonal*LAYERS + layer)*Z_SPAN + (z−Z_MIN)`,
+takže **vrstva vždy předčila `z`** — statik (vrstva 1) na téže diagonále se
+nakreslil PŘED mobilem (vrstva 2), i když byl o 11 jednotek výš. Uživatel to
+popsal jako „hra nepoznala, na jaké rovině/výšce se pohybuji" a „posouvá mě po
+nejvyšší viditelné vrstvě".
+**Doklad:** `_analyza/p20a-nalez.md` — v okně x1460–1540/y1630–1700 je **5 dlaždic**,
+kde střecha na dlaždici hráče ≥ 8 jednotek nad ním plně překrývá jeho sprite
+a ve **všech 5** jde před hráče (např. (1491,1636): klíč statiku 2 401 951 <
+hráč 2 402 196). Chůze přitom vyloučena: 205 framů chůze → `player.pos.z −
+map.z_at(x,y) = 0` ve všech. Reference: ClassicUO `GameObject.CalculateDepthZ()`
+(`_src/classicuo/.../Views/View.cs:83`) = `(x + y) + (127 + z) * 0.01f` — vrstva
+v tom klíči **není**; diagonála, pak `z`. Oprava: `diagonal*769 + (z−Z_MIN)*3 + layer`.
+**Ponaučení:** (1) **Když kód vypadá jako „vada logiky pohybu", nejdřív změř, že
+se skutečně pohybuje špatně** — tady byla chůze čistá a vina byla v kreslení
+(`sort_key`). Uživatelský popis je symptom, ne diagnóza. (2) **Pořadí v jednom
+čísle je smlouva**: `LAYERS` a `Z_SPAN` v tom klíči rozhodují o tom, co je
+silnější; kdo je přehodí, nezmění výkon, ale VÝZNAM. (3) Test, který tvrdil
+„vrstva je silnější než z", byl **zelený a špatný** — měřil moje rozhodnutí, ne
+referenci. Po opravě musí test měřit i to, že se vrstvy v klíči nepřekryjí
+(`LAYERS > max layer`); bez toho mutace „LAYERS 3 → 2" **projde** (naměřeno).
+
+### 2026-10-08 — Když obraz zmizí, hledej `null` v cestě kreslení, ne data (chyba)
+**Co se stalo:** když se runtime atlas nevešel, `build()` vrátil `false` a nechal
+`_mesh_pred`/`_mesh_po` na `null` — ale `world_view._priprav_mesh_vnitrni`
+vracelo `true` (stav „dávka je připravená"), takže `_kresli_mesh()` kreslil
+**prázdnou dávku** a obraz byl celý černý (jen postava a HUD, které se kreslí
+jinudy). Naměřeno: rozdíl proti původní cestě **909 618 px (98,70 %)**.
+**Doklad:** `_analyza/p20b-pretek-blank.gd`, `pretek_mesh.png` (14 704 B) vs
+`pretek_puvodni.png` (1 542 247 B); oprava = `return _mesh.is_built()`.
+**Ponaučení:** (1) „Připraveno" a „postaveno" musí být **totéž slovo ve
+smlouvě**; návrat `true` z `_priprav_*` znamená „můžeš kreslit", takže se musí
+ptát na skutečný stav dávky, ne na to, že se o stavbu pokusil. (2) Černá
+obrazovka s viditelnou postavou je diagnostický podpis: postava se kreslí
+samostatně, takže chybí **svět**, ne kamera ani vstup.
+
+---
+
 ### 2026-10-08 — Žurnál byl zelený, měřený, a přesto NA OBRAZOVCE PRÁZDNÝ (chyba + postup)
 **Co se stalo:** `ui.journal` měl 8 kontrol a mutace 7/7, sada 1 160/0 — a na
 snímku z běhu hry **nebyl vidět ani jeden řádek**. Příčina: `RichTextLabel`

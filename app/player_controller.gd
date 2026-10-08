@@ -89,6 +89,14 @@ var _iso
 var _last_tile: Vector2i = Vector2i(-9999, -9999)
 var _action: int = ACTION_IDLE
 var _step: Dictionary = {}      # prave bezici krok z `sim.movement.pending_step`
+# ⚠ SMER KRESLENI vs SMER SIMULACE (17. session, 2026-10-08) - VADA
+# "animace nezmeni orientaci, postava klouze do strany": `sim.movement` zapise
+# `mob.dir` az v `apply_step` na KONCI kroku (400 ms), takze kdyz hrac zmeni
+# smer UPROSTRED kroku, kreslil se jeste 400 ms stary smer - a postava se
+# mezitim posouvala novym smerem (namEReno: 1 295 framu, kdy `player.dir` !=
+# `pending_step.dir`, sonda `_analyza/p20-hlubka.gd`). Smer kresleni je proto
+# stav KLIENTA: nastavi se hned se zamerem kroku (`update_step`).
+var _view_dir: int = 0
 
 
 static func default_bindings() -> Dictionary:
@@ -172,16 +180,33 @@ func _process(_delta: float) -> void:
 		input_map.view_size = get_viewport().get_visible_rect().size
 	# Krok v letu ridi STAV (akce) i posun v pixelech - viz hlavicka (V2).
 	update_step(_pending_of_player())
-	# Kamera se posune jen kdyz se zmeni DLAZDICE (diskretni krok), ale kresli
-	# se kazdy frame - bezi animace (80 ms na frame, docs/05 §5.1.1).
+	# ⚠⚠ KAMERA SE POSOUVA KAZDY FRAME (17. session, 2026-10-08) - VADA
+	# "obraz se pohybuje skokove, ne plynule": do teto session se stred kamery
+	# prepsal JEN kdyz se zmenila DLAZDICE (`if tile != _last_tile: _follow()`),
+	# takze svet stal a pak skocil o celou dlazdici - namEReno **44,00 px na
+	# frame** (sonda `_analyza/p20-kadence.gd`). Postava se pritom posouvala
+	# plynule, takze se postava a svet rozesly presne o ten skok.
+	# Reference drzi hrace ve stredu a posouva SVET (`_src/classicuo`
+	# `Mobile.cs:776-782`, `:836-844`), takze kamera dostava STEJNY posun jako
+	# postava. `_follow()` se tim nemeni - jen se k nemu pricte posun kroku.
+	var offset: Vector2 = player_pixel_offset()
 	var tile := player_tile()
-	if tile != _last_tile:
-		_follow()
 	if view != null:
 		view.set_action(_action)
 		if view.has_method("set_player_offset"):
-			view.set_player_offset(player_pixel_offset())
+			view.set_player_offset(offset)
+	if tile != _last_tile:
+		_follow(offset)
+	elif view != null and view.has_method("look_at_tile"):
+		# Same-slide: stred se nemeni, jen se pricte posun v pixelech.
+		view.look_at_tile(tile, int(player.pos.z), offset)
+	if view != null:
 		view.queue_redraw()
+	# `loop.camera_offset` se musi obnovit i na framech BEZ zmeny dlazdice: kamera
+	# se od 17. session posouva kazdy frame (o posun kroku), takze stara hodnota
+	# by pri prepocitavani svet<->obrazovka (`app.input.click_at`) chybovala.
+	if loop != null:
+		loop.camera_offset = _camera_offset()
 
 
 func action() -> int:
@@ -217,6 +242,19 @@ func update_step(krok: Dictionary) -> void:
 		_action = ACTION_IDLE
 		return
 	_action = ACTION_RUN if bool(_step["run"]) else ACTION_WALK
+	# SMER KRESLENI SE MENI HNED SE ZAMEREM (17. session): `player.dir` se
+	# prepise az na konci kroku, takze by postava 400 ms "klouzala do strany".
+	var dir: int = int(_step.get("dir", _view_dir))
+	if _view_dir != dir:
+		_view_dir = dir
+		if view != null and view.has_method("set_view_dir"):
+			view.set_view_dir(dir)
+		_follow(player_pixel_offset())
+
+
+func view_dir() -> int:
+	# Smer, kterym se postava KRESLI (mobil ma jeste stary - viz `_view_dir`).
+	return _view_dir
 
 
 static func step_fraction(elapsed_ms: int, delay_ms: int) -> float:
@@ -249,15 +287,16 @@ func player_pixel_offset(now_ms: int = -1) -> Vector2:
 	return (kam_px - od) * f
 
 
-func _follow() -> void:
+func _follow(offset: Vector2 = Vector2.ZERO) -> void:
 	_last_tile = player_tile()
 	if view != null and view.has_method("look_at_tile"):
 		# Vyska jde s sebou: jinak by kamera stala na `z = 0` a postava na kopci
-		# by utekla nahoru (viz `app/world_view.look_at_tile`).
-		view.look_at_tile(_last_tile, int(player.pos.z))
+		# by utekla nahoru (viz `app/world_view.look_at_tile`). `offset` drzi
+		# hrace ve stredu i UPROSTRED kroku (viz `_process`).
+		view.look_at_tile(_last_tile, int(player.pos.z), offset)
 	elif camera != null:
 		camera.position = _iso.to_screen(_last_tile.x, _last_tile.y, int(player.pos.z)) \
-			+ Vector2(Const.ISO_STEP, Const.TILE_H / 2)
+			+ Vector2(Const.ISO_STEP, Const.TILE_H / 2) + offset
 	if loop != null:
 		loop.player_tile = _last_tile
 		loop.camera_offset = _camera_offset()

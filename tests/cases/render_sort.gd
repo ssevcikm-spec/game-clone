@@ -97,17 +97,45 @@ func run(t) -> void:
 		"render.sort: priority_z mimo rozsah nepreskoci diagonalou (%s)"
 		% str(_tags(sort.draw_order(sveru))))
 
-	# 2) jedna dlazdice: land -> statiky podle z -> mobilove podle z
+	# 2) jedna dlazdice: DOLE az NAHORU podle `z`; pri stejnem `z` rozhoduje
+	# vrstva (land < static < mobile). Do 17. session byla vrstva pred `z`, takze
+	# statik nad hracem sel pred hracem (vada "postava na strese").
 	var smes := [_tag("mobile", 4, 4, 0), _tag("static", 4, 4, 5), _tag("land", 4, 4, 0),
 		_tag("mobile", 4, 4, -3), _tag("static", 4, 4, -1)]
-	t._check(_tags(sort.draw_order(smes)) == ["land@4,4,0", "static@4,4,-1",
-		"static@4,4,5", "mobile@4,4,-3", "mobile@4,4,0"],
-		"render.sort: jedna dlazdice = land, statiky podle z, mobilove podle z "
+	t._check(_tags(sort.draw_order(smes)) == ["mobile@4,4,-3", "static@4,4,-1",
+		"land@4,4,0", "mobile@4,4,0", "static@4,4,5"],
+		"render.sort: jedna dlazdice = podle z vzestupne, pri shode vrstva "
 		+ "(namEReno %s)" % str(_tags(sort.draw_order(smes))))
 
-	# 3) vrstva je silnejsi nez z
-	t._check(sort.sort_key(_tag("static", 1, 1, 40)) < sort.sort_key(_tag("mobile", 1, 1, -40)),
-		"render.sort: na jedne dlazdici static (z=40) pred mobilem (z=-40)")
+	# 3) ⚠ 17. session (2026-10-08): `z` je SILNEJSI nez vrstva. Do teto session
+	#    to bylo obracene a byl to duvod, proc uzivatel videl postavu "stat na
+	#    strese": strecha (statik, vrstva 1) na TEZE diagonale sla PRED hracem
+	#    (mobil, vrstva 2), i kdyz byla o 11 jednotek vys. Reference: ClassicUO
+	#    `CalculateDepthZ()` (`View.cs:83`) = `(x + y) + (127 + z) * 0.01f` -
+	#    vrstva v tom klíči NENI vubec, u nas je az ZA `z`.
+	t._check(sort.sort_key(_tag("static", 10, 10, 31)) > sort.sort_key(_tag("mobile", 10, 10, 20)),
+		"render.sort: vyssi `z` na TEZE diagonale jde POZDEJI (strecha z=31 za hracem z=20)")
+	# stejna vyska: poradi vrstvy zustava (mobil vpred na sve dlazdici)
+	t._check(sort.sort_key(_tag("static", 10, 10, 20)) < sort.sort_key(_tag("mobile", 10, 10, 20)),
+		"render.sort: pri STEJNEM `z` jde statik pred mobilem")
+	# diagonala je PRVOTNI klic - na tom stoji binarni deleni v `chunk_mesh.split`
+	t._check(sort.sort_key(_tag("static", 1, 1, 127)) < sort.sort_key(_tag("mobile", 50, 50, -128)),
+		"render.sort: diagonala je PRVOTNI klic (i statik vysoko na blizke diagonale pred hracem daleko)")
+	# 3b) RADIX VRSTEV musi pojmout VSECHNY vrstvy: `LAYERS` je pocet hodnot
+	#     `layer` v klíči, takze musi byt > nejvetsi vrstva (mobil = 2). Kdyz se
+	#     `LAYERS` snizi na 2, vrstvy static (1) a mobile (2) se v klíči PREKRYJI
+	#     a `z` je pak neoddeli - ticha vada poradi. (NamerEReno 2026-10-08:
+	#     mutace "LAYERS 3 -> 2" prosla, dokud tu tahle kontrola nebyla.)
+	var nejvetsi_vrstva: int = maxi(int(sort.get("LAYER_LAND")),
+		maxi(int(sort.get("LAYER_STATIC")), int(sort.get("LAYER_MOBILE"))))
+	t._check(int(sort.get("LAYERS")) > nejvetsi_vrstva,
+		"render.sort: LAYERS (%d) je vetsi nez nejvyssi vrstva (%d) - jinak se vrstvy v klíči prekryji"
+			% [int(sort.get("LAYERS")), nejvetsi_vrstva])
+	# a krok `z` v klíči musi byt aspon `LAYERS`, aby se `z` a vrstva nerozpadly
+	# (dva objekty s jinym `z` se nesmi prekryt ve stejnem klíči)
+	t._check(int(sort.get("LAYERS")) >= 3 and int(sort.get("Z_SPAN")) >= 256,
+		"render.sort: LAYERS >= 3 a Z_SPAN >= 256 (namEReno %d / %d)"
+			% [int(sort.get("LAYERS")), int(sort.get("Z_SPAN"))])
 	# `item` je predmet na zemi - patri do mobilni vrstvy
 	t._check(sort.sort_key(_tag("item", 2, 2, 0)) == sort.sort_key(_tag("mobile", 2, 2, 0)),
 		"render.sort: `item` se radi jako mobilni")

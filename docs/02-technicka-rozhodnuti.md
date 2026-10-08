@@ -90,15 +90,25 @@ serialu, seřazené klíče vlastností, žádné floaty).
 
 **Řazení (occlusion) — musí být jedna funkce, ne rozházené `z_index`:**
 kreslí se po dlaždicích ve směru rostoucího `x + y`; v rámci jedné dlaždice
-nejdřív land, pak statics **podle `priority_z` vzestupně**, pak mobilové podle `z`
-vzestupně. Statiky s `Surface` flagem tvoří „povrch" pro postavení.
+**podle `priority_z` vzestupně** a teprve při shodě `z` rozhoduje druh objektu
+(land → statics → mobilové). Statiky s `Surface` flagem tvoří „povrch" pro
+postavení.
 **`priority_z` NENÍ `z` z mapy** (opraveno 2026-10-07): statik s výškou jde `+1`,
 podlaha (`IsBackground`, flag `0x1`) `−1` — stejně jako `PriorityZ` v ClassicUO
 (`Chunk.cs:246-272`). Bez toho měly plocha mostu a jeho zábradlí stejný klíč a
 rozhodovalo pořadí v souboru mapy (naměřeno: 11 271 shod `z`, z toho 6 401
 s vadou, 71 nad vodou — `REVIZE-POHYB-2026-10-07.md` §2.6).
-Konkrétní klíč řazení je v `render/sort.gd` a je **pokrytý testem** (dva
-objekty na stejné dlaždici různého `z` → pořadí; viz §8, brána render).
+**⚠ Do 2026-10-08 byla v klíči vrstva PŘED `z`** (`(diagonal*3 + layer)*256 + z`),
+takže statik na téže diagonále šel před mobilem, i když byl výš — uživatel to
+viděl jako „postavu, která stojí na střeše" (naměřeno: 5 dlaždic v Británii,
+kde střecha ≥ 8 jednotek nad hráčem překrývala jeho sprite a kreslila se před
+ním, `_analyza/p20a-nalez.md`). Dnes platí `diagonal*769 + (z−Z_MIN)*3 + layer`,
+což odpovídá referenci: ClassicUO `GameObject.CalculateDepthZ()`
+(`_src/classicuo/.../Views/View.cs:83`) = `(x + y) + (127 + z) * 0.01f` —
+diagonála, pak `z`, vrstva až za nimi. Konkrétní klíč řazení je v
+`render/sort.gd` a je **pokrytý testem** (dva objekty na stejné dlaždici
+různého `z` → pořadí; při stejném `z` rozhoduje vrstva; diagonála je prvotní
+klíč, protože na tom stojí binární dělení v `render.chunk_mesh.split`).
 
 **Chunkový renderer:** svět se kreslí po blocích 8×8 dlaždic. Pro každý
 viditelný blok se sestaví seznam kreslení (land + statiky + mobilové v dosahu),

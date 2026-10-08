@@ -181,7 +181,75 @@ func run(t) -> void:
 	controller.update_step({})
 	t._check(controller.player_pixel_offset(1400) == Vector2.ZERO,
 		"player_controller: bez kroku je posun nulovy")
+
+	# 7) ⚠ 17. session (2026-10-08) - SMER KRESLENI SE MENI HNED SE ZAMEREM.
+	#    Uzivatel: "kdyz se zmeni smer chuze v prubehu animace, postava se sice
+	#    posouva spravne, ale animace nezmeni orientaci, takaze postava jakoby
+	#    klouze do strany". Pricina (namERena): `mob.dir` zapisuje
+	#    `sim.movement.apply_step` az na KONCI kroku (400 ms), takze se kreslil
+	#    stary smer. Kreslici smer je proto stav KLIENTA (`view_dir`).
+	var sv = StubView.new()
+	controller.view = sv
+	controller.update_step({"dir": 4, "run": false, "start_ms": 1000, "delay_ms": 400,
+		"due_ms": 1400, "z": 0})
+	t._check(controller.view_dir() == 4,
+		"player_controller: smer KRESLENI se zmeni hned se zamerem kroku (namEReno %d, cekano 4)"
+			% controller.view_dir())
+	t._check(sv.smer == 4,
+		"player_controller: novy smer se posle do kreslice (world_view), namEReno %d" % sv.smer)
+	# a mobil pritom jeste stoji na starem smeru - presne to je ta vada
+	if controller.player != null:
+		controller.player.dir = 0
+		controller.update_step({"dir": 4, "run": false, "start_ms": 1000,
+			"delay_ms": 400, "due_ms": 1400, "z": 0})
+		t._check(controller.view_dir() == 4 and int(controller.player.dir) == 0,
+			"player_controller: kresleny smer jde PRED simulaci (kresleni %d, mobil %d)"
+				% [controller.view_dir(), int(controller.player.dir)])
+
+	# 8) ⚠ 17. session - KAMERA SE POSOUVA KAZDY FRAME (ne jen po dlazdici).
+	#    Uzivatel: "obraz se pohybuje skokove, ne plynule - jakmile je postava
+	#    na novem tile, poskoci i obrazovka". NamEReno pred opravou: skok kamery
+	#    **44,00 px** na frame (cela dlazdice); po opravě 6,23 px.
+	#    Kontroluje se SMLOUVA: `look_at_tile` dostane posun kroku, takze se
+	#    stred kamery hybe plynule a hrac zustava ve stredu.
+	var sv2 = StubView.new()
+	controller.view = sv2
+	controller._last_tile = Vector2i(1495, 1630)
+	if controller.player != null:
+		controller.player.pos = Vector3i(1495, 1630, 0)
+	controller.update_step({"dir": 0, "run": false, "start_ms": 1000, "delay_ms": 400,
+		"due_ms": 1400, "z": 0})
+	var posun_80: Vector2 = controller.player_pixel_offset(1080)
+	sv2.zaznamy = []
+	# rucni volani posunu kamery bez sceny: `_process` potrebuje viewport - proto
+	# se kontroluje jen to, co smi klient udelat: predat posun do `look_at_tile`.
+	controller._follow(posun_80)
+	var druhy: Dictionary = sv2.zaznamy[-1] if sv2.zaznamy.size() > 0 else {}
+	t._check(not druhy.is_empty() and druhy["offset"] == posun_80 \
+			and druhy["offset"] != Vector2.ZERO,
+		"player_controller: kamera dostava posun kroku (posun %s, predano %s)"
+			% [str(posun_80), str(druhy.get("offset", null))])
+	controller.view = null
 	controller.free()          # Node, ne RefCounted - jinak zustane viset
+
+
+class StubView extends Node2D:
+	# Nahrazuje `app/world_view` v testu (bez sceny a bez atlasu): zapisuje, co
+	# mu controller poslal. Test tak meri SMLOUVU, ne cizi modul.
+	var smer: int = -1
+	var zaznamy: Array = []
+
+	func set_view_dir(dir: int) -> void:
+		smer = dir
+
+	func look_at_tile(tile: Vector2i, z: int = 0, offset: Vector2 = Vector2.ZERO) -> void:
+		zaznamy.append({"tile": tile, "z": z, "offset": offset})
+
+	func set_player_offset(_offset: Vector2) -> void:
+		pass
+
+	func set_action(_action: int) -> void:
+		pass
 
 
 func command_je_novy(mapper) -> bool:

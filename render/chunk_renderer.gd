@@ -90,6 +90,9 @@ func visible(center: Vector2i, tiles_x: int, tiles_y: int) -> Array:
 	if _built and want == _cover:
 		return _list
 	_cover = want
+	# ⚠ P20 (17. session): cena prestavby seznamu je 85-250 ms (podle velikosti
+	# okna) a je to duvod, proc se prestavba ODDALUJE (`RECENTER_TILES` ve
+	# `app/world_view`). Mereni: `_analyza/p20-kadence.gd`.
 	_list = _build(want)
 	_built = true
 	return _list

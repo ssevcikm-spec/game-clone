@@ -244,6 +244,18 @@ func build(objects: Array, diagonal_hrace: int) -> bool:
 	if _pridano > 0:
 		# Stranka ma novy obsah -> na GPU se prekresli a `HOLD_FRAMU` framu se
 		# jeste kresli puvodne (viz `tick_hold`).
+		#
+		# ⚠⚠ 17. session (2026-10-08) - VADA "ROZMAZANE TEXTURY, NEKTERE TAM
+		# NEMAJI CO DELAT": `SubViewport.UPDATE_ONCE` znamena "vykresli se
+		# JEDNOU PO PRIZNACENI rezimu", ne "pri kazdem `queue_redraw()`".
+		# Stranka se proto na GPU prekreslila jen pri PRVNI stavbe a kazda
+		# dalsi zmena `_sloty` (novy art i prelozeni stranky) nechala na strance
+		# STARE rozvrzeni, zatimco UV v meshi uz mirila jinam - presne to je
+		# "rozmazane/zvetsene/nesedi". Dokaz (minimalni repro): samotne
+		# `queue_redraw()` pixel nezmeni, `UPDATE_ONCE` + `queue_redraw()` ano
+		# (`_analyza/p20b-update-once.gd`, `_analyza/p20b-nalez.md` §2).
+		# Rezim se proto PRED kazdym prekreslenim ZNOVU NASTAVI.
+		_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
 		_kreslic.queue_redraw()
 		_hold = HOLD_FRAMU
 	_hotovo = not _pretek
@@ -274,6 +286,16 @@ func _stavba(objects: Array, diagonal_hrace: int) -> bool:
 	_diag.resize(n)
 	_hranice = []
 	_diry = []
+	# ⚠⚠ 17. session (2026-10-08) - BALENI STRANKY: do teto session se arty
+	# pridavaly v PORADI SEZNAMU (jak prisly), coz u 2048² stranky promrhava
+	# vic nez polovinu mista (namEReno: plocha slotu 2 040 930 z 4 194 304 =
+	# **48,7 %**) - a v Britanii se pak stranka UZ NEVESLA (`pretek=true`,
+	# `bez_slotu=39`) i kdyz soucet spritu je polovina stranky. Proto se nejdriv
+	# spoctou vsechny potrebne arty a sloty se prideli podle VYSKY SESTUPNE
+	# ("first fit decreasing height" - klasicka policova heuristika). Tim se
+	# radky srovnaji a vejde se i vetsi okno seznamu. Vysledne UV se tim
+	# NEMENI - slot si kazdy objekt najde pres `_slot_rozmer` (stejny klic).
+	_predplnit_sloty(objects)
 	# ⚠ HORKA SMYČKA (namEReno 2026-10-08): prvni verze stavela pro kazdy objekt
 	# `PackedVector2Array([...])` (3 alokace na objekt), pocitala pozici pres
 	# `_chunk.screen_position()` a UV pres `_v_uv()` (2 volani na objekt) a pak
@@ -422,6 +444,43 @@ func _stavba(objects: Array, diagonal_hrace: int) -> bool:
 	_stats = {"svahu": svahu, "der": der, "nodraw": nodraw, "hranic": hranic,
 		"bez_slotu": bez_slotu}
 	return bez_slotu == 0
+
+
+func _predplnit_sloty(objects: Array) -> void:
+	# PREDPOCITANI SLOTU (17. session): spocte potrebne arty, seradi je podle
+	# VYSKY SESTUPNE a prida jim sloty. `_stavba` pak uz jen hleda hotove recty
+	# pres `_slot_rozmer` (klic -> rect), takze se geometrie ani UV nemeni.
+	#
+	# DULEZITE: bez tohoto kroku se balí v poradi seznamu a vznikaji "zubate"
+	# radky, ktere sezerou vic nez polovinu stranky (namEReno 48,7 % vyuziti).
+	var potreba: Dictionary = {}          # klic -> [vyska, sirka, tex]
+	for obj in objects:
+		var kind: String = str(obj["kind"])
+		var klic: int = 0
+		var tex: Texture2D = null
+		if kind == "land" and je_svah(obj, _textures):
+			klic = int(obj["texmap"]) + TEXMAP_OFFSET
+			tex = _textures.texmap(int(obj["texmap"]))
+		elif kind == "mobile" or kind == "item":
+			continue                       # ty se radi do `_hranice`, ne do stranky
+		else:
+			klic = int(obj["art_id"])
+			tex = _textures.texture(klic)
+		if tex == null or _sloty.has(klic) or potreba.has(klic):
+			continue
+		potreba[klic] = [tex.get_height(), tex.get_width(), tex]
+	var klice: Array = potreba.keys()
+	# Sestupne podle vysky, pri shode podle sirky (determinismus!).
+	klice.sort_custom(func(a, b):
+		if int(potreba[a][0]) != int(potreba[b][0]):
+			return int(potreba[a][0]) > int(potreba[b][0])
+		if int(potreba[a][1]) != int(potreba[b][1]):
+			return int(potreba[a][1]) > int(potreba[b][1])
+		return int(a) < int(b))
+	for k in klice:
+		if _pretek:
+			break
+		_slot_rozmer(int(k), int(potreba[k][1]), int(potreba[k][0]), potreba[k][2])
 
 
 func _ocisti_stranku() -> void:
