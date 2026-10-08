@@ -24,6 +24,26 @@ Typy: `chyba` (moje vada) · `past-nástroje` (prostředí/nástroj, ne logika) 
 
 ---
 
+### 2026-10-08 — Měřicí přístroj se počítá do měření: snímek prodlouží NÁSLEDUJÍCÍ frame (chyba)
+**Co se stalo:** sonda měřila frame časy při chůzi a hlásila **75 framů > 16 ms**
+(3,1 %) — vypadalo to jako „hra se pořád zasekává“. Když jsem z měření vyloučil
+framy, kde sonda ukládá snímek, číslo **zůstalo 70** — a teprve rozpad ukázal, že
+**45 z těch dlouhých framů padlo přesně na frame po snímku** (211, 451, 511,
+571, 631, …): `get_image()` + `save_png` (1280×720 PNG ≈ desítky ms) se projeví
+až **na dalším framu** (odečtení z GPU se dokončí po konci framu). Po vyloučení
+i toho následujícího framu vyšlo **30 framů > 16 ms, 6 > 33 ms** a
+**2 093 z 2 319 framů ≤ 1 ms**.
+**Doklad:** `_analyza/p21-chuze.gd` (naměřené hodnoty 75 → 70 → 30; rozpad
+`≤1 ms 2093 … ≤150 ms 6`), `render/chunk_mesh.gd` + `app/world_view.gd`
+(počítadla `cesty()`).
+**Ponaučení:** (1) **Metrika, která u toho něco dělá, měří sebe** — u frame časů
+nesmí být v měřeném framu žádná práce navíc (snímek, zápis, alokace);
+když už tam je, vyluč **frame s prací i ten následující** (asynchronní dokončení).
+(2) Jedno číslo („75 framů > 16 ms“) nestačí — **rozpad do pásem** (≤1, ≤2, …,
+≤150 ms) ukáže, jestli jde o zaseky, nebo o mírně přerostlé framy; tady to bylo
+6 zaseků + 24 mírných, ne 75 katastrof. (3) Než začneš optimalizovat, ověř, že
+naměřené číslo není artefakt měření — jinak „opravíš“ hru, která je v pořádku.
+
 ### 2026-10-08 — Srovnávat pixely má smysl jen tam, kde je NEMÁ kdo překreslit (chyba)
 **Co se stalo:** měřil jsem, jestli se land dlaždice kreslí přesně jako art
 z atlasu. První běh dal **34,7 % shody** a vypadal jako vážná vada kreslení

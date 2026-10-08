@@ -64,12 +64,24 @@ smlouva vstupu OK (běh `--only sort,chunk_mesh,chunk_renderer,world_view,player
 první běh dal 75/76 a ta jedna odhalila **chybějící test** — doplněna část F
 v `tests/cases/chunk_mesh.gd`, pak 76/76).
 **Chůze v běhu hry** (`_analyza/p21-chuze.gd`, **2 400 framů**, střídavě NE/SE,
-běh): frame ms **median 0,59, max 150,00**, framů > 16 ms: **75** (3,1 %),
-> 33 ms: **50**; **0 černých snímků** ze 41; **0 framů s prázdnou dávkou**
-(`kvadru 0` z 2 400 — dřívější cesta „přetečení → nic se nekreslí" se neobjevila);
-za chůze se dotáhlo 5 dalších stránek atlasu (35 → 40) **bez záseku od načítání**;
-`mesh_stats()` `kvadru 11390`, `pretek false`, `ceka 0`.
+běh): frame ms **median 0,59**, **max 133,33**; rozpad měřených framů:
+**≤1 ms 2 093**, ≤2 ms 116, ≤4 ms 42, ≤8 ms 23, ≤16 ms 15, ≤33 ms 24,
+**≤150 ms 6**, >150 ms 0 → **> 16 ms jen 30 z 2 319 (1,3 %)**, z toho 6 je
+**75–133 ms** (přestavba dávky + první použití překreslené stránky) a 24 je
+16–33 ms. Cesty kreslení (`world_view.cesty()`): `davkou 2538`, `predchozi 4`,
+`puvodni 8` (původní cesta = jen start), `staveb 7`.
+**0 černých snímků** ze 41; **0 framů s prázdnou dávkou**, které by způsobilo
+kreslení (4 framy měly prázdná *počítadla* na startu);
+`mesh_stats()` `kvadru 13081`, `pretek false`, `ceka 0`; za chůze se dotáhlo
+6 dalších stránek atlasu **bez záseku od načítání**.
 **WARNINGy o `Loaded resource as image file` zmizely** (atlas i animace).
+
+> ⚠⚠ **Pozor na číslo z dřívějška:** první běhy téhle sondy hlásily
+> „75 dlouhých framů“ — a **45 z nich bylo způsobeno SONDOU SAMOTNOU**:
+> `get_image()` + `save_png` na snímek se projeví až na **následujícím** framu
+> (odectení z GPU). Sonda proto dnes vynechává frame se snímkem **i ten další**;
+> teprve pak je vidět skutečný stav (30 framů). Kdo bude měřit frame časy,
+> **nesmí u toho ukládat snímky** — nebo je musí z měření vyloučit.
 
 **TERÉN JE VYKRESLENÝ PIXEL NA PIXEL** (`_analyza/p21-teren-parita.gd`, nová
 sonda): na čisté rovné louce bez statiků (nalezené programově: (1552, 1400), z −5)
@@ -81,12 +93,18 @@ terénu je věrné artu; „kostkovaný“ dojem tedy není chyba vzorkování a
 je to art sám (a překryvy dlaždic na změnách výšky, které má i klient).
 
 **⚠ Co se NEOPRAVILO / NEMĚŘILO (nezamlčeno):**
-(`a`) **Přestavba seznamu i dávky je pořád jediný zásek** — naměřeno v běhu hry
-**~150 ms** (2 400 framů: 75 framů > 16 ms, 3,1 %; `stavba_ms 148–175`);
-ostatních 97 % framů je **0,6 ms**. Zůstává to jako **R6** (stavět po částech);
-WARNING byl jen druhá polovina téže cesty a ta je opravená. **Toto je jediná
-položka zadání 18. session, která není hotová** — a je to plánovaný samostatný
-cíl (viz „CÍL 19. SESSION" níž: time-slicing + paritní hash `m9-parita.gd`).
+(`a`) **Přestavba seznamu i dávky je pořád jediný zásek** — čistě naměřeno
+(`p21-chuze.gd`, snímky vyloučené z měření): **2 093 z 2 319 framů ≤ 1 ms**,
+**6 framů 75–133 ms** (přestavba + první použití překreslené stránky, 7 staveb),
+24 framů 16–33 ms; `stavba_ms ≈ 169`. Zůstává to jako **R6** (stavět po částech).
+**Toto je jediná položka zadání 18. session, která není hotová** a je to
+plánovaný samostatný cíl (viz „CÍL 19. SESSION“ níž: time-slicing + paritní hash
+`m9-parita.gd`). ⚠ 18. session k tomu udělala dvě věci, které se **měřily**:
+`hold` framy se už neplatí původní cestou (`predchozi` = stará dávka sedí na
+starou stránku přesně; `puvodni` = 8 framů, jen start) a opravená **díra, která
+mohla dělat černý frame**: dělení dávky se dřív dělalo jen když `build` uspěl,
+takže po `hold` framech mohly zůstat `_mesh_pred/_mesh_po` NULL a 1 frame se
+nekreslil NIC (dnes se dělí vždy).
 (`b`) **Černá obrazovka se NEPODAŘILA reprodukovat** — 2 400 framů běhu ve dvou
 směrech, **0** černých snímků (nejčernější 39,3 % tmavých pixelů = tmavý terén),
 **0 framů s prázdnou dávkou**. Pravděpodobná příčina je už opravená cesta

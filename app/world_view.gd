@@ -93,6 +93,14 @@ var _mesh_seznam: Array = []       # seznam, pro ktery je mesh postaveny
 var _mesh_klic: int = -2147483647
 var _mesh_stats: Dictionary = {}
 var _mesh_pretek_hlasen: bool = false
+# POCITADLA CESTY KRESLENI (18. session, pro sondy - cisla, ktera se jinak
+# meri jen okem): kolik framu se kreslilo davkou / predchozi davkou / puvodni
+# cestou, kolik bylo staveb a kolik framu vubec proslo kreslenim.
+var _drawu: int = 0
+var _davek: int = 0
+var _predchozich: int = 0
+var _puvodnich: int = 0
+var _staveb: int = 0
 # Pocet dotecenych stranek atlasu pri posledni stavbe (18. session): kdyz se
 # zmeni, davka se prestavi, aby se do ni dostaly arty, ktere se jeste nacitaly.
 var _textures_verze: int = 0
@@ -309,15 +317,25 @@ func _list_okraj() -> Vector2i:
 func _draw() -> void:
 	if _textures == null:
 		return
+	_drawu += 1
 	# M9: nejdriv se zkusi davka (1-2 draw cally). Kdyz neni postavena (runtime
 	# atlas se naplnil), kresli se puvodni cestou - obraz musi byt spravny vzdy.
 	# POZOR: `_priprav_mesh()` vraci `_mesh.is_built()` - dokud dávka postavena
 	# NENI, kresli se puvodni cestou (jinak by se kreslil prazdny mesh = cerno).
-	if mesh_enabled and _mesh != null and _priprav_mesh():
-		_kresli_mesh()
-		return
+	if mesh_enabled and _mesh != null:
+		if _priprav_mesh():
+			_kresli_mesh(false)
+			_davek += 1
+			return
+		# ⚠ 18. session: dokud se stranka na GPU prekresluje (`hold`), kresli se
+		# PREDCHOZI davka - ta na starou stranku sedi presne. Puvodni cesta stoji
+		# ~35 ms/frame a tvorila 44 z 75 dlouhych framu chuze (`p21-chuze.gd`).
+		if _mesh.hold() > 0 and _mesh.ma_predchozi():
+			_kresli_mesh(true)
+			_predchozich += 1
+			return
+	_puvodnich += 1
 	_draw_puvodni()
-
 
 func _draw_puvodni() -> void:
 	drawn = 0
@@ -449,7 +467,17 @@ func _priprav_mesh_vnitrni(seznam: Array) -> bool:
 		return false
 	if not is_same(seznam, _mesh_seznam):
 		_mesh_seznam = seznam
-		if not _mesh.build(seznam):
+		_staveb += 1
+		var ok: bool = _mesh.build(seznam)
+		# ⚠⚠ 18. session - DIRA, KTERA DELALA CERNY FRAME: deleni davky se do
+		# teto session delalo JEN kdyz `build` uspel. Kdyz vratil `false` kvuli
+		# `hold` (stranka se prekresluje), zustaly `_mesh_pred`/`_mesh_po` NULL -
+		# a na framu, kdy `hold` klesl na 0, se pak kreslilo NIC (dokud se
+		# nezmenil klic hrace, ktery deleni "spravil"). Dnes se deli VZDY.
+		_mesh_klic = klic
+		_mesh.split_for_player(klic)
+		_nacti_mesh_stats()
+		if not ok:
 			# ⚠ 18. session: HLAST SE JEN PRI PRETEKU. Do teto session se tu
 			# hlasilo "nevesel se do atlasu" i kdyz byl duvod jen `hold()`
 			# (stranka se prave prekresluje) - to je FALESNE HLASENI a nuti
@@ -459,11 +487,7 @@ func _priprav_mesh_vnitrni(seznam: Array) -> bool:
 				_mesh_pretek_hlasen = true
 				push_warning("app.world_view: render.chunk_mesh se nevesel do atlasu ("
 					+ str(_mesh.stats()) + ") - kresli se puvodni cestou")
-			_nacti_mesh_stats()
 			return false
-		_mesh_klic = klic
-		_mesh.split_for_player(klic)
-		_nacti_mesh_stats()
 		return true
 	if klic != _mesh_klic:
 		_mesh_klic = klic
@@ -501,14 +525,29 @@ func _nacti_mesh_stats() -> void:
 			push_warning("app.world_view: art %d neni v atlase - kresli se magenta" % art_id)
 
 
-func _kresli_mesh() -> void:
+func _kresli_mesh(predchozi: bool = false) -> void:
 	# PORADI: (1) vse s klicem `<=` klic hrace, (2) hrac, (3) vse s vetsim
 	# klicem. Presne to dela puvodni smycka - jen se 3 prikazy misto tisice.
 	# ⚠ 18. session: land je od teto session v klíči PRVNI PRUCHOD, takze je
 	# cely v "pred hracem" casti - presne jako reference (`RenderLists.cs`
 	# kresli mesh land pred mesh statics); statik se tak nikdy nekresli pod pudu.
+	# ⚠ 18. session: `predchozi = true` kresli davku PREDCHOZI (behem `hold`,
+	# kdy stranka jeste nema novy obsah) - vcetne jejich pocitadel, aby
+	# `drawn`/`kvadru` nelhaly.
 	player_drawn = false
 	player_missing = false
+	if predchozi:
+		var st: Dictionary = _mesh.stats_predchozi()
+		if not st.is_empty():
+			# Pocitadla predchozi davky - jinak by `drawn`/`kvadru` tvrdily neco
+			# jineho, nez je na obrazovce. Prazdna (prvni stavba, nez se stihla
+			# zapsat) se NEPREPISUJI: "0 kvadru" by byla lez (namEReno 4 framy).
+			_mesh_stats = st
+			drawn = int(st.get("kvadru", 0)) - int(st.get("der", 0))
+		_mesh.draw_before_predchozi(self)
+		_draw_player()
+		_mesh.draw_after_predchozi(self)
+		return
 	_mesh.draw_before(self)
 	_draw_player()
 	_mesh.draw_after(self)
@@ -518,6 +557,14 @@ func mesh_stats() -> Dictionary:
 	# Mereni pro `app.metrics` (M9): kolik kvadru je v dávce a jak draha byla
 	# stavba. Prazdny slovnik = dávka se nepouziva (a je to videt).
 	return _mesh_stats.duplicate()
+
+
+func cesty() -> Dictionary:
+	# POCITADLA CESTY KRESLENI (18. session) - pro sondu `p21-chuze.gd`.
+	# `staveb` je pocet prestaveb, `puvodnich` pocet framu, kdy se kreslilo
+	# puvodni cestou (ta stoji desitky ms - proto jsou videt jako zaseky).
+	return {"drawu": _drawu, "davkou": _davek, "predchozi": _predchozich,
+		"puvodni": _puvodnich, "staveb": _staveb}
 
 
 func _draw_slope(obj: Dictionary, pozice: Vector2) -> bool:

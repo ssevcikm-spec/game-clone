@@ -124,6 +124,13 @@ var _diry: Array = []                # art id, ktere v atlase nejsou (hlasi se)
 var _mesh_pred: ArrayMesh = null
 var _mesh_po: ArrayMesh = null
 var _posledni_split: int = -2147483647
+# ⚠ 18. session: PREDCHOZI davka (viz `build`). Drzi se proto, aby se `hold`
+# framy (stranka se prekresluje na GPU) kreslila STARA davka - ta na starou
+# stranku sedi presne, kdezto puvodni cesta stoji ~35 ms/frame.
+var _predchozi_pred: ArrayMesh = null
+var _predchozi_po: ArrayMesh = null
+var _predchozi_stats: Dictionary = {}
+var _predchozi: bool = false
 
 var _stats: Dictionary = {}
 var _hotovo: bool = false
@@ -294,6 +301,16 @@ func build(objects: Array) -> bool:
 		_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
 		_kreslic.queue_redraw()
 		_hold = HOLD_FRAMU
+	# ⚠⚠ 18. session - PREDCHOZI DAVKA SE UZ NEZAHOZUJE (vada "periodicky zasek"):
+	# `hold` znamena, ze NOVA davka jeste 2 framy cte starou stranku (proto se
+	# puvodne kreslila puvodni cestou). Jenze STARA davka na starou stranku sedi
+	# PRESNE - a driv se tu zahodila (`_mesh_pred = null`), takze se kazda
+	# prestavba platila jeste 2 framy puvodni cesty. NamEReno v chuzi
+	# (`_analyza/p21-chuze.gd`): z 75 framu > 16 ms jich bylo 44 prave tohle.
+	_predchozi_pred = _mesh_pred
+	_predchozi_po = _mesh_po
+	_predchozi_stats = _stats.duplicate()
+	_predchozi = _predchozi_pred != null or _predchozi_po != null
 	_hotovo = not _pretek
 	_mesh_pred = null
 	_mesh_po = null
@@ -571,6 +588,27 @@ func draw_before(view) -> void:
 func draw_after(view) -> void:
 	if _mesh_po != null:
 		view.draw_mesh(_mesh_po, _viewport.get_texture())
+
+
+func ma_predchozi() -> bool:
+	# Je k dispozici PREDCHOZI davka (kresli se, dokud se stranka prekresluje)?
+	return _predchozi
+
+
+func draw_before_predchozi(view) -> void:
+	if _predchozi_pred != null:
+		view.draw_mesh(_predchozi_pred, _viewport.get_texture())
+
+
+func draw_after_predchozi(view) -> void:
+	if _predchozi_po != null:
+		view.draw_mesh(_predchozi_po, _viewport.get_texture())
+
+
+func stats_predchozi() -> Dictionary:
+	# Pocitadla PREDCHOZI davky - kdyz se kresli ona, musi to sedet s obrazem
+	# (jinak by `drawn`/`kvadru` tvrdily neco jineho, nez je na obrazovce).
+	return _predchozi_stats.duplicate()
 
 
 func _mesh_z_rozsahu(a: int, b: int) -> ArrayMesh:
