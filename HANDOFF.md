@@ -59,10 +59,11 @@ níže v „Co se NEOPRAVILO / NEMĚŘILO“.**
 **Integrační čísla (naměřeno dnes):** sada **1 201 kontrol / 0 selhání** (44 case
 souborů, bylo 1 178/0); brány `run-all.py` **11 měřeno / 0 vad** (G10 měřeno na
 **čerstvém** snímku); `check-docs-refs` / `check-zadani` / `roadmap-gen --check`
-**exit 0**; **draw calls 5**. **Mutace: 76 z 76** (devět změněných modulů;
-18. session navíc `chunk_mesh`+`world_view` **20/20**, včetně nové mutace na
-rozpočet stavby — a jedna mutace, která neměla jak selhat, byla ODSTRANĚNA,
-ne ponechána zelená).
+**exit 0**; **draw calls 5**. **Mutace (8 změněných modulů): 77 z 77 chyceno**,
+smlouva vstupu OK (běh `--only sort,chunk_mesh,chunk_renderer,world_view,player_controller,input,movement,journal`;
+dvě mutace byly vyměněny: „čekající stránka jako díra“ odhalila chybějící test
+(část F v `tests/cases/chunk_mesh.gd`), „stavba se nedělí do framů“ nemohla
+selhat → nahrazena mutací na `_STAVBA_MS`).
 **Chůze v běhu hry** (`_analyza/p21-chuze.gd`, **2 400 framů**, střídavě NE/SE,
 běh): frame ms **median 0,59**, **max 133,33**; rozpad měřených framů:
 **≤1 ms 2 093**, ≤2 ms 116, ≤4 ms 42, ≤8 ms 23, ≤16 ms 15, ≤33 ms 24,
