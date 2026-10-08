@@ -8,6 +8,39 @@
 > **Kdo soubor přepisuje celý, ať tyhle bloky nechá** — nebo si je přesune;
 > zkontroluj to **hledáním**, ne pamětí (`docs/09 §9.7`).
 
+## ✅ CO JE NOVÉHO (2026-10-09 — TŘI VADY ZE HRY, DEBUG OVERLAY, NÁVRH VIZUÁLNÍ REVIZE)
+
+**Zadání uživatele (doslova):** 10 pozorování ze hry (stamina, animace běhu,
+zoom, okno, kovárna/roh hradu přes vodu, voda v lese, chybějící debug info,
+zeď z podkroví, 2 záseky z ~2300 na ~130 ms, probliknutí) + otázka „dávalo by
+smysl pustit tě s maximálním výkonem na revizi… dokončit celý vizuál?".
+
+| Věc | Co je hotové a čím je to doložené |
+|---|---|
+| **Běh má vlastní animaci** | Číslo akce se bralo jako skupina `anim.mul`, ale u člověka je `1 = WalkArmed` a běh je **2** (`_src/classicuo/src/ClassicUO.Assets/AnimationsLoader.cs:1721`). Export přepnut na `0:walk,2:run,4:idle`; klient má `render/anim_player.ACTION_GROUP` (id 1 → skupina 2), `sim.movement.ACTION_RUN` **zůstává 1** (spec test na něm stojí). Doklady: `_analyza/p25-groups-montaz.py` (pohledem), `_analyza/p25-run-sprite.gd` (živě: akce 1 → skupina 2, 44×57 px), `_analyza/p25-hrac-srovnani.png` |
+| **Stamina vypnuta** | `never` byla v `app/config.gd` SCHEMA povolená, ale `sim.movement` ji neznal → tichý průchod jako `run_only`. Teď jsou implementované všechny 4 modely, `data/balance.json` má `never` (pokyn uživatele). Reference: běh staminu nebere, spotřebu váže **přetížení** (`_src/servuo/Scripts/Misc/WeightOverloading.cs:111`), regenerace 1 bod/interval (`Server/Mobile.cs:1968-1976`) — `sim.regen` u nás chybí |
+| **Debug overlay (`F3`)** | `ui/debug_overlay.gd`: lokace, zoom, stav, animace, fps + **špička frame času**. Je viditelný od startu (aby ho zachytil screenshot — návrh uživatele) a má `MOUSE_FILTER_IGNORE`. Snímky: `_analyza/p25-overlay-walk.png` / `-run.png` |
+| **⚠ NÁLEZ: zoom rozhází pozici postavy** | Overlay při zoomu 0,75 ukazuje **`pick=(426,280)`** proti skutečnému **(480,300)**: `_camera_offset()` míchá světové a obrazovkové pixely a zoom nezohledňuje (reference má `Camera.ScreenToWorld`, `Camera.cs:88-103`). **NEOpraveno** — je to první bod fáze 1 |
+| **⚠ ZMĚNA SPECU (jediná)** | `tests/cases/balance.gd` pinovalo `stamina_drain_model == "run_only"` → nyní `"never"`. Vynuceno pokynem uživatele; vrácení = jedna hodnota v testu + jedna v datech |
+
+**Čísla (celá na tomto stromě):** testy **1372 → 1385 kontrol / 0 selhání**
+(nové cases `stamina_model.gd`, `debug_overlay.gd`); brány
+`tools/gates/run-all.py` **11 měřeno / 0 chyb**; commit `d858c8c`,
+`origin/main = d858c8c` (push ověřen).
+
+**➡ NÁVRH REVIZE VIZUÁLU JE V `VIZUAL-PARITA-2026-10-09.md`** — naměřené
+nálezy k deseti pozorováním, pravidla originálu s citacemi (Z-pásma
+`playerZ ± 14/16`, fade střech na alfu 0, hloubka `(x+y) + (127+z)*0.01`) a tři
+fáze práce. **Nic z návrhové části se neprovádělo** — čeká na rozhodnutí
+uživatele o rozsahu.
+
+**Co zůstává otevřené z tohoto bloku:** zoom (§2.3), Z-pásma a střechy (§2.4),
+voda a statiky u Britainu (neměřeno — chybí souřadnice ze snímků uživatele, ty
+teď dává overlay), záseky a probliknutí (§2.6), `sim.regen` a spotřeba podle
+váhy (§2.2), okno a černý pás GUI (rozhodnutí uživatele).
+
+
+
 ## ✅ CO JE NOVÉHO (20. session, DRUHÁ ČÁST) — RECEPTY NA TYPY, VÝHEŇ VE SVĚTĚ, BATOH, VÝROBA
 
 **Zadání uživatele (doslova):** „Proveď všechny 3" — (1) push, (2) výheň a kovadlina do světa
