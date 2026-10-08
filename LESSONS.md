@@ -24,6 +24,37 @@ Typy: `chyba` (moje vada) · `past-nástroje` (prostředí/nástroj, ne logika) 
 
 ---
 
+### 2026-10-08 — Časové dělení má tři povinnosti: držet předchozí výsledek, dokončit fázi, nemít mrtvou bránu (postup)
+**Co se stalo:** přestavba dávky (13 000 objektů, ~150 ms) se rozdělila na
+`zacni()` + `krok(8 ms)`. První verze měřila **hůř než předtím** (46 framů
+> 16 ms, `puvodni` 78 framů) a našly se tři konkrétní vady:
+(a) `zacni()` si ukládalo „předchozí dávku“ i uprostřed stavby, kdy jsou
+`_mesh_pred/_mesh_po` NULL — a tím se předchozí dávka ZTRATILA, takže se zbytek
+stavby kreslil pomalou původní cestou;
+(b) rozdělení dávky (`split_for_player`) se dělalo, jen když `stav() == 0`; když
+přišla změna (`invalidate()`) během `hold`, meshe zůstaly NULL a přišlo se
+i o předchozí dávku → 26 framů původní cesty;
+(c) statistiky se psaly uvnitř práce (`_dokonci`), takže v nich chyběl poslední
+krok a jeho čas (`kroku 0`, `stavba_ms 0.0`).
+Po opravách: **2 037 z 2 319 framů ≤ 1 ms, > 16 ms jen 25, > 33 ms 2** (dřív
+6 framů 75–150 ms).
+**Doklad:** `_analyza/p21-chuze.gd` (rozpad framů + `cesty()`), test parity
+v `tests/cases/chunk_mesh.gd` (sekce G: po částech == atomicky, bit po bitu),
+`tests/cases/world_view.gd` (počítá framy, ve kterých stavba OPRAVDU běžela).
+**Ponaučení:** (1) Kdo dělí práci do framů, musí **držet platný předchozí
+výsledek** a nesmí ho přepsat neúplným stavem — jinak se „zrychlení“ projeví
+jako pomalá náhradní cesta. (2) **Dokončovací krok se nesmí přeskočit** podle
+stavu, který se mezitím změní (tady `hold`): finalizace se dělá podle toho, že
+je geometrie hotová, ne podle toho, že je zrovna použitelná. (3) Metriky piš
+**po** dokončení práce, ne uvnitř ní.
+(4) **A pozor na mrtvou mutaci:** nová mutace „stavba se nedělí do framů“ se
+nechytila, protože i s vypnutou časovou kontrolou se stavba zastaví na konci
+fáze 1 — tedy mutace nemohla selhat. Vyměnil jsem ji za mutaci na ROZPOČET
+(`_STAVBA_MS`), která chycená je; **brána, která nemá jak selhat, je horší než
+žádná**.
+(5) **Sonda s vypnutým controllerem musí žádat překreslení** (`queue_redraw()`),
+jinak se `_draw()` nevolá, stavba se neposouvá a snímek zachytí půlku světa.
+
 ### 2026-10-08 — Měřicí přístroj se počítá do měření: snímek prodlouží NÁSLEDUJÍCÍ frame (chyba)
 **Co se stalo:** sonda měřila frame časy při chůzi a hlásila **75 framů > 16 ms**
 (3,1 %) — vypadalo to jako „hra se pořád zasekává“. Když jsem z měření vyloučil

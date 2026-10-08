@@ -56,13 +56,13 @@ níže v „Co se NEOPRAVILO / NEMĚŘILO“.**
 | **Zásek + WARNING v logu** | Byla to **jedna** věc: stránka atlasu (2048², 16 MB) se četla `Image.load()` **synchronně uvnitř `build()`**. Naměřeno: **~58 ms na stránku** (`_analyza/p21-atlas-cena.gd`, 34 stránek = 1 982 ms) | Stránky se načítají jako **resource na pozadí** (`ResourceLoader.load_threaded_request`; mají `.import`, `compress/mode=0`, bez mipmap) a `render.anim` taky; kdo stránku nemá, dostane `page_pending()` → objekt se **vynechá** (není to „chybí art“ = magenta). `tick_nacteni()` vyzvedne hotové **každý frame** |
 | **„journal mi zakrývá výhled“** | Hra kreslila svět přes celé okno a GUI na něj | **Černý pás pro GUI** (starý způsob UO, na přání uživatele): `GUI_PAS_VPRAVO = 320`, `GUI_PAS_DOLE = 120` (`CanvasLayer` layer 1 pod HUD layer 2), žurnál v pravém pásu, stavový pruh v dolním; kamera se posune o `view.gui_odsazeni = (160, 60)`, aby hráč stál ve středu **viditelného** světa. Snímek `_analyza/p21-britain.png` |
 
-**Integrační čísla (naměřeno dnes):** sada **1 195 kontrol / 0 selhání** (44 case
+**Integrační čísla (naměřeno dnes):** sada **1 201 kontrol / 0 selhání** (44 case
 souborů, bylo 1 178/0); brány `run-all.py` **11 měřeno / 0 vad** (G10 měřeno na
 **čerstvém** snímku); `check-docs-refs` / `check-zadani` / `roadmap-gen --check`
-**exit 0**; **draw calls 5**. **Mutace (9 změněných modulů): 76 z 76 chyceno**,
-smlouva vstupu OK (běh `--only sort,chunk_mesh,chunk_renderer,world_view,player_controller,input,movement,journal`;
-první běh dal 75/76 a ta jedna odhalila **chybějící test** — doplněna část F
-v `tests/cases/chunk_mesh.gd`, pak 76/76).
+**exit 0**; **draw calls 5**. **Mutace: 76 z 76** (devět změněných modulů;
+18. session navíc `chunk_mesh`+`world_view` **20/20**, včetně nové mutace na
+rozpočet stavby — a jedna mutace, která neměla jak selhat, byla ODSTRANĚNA,
+ne ponechána zelená).
 **Chůze v běhu hry** (`_analyza/p21-chuze.gd`, **2 400 framů**, střídavě NE/SE,
 běh): frame ms **median 0,59**, **max 133,33**; rozpad měřených framů:
 **≤1 ms 2 093**, ≤2 ms 116, ≤4 ms 42, ≤8 ms 23, ≤16 ms 15, ≤33 ms 24,
@@ -93,18 +93,22 @@ terénu je věrné artu; „kostkovaný“ dojem tedy není chyba vzorkování a
 je to art sám (a překryvy dlaždic na změnách výšky, které má i klient).
 
 **⚠ Co se NEOPRAVILO / NEMĚŘILO (nezamlčeno):**
-(`a`) **Přestavba seznamu i dávky je pořád jediný zásek** — čistě naměřeno
-(`p21-chuze.gd`, snímky vyloučené z měření): **2 093 z 2 319 framů ≤ 1 ms**,
-**6 framů 75–133 ms** (přestavba + první použití překreslené stránky, 7 staveb),
-24 framů 16–33 ms; `stavba_ms ≈ 169`. Zůstává to jako **R6** (stavět po částech).
-**Toto je jediná položka zadání 18. session, která není hotová** a je to
-plánovaný samostatný cíl (viz „CÍL 19. SESSION“ níž: time-slicing + paritní hash
-`m9-parita.gd`). ⚠ 18. session k tomu udělala dvě věci, které se **měřily**:
-`hold` framy se už neplatí původní cestou (`predchozi` = stará dávka sedí na
-starou stránku přesně; `puvodni` = 8 framů, jen start) a opravená **díra, která
-mohla dělat černý frame**: dělení dávky se dřív dělalo jen když `build` uspěl,
-takže po `hold` framech mohly zůstat `_mesh_pred/_mesh_po` NULL a 1 frame se
-nekreslil NIC (dnes se dělí vždy).
+(`a`) ✅ **Přestavba dávky je VYŘEŠENÁ (R6) — časově dělená.** Naměřeno
+(`_analyza/p21-chuze.gd`, 2 400 framů, snímky vyloučené z měření):
+**2 037 z 2 319 framů ≤ 1 ms**, framů **> 16 ms: 25** (1,1 %), **> 33 ms: 2**,
+max **133 ms** (dřív 6 framů 75–150 ms + 28 framů 16–33 ms).
+Stavba se dělá po částech (`chunk_mesh.krok(8 ms)`, 103–166 kroků na stavbu)
+a během ní se kreslí **PŘEDCHOZÍ** dávka (`predchozi 137`, `puvodni` jen 29 na
+startu). Geometrie je **bit po bitu stejná** jako atomická stavba — dokazuje to
+test `chunk_mesh` (sekce G: `_verts/_uvs/_barvy/_klic` se rovnají) a mutace
+„obří rozpočet na frame“.
+**⚠ CO ZŮSTÁVÁ (změřené, ne zamlčené):** 2 framy z 2 319 mají **~130 ms** a padají
+na frame, kdy stavba **dokončí** (`hold 2`) — tj. na **překreslení runtime atlasu
+na GPU** (600 spritů do 2048² `SubViewport` + `UPDATE_ONCE`), ne na stavbu
+samotnou (`stavba_ms` je rozložená do 8ms kroků, `faze1_ms` = 8,6 ms).
+Další krok (samostatný, levný nápad): `render_target_clear_mode = CLEAR_MODE_NEVER`
++ kreslit jen NOVÉ sprity (přeskládání stránky je vzácné: `repakov 0`) — tím by
+zmizel i ten poslední zásek. **Do té doby je to 2 záseky za ~7 s chůze místo 6.**
 (`b`) **Černá obrazovka se NEPODAŘILA reprodukovat** — 2 400 framů běhu ve dvou
 směrech, **0** černých snímků (nejčernější 39,3 % tmavých pixelů = tmavý terén),
 **0 framů s prázdnou dávkou**. Pravděpodobná příčina je už opravená cesta

@@ -60,6 +60,9 @@ const HOLE_COLOR := Color(1.0, 0.0, 1.0, 0.85)
 const BILA_VELIKOST: int = 2         # strana bileho ctverecku v atlase
 const VRCHOLU_NA_KVADR: int = 6      # dva trojuhelniky [0,1,2] a [2,3,0], bez indexu
 const HOLD_FRAMU: int = 2            # frame, nez se smi pouzit nova stranka
+# Kolik objektu se zpracuje, nez se zkontroluje cas (18. session). Kontrolovat
+# cas po KAZDEM objektu by bylo drazsi nez prace sama (`Time.get_ticks_usec`).
+const DRZKA: int = 64
 # ⚠ BARVA SVAHU (18. session): reference pousti plochy land art rezimem
 # `SHADER_NONE` (bez stineni) a SVah (texmapu) rezimem `SHADER_LAND`, kde se
 # barva nasobi `get_light(normal)`; pro plochou normalu to je presne
@@ -135,6 +138,21 @@ var _predchozi: bool = false
 var _stats: Dictionary = {}
 var _hotovo: bool = false
 
+# --- STAVBA PO CASTECH (18. session, R6) ---------------------------------
+# `build()` byl jeden blok ~150 ms. Dnes se stavi `zacni()` + opakovane
+# `krok(ms)`, takze frame zustane kratky a kresli se pritom PREDCHOZI davka.
+var _fronta: Array = []              # seznam, ktery se stavi
+var _k: int = 0                      # index ve fazi 0/2
+var _faze: int = 3                   # 0 sber artu, 1 sloty, 2 geometrie, 3 hotovo
+var _potreba: Dictionary = {}        # klic -> [vyska, sirka, tex] (faze 0)
+var _poc: Dictionary = {"svahu": 0, "der": 0, "nodraw": 0, "ceka": 0, "bez_slotu": 0}
+var _q: int = 0                      # kolik kvadru je hotovych
+var _t0: int = 0                     # zacatek stavby (pro `stavba_ms`)
+var _prace_us: int = 0               # kolik us skutecne zabrala stavba (pres framy)
+var _kroku: int = 0                  # kolik `krok` volani stavba potrebovala
+var _faze1_us: int = 0               # kolik z toho zabralo predehleni slotu (nerezene)
+var _pokusu: int = 0                 # kolikrat se stavba zacala (max 2: druhy pruchod)
+
 
 func _init(chunk, textures, page_size: int = PAGE_SIZE, parent: Node = null) -> void:
 	_chunk = chunk
@@ -161,7 +179,40 @@ func _init(chunk, textures, page_size: int = PAGE_SIZE, parent: Node = null) -> 
 
 
 func is_built() -> bool:
-	return _hotovo and not _pretek and _hold <= 0
+	return stav() == 0
+
+
+func stavi_se() -> bool:
+	# Bezi stavba? (Volajici musi volat `krok` - i kdyz `stav()` vraci 2,
+	# protoze zadna predchozi davka neni: to znamena "kresli puvodni cestou",
+	# ne "nestav".)
+	return _faze < 3
+
+
+func je_geometrie_hotova() -> bool:
+	# Geometrie je postavena (`_hotovo`), i kdyz se stranka jeste prekresluje
+	# (`hold`). Volajici ji smi ROZDELIT uz ted - kreslit se bude az se `stav()`
+	# vrati 0, ale rozdeleni tim nezapadne (do 18. session se delilo jen pri
+	# `stav() == 0`, takze po `invalidate()` uprostred `hold` zustaly meshe NULL
+	# a prisla se o ne i PREDCHOZI davka - namEReno `puvodni` 78 framu).
+	return _faze >= 3 and _hotovo
+
+
+func stav() -> int:
+	# 0 = hotova davka (kresli ji), 1 = stavi se / ceka se na prekresleni stranky
+	# (kresli PREDCHOZI davku), 2 = neda se (pretek, nebo zadna predchozi davka
+	# neni) - kresli se puvodni cestou.
+	if _faze < 3 or not _hotovo or _hold > 0:
+		return 1 if _predchozi else 2
+	if _pretek:
+		return 2
+	return 0
+
+
+func treba_split() -> bool:
+	# Byla hotova davka uz rozdelena na "pred hracem"/"po hraci"? Po kazde
+	# stavbe je potreba deleni znovu (`app/world_view` ho udela jednou).
+	return _mesh_pred == null and _mesh_po == null
 
 
 func pretek() -> bool:
@@ -178,6 +229,10 @@ func tick_hold() -> void:
 	# frame cetl prazdnou texturu (a to by byl obraz, ktery lhal).
 	if _hold > 0:
 		_hold -= 1
+	# ⚠ 18. session: `hold` ve statistice se musi prepsat, jinak hlasi 2 i po
+	# vyprseni (sonda `p21-snimky.gd` se pta na `hold == 0` a cekala by zbytecne).
+	if _stats.has("hold"):
+		_stats["hold"] = _hold
 
 
 func texture() -> Texture2D:
@@ -200,10 +255,11 @@ func klic_kvadru(index: int) -> int:
 
 
 func invalidate() -> void:
+	# Zahodi HOTOVOU davku (seznam se zmeni a bude se stavit znovu).
+	# ⚠ 18. session: NEMAZE se pritom `_predchozi_*` - dokud se nova davka
+	# nedostavi, kresli se porad ta stara (jinak by kazda zmena seznamu blikla
+	# puvodni cestou, ktera stoji ~35 ms/frame).
 	_hotovo = false
-	_mesh_pred = null
-	_mesh_po = null
-	_posledni_split = -2147483647
 
 
 static func slope_polygon(obj: Dictionary, pos: Vector2) -> PackedVector2Array:
@@ -267,28 +323,148 @@ static func je_svah(obj: Dictionary, textures) -> bool:
 
 
 func build(objects: Array) -> bool:
-	# Projde seznam v PORADI a postavi z nej kvadry. Vraci false, kdyz se nema
-	# kreslit dávkou (stranka se prave preklada, nebo se neco neveslo).
-	var t0: int = Time.get_ticks_usec()
-	_pridano = 0
+	# ATOMICKA stavba: zahaji a dobuduje v JEDNOM framu. Pouziva se v testech
+	# a tam, kde se na vysledek ceka (druhy pruchod po prelozeni stranky).
+	# ⚠⚠ 18. session - VADA "PERIODICKY ZASEK": HRA stavi davku PO CASTECH
+	# (`zacni` + `krok`), protoze cela stavba stoji **namERene ~130-170 ms**
+	# (`_analyza/p21-chuze.gd`: 6 framu z 2319 ma 75-133 ms a vsechny jsou
+	# prestavba). `krok(ms_limit)` udela nejvys `ms_limit` ms prace, takze frame
+	# zustane pod 16 ms a pritom se kresli PREDCHOZI davka.
+	zacni(objects)
+	krok(1.0e9)
+	return is_built()
+
+
+func zacni(objects: Array) -> void:
+	# Zahaji novou stavbu. PREDCHOZI davka se pritom DRZI (`_predchozi_*`), aby
+	# se behem stavby kreslilo to, co uz je na obrazovce.
+	#
+	# ⚠ 18. session (namEReno v `p21-chuze.gd`): `_predchozi_*` se prebiraji JEN
+	# kdyz zadna stavba nebezi. Kdyby se prebiraly i uprostred stavby, byly by
+	# v tu chvili `_mesh_pred/_mesh_po` NULL (nova davka se jeste stavi) a
+	# ztratila by se i ta stara - hra by pak cely zbytek stavby kreslila puvodni
+	# cestou (namEReno: `puvodni` 75 framu misto 8).
+	if _faze >= 3:
+		_predchozi_pred = _mesh_pred
+		_predchozi_po = _mesh_po
+		_predchozi_stats = _stats.duplicate()
+		_predchozi = _predchozi_pred != null or _predchozi_po != null
+	_mesh_pred = null
+	_mesh_po = null
+	_posledni_split = -2147483647
+	_hotovo = false
 	_pretek = false
-	var ok: bool = _stavba(objects)
-	if not ok and not _pretek:
-		# Stranka byla plna: zacne se znovu (append-only by ji jinak jen
-		# zaplnil) a seznam se projde DRUHYM pruchodem. Je to drahe, ale deje
-		# se to jen kdyz se nasbirilo vic artu, nez se do stranky vejde.
+	_pridano = 0
+	_prace_us = 0
+	_fronta = objects
+	_faze = 0
+	_k = 0
+	_pokusu = 1
+	_potreba = {}
+	_poc = {"svahu": 0, "der": 0, "nodraw": 0, "ceka": 0, "bez_slotu": 0}
+	_q = 0
+	_diry = []
+	_rezervuj(objects.size())
+	_t0 = Time.get_ticks_usec()
+
+
+func _rezervuj(n: int) -> void:
+	# Pole na CELY seznam (indexuje se pozicemi, ne appendem - proto se na konci
+	# zkrati na `_q`): jinak by kazdy objekt znamenal realokaci.
+	_verts.resize(n * VRCHOLU_NA_KVADR)
+	_uvs.resize(n * VRCHOLU_NA_KVADR)
+	_barvy.resize(n * VRCHOLU_NA_KVADR)
+	_klic.resize(n)
+
+
+func krok(ms_limit: float) -> void:
+	# Posune stavbu o nejvys `ms_limit` ms prace. Faze:
+	#   0 = sber potrebnych artu, 1 = predehleni slotu, 2 = geometrie, 3 = hotovo.
+	# Cas se kontroluje po `DRZKA` objektech, aby mereni casu nebylo drazsi nez
+	# prace sama.
+	#
+	# ⚠ `_prace_us` scita jen SKUTECNOU praci stavby (ne stenu mezi framy):
+	# `stavba_ms` ve statistice je proto "kolik vypocet stál", ne "za jak dlouho
+	# se to stihlo" (namEReno 18. session: přes framy vyšlo 2 231 ms, coz bylo
+	# zavadejici cislo).
+	if _faze >= 3:
+		return
+	var t0: int = Time.get_ticks_usec()
+	_krok_vnitrni(t0, int(ms_limit * 1000.0))
+	_prace_us += Time.get_ticks_usec() - t0
+	_kroku += 1
+	if _faze >= 3:
+		# ⚠ Statistiky se pisou ZNOVU po dokonceni: `_dokonci` je zapsalo uvnitr
+		# teto prace, takze by v nich chybel tento krok a jeho cas (namEReno:
+		# `kroku 0`, `stavba_ms 0.0`).
+		_zapis_stats()
+
+
+func _krok_vnitrni(t0: int, limit: int) -> void:
+	var od: int = 0
+	while _faze < 3:
+		if _faze == 0:
+			if _k < _fronta.size():
+				_slot_objekt(_fronta[_k])
+				_k += 1
+				od += 1
+				if od >= DRZKA and Time.get_ticks_usec() - t0 >= limit:
+					return
+				continue
+			_faze = 1
+			continue
+		if _faze == 1:
+			var t1: int = Time.get_ticks_usec()
+			_pridel_sloty()
+			_faze1_us += Time.get_ticks_usec() - t1
+			_faze = 2
+			_k = 0
+			if Time.get_ticks_usec() - t0 >= limit:
+				return
+			continue
+		if _k < _fronta.size():
+			_kvadr(_fronta[_k])
+			_k += 1
+			od += 1
+			if od >= DRZKA and Time.get_ticks_usec() - t0 >= limit:
+				return
+			continue
+		_dokonci()
+
+
+func _dokonci() -> void:
+	# Konec stavby: kdyz se slot nevesel, zkusi se JESTE JEDNO prelozeni stranky
+	# (append-only by seznam jen zaplnil, ne uvolnil); kdyz ani to nepomuze,
+	# `_pretek` znamena "kresli puvodni cestou".
+	if _poc["bez_slotu"] > 0 and not _pretek and _pokusu < 2:
+		# Druhy pruchod se smi zkusit JEDNOU (`_pokusu`): kdyz se stranka jen
+		# zaplnila, prelozeni pomuze; kdyz nepomuze, musi se skoncit - jinak by
+		# se stavba zacyklila (namEReno 18. session: testy visely).
+		_pokusu += 1
 		_ocisti_stranku()
-		ok = _stavba(objects)
-		if not ok:
-			_pretek = true
-			push_warning("render.chunk_mesh: runtime atlas %dx%d staci i po prekladu - "
-				% [_velikost, _velikost]
-				+ "kresli se puvodni cestou; kdo to vidi, at zvedne PAGE_SIZE")
+		_pridano = 0
+		_faze = 0
+		_k = 0
+		_potreba = {}
+		_poc = {"svahu": 0, "der": 0, "nodraw": 0, "ceka": 0, "bez_slotu": 0}
+		_q = 0
+		_diry = []
+		_rezervuj(_fronta.size())
+		return
+	if _poc["bez_slotu"] > 0:
+		_pretek = true
+		push_warning("render.chunk_mesh: runtime atlas %dx%d staci i po prekladu - "
+			% [_velikost, _velikost]
+			+ "kresli se puvodni cestou; kdo to vidi, at zvedne PAGE_SIZE")
+	_verts.resize(_q * VRCHOLU_NA_KVADR)
+	_uvs.resize(_q * VRCHOLU_NA_KVADR)
+	_barvy.resize(_q * VRCHOLU_NA_KVADR)
+	_klic.resize(_q)
 	if _pridano > 0:
 		# Stranka ma novy obsah -> na GPU se prekresli a `HOLD_FRAMU` framu se
-		# jeste kresli puvodne (viz `tick_hold`).
+		# jeste kresli PREDCHOZI davka (viz `tick_hold` a `stav`).
 		#
-		# ⚠⚠ 17. session (2026-10-08) - VADA "ROZMAZANE TEXTURY, NEKTERE TAM
+		# \u26a0\u26a0 17. session (2026-10-08) - VADA "ROZMAZANE TEXTURY, NEKTERE TAM
 		# NEMAJI CO DELAT": `SubViewport.UPDATE_ONCE` znamena "vykresli se
 		# JEDNOU PO PRIZNACENI rezimu", ne "pri kazdem `queue_redraw()`".
 		# Stranka se proto na GPU prekreslila jen pri PRVNI stavbe a kazda
@@ -296,234 +472,196 @@ func build(objects: Array) -> bool:
 		# STARE rozvrzeni, zatimco UV v meshi uz mirila jinam - presne to je
 		# "rozmazane/zvetsene/nesedi". Dokaz (minimalni repro): samotne
 		# `queue_redraw()` pixel nezmeni, `UPDATE_ONCE` + `queue_redraw()` ano
-		# (`_analyza/p20b-update-once.gd`, `_analyza/p20b-nalez.md` §2).
+		# (`_analyza/p20b-update-once.gd`, `_analyza/p20b-nalez.md` \u00a72).
 		# Rezim se proto PRED kazdym prekreslenim ZNOVU NASTAVI.
 		_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
 		_kreslic.queue_redraw()
 		_hold = HOLD_FRAMU
-	# ⚠⚠ 18. session - PREDCHOZI DAVKA SE UZ NEZAHOZUJE (vada "periodicky zasek"):
-	# `hold` znamena, ze NOVA davka jeste 2 framy cte starou stranku (proto se
-	# puvodne kreslila puvodni cestou). Jenze STARA davka na starou stranku sedi
-	# PRESNE - a driv se tu zahodila (`_mesh_pred = null`), takze se kazda
-	# prestavba platila jeste 2 framy puvodni cesty. NamEReno v chuzi
-	# (`_analyza/p21-chuze.gd`): z 75 framu > 16 ms jich bylo 44 prave tohle.
-	_predchozi_pred = _mesh_pred
-	_predchozi_po = _mesh_po
-	_predchozi_stats = _stats.duplicate()
-	_predchozi = _predchozi_pred != null or _predchozi_po != null
-	_hotovo = not _pretek
-	_mesh_pred = null
-	_mesh_po = null
-	_posledni_split = -2147483647
 	var pouzito: int = 0
 	for r in _sloty.values():
 		pouzito += int(r.size.x) * int(r.size.y)
-	_stats = {"objektu": objects.size(), "kvadru": _klic.size(),
-		"svahu": _stats.get("svahu", 0), "der": _stats.get("der", 0),
-		"nodraw": _stats.get("nodraw", 0), "ceka": _stats.get("ceka", 0),
-		"bez_slotu": _stats.get("bez_slotu", 0), "slotu": _sloty.size(),
+	_stats = {"objektu": _fronta.size(), "kvadru": _klic.size(),
+		"svahu": _poc["svahu"], "der": _poc["der"], "nodraw": _poc["nodraw"],
+		"ceka": _poc["ceka"], "bez_slotu": _poc["bez_slotu"], "slotu": _sloty.size(),
 		"plocha_px": pouzito, "stranka": _velikost, "polozek": _polozky.size(),
 		"repakov": _repakov, "pretek": _pretek, "hold": _hold,
-		"stavba_ms": (Time.get_ticks_usec() - t0) / 1000.0}
-	return is_built()
+		"kroku": _kroku, "faze1_ms": _faze1_us / 1000.0,
+		"stavba_ms": _prace_us / 1000.0}
+	_faze = 3
+	_hotovo = not _pretek
 
 
-func _stavba(objects: Array) -> bool:
-	# Jedna stavba: projde seznam, prida chybejici arty do stranky a postavi
-	# geometrii. Vraci false, kdyz se slot nevesel (a `_pretek` zustane false -
-	# rozhodnuti "prelozit, nebo se vzdát" dela `build`).
-	var n: int = objects.size()
-	_verts.resize(n * VRCHOLU_NA_KVADR)
-	_uvs.resize(n * VRCHOLU_NA_KVADR)
-	_barvy.resize(n * VRCHOLU_NA_KVADR)
-	_klic.resize(n)
-	_diry = []
-	# ⚠⚠ 17. session (2026-10-08) - BALENI STRANKY: do teto session se arty
-	# pridavaly v PORADI SEZNAMU (jak prisly), coz u 2048² stranky promrhava
-	# vic nez polovinu mista (namEReno: plocha slotu 2 040 930 z 4 194 304 =
-	# **48,7 %**) - a v Britanii se pak stranka UZ NEVESLA (`pretek=true`,
-	# `bez_slotu=39`) i kdyz soucet spritu je polovina stranky. Proto se nejdriv
-	# spoctou vsechny potrebne arty a sloty se prideli podle VYSKY SESTUPNE
-	# ("first fit decreasing height" - klasicka policova heuristika). Tim se
-	# radky srovnaji a vejde se i vetsi okno seznamu. Vysledne UV se tim
-	# NEMENI - slot si kazdy objekt najde pres `_slot_rozmer` (stejny klic).
-	_predplnit_sloty(objects)
-	# ⚠ HORKA SMYČKA (namEReno 2026-10-08): prvni verze stavela pro kazdy objekt
-	# `PackedVector2Array([...])` (3 alokace na objekt), pocitala pozici pres
-	# `_chunk.screen_position()` a UV pres `_v_uv()` (2 volani na objekt) a pak
-	# 18 zapisu v DVOU vnorenych smyckach. Pri 7 869 objektech to bylo
-	# **100 ms** na prestavbu (kazde 4 kroky chuze = seknuti 150 ms).
-	# Dnes se pocita to same, ale INLINE: pozice i UV primo, zapisy rozepsane.
-	# Vzorec pozice je z `core/iso.gd` (`(x-y)*ISO_STEP`, `(x+y)*ISO_STEP - z*Z_SCALE`)
-	# a `render.chunk.screen_position` k nemu jen odecte `offset` statiku.
+func _zapis_stats() -> void:
+	# (Prepis statistik po dokonceni stavby - viz `krok`.)
+	if _stats.is_empty():
+		return
+	_stats["hold"] = _hold
+	_stats["kroku"] = _kroku
+	_stats["faze1_ms"] = _faze1_us / 1000.0
+	_stats["stavba_ms"] = _prace_us / 1000.0
+
+
+func _kvadr(obj: Dictionary) -> void:
+	# JEDEN objekt -> jeden kvadr. Do 18. session to bylo telo smycky ve
+	# `_stavba`; dnes se vola z `krok` (stavba po castech) a `q`/pocitadla jsou
+	# stav objektu (`_q`, `_poc`). KOD SE NEMENIL - jen odsazeni a `continue`
+	# -> `return` (ze smycky se stala funkce).
 	var krok: float = float(Const.ISO_STEP)
 	var zs: float = float(Const.Z_SCALE)
 	var stranka_f: float = float(_velikost)
 	var vnitrek: float = UV_INSET_PX / stranka_f   # pulpixelovy inset UV u texmap
-	var q: int = 0
-	var svahu: int = 0
-	var der: int = 0
-	var nodraw: int = 0
-	var ceka: int = 0
-	var bez_slotu: int = 0
-	for obj in objects:
-		var kind: String = str(obj["kind"])
-		var art_id: int = int(obj["art_id"])
-		var x: int = int(obj["x"])
-		var y: int = int(obj["y"])
-		var z: int = int(obj["z"])
-		var diagonala: int = x + y
-		var offset: Vector2i = obj["offset"] if kind == "static" else Vector2i.ZERO
-		var pozice := Vector2(float(x - y) * krok - float(offset.x),
-			float(diagonala) * krok - float(z * Const.Z_SCALE) - float(offset.y))
-		if kind == "land" and art_id <= VOID_LAND_MAX:
-			nodraw += 1
-			continue
-		var slot := Rect2i()
-		var body0 := Vector2.ZERO
-		var body1 := Vector2.ZERO
-		var body2 := Vector2.ZERO
-		var body3 := Vector2.ZERO
-		var barva: Color = Color.WHITE
-		var stred_uv := Vector2.ZERO
-		var je_to_svah: bool = false
-		if kind == "land" and je_svah(obj, _textures):
-			slot = _slot(int(obj["texmap"]) + TEXMAP_OFFSET,
-				_textures.texmap(int(obj["texmap"])))
-			if slot.size.x <= 0:
-				bez_slotu += 1
-				continue
-			body0 = pozice + Vector2(krok, 0.0)
-			body1 = pozice + Vector2(2.0 * krok,
-				krok + float(z - int(obj["z_corners"][1])) * zs)
-			body2 = pozice + Vector2(krok,
-				2.0 * krok + float(z - int(obj["z_corners"][3])) * zs)
-			body3 = pozice + Vector2(0.0,
-				krok + float(z - int(obj["z_corners"][2])) * zs)
-			je_to_svah = true
-			barva = SVAH_BARVA       # viz `SVAH_JAS` v hlavicce
-			svahu += 1
-		else:
-			var tex: Texture2D = _textures.texture(art_id)
-			if tex == null and _textures.page_pending(art_id):
-				# ⚠ 18. session: stranka atlasu se nacita NA POZADI (16 MB, ~58 ms).
-				# Objekt se pro par framu VYNECHA - "jeste nenacteno" NENI
-				# "chybi" a kreslit za to magenta diru by byla lez. Kdyz stranka
-				# dotece, `app/world_view` davku prestavi (`textures.verze()`).
-				ceka += 1
-				continue
-			if tex == null:
-				# CHYBEJICI ART NENI TICHO (vada 61 z 5. session): vyrazna
-				# magenta, stejny tvar jako `app/world_view._draw_hole`.
-				der += 1
-				if not _diry.has(art_id):
-					_diry.append(art_id)
-				if kind == "land":
-					body0 = pozice + Vector2(krok, 0.0)
-					body1 = pozice + Vector2(2.0 * krok, krok)
-					body2 = pozice + Vector2(krok, 2.0 * krok)
-					body3 = pozice + Vector2(0.0, krok)
-				else:
-					body0 = pozice + Vector2(krok, 0.0)
-					body1 = pozice + Vector2(2.0 * krok, 0.0)
-					body2 = pozice + Vector2(2.0 * krok, krok)
-					body3 = pozice + Vector2(krok, krok)
-				barva = HOLE_COLOR
-				slot = _sloty[BILY]
-				var sx: float = (float(slot.position.x) + 0.5 * float(slot.size.x)) / stranka_f
-				var sy: float = (float(slot.position.y) + 0.5 * float(slot.size.y)) / stranka_f
-				stred_uv = Vector2(sx, sy)
+	var kind: String = str(obj["kind"])
+	var art_id: int = int(obj["art_id"])
+	var x: int = int(obj["x"])
+	var y: int = int(obj["y"])
+	var z: int = int(obj["z"])
+	var diagonala: int = x + y
+	var offset: Vector2i = obj["offset"] if kind == "static" else Vector2i.ZERO
+	var pozice := Vector2(float(x - y) * krok - float(offset.x),
+		float(diagonala) * krok - float(z * Const.Z_SCALE) - float(offset.y))
+	if kind == "land" and art_id <= VOID_LAND_MAX:
+		_poc["nodraw"] += 1
+		return
+	var slot := Rect2i()
+	var body0 := Vector2.ZERO
+	var body1 := Vector2.ZERO
+	var body2 := Vector2.ZERO
+	var body3 := Vector2.ZERO
+	var barva: Color = Color.WHITE
+	var stred_uv := Vector2.ZERO
+	var je_to_svah: bool = false
+	if kind == "land" and je_svah(obj, _textures):
+		slot = _slot(int(obj["texmap"]) + TEXMAP_OFFSET,
+			_textures.texmap(int(obj["texmap"])))
+		if slot.size.x <= 0:
+			_poc["bez_slotu"] += 1
+			return
+		body0 = pozice + Vector2(krok, 0.0)
+		body1 = pozice + Vector2(2.0 * krok,
+			krok + float(z - int(obj["z_corners"][1])) * zs)
+		body2 = pozice + Vector2(krok,
+			2.0 * krok + float(z - int(obj["z_corners"][3])) * zs)
+		body3 = pozice + Vector2(0.0,
+			krok + float(z - int(obj["z_corners"][2])) * zs)
+		je_to_svah = true
+		barva = SVAH_BARVA       # viz `SVAH_JAS` v hlavicce
+		_poc["svahu"] += 1
+	else:
+		var tex: Texture2D = _textures.texture(art_id)
+		if tex == null and _textures.page_pending(art_id):
+			# ⚠ 18. session: stranka atlasu se nacita NA POZADI (16 MB, ~58 ms).
+			# Objekt se pro par framu VYNECHA - "jeste nenacteno" NENI
+			# "chybi" a kreslit za to magenta diru by byla lez. Kdyz stranka
+			# dotece, `app/world_view` davku prestavi (`textures.verze()`).
+			_poc["ceka"] += 1
+			return
+		if tex == null:
+			# CHYBEJICI ART NENI TICHO (vada 61 z 5. session): vyrazna
+			# magenta, stejny tvar jako `app/world_view._draw_hole`.
+			_poc["der"] += 1
+			if not _diry.has(art_id):
+				_diry.append(art_id)
+			if kind == "land":
+				body0 = pozice + Vector2(krok, 0.0)
+				body1 = pozice + Vector2(2.0 * krok, krok)
+				body2 = pozice + Vector2(krok, 2.0 * krok)
+				body3 = pozice + Vector2(0.0, krok)
 			else:
-				slot = _slot(art_id, tex)
-				if slot.size.x <= 0:
-					bez_slotu += 1
-					continue
-				var w: float = float(slot.size.x)
-				var h: float = float(slot.size.y)
-				body0 = pozice
-				body1 = pozice + Vector2(w, 0.0)
-				body2 = pozice + Vector2(w, h)
-				body3 = pozice + Vector2(0.0, h)
-		var b: int = q * VRCHOLU_NA_KVADR
-		# 6 vrcholu = dva trojuhelniky [0,1,2] a [2,3,0] (rozepsano, bez smycek).
-		_verts[b] = body0
-		_verts[b + 1] = body1
-		_verts[b + 2] = body2
-		_verts[b + 3] = body2
-		_verts[b + 4] = body3
-		_verts[b + 5] = body0
-		_barvy[b] = barva
-		_barvy[b + 1] = barva
-		_barvy[b + 2] = barva
-		_barvy[b + 3] = barva
-		_barvy[b + 4] = barva
-		_barvy[b + 5] = barva
-		if barva == HOLE_COLOR:
-			# DIRA: barvu nese vrchol, textura je bily ctverecek.
-			_uvs[b] = stred_uv
-			_uvs[b + 1] = stred_uv
-			_uvs[b + 2] = stred_uv
-			_uvs[b + 3] = stred_uv
-			_uvs[b + 4] = stred_uv
-			_uvs[b + 5] = stred_uv
+				body0 = pozice + Vector2(krok, 0.0)
+				body1 = pozice + Vector2(2.0 * krok, 0.0)
+				body2 = pozice + Vector2(2.0 * krok, krok)
+				body3 = pozice + Vector2(krok, krok)
+			barva = HOLE_COLOR
+			slot = _sloty[BILY]
+			var sx: float = (float(slot.position.x) + 0.5 * float(slot.size.x)) / stranka_f
+			var sy: float = (float(slot.position.y) + 0.5 * float(slot.size.y)) / stranka_f
+			stred_uv = Vector2(sx, sy)
 		else:
-			var ux: float = float(slot.position.x) / stranka_f
-			var uy: float = float(slot.position.y) / stranka_f
-			var uw: float = float(slot.size.x) / stranka_f
-			var uh: float = float(slot.size.y) / stranka_f
-			var uv0 := Vector2(ux, uy)
-			var uv1 := Vector2(ux + uw, uy)
-			var uv2 := Vector2(ux + uw, uy + uh)
-			var uv3 := Vector2(ux, uy + uh)
-			if je_to_svah:
-				# SVAH: rohy TEXTURY na vrcholy diamantu (reference
-				# `ChunkMesh.cs:464-475`) + pulpixelovy inset proti sevum.
-				uv0 = Vector2(ux + vnitrek, uy + vnitrek)
-				uv1 = Vector2(ux + uw - vnitrek, uy + vnitrek)
-				uv2 = Vector2(ux + uw - vnitrek, uy + uh - vnitrek)
-				uv3 = Vector2(ux + vnitrek, uy + uh - vnitrek)
-			_uvs[b] = uv0
-			_uvs[b + 1] = uv1
-			_uvs[b + 2] = uv2
-			_uvs[b + 3] = uv2
-			_uvs[b + 4] = uv3
-			_uvs[b + 5] = uv0
-		_klic[q] = _sort.sort_key(obj)
-		q += 1
-	_verts.resize(q * VRCHOLU_NA_KVADR)
-	_uvs.resize(q * VRCHOLU_NA_KVADR)
-	_barvy.resize(q * VRCHOLU_NA_KVADR)
-	_klic.resize(q)
-	_stats = {"svahu": svahu, "der": der, "nodraw": nodraw, "ceka": ceka,
-		"bez_slotu": bez_slotu}
-	return bez_slotu == 0
+			slot = _slot(art_id, tex)
+			if slot.size.x <= 0:
+				_poc["bez_slotu"] += 1
+				return
+			var w: float = float(slot.size.x)
+			var h: float = float(slot.size.y)
+			body0 = pozice
+			body1 = pozice + Vector2(w, 0.0)
+			body2 = pozice + Vector2(w, h)
+			body3 = pozice + Vector2(0.0, h)
+	var b: int = _q * VRCHOLU_NA_KVADR
+	# 6 vrcholu = dva trojuhelniky [0,1,2] a [2,3,0] (rozepsano, bez smycek).
+	_verts[b] = body0
+	_verts[b + 1] = body1
+	_verts[b + 2] = body2
+	_verts[b + 3] = body2
+	_verts[b + 4] = body3
+	_verts[b + 5] = body0
+	_barvy[b] = barva
+	_barvy[b + 1] = barva
+	_barvy[b + 2] = barva
+	_barvy[b + 3] = barva
+	_barvy[b + 4] = barva
+	_barvy[b + 5] = barva
+	if barva == HOLE_COLOR:
+		# DIRA: barvu nese vrchol, textura je bily ctverecek.
+		_uvs[b] = stred_uv
+		_uvs[b + 1] = stred_uv
+		_uvs[b + 2] = stred_uv
+		_uvs[b + 3] = stred_uv
+		_uvs[b + 4] = stred_uv
+		_uvs[b + 5] = stred_uv
+	else:
+		var ux: float = float(slot.position.x) / stranka_f
+		var uy: float = float(slot.position.y) / stranka_f
+		var uw: float = float(slot.size.x) / stranka_f
+		var uh: float = float(slot.size.y) / stranka_f
+		var uv0 := Vector2(ux, uy)
+		var uv1 := Vector2(ux + uw, uy)
+		var uv2 := Vector2(ux + uw, uy + uh)
+		var uv3 := Vector2(ux, uy + uh)
+		if je_to_svah:
+			# SVAH: rohy TEXTURY na vrcholy diamantu (reference
+			# `ChunkMesh.cs:464-475`) + pulpixelovy inset proti sevum.
+			uv0 = Vector2(ux + vnitrek, uy + vnitrek)
+			uv1 = Vector2(ux + uw - vnitrek, uy + vnitrek)
+			uv2 = Vector2(ux + uw - vnitrek, uy + uh - vnitrek)
+			uv3 = Vector2(ux + vnitrek, uy + uh - vnitrek)
+		_uvs[b] = uv0
+		_uvs[b + 1] = uv1
+		_uvs[b + 2] = uv2
+		_uvs[b + 3] = uv2
+		_uvs[b + 4] = uv3
+		_uvs[b + 5] = uv0
+	_klic[_q] = _sort.sort_key(obj)
+	_q += 1
 
 
-func _predplnit_sloty(objects: Array) -> void:
-	# PREDPOCITANI SLOTU (17. session): spocte potrebne arty, seradi je podle
-	# VYSKY SESTUPNE a prida jim sloty. `_stavba` pak uz jen hleda hotove recty
-	# pres `_slot_rozmer` (klic -> rect), takze se geometrie ani UV nemeni.
-	#
-	# DULEZITE: bez tohoto kroku se balí v poradi seznamu a vznikaji "zubate"
+func _slot_objekt(obj: Dictionary) -> void:
+	# FAZE 0 stavby: ktery art (nebo texmap) tenhle objekt potrebuje? Slot se
+	# pridava jen jednou na klic, takze se `_potreba` jen plni.
+	var kind: String = str(obj["kind"])
+	var klic: int = 0
+	var tex: Texture2D = null
+	if kind == "land" and je_svah(obj, _textures):
+		klic = int(obj["texmap"]) + TEXMAP_OFFSET
+		tex = _textures.texmap(int(obj["texmap"]))
+	else:
+		# ⚠ 18. session: MOBILY A PREDMETY se predpocitavaji TAKY. Do teto
+		# session se vyjimaly (`continue` s komentarem o `hranice()`), jenze
+		# `hranice()` uz neexistuje a jejich art se tim nepredpocital - stranka
+		# se pak mohla naplnit az behem stavby (`_slot` uvnitr `_stavba`).
+		klic = int(obj["art_id"])
+		tex = _textures.texture(klic)
+	if tex == null or _sloty.has(klic) or _potreba.has(klic):
+		return
+	_potreba[klic] = [tex.get_height(), tex.get_width(), tex]
+
+
+func _pridel_sloty() -> void:
+	# FAZE 1 stavby: PREDPOCITANI SLOTU (17. session) - arty se seradi podle
+	# VYSKY SESTUPNE a prideli se jim sloty ("first fit decreasing height").
+	# ⚠ DULEZITE: bez tohoto kroku se balí v poradi seznamu a vznikaji "zubate"
 	# radky, ktere sezerou vic nez polovinu stranky (namEReno 48,7 % vyuziti).
-	var potreba: Dictionary = {}          # klic -> [vyska, sirka, tex]
-	for obj in objects:
-		var kind: String = str(obj["kind"])
-		var klic: int = 0
-		var tex: Texture2D = null
-		if kind == "land" and je_svah(obj, _textures):
-			klic = int(obj["texmap"]) + TEXMAP_OFFSET
-			tex = _textures.texmap(int(obj["texmap"]))
-		else:
-			# ⚠ 18. session: MOBILY A PREDMETY se predpocitavaji TAKY. Do teto
-			# session se vyjimaly (`continue` s komentarem o `hranice()`), jenze
-			# `hranice()` uz neexistuje a jejich art se tim nepredpocital - stranka
-			# se pak mohla naplnit az behem stavby (`_slot` uvnitr `_stavba`).
-			klic = int(obj["art_id"])
-			tex = _textures.texture(klic)
-		if tex == null or _sloty.has(klic) or potreba.has(klic):
-			continue
-		potreba[klic] = [tex.get_height(), tex.get_width(), tex]
+	var potreba: Dictionary = _potreba
 	var klice: Array = potreba.keys()
 	# Sestupne podle vysky, pri shode podle sirky (determinismus!).
 	klice.sort_custom(func(a, b):

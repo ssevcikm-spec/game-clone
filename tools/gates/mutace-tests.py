@@ -649,8 +649,14 @@ MODULY = {
             # to vidi. (Kresleni `_draw()` se v headless testu volat neda -
             # Godot dovoli `draw_*` jen v NOTIFICATION_DRAW - takze se meri
             # PRIPRAVA dávky.)
-            ("davka se nikdy nepostavi (mesh zustane prazdny)",
-             "if not _mesh.build(seznam):", "if false:"),
+            ("davka se nikdy nezahaji (mesh zustane prazdny)",
+             "_mesh.zacni(seznam)", "pass"),
+            # ⚠ 18. session: ROZPOČET STAVBY NA FRAME. Kdyby byl obri, udelala by
+            # se cela stavba (~150 ms) v jednom framu - presne vada, kterou R6
+            # opravuje. Chyti to test "davka se stavi PO CASTECH" (pocita framy,
+            # ve kterych stavba OPRAVDU bezela).
+            ("stavba dostane obri rozpocet na frame (jeden dlouhy frame)",
+             "const _STAVBA_MS: float = 8.0", "const _STAVBA_MS: float = 1000000.0"),
             # ⚠ 18. session: kamera se posouva o cerny pas pro GUI - bez toho by
             # hrac stal pod pasem (mimo viditelny svet). Meri se klicem hrace
             # v `tests/cases/world_view.gd` (sekce 5c).
@@ -691,7 +697,14 @@ MODULY = {
             ("pretek stranky se nehlasi (ticha degradace)",
              "if _y + vyska > _velikost:", "if _y + vyska > _velikost * 1000:"),
             ("do klice kvadru se zapise nula (split prestane fungovat)",
-             "_klic[q] = _sort.sort_key(obj)", "_klic[q] = 0"),
+             "_klic[_q] = _sort.sort_key(obj)", "_klic[_q] = 0"),
+            # ⚠ 18. session: "stavba se nedeli do framu" tu BYLA, ale gate ji
+            # oznacil za NECHYCENOU - a měl pravdu: i kdyz se cas v geometrii
+            # nekontroluje, `krok` se presto zastavi na konci faze 1 (sloty),
+            # takze se stavba porad deli. Skutecne riziko je v ROZPOCTU
+            # (`_STAVBA_MS` ve `world_view`) - a to hlida mutace tam.
+            # Mrtvou mutaci NENECHÁVÁME: brána, která nemá jak selhat, je horší
+            # nez zadna (LESSONS 2026-10-08).
             # ⚠ 18. session: vynechany objekt kvuli NACTENI STRANKY neni dira -
             # kdyby se to pletlo, kazda pomalejsi stranka by blikla magenta.
             ("ceka stranka se kresli jako dira (magenta)",

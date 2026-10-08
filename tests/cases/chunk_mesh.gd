@@ -467,6 +467,45 @@ func run(t) -> void:
 		"render.chunk_mesh: cekajici stranka se VYNECHA (ceka 1, der 0, kvadru 4; namEReno %s)"
 			% str(st4))
 
+	# --- G) ⚠ 18. session: STAVBA PO CASTECH DA STEJNA DATA ------------------
+	# `build()` je atomicky (jeden frame), hra stavi `zacni()` + `krok()`.
+	# Obe cesty MUSI dat PRESNE stejnou geometrii - kdyby se rozechazely, obraz
+	# by zavisel na zatizeni stroje (a `_draw` by kreslil jinou davku nez test).
+	var atomicky = script.new(FakeChunk.new(), textury, STRANKA)
+	atomicky.build(seznam)
+	var po_castech = script.new(FakeChunk.new(), textury, STRANKA)
+	po_castech.zacni(seznam)
+	t._check(po_castech.stavi_se(),
+		"render.chunk_mesh: `zacni` necha stavbu otevrenou (stavi_se %s)"
+			% str(po_castech.stavi_se()))
+	po_castech.krok(1.0e9)
+	t._check(not po_castech.stavi_se() and po_castech.stats().size() > 0,
+		"render.chunk_mesh: `krok` stavbu dokonci a zapise statistiky")
+	t._check(atomicky.get("_verts") == po_castech.get("_verts")
+		and atomicky.get("_uvs") == po_castech.get("_uvs")
+		and atomicky.get("_barvy") == po_castech.get("_barvy")
+		and atomicky.get("_klic") == po_castech.get("_klic"),
+		"render.chunk_mesh: stavba po castech da STEJNA data jako atomicka "
+		+ "(vrcholu %d vs %d)" % [atomicky.get("_verts").size(), po_castech.get("_verts").size()])
+	# ⚠ A ROZDELENI SE MUSI OPRAVDU DIT: na velkem seznamu s drobnym rozpoctem
+	# musi `krok` skoncit UPROSTRED stavby. Kdyby se cas nekontroloval, dokoncil
+	# by vse v jednom volani (a frame by byl zase 150 ms) - na to upozornil az
+	# mutacni test ("stavba se nedeli do framu" prochazel).
+	var velky_seznam: Array = []
+	for i in 4000:
+		velky_seznam.append(_obj("static", i % 64, (i / 64) % 64, 0x4000 + 5))
+	var kouskovany = script.new(FakeChunk.new(), textury, STRANKA)
+	kouskovany.zacni(velky_seznam)
+	kouskovany.krok(0.001)                      # 1 us: smi udelat jen DRZKA objektu
+	t._check(kouskovany.stavi_se(),
+		"render.chunk_mesh: `krok` s malym rozpoctem stavbu NEDOKONCI (stavi_se %s)"
+			% str(kouskovany.stavi_se()))
+	# a cas se meri jako SKUTECNA prace, ne jako stena pres framy
+	t._check(float(po_castech.stats().get("stavba_ms", -1.0)) >= 0.0
+		and int(po_castech.stats().get("kroku", 0)) >= 1,
+		"render.chunk_mesh: `kroku` a `stavba_ms` se meri (namEReno %s / %s)"
+			% [str(po_castech.stats().get("kroku")), str(po_castech.stats().get("stavba_ms"))])
+
 	# --- E) PRETEK: co se nevejde, se NAHLASI ------------------------------	# Zamerne se bere JEN maly art (4x4) a stranka 6x6: art se vejde SAM, ale
 	# s bilym slotem uz ne - tim se meri VETEV "stranka je plna", ne "art je
 	# vetsi nez stranka" (to je jina vetev a jina hlaska).

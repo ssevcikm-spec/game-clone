@@ -107,6 +107,11 @@ var _textures_verze: int = 0
 # Kolik framu se uz ceka na doteceni stranek atlasu (viz `_priprav_mesh`).
 var _cekani_verze: int = 0
 const _CEKANI_FRAMU: int = 120
+# Kolik ms prace smi stavba dávky udelat v jednom framu (18. session).
+# Cela stavba stoji ~130-170 ms; pri 8 ms/frame zustane frame pod 16 ms
+# a davka je hotova za ~20 framu (pri 300 FPS ~70 ms), pritom se porad kresli
+# PREDCHOZI davka. Kdo chce videt, jak to stoji, at si to zvedne v sonda.
+const _STAVBA_MS: float = 8.0
 # VYCHOZI CESTA JE MESH (M9). Vypina se jen pro mereni parity a pro pripad, ze
 # se runtime atlas naplni - obe cesty musi umet to same (docs/08: modernizace
 # nesmi ubrat zadne mereni).
@@ -323,14 +328,15 @@ func _draw() -> void:
 	# POZOR: `_priprav_mesh()` vraci `_mesh.is_built()` - dokud dávka postavena
 	# NENI, kresli se puvodni cestou (jinak by se kreslil prazdny mesh = cerno).
 	if mesh_enabled and _mesh != null:
-		if _priprav_mesh():
+		var st: int = _priprav_mesh()
+		if st == 0:
 			_kresli_mesh(false)
 			_davek += 1
 			return
-		# ⚠ 18. session: dokud se stranka na GPU prekresluje (`hold`), kresli se
-		# PREDCHOZI davka - ta na starou stranku sedi presne. Puvodni cesta stoji
-		# ~35 ms/frame a tvorila 44 z 75 dlouhych framu chuze (`p21-chuze.gd`).
-		if _mesh.hold() > 0 and _mesh.ma_predchozi():
+		# ⚠ 18. session: dokud se davka stavi (`krok`) nebo se stranka na GPU
+		# prekresluje (`hold`), kresli se PREDCHOZI davka - ta na starou stranku
+		# sedi presne. Puvodni cesta stoji ~35 ms/frame.
+		if st == 1:
 			_kresli_mesh(true)
 			_predchozich += 1
 			return
@@ -422,85 +428,68 @@ func is_slope(obj: Dictionary) -> bool:
 	return MeshScript.je_svah(obj, _textures)
 
 
-func _priprav_mesh() -> bool:
-	# Postavi (nebo prekraji) davku pro AKTUALNI seznam a klic hrace.
-	# Stavi se jen kdyz se seznam vymenil (`render.chunk` vraci porad TUTEZ
-	# instanci, dokud se neprestavi) - ne kazdy frame.
-	#
-	# ⚠ 18. session: stranky atlasu se nacitaji NA POZADI, takze se stava, ze
-	# se objekt pri stavbe VYNECHA (`page_pending`). Kdyz stranka dotece
-	# (`textures.verze()` se zmeni), davka se prestavi - jinak by art zustal
-	# nenakresleny, dokud se neprestavi cely seznam.
+func _priprav_mesh() -> int:
+	# Posune stavbu dávky a vrati její STAV (0 = hotova davka, 1 = stavi se /
+	# ceka se na stranku -> kresli PREDCHOZI, 2 = neda se -> puvodni cesta).
+	# ⚠ 18. session: stavba je ROZDELENA do framu (`chunk_mesh.krok`) - cela
+	# stavba stoji ~130-170 ms a byla to jedina zbyla vada "periodicky zasek".
 	var seznam: Array = _list()
 	if _textures != null:
 		# Hotove stranky se prevzimaji KAZDY frame - bez toho by stranka
 		# zustala "ceka" a objekty by se neobjevily (viz `tick_nacteni`).
 		_textures.tick_nacteni()
-	if _textures != null and _textures.verze() != _textures_verze:
-		_textures_verze = _textures.verze()
-		# ⚠ 18. session: PRESTAVBA SE ODDALUJE, dokud nejsou stranky dotecene.
-		# NamerENo (`_analyza/p21-chuze.gd`): na startu prichazi 33 stranek
-		# postupne a kazda zmena verze spustila CELOU stavbu (166-1058 ms) -
-		# hra se na startu zasekavala 33x. Ceka se proto na `pending() == 0`;
-		# kdyby neco viselo, po `_CEKANI_FRAMU` se prestavi i tak (jinak by art
-		# zustal vynechany navzdy).
-		if _textures.pending() == 0:
-			_cekani_verze = 0
-			_mesh.invalidate()
-			_mesh_seznam = []
-		else:
-			_cekani_verze += 1
-			if _cekani_verze >= _CEKANI_FRAMU:
+		if _textures.verze() != _textures_verze:
+			_textures_verze = _textures.verze()
+			# ⚠ PŘESTAVBA SE ODDÁLÍ, dokud nejsou stranky dotecene: na startu
+			# prichazi 33 stranek postupne a kazda zmena verze by spustila CELOU
+			# stavbu (`_analyza/p21-chuze.gd`). Kdyby neco viselo, po
+			# `_CEKANI_FRAMU` se prestavi i tak (jinak by art zustal vynechany).
+			if _textures.pending() == 0:
 				_cekani_verze = 0
 				_mesh.invalidate()
 				_mesh_seznam = []
-	return _priprav_mesh_vnitrni(seznam)
-
-
-func _priprav_mesh_vnitrni(seznam: Array) -> bool:
-	var klic: int = _klic_hrace()
+			else:
+				_cekani_verze += 1
+				if _cekani_verze >= _CEKANI_FRAMU:
+					_cekani_verze = 0
+					_mesh.invalidate()
+					_mesh_seznam = []
 	if _mesh.hold() > 0:
-		# Runtime atlas se prave prekresluje na GPU (`UPDATE_ONCE`): do te doby
-		# by davka cetla prazdnou texturu, takze se kresli puvodni cestou.
+		# Stranka se prekresluje na GPU: nová davka by cetla starou texturu.
 		_mesh.tick_hold()
 		_nacti_mesh_stats()
-		return false
-	if not is_same(seznam, _mesh_seznam):
+	if not is_same(seznam, _mesh_seznam) and not _mesh.stavi_se():
+		# ⚠ 18. session: stavba se NEZAHajUJE znovu, kdyz uz jedna bezi. Kdyby
+		# se zahajovala (zmena seznamu uprostred stavby), prisla by o rozdelenou
+		# praci a - dokud nebyla opravena i `zacni` - i o PREDCHOZI davku
+		# (namEReno: `puvodni` 75 framu). Po dokonceni stavby se novy seznam
+		# pozna (`_mesh_seznam` zustava stary) a stavi se znovu.
 		_mesh_seznam = seznam
 		_staveb += 1
-		var ok: bool = _mesh.build(seznam)
-		# ⚠⚠ 18. session - DIRA, KTERA DELALA CERNY FRAME: deleni davky se do
-		# teto session delalo JEN kdyz `build` uspel. Kdyz vratil `false` kvuli
-		# `hold` (stranka se prekresluje), zustaly `_mesh_pred`/`_mesh_po` NULL -
-		# a na framu, kdy `hold` klesl na 0, se pak kreslilo NIC (dokud se
-		# nezmenil klic hrace, ktery deleni "spravil"). Dnes se deli VZDY.
-		_mesh_klic = klic
-		_mesh.split_for_player(klic)
-		_nacti_mesh_stats()
-		if not ok:
-			# ⚠ 18. session: HLAST SE JEN PRI PRETEKU. Do teto session se tu
-			# hlasilo "nevesel se do atlasu" i kdyz byl duvod jen `hold()`
-			# (stranka se prave prekresluje) - to je FALESNE HLASENI a nuti
-			# hledat vadu, ktera neni (namEReno v `_analyza/p21-chuze.gd`:
-			# `pretek: false`, a pritom se hlasil pretek).
-			if _mesh.pretek() and not _mesh_pretek_hlasen:
-				_mesh_pretek_hlasen = true
-				push_warning("app.world_view: render.chunk_mesh se nevesel do atlasu ("
-					+ str(_mesh.stats()) + ") - kresli se puvodni cestou")
-			return false
-		return true
-	if klic != _mesh_klic:
-		_mesh_klic = klic
-		_mesh.split_for_player(klic)
-		_nacti_mesh_stats()
-	# ⚠⚠ 17. session (2026-10-08) - VADA "SVET JE CELY CERNY": tady se do teto
-	# session vracelo `true` (tedy "davka je pripravena") i kdyz `build()`
-	# SELHAL a nechal `_mesh_pred`/`_mesh_po` na `null` - `_kresli_mesh()` pak
-	# nekreslil NIC (jenz pozadi je cerne). NamEReno: rozdil proti puvodni
-	# ceste 909 618 px (98,70 %); sonda `_analyza/p20b-pretek-blank.gd`.
-	# `_pretek` (atlas se nevesel) je proto TVRDY vypinac: kresli se puvodni
-	# cestou, dokud se stranka neprelozi a `is_built()` neplatí.
-	return _mesh.is_built()
+		_mesh.zacni(seznam)
+	if _mesh.stavi_se():
+		_mesh.krok(_STAVBA_MS)
+	var st: int = _mesh.stav()
+	if _mesh.je_geometrie_hotova():
+		var klic: int = _klic_hrace()
+		# ⚠ Rozdeleni na "pred hracem"/"po hraci" se dela HODNE po kazde stavbe
+		# (i dokud se stranka prekresluje) - kdyby se preskocilo, kreslil by se
+		# prazdny mesh (cerna obrazovka) a prislo by se i o predchozi davku.
+		if _mesh.treba_split() or klic != _mesh_klic:
+			_mesh_klic = klic
+			_mesh.split_for_player(klic)
+			_nacti_mesh_stats()
+	return st
+
+
+func stav_davky() -> int:
+	# Stav davky pro testy a sondy (viz `chunk_mesh.stav`).
+	return _mesh.stav() if _mesh != null else 2
+
+
+func stavi_se() -> bool:
+	# Bezi stavba davky? (Pro testy a sondy - viz `chunk_mesh.stavi_se`.)
+	return _mesh.stavi_se() if _mesh != null else false
 
 
 func _klic_hrace() -> int:

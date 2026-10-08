@@ -525,10 +525,25 @@ func run(t) -> void:
 	#     rekne cislem; kdyby se stavba preskocila, zustane prazdny slovnik.
 	#     (Kresleni `_draw()` se v headless testu volat NEDÁ - Godot dovoli
 	#     `draw_*` jen v NOTIFICATION_DRAW, takze se meri priprava dávky.)
+	#     ⚠ 18. session: stavba je ROZDELENA do framu (`chunk_mesh.krok`,
+	#     `_STAVBA_MS`), takze jeden `_priprav_mesh()` ji nedokonci - test ji
+	#     dokonci smyckou a ZAZNAMENA, kolik framu to bylo (kdyby se stavba
+	#     nikdy nedokoncila, spadne to na `stav_davky() != 0`).
 	view.look_at_tile(Vector2i(1495, 1630), 0)
-	view.call("_priprav_mesh")
-	view.call("_priprav_mesh")
-	view.call("_priprav_mesh")
+	var framu_stavby: int = 0
+	for i in 400:
+		view.call("_priprav_mesh")
+		# ⚠ Pocita se, v kolika framech stavba OPRAVDU bezela (`stavi_se`), ne
+		# kolik probehlo volani - samotny `hold` (2 framy) by dal "vice framu"
+		# i tehdy, kdyby se cela stavba udelala v jednom (mutační test na to
+		# upozornil: "stavba se nedeli do framu" prosla).
+		if bool(view.call("stavi_se")):
+			framu_stavby += 1
+		if int(view.call("stav_davky")) == 0:
+			break
+	t._check(int(view.call("stav_davky")) == 0 and framu_stavby > 1,
+		"app.world_view: dávka se stavi PO CASTECH a dokonci se (%d framu, stav %s)"
+			% [framu_stavby, str(view.call("stav_davky"))])
 	var davka: Dictionary = view.mesh_stats()
 	t._check(not davka.is_empty() and int(davka.get("kvadru", 0)) > 0,
 		"app.world_view: M9 dávka se postavi (_priprav_mesh) a ma kvadry "
