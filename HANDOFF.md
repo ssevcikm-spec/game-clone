@@ -59,10 +59,10 @@ níže v „Co se NEOPRAVILO / NEMĚŘILO“.**
 **Integrační čísla (naměřeno dnes):** sada **1 195 kontrol / 0 selhání** (44 case
 souborů, bylo 1 178/0); brány `run-all.py` **11 měřeno / 0 vad** (G10 měřeno na
 **čerstvém** snímku); `check-docs-refs` / `check-zadani` / `roadmap-gen --check`
-**exit 0**; **draw calls 5**. **Mutace (9 změněných modulů): 75 z 76 chyceno**
-a ta jedna (`ceka stranka se kresli jako dira`) odhalila **chybějící test** —
-doplněn (část F v `tests/cases/chunk_mesh.gd`), samostatný běh
-`--only chunk_mesh` = **13/13**; smlouva vstupu OK.
+**exit 0**; **draw calls 5**. **Mutace (9 změněných modulů): 76 z 76 chyceno**,
+smlouva vstupu OK (běh `--only sort,chunk_mesh,chunk_renderer,world_view,player_controller,input,movement,journal`;
+první běh dal 75/76 a ta jedna odhalila **chybějící test** — doplněna část F
+v `tests/cases/chunk_mesh.gd`, pak 76/76).
 **Chůze v běhu hry** (`_analyza/p21-chuze.gd`, 900 framů, běh): frame ms
 **median 0,47, max 147,29**, framů > 16 ms: **19**, > 33 ms: **15**,
 **žádný černý frame** (0 ze 16 snímků), `textures.stats()` `nacteni_stranek 34,
