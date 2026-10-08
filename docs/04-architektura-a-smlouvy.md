@@ -414,7 +414,16 @@ změnil, je tu i **původní znění** — historie se nepřepisuje, jen doplňu
     celá čísla **normalizuje na `int`** (a jen když jsou skutečně celá).
   - **`render.chunk_mesh` je výchozí cesta kreslení** a `app.world_view` si drží
     i **původní** cestu jako fallback pro případ `pretek()` (runtime atlas se
-    nevešel). Rozhraní: `build`, **`split_for_player(klic)`**, `draw_before/draw_after`,
+    nevešel). **18. session:** fallback se používá jen při přetečení a na startu;
+    `hold` framy (stránka se překresluje na GPU) kreslí **předchozí dávku**
+    (`ma_predchozi()`, `draw_before_predchozi/draw_after_predchozi`,
+    `stats_predchozi()`) — stará dávka na starou stránku sedí přesně, kdežto
+    původní cesta stojí ~35 ms/frame. Dělení dávky (`split_for_player`) se dělá
+    **vždy**, i když `build()` vrátí `false` kvůli `hold` — jinak zůstanou
+    `_mesh_pred/_mesh_po` NULL a jeden frame se nekreslí nic (díra, která mohla
+    dělat černou obrazovku). Cesty kreslení se **měří**: `world_view.cesty()`
+    → `{drawu, davkou, predchozi, puvodni, staveb}` (sonda `_analyza/p21-chuze.gd`).
+    Rozhraní: `build`, **`split_for_player(klic)`**, `draw_before/draw_after`,
     `stats()`, `hold()/tick_hold()`. **`hold()` je součást smlouvy:**
     atlas se skládá na GPU (`SubViewport`, `UPDATE_ONCE`), takže po změně stranky
     se `HOLD_FRAMU = 2` framy **nesmí** kreslit dávkou (četla by prázdnou texturu).
