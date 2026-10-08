@@ -826,7 +826,18 @@ texmapy), držení vstupu, stopa framů, sekání; **20 nových/rozšířených 
 zbývající záseky jsou **jedna přestavba dávky 53,8 ms každé 4 kroky** (max frame
 149,8 ms) — to je otevřená věc 4b v „Co čeká na tebe“.
 
-**⚠ CI NAD COMMITTY TÉTO SESSION (14.) JE ZELENÝ — `#52` nad `5a42887`
+**⚠ CI NAD COMMITTY TÉTO SESSION (15.) JE ZELENÝ — `#57` nad `0275c0e`
+(kód + testy + smlouvy + HANDOFF/LESSONS) = `success`**, job **5:00 min**
+(23:41:40 → 23:46:41 UTC, 17 kroků + post kroky). Ověřeno **s PAT** živě přes
+`node _analyza/ci-beh-stav.mjs` (bez tokenu je API limitované). Běh nad mezicommitem
+`9ac2e0a` se nekontroloval (byl to checkpoint před optimalizací); rozhoduje `sha`,
+a to je `0275c0e` = `HEAD` = `origin/main` (ahead 0).
+**⚠ Co ověřené NENÍ:** obsah kroků (čísla z logu) — v tomto běhu se log
+nevyžádal; ověřený je **návratový kód všech kroků** včetně kroku 9 (plný mutační
+důkaz) a kroku 15 (stav plánu). Kdo chce čísla, ať spustí
+`node _analyza/ci-hledej.mjs 57` s PAT (viz „Předletová kontrola“).
+
+**⚠ CI NAD COMMITTY 14. SESSION JE ZELENÝ — `#52` nad `5a42887`
 (kód + testy + smlouvy + HANDOFF/LESSONS) = `success`**, **17 kroků (+ 3 post
 kroky), job 5:21 min** (21:51:03 → 21:56:24 UTC; ověřeno živě přes API včetně
 výpisu všech kroků: 6 self-testy, **7 testy bez `assets/uo`**, 8 brány,
