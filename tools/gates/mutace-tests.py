@@ -805,6 +805,14 @@ MODULY = {
             # vyslo "SLEPY", protoze se zaloha nemutovala).
             ("zaloha klice hrace vraci nulu (pri prazdnem seznamu je hrac pred vsim)",
              "return _sort.klic_nad_diagonalou(diagonal) + 1", "return 0"),
+            # --- 19. session: VYMENA TEXTUR ZA BEHU (`nastav_vymenu`)
+            # Kdyby se nahrady nepredaly DÁVCE, projevila by se vymena jen na
+            # puvodni ceste kresleni a na svazich (kde se bere texmap) ne -
+            # presne to je past, kterou ma tenhle test chytit.
+            ("vymena textur se dávce nepreda (na svazich se neprojevi)",
+             "\t\t_mesh.vymena = nahrady\n", ""),
+            ("prazdna vymena dávku nevypne (stare nahrady zustanou)",
+             "\tvymena_textur = nahrady\n", "\tvymena_textur = {}\n"),
         ],
     },
     # M9 (15. session): davkove kresleni. Mutace miri na GEOMETRII, PORADI

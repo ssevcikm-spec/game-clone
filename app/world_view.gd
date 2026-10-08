@@ -197,6 +197,30 @@ var mesh_enabled: bool = true
 # (testy i kdo si pas nezapne dostanou presne stare chovani).
 var gui_odsazeni: Vector2 = Vector2.ZERO
 
+# ⚠⚠ 19. session - VYMENA TEXTUR ZA BEHU (sonda a budouci vymena assetu):
+# `art_id -> Texture2D`. Kdyz je slovnik neprazdny, kresleni vezme texturu z nej
+# a UO atlas obejde; **simulace, kolize ani mapa se NEMENI** (meni se jen obraz).
+# Je to VSTUP, ne konstanta: kdo ji nezapne, dostane presne stare chovani.
+# Nastavuje se METODOU `nastav_vymenu()` - ne primym zapisem do promenne,
+# protoze davka ma textury zapečene v runtime atlase na GPU a musi se zahodit.
+var vymena_textur: Dictionary = {}
+
+
+func nastav_vymenu(nahrady: Dictionary) -> void:
+	# Vymena textur za behu (19. session): jedna cesta, ktera zaridi VSE -
+	# ulozi nahrady, preda je dávce (aby se projevily i na svazich, kde se bere
+	# texmap) a zahodi postavenou davku (textury jsou v ni zapečene).
+	#
+	# POZOR: promenna se NESMI jmenovat stejne jako parametr - prirazeni by
+	# volalo tento setter dokola (nebo by ho GDScript vubec nevzal).
+	vymena_textur = nahrady
+	if _mesh != null:
+		_mesh.vymena = nahrady
+		_mesh.invalidate()
+	# Stary seznam objektu ma maly okraj; po vymene se musi prestavet.
+	_list_center = Vector2i(-99999, -99999)
+	queue_redraw()
+
 
 func _ready() -> void:
 	_iso = Iso.new()
@@ -229,6 +253,7 @@ func setup(map, textures) -> void:
 	# stejne poradi) - `look_at_tile` ho necha postavit. `self` je rodic pro
 	# `SubViewport`, ve kterem se sklada runtime atlas (na GPU, bez kopii).
 	_mesh = MeshScript.new(_chunk, textures, MeshScript.PAGE_SIZE, self)
+	_mesh.vymena = vymena_textur
 	look_at_tile(center_tile)
 
 
@@ -573,6 +598,12 @@ func _draw_puvodni() -> void:
 		var art_id: int = int(obj["art_id"])
 		if str(obj["kind"]) == "land" and art_id <= VOID_LAND_MAX:
 			nodraw += 1
+			continue
+		# VYMENA ZA BEHU (19. session): kdo ma nahradu, kresli ji - a to i pro
+		# SVAH (jinak by svah vzal texmap z UO a vymena by prosla jen na rovine).
+		if not vymena_textur.is_empty() and vymena_textur.has(art_id):
+			draw_texture(vymena_textur[art_id], pozice)
+			drawn += 1
 			continue
 		if str(obj["kind"]) == "land" and _draw_slope(obj, pozice):
 			drawn += 1

@@ -785,6 +785,27 @@ func run(t) -> void:
 		"app.world_view: dávka ma kvadr na KAZDY objekt seznamu (%s vs %s)"
 			% [str(davka.get("kvadru")), str(view.visible_count())])
 
+	# 12b) ⚠ 19. session - VYMENA TEXTUR ZA BEHU (`nastav_vymenu`). Je to
+	#      pripraveny hacek pro budouci vymenu assetu (a pro sondu
+	#      `_analyza/p22-sbs-hra.gd`); dnes je VYPNUTY (prazdny slovnik), takze
+	#      se chovani hry nemeni. Test meri OBA smery:
+	#        * zapnuti vymeny se preda DÁVCE i ulozi do view (jinak by se
+	#          vymena projevila jen na puvodni ceste a na svazich ne),
+	#        * vypnuti ji zase vrati na prazdno.
+	#      Textura je `ImageTexture` vytvorena v testu - nic se necte z disku.
+	var obrazek_vymeny := Image.create(4, 4, false, Image.FORMAT_RGBA8)
+	obrazek_vymeny.fill(Color(1.0, 0.0, 0.0, 1.0))
+	var tex_vymeny := ImageTexture.create_from_image(obrazek_vymeny)
+	view.nastav_vymenu({3: tex_vymeny})
+	var v_davce: int = view.get("_mesh").vymena.size()
+	t._check(int(view.get("vymena_textur").size()) == 1 and v_davce == 1,
+		"app.world_view: nastav_vymenu preda nahradu i dávce (view %d, dávka %d)"
+			% [int(view.get("vymena_textur").size()), v_davce])
+	view.nastav_vymenu({})
+	t._check(int(view.get("vymena_textur").size()) == 0
+		and int(view.get("_mesh").vymena.size()) == 0,
+		"app.world_view: prazdna vymena vypne nahrady i v dávce")
+
 	# 13) uvolneni uzlu: `free()` (ne queue_free) - zbyly uzel shodi cely beh
 	view.free()
 	t._check(not is_instance_valid(view),

@@ -110,6 +110,12 @@ const BRIGHTLIGHT_PROFIL_15: float = 1.5
 # `rect.Width - 1`) - bez nej se na sevech dlazdic proleva sousedni texel.
 const UV_INSET_PX: float = 0.5
 
+# ⚠ 19. session - VYMENA TEXTUR ZA BEHU (sonda a budouci vymena assetu):
+# `art_id -> Texture2D`. Davka si textury bere z `render.textures`, takze bez
+# tohohle by se vymena projevila jen na puvodni ceste (rovna plocha) a na
+# svazich/davce ne - presne to je past, kterou hlida test.
+var vymena: Dictionary = {}
+
 
 class Kreslic extends Node2D:
 	# Sklada runtime atlas NA GPU: kazdy slot je jeden `draw_texture`.
@@ -183,6 +189,15 @@ var _prace_us: int = 0               # kolik us skutecne zabrala stavba (pres fr
 var _kroku: int = 0                  # kolik `krok` volani stavba potrebovala
 var _faze1_us: int = 0               # kolik z toho zabralo predehleni slotu (nerezene)
 var _pokusu: int = 0                 # kolikrat se stavba zacala (max 2: druhy pruchod)
+
+
+func textura(art_id: int) -> Texture2D:
+	# Textura pro art id s ohledem na VYMENU ZA BEHU (19. session): nahrada ma
+	# prednost, jinak se bere z UO atlasu. Je to jedine misto, ktere se na
+	# vymenu ptá - proto se obe cesty (davka i puvodni) nemohou rozejit.
+	if vymena.has(art_id):
+		return vymena[art_id]
+	return _textures.texture(art_id)
 
 
 func _init(chunk, textures, page_size: int = PAGE_SIZE, parent: Node = null) -> void:
@@ -616,7 +631,18 @@ func _kvadr(obj: Dictionary) -> void:
 	var barva: Color = Color.WHITE
 	var stred_uv := Vector2.ZERO
 	var je_to_svah: bool = false
-	if kind == "land" and je_svah(obj, _textures):
+	if vymena.has(art_id):
+		# VYMENA ZA BEHU (19. session): nahrada ma prednost pred svahy i pred UO
+		# atlasem - jinak by vymena na svazich nebyla videt (svah bere texmap).
+		slot = _slot(art_id, vymena[art_id])
+		if slot.size.x <= 0:
+			_poc["bez_slotu"] += 1
+			return
+		body0 = pozice + Vector2(krok, 0.0)
+		body1 = pozice + Vector2(2.0 * krok, krok)
+		body2 = pozice + Vector2(krok, 2.0 * krok)
+		body3 = pozice + Vector2(0.0, krok)
+	elif kind == "land" and je_svah(obj, _textures):
 		slot = _slot(int(obj["texmap"]) + TEXMAP_OFFSET,
 			_textures.texmap(int(obj["texmap"])))
 		if slot.size.x <= 0:
@@ -633,7 +659,7 @@ func _kvadr(obj: Dictionary) -> void:
 		barva = svah_barva(obj)  # viz `svah_jas` a hlavicka (stinovani dle normaly)
 		_poc["svahu"] += 1
 	else:
-		var tex: Texture2D = _textures.texture(art_id)
+		var tex: Texture2D = textura(art_id)
 		if tex == null and _textures.page_pending(art_id):
 			# ⚠ 18. session: stranka atlasu se nacita NA POZADI (16 MB, ~58 ms).
 			# Objekt se pro par framu VYNECHA - "jeste nenacteno" NENI
@@ -727,7 +753,12 @@ func _slot_objekt(obj: Dictionary) -> void:
 	var kind: String = str(obj["kind"])
 	var klic: int = 0
 	var tex: Texture2D = null
-	if kind == "land" and je_svah(obj, _textures):
+	if kind == "land" and vymena.has(int(obj["art_id"])):
+		# VYMENA ZA BEHU (19. session): nahrada ma prednost i pro svah - jinak by
+		# svah vzal texmap z UO atlasu a vymena by na kopci vubec nebyla videt.
+		klic = int(obj["art_id"])
+		tex = vymena[klic]
+	elif kind == "land" and je_svah(obj, _textures):
 		klic = int(obj["texmap"]) + TEXMAP_OFFSET
 		tex = _textures.texmap(int(obj["texmap"]))
 	else:
@@ -736,7 +767,7 @@ func _slot_objekt(obj: Dictionary) -> void:
 		# `hranice()` uz neexistuje a jejich art se tim nepredpocital - stranka
 		# se pak mohla naplnit az behem stavby (`_slot` uvnitr `_stavba`).
 		klic = int(obj["art_id"])
-		tex = _textures.texture(klic)
+		tex = textura(klic)
 	if tex == null or _sloty.has(klic) or _potreba.has(klic):
 		return
 	_potreba[klic] = [tex.get_height(), tex.get_width(), tex]
