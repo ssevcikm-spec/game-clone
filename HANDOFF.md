@@ -670,6 +670,12 @@ každé 4 kroky chůze, nový art vidět o 2 frame později, mesh neorezává po
 > `SimWorld.systems` (aby `sim.interaction.use_on` přestal vracet
 > `not_available`), mutační moduly v `tools/gates/mutace-tests.py`, `run-all.py`
 > a sada zelené, **snímek s hláškou v žurnálu**.
+> **⚠ SPLNĚNO S JEDNOU ODCHYLKOU (16. session): „čtyři výsledky" jsou ve
+> skutečnosti TŘI** — `quality Low (0)` reference z výroby **nikdy nevydá**
+> (`quality` startuje na 1, jediné přiřazení je `quality = 2`,
+> `CraftItem.cs:1354-1356`). Naměřeno: 40 pokusů na 25,0 skillu → **0× Low**
+> (a 0× Exceptional, protože `chance − 0,6 < 0`), na 60,0 → Exceptional padá.
+> Test to MĚŘÍ (ne že by to předpokládal) a `docs/05 §5.8` to má zapsané.
 > **Co do cíle NEPATŘÍ:** `sim.enhance` (zpackaná dýka — samostatná výzva,
 > viz „Co čeká na tebe“ bod 5), mistrovské kousky s vlastností (runic/reforging
 > až po `data.item_properties.json`), `ui.craft_gump`/`ui.backpack` (až bude
@@ -907,7 +913,26 @@ u kovárny v demu nejde (sonda si vyheň položí jako předmět a **řekne to**
 z `data/items.json`) — buď tam nejsou, nebo se statiky v mapě neshodují s rolemi;
 kdo půjde kolem kovárny, ať to změří.
 
-**⚠ CI NAD COMMITTY TÉTO SESSION (15.) JE ZELENÝ — `#57` nad `0275c0e`
+**⚠ CI NAD COMMITTY TÉTO SESSION (16.) JE ZELENÝ — `#60` nad `59eced2`
+(kód + testy + smlouvy + HANDOFF/LESSONS) = `success`**, job **10:39 min**
+(07:03:20 → 07:13:58 UTC). Ověřeno **živě s PAT** (`node _analyza/ci-beh-stav.mjs`,
+`node _analyza/ci-hledej.mjs 60`), i **obsahem** kroků:
+> * krok 7 (testy, sada **bez `assets/uo`**): **1 094 kontrol, 0 selhání**
+>   (lokálně s assety 1 163 — rozdíl jsou `NEMĚŘENO` kontroly nad assety),
+> * krok 8 (brány): **`SOUHRN: měřeno 9, čeká 2, chyb 0`** (`check-assets`
+>   a `check-render` jsou „čeká“ = bez assetů NEMĚŘENO, což je povolené),
+> * krok 9 (mutace): **`201 z 201 mutaci chyceno; smlouva vstupu: OK`** —
+>   včetně **27 z 27** z této session (`harvest` 9, `craft` 10, `journal` 7
+>   + kontrola vstupu), a krok 10 (`data/skills.json`) **8 z 8**,
+> * krok 6 (self-testy): **21 celkem, 0 chyb**; kroky 11–13: `render-hue`
+>   14/14, `render-anim` 11/11, `anim` 8/8,
+> * krok 15 (plán): **0 rozporů**; krok 4 G4 (`check-wiring`): **63 granul
+>   s hotovým souborem** (bylo 60) a **85 volaných z produkce** (bylo 80).
+**⚠ Konec řetězu:** tenhle zápis je nový (jen dokumentační) commit, takže **běh
+nad ním zkontrolovaný není** — jinak by každý záznam plodil další. Rozhoduje
+`sha`: kód je v **`59eced2`** (zelený).
+
+**⚠ CI NAD COMMITTY 15. SESSION JE ZELENÝ — `#57` nad `0275c0e`
 (kód + testy + smlouvy + HANDOFF/LESSONS) = `success`**, job **5:00 min**
 (23:41:40 → 23:46:41 UTC, 17 kroků + post kroky), a **`#58` nad `e7f8e0b`**
 (commit, který zapisuje `#57` do HANDOFFu) = `success`, job **5:19 min**
@@ -1186,11 +1211,11 @@ a barva kůže.** Statiky nesou barvu ze záznamu mapy, ale **nikdo ji nepouží
 | Mutační důkaz | `python tools/gates/mutace-tests.py --only harvest,craft,journal` (nové moduly) · plný běh dělá CI | **27 z 27 chyceno** (`harvest` 9 + `craft` 10 + `journal` 7 + kontrola vstupu), smlouva vstupu OK (16. session). Předtím `chunk_mesh`/`config`/`metrics` = 25/25. **Plný harness 201 vzorů** (15. session: 174). ⚠ Mutace našla dvě slepé kontroly v nových testech (barvy, velikost žurnálu) — viz `LESSONS` |
 | Fixture | `python tests/fixtures/{world,hues,anim}/make_fixture.py --check` | **3× OK**, `exit 0` |
 | Animace / Barvy / Texmapy | `anim.py` / `hues.py` / `texmaps.py --verify` | `35 / 5 / 4 116` kontrol a texmap, 0 chyb (v self-testech bran) |
-| **Snímek je z běhu** | `Get-Item .cache/render/snapshot.png` | G10 prošla (**`kuze_pixelu 9101`**, `barev 3767`) — snímek vygenerovala 15. session (`_analyza/m9-snimek.gd`); **parita obrazu** (dávka vs. původní cesta, 3 scény, stejný hash) je v `_analyza/m9-parita.gd` + `m9-parita.py` |
+| **Snímek je z běhu** | `Get-Item .cache/render/snapshot.png` | G10 prošla (**`kuze_pixelu 9101`**, `barev 3767`) — snímek je z 15. session; **parita obrazu** (dávka vs. původní cesta, 3 scény, stejný hash) je v `_analyza/m9-parita.gd` + `m9-parita.py`. **16. session přidala snímek žurnálu** `.cache/render/vlna16-zurnal.png` (`_analyza/vlna16-sber-vyroba.gd`), na kterém je **vidět řádek zpráv** — kdyby velikost `RichTextLabel` chyběla, je prázdný (naměřeno) |
 | Godot běží | `& .cache\godot\...console.exe --headless --version` | `4.7.2.stable.official.ed1daf0bf` |
 | Instalace UO na místě | `Test-Path 'D:\Games\...\tiledata.mul'` | `True` |
 | Kontroly zadání | `check-docs-refs.py`, `check-zadani.py`, `roadmap-gen.py --check` | `exit 0` (všechny tři, 14. session) |
-| Stav plánu | `python tools/plan-status.py` | `111 granul`, **`56` měřeně hotových**, **0 rozporů**; **`M9  3 / 0 / 0`** (14. session: 53 a M9 se v přehledu vůbec nezobrazoval — chyběl v `MILNIKY`) |
+| Stav plánu | `python tools/plan-status.py` | `111 granul`, **`59` měřeně hotových** (16. session +3), **0 rozporů**; **`M4 4 / 0 / 2`** (16. session; předtím 1/0/5) a **`M9 3 / 0 / 0`**; `done: true` v roadmapě zůstává **0** (stav se měří, nepřepisuje) |
 | **Sandbox** | `whoami /groups \| Select-String Mandatory` | **musí být `Medium`** (plný přístup); `Low` = `workspace-write` → falešné vady (viz „Oprávnění" výš a `LESSONS`) |
 
 ## Otevřené věci a co je potřeba dodělat

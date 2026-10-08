@@ -44,9 +44,15 @@
 
 ## 4. Co z rozhodnutí plyne pro plán
 
-- **Do cíle 16. session patří** (a je v něm): `sim.harvest`, `sim.craft`,
-  `ui.journal` — řemeslo je odblokované (`sim.skill_gain` i `data.recipes`
-  hotové) a R1 mu dává „růst i při neúspěchu" **měřený**, ne tvrzený.
+- **Cíl 16. session byl splněn** (a je v něm): `sim.harvest`, `sim.craft`,
+  `ui.journal` — **hotové a měřené** (sada **1 163 kontrol / 0 selhání**, brány
+  **11/0/0**, mutace `harvest` 9/9 + `craft` 10/10 + `journal` 7/7, plán
+  **59 měřeně hotových granul**, 0 rozporů). Na reálné mapě: **624 rudy →
+  624 ingotů → dagger** (`_analyza/vlna16-sber-vyroba.gd`, snímek
+  `.cache/render/vlna16-zurnal.png`). **R1** (neúspěch učí) se přitom ukázal jako
+  prakticky nutný: na Mining 0 je šance `CheckSkill(0,100)` nulová, takže
+  nováček postupuje **jen** přes růst z neúspěchu (naměřeno: první úspěch po
+  63 úsecích).
 - **Nejbližší další cíl (17. session), podle R5/R6:** nejdřív **R6** (zásek
   53,8 ms → cíl „žádný frame > 8 ms"), protože je to nejcitelnější vada
   a uživatel si na ni stěžoval; **R5** (první frame < 300 ms) hned po něm,
