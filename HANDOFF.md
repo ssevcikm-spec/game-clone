@@ -63,28 +63,46 @@ souborů, bylo 1 178/0); brány `run-all.py` **11 měřeno / 0 vad** (G10 měře
 smlouva vstupu OK (běh `--only sort,chunk_mesh,chunk_renderer,world_view,player_controller,input,movement,journal`;
 první běh dal 75/76 a ta jedna odhalila **chybějící test** — doplněna část F
 v `tests/cases/chunk_mesh.gd`, pak 76/76).
-**Chůze v běhu hry** (`_analyza/p21-chuze.gd`, 900 framů, běh): frame ms
-**median 0,47, max 147,29**, framů > 16 ms: **19**, > 33 ms: **15**,
-**žádný černý frame** (0 ze 16 snímků), `textures.stats()` `nacteni_stranek 34,
-ceka 0`, `mesh_stats()` `kvadru 13139` (všechny objekty), `pretek false`.
+**Chůze v běhu hry** (`_analyza/p21-chuze.gd`, **2 400 framů**, střídavě NE/SE,
+běh): frame ms **median 0,59, max 150,00**, framů > 16 ms: **75** (3,1 %),
+> 33 ms: **50**; **0 černých snímků** ze 41; **0 framů s prázdnou dávkou**
+(`kvadru 0` z 2 400 — dřívější cesta „přetečení → nic se nekreslí" se neobjevila);
+za chůze se dotáhlo 5 dalších stránek atlasu (35 → 40) **bez záseku od načítání**;
+`mesh_stats()` `kvadru 11390`, `pretek false`, `ceka 0`.
 **WARNINGy o `Loaded resource as image file` zmizely** (atlas i animace).
 
+**TERÉN JE VYKRESLENÝ PIXEL NA PIXEL** (`_analyza/p21-teren-parita.gd`, nová
+sonda): na čisté rovné louce bez statiků (nalezené programově: (1552, 1400), z −5)
+se 44×44 čtverec dlaždice na obrazovce srovnává s artem z atlasové stránky —
+**4 ze 7 dlaždic mají 96–97 % pixelů přesně** a **střední odchylka 0,4–0,5/255**
+(zbytek jsou pixely, kam už zasahuje sousední dlaždice o jiné výšce). Celková
+shoda 86,1 % (12,1/255) včetně těch překrytých. **Co z toho plyne:** naše kreslení
+terénu je věrné artu; „kostkovaný“ dojem tedy není chyba vzorkování ani UV —
+je to art sám (a překryvy dlaždic na změnách výšky, které má i klient).
+
 **⚠ Co se NEOPRAVILO / NEMĚŘILO (nezamlčeno):**
-(`a`) **Přestavba seznamu i dávky je pořád jediný zásek** — naměřeno **~170 ms**
-(framů > 16 ms: 19 z 900). Zůstává to jako **R6** (stavět po částech); WARNING
-byl jen druhá polovina téže cesty a ta je opravená.
-(`b`) **Černá obrazovka se NEPODAŘILA reprodukovat** — 900 framů běhu, 0 černých
-snímků (nejčernější 4,2 %). Pravděpodobná příčina je už opravená cesta
+(`a`) **Přestavba seznamu i dávky je pořád jediný zásek** — naměřeno v běhu hry
+**~150 ms** (2 400 framů: 75 framů > 16 ms, 3,1 %; `stavba_ms 148–175`);
+ostatních 97 % framů je **0,6 ms**. Zůstává to jako **R6** (stavět po částech);
+WARNING byl jen druhá polovina téže cesty a ta je opravená. **Toto je jediná
+položka zadání 18. session, která není hotová** — a je to plánovaný samostatný
+cíl (viz „CÍL 19. SESSION" níž: time-slicing + paritní hash `m9-parita.gd`).
+(`b`) **Černá obrazovka se NEPODAŘILA reprodukovat** — 2 400 framů běhu ve dvou
+směrech, **0** černých snímků (nejčernější 39,3 % tmavých pixelů = tmavý terén),
+**0 framů s prázdnou dávkou**. Pravděpodobná příčina je už opravená cesta
 „přetečení atlasu → prázdný mesh“ ze 17. session. **Když se to vrátí, potřebuji
 snímek nebo místo** (bylo hlášeno „u kopců“).
-(`c`) **„Kostkovaná krajina“ je opravená jen v tom, co bylo naměřené** (subpixel,
-UV svahů). Jestli je rozdíl proti živému serveru vidět dál, je to **jiná věc** —
-potřebuji konkrétní místo (dlaždici) a dva snímky, jinak bych opravoval dojem.
-(`d`) **Postavu v budově může zakrýt PŘEDNÍ ZEĎ** (střecha se už skryje). Reference
-to řeší `TransparentTest`/Circle of Transparency (`View.cs:98-101`,
-`StaticView.cs:17-31`, referenční Z = **hráč + 5**; fade krok ±25) — **není
-implementováno**. Není to stejná vada jako „postava na střeše“: bez CoT se hráč
-schová za zdí i v živém klientu.
+(`c`) **„Kostkovaná krajina“ je změřená jako VĚRNÁ ARTU** (viz parita výše):
+čisté dlaždice sedí na pixel (odchylka 0,4/255), rozdíl proti živému serveru tedy
+není v našem kreslení. Opravené zůstává to, co naměřené bylo: UV svahů (byly
+otočené o 45°) a subpixelový posun (0,5 px = 91,55 % pixelů). Jestli je rozdíl
+vidět dál, potřebuji **konkrétní dlaždici + dva snímky**.
+(`d`) **Postavu v budově může zakrýt PŘEDNÍ ZEĎ** (střecha se už skryje).
+⚠ **Ověřeno v referenci:** `UseCircleOfTransparency` je **výchozí `false`**
+(`Profile.cs:126`), takže i živý klient hráče za zdí schová — chybí tedy
+**funkce**, ne oprava. Reference ji má: `TransparentTest` (`View.cs:98-101`,
+`StaticView.cs:17-31`/`MultiView.cs:18-32`, referenční Z = **hráč + 5**),
+fade po **±25**, `FOLIAGE_ALPHA = 76`.
 (`e`) **Fotku 1 se nepodařilo reprodukovat přesně** (nemám k dispozici snímek od
 uživatele, jen popis). Oprava je ale **věrná referenci** (poměr vah klíče), takže
 platí i pro místo z fotky; kdyby přesto prosvítalo, je to nový nález.

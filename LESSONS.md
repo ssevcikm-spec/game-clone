@@ -24,6 +24,28 @@ Typy: `chyba` (moje vada) · `past-nástroje` (prostředí/nástroj, ne logika) 
 
 ---
 
+### 2026-10-08 — Srovnávat pixely má smysl jen tam, kde je NEMÁ kdo překreslit (chyba)
+**Co se stalo:** měřil jsem, jestli se land dlaždice kreslí přesně jako art
+z atlasu. První běh dal **34,7 % shody** a vypadal jako vážná vada kreslení
+(střední odchylka **48/255**). Příčina byla v **měření**: srovnával jsem 44×44
+čtverec dlaždice s artem i tam, kde přes něj kreslí **statik** (kreslí se po
+landu) a **sousední svah** (jeho texmapa se natahuje přes rozdíl výšky), a hledal
+jsem posun, který by to „spravil“ — nejlepší posun dal 1–7 %, což je šum.
+Po zúžení na **rovnou louku bez statiků** (nalezenou programově) vyšlo
+**96–97 % pixelů přesně** a **střední odchylka 0,4/255** — tedy vykreslení je
+věrné a rozdíl v obraze není z našeho kreslení.
+**Doklad:** `_analyza/p21-teren-parita.gd` (34,7 % → 86,1 % celkem, 0,4–0,5/255
+na čistých dlaždicích; 4 ze 7 dlaždic 96–97 %), snímek `_analyza/p21-parita-obraz.png`.
+**Ponaučení:** (1) **Pixelová parita má smysl jen na místech, kde je vidět právě
+to, co měříš** — u painter's algoritmu musíš vyloučit vše, co se kreslí POZDĚJI
+(statiky, svahy) a co tedy měřený objekt překrývá; jinak měříš cizí pixely.
+(2) Když vyjde „shoda“ v desítkách procent a **žádný posun ji nespraví**,
+hledej chybu v měření, ne v kódu — posun, který nic nezlepší, znamená, že
+srovnáváš dva různé obrazy, ne že je jeden posunutý.
+(3) Práh porovnání barev se musí hlásit jako **histogram odchylek** (kolik pixelů
+se liší o ≤1, ≤2, … /255): jedno číslo „shoda“ schová rozdíl mezi zaokrouhlením
+a cizím obrazem.
+
 ### 2026-10-08 — Klíč řazení: z reference se musí přečíst POMĚR, ne jen vzorec (chyba)
 **Co se stalo:** dvě vady ze snímků uživatele („zeď prosvítá přes střechu“, „svah
 prosvítá přes schody/most“) měly stejného viníka: klíč `render/sort.gd` sice byl
