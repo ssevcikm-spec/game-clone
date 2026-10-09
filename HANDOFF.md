@@ -41,6 +41,19 @@ Pro granule platí zákaz dál.
 **40** PNG animací (těla 400 a 401), rozhraní `manifest.json` / `tiles.json` /
 `hues.json` / `anim-manifest.json` / `world/map0.*`.
 
+**Plná validace na této revizi (2026-10-09, po všech změnách dokumentů):**
+`python tools/gates/run-all.py` → **11 bran OK, 0 chyb, 0 čeká** (G13 poradní,
+neměří se), G3 `tests/run_tests.gd` → **1 466 kontrol / 0 selhání**, G9 replay
+hash shodný, G10 snímek 1280×720. Dokumentové brány: `check-docs-refs` OK,
+`check-zadani` OK, `roadmap-gen --check` OK.
+
+**Nezávislé ověření (subagent, read-only) našlo a session opravila:** 4 vady
+popisků měření v záznamu („jen `.gd`", „řádků Pythonu", 34 kB u GDD) a 5 vad
+smlouvy klienta `docs/01-data-uo.md` — dvě z nich vznikly **vadou měřidla**
+(sonda tiskla jen první 2 položky dictu a nejvýš 12 klíčů). Brána klienta navíc
+teď **porovnává exit kód Godotu** (dřív ho jen tiskla) a její self-test dělá
+**2 mutace** (2/2).
+
 **Otevřená témata (neprovedená, §6 záznamu):** roadmapa pro `K1`–`K6` (6.1),
 podmínky v politice (6.2), „vidět do uvažování postavy" (6.3), „feel" jako
 měřitelná definice (6.4), **AI interakce / komplexní robot — námět k rozhodnutí**

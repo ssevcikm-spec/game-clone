@@ -63,11 +63,12 @@ Je to **přestat platit za C jako cíl** a nechat C v platnosti jako **nástroj*
 **Rozhodnutí uživatele:** na dotaz „který z těch dvou má být produkt"
 (`game-clone` vs. `uo-shadows`) — **`game-clone`**.
 
-**Důvod:** má svět, data i nejlepší ověření (**1 422 kontrol** podle `HANDOFF.md`
-z 20. session — touto session neměřeno; **11 bran** pouští `tools/gates/run-all.py`,
-`docs/08` jich popisuje **13** — dva čítače téhož slova), a hlavně
-**kostru, na které stojí i to, co uživatel chce** (autorita v `sim/`, vstup jen
-přes `Command`, běh headless). `uo-shadows` zůstává **držená opce** (D6).
+**Důvod:** má svět, data i nejlepší ověření (**1 466 kontrol / 0 selhání**
+naměřeno na této revizi; `HANDOFF.md` z 20. session uváděl 1 422 — čítač roste
+s přibývajícími testy; **11 bran** pouští `tools/gates/run-all.py` — naměřeno
+**11 OK / 0 chyb**, `docs/08` jich popisuje **13** — dva čítače téhož slova),
+a hlavně **kostru, na které stojí i to, co uživatel chce** (autorita v `sim/`,
+vstup jen přes `Command`, běh headless). `uo-shadows` zůstává **držená opce** (D6).
 
 **Cena:** projekt nese dokumenty psané pro věrnost — ty se musí přeoznačit
 (D2), jinak budou agenti dál stavět kopii. To je práce s dokumenty, ne s kódem.
