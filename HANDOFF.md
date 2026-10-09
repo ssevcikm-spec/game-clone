@@ -211,11 +211,15 @@ vlastní doklad. G9 po přepnutí: `hash == očekávaný` u obou replayů, `exit
   Po opravě: `world_loop` **1/1 chyceno skutečným kódem** (1 551 kontrol,
   1 selhání), `offline` 5/5, `mobile` 4/4, `registry` 7/7, `plan-status --check`
   `exit 0`.
-* **⚠ Dva různé počty kontrol téhož dne:** druhá session (telefon, `e8d980c`)
-  naměřila **1 466 kontrol / 0 selhání** při **61 case souborech**, tady je
-  **1 551 / 0** při týchž 61. **Rozdíl 85 kontrol není vysvětlený** — nabízí se
-  podmíněné kontroly nad `assets/uo/` (telefon assety nemá), ale **není to
-  ověřené**; kdo to potká, ať měří **tímtéž postupem na témže stromě**.
+* **⚠ Čtyři různá čísla „N kontrol / 0 selhání“ téhož dne — a je to PROSTŘEDÍ:**
+  **stanice** (má `assets/uo/`, 77 atlasových stran): **1 551** · **telefon**
+  (3. session, `e8d980c`): **1 466** · **CI na GitHubu** (`#89` = `538667a`,
+  bez assetů): **1 422** · **CI na mém commitu** (`#94` = `01b41e7`):
+  **1 466** = 1 422 **+ 44** (přesně tolik přidaly moje dva nové case soubory).
+  Telefon a CI se tedy **shodují na 1 466** a rozdíl proti stanici (85) sedí na
+  **podmíněné kontroly nad assety**, které bez `assets/uo/` nemají co měřit.
+  Je to **silná indicie, ne isolovaný důkaz** (nevypínal jsem assety na stanici) —
+  kdo to bude řešit, ať měří **tímtéž postupem na témže stromě s assety i bez nich**.
 
 ### 7) Co zůstává otevřené (pojmenované, ne zamlčené)
 
@@ -240,6 +244,40 @@ vlastní doklad. G9 po přepnutí: `hash == očekávaný` u obou replayů, `exit
    mobily se ukládají, ale klientovi se neposílají; mění se to až s M5.
 7. Strop `MAX_AGENT_TICKS = 500` je „řádově stovky" podle návrhu; dnešní správná
    hodnota je **0** a vada (tiknutí systémů) dá **2 160** (720 kroků × 3 systémy).
+8. **⚠ CI JE ČERVENÉ NA KROKU „Mutační důkaz testů“ — a bylo i PŘED touto
+   session.** Naměřeno z GitHub API (bez tokenu): běhy **`#87`** (`77745e6`),
+   **`#88`** (`5959f3b`) a **`#89`** (`538667a`) = **failure** a padá **jediný
+   krok**: `python tools/gates/mutace-tests.py` → `227 z 235 mutaci chyceno`,
+   tedy **8 NECHYCENÝCH vzorů**: `sort/nestabilni razeni (poradi vstupu se do
+   klice neda)`, `movement/beh nebere staminu`, `chunk_renderer/{z_corners berou
+   vlastni vysku, strop patra propusti objekt, krytí se pozná jen z kandidáta,
+   Surface+Background uz neni strop}`, `input/{střed pro směr je střed okna,
+   držené pravé tlačítko ignoruje vzdálenost kurzoru}`. Všechny kroky **před**
+   tím krokem prošly (`self-testy`, `ci-godot`, `run-all`); kroky za ním se
+   v `#89` **už nespustily**. `#89` je **commit bez jediného řádku kódu**, takže
+   to **není regrese jeho obsahu**.
+   **Po mých commitech (`#94` = `01b41e7`): `238 z 247` a NECHYCENÝCH je 9.**
+   ⚠ **Pozor na výklad:** devátý (`world_view/kamera nedostane zoom`) **není nový
+   slepý vzor** — byl to **falešně CHYCENÝ** vzor: jeho mutant **vůbec nevznikl
+   jako platný kód** (smazal jediný příkaz v `if`, čímž vznikl prázdný blok →
+   parse error) a moje oprava ho teď **poctivě hlásí jako NECHYCENÝ**. Aritmetika
+   sedí na kus: `235 + 12 = 247` (mých 12 nových vzorů) a
+   `227 + 12 − 1 = 238` (všech 12 mých chyceno, jeden dřív falešně chycený
+   odečten). **`world_loop` v CI NECHYCENÝ není** → oprava `class_name` funguje
+   i v CI. Vzor `world_view/kamera nedostane zoom` jsem navíc **opravil**
+   (`pass` místo smazání), aby mutant byl platný kód — a **ověřil lokálně:
+   18/18 chyceno** včetně něj (`FAIL app.world_view: nastav_zoom nasadi zoom na
+   kameru (naměřeno (1.0, 1.0), čekáno 0.5)`). **Příští CI tedy čekej
+   `239 z 247` a NECHYCENÉ zpět na 8** (ty původní).
+   **Co jsem s tím dělal dál: NIC** — zbylých 8 vzorů potřebuje vlastní
+   rozhodnutí „slepý TEST, nebo špatný VZOR“ (`mutace-tests.py` sám v hlavičce
+   píše, že nechycený vzor se má **odstranit**; u existujících testů to ale
+   `ZADANI-21` zakazuje) a je to samostatné zadání.
+   **NEMĚŘENO:** zda je těch 8 slepých i **na stanici** (s assety) — plný
+   harness tu trvá ~80 min.
+   **Co je ověřené o této session:** nové moduly `offline` 5/5, `mobile` 4/4,
+   `registry` 7/7 a `world_loop` 1/1 (lokálně) — **12 nových vzorů je chyceno
+   i v CI** (v `#94` žádný z nich v NECHYCENÝCH není).
 
 **Co jsem NEMĚNIL:** `docs/**`, `.forge/roadmap.json`, `project.godot`,
 `tests/fixtures/**`, existující testy, `godot-uo-client`, `uo-shadows`.

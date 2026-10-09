@@ -365,12 +365,31 @@ def selftest() -> int:
         ("vadny_bez_vystupu", {}, VADA),
         ("vadny_chybi_klic", {k: v for k, v in dobra().items() if k != "capped"}, VADA),
     ]
-    return selftest_cli(
+    vysledek = selftest_cli(
         NAME,
         lambda data, gate: evaluate(gate, data),
         [(label, expected) for label, _, expected in cases],
         fixtures=[(label, data) for label, data, _ in cases],
     )
+    # TŘETÍ STAV: když brána nemá co měřit (`sim/offline.gd` není), musí to
+    # ŘÍCT (2 = NEMĚŘENO), ne zezelenat. Cesta je záměrně NEEXISTUJÍCÍ, takže
+    # se nic nezapisuje a test běží i v tom nejpřísnějším sandboxu.
+    prazdno = Path(__file__).resolve().parents[2] / ".cache" / "gates" / "f1-neexistuje"
+    gate = Gate(f"{NAME}/selftest:nemerene")
+    check(prazdno, gate)
+    # Podmínka je ZUŽENÁ na důvod: bez ní by test prošel i tehdy, kdyby pending
+    # hlásila jiná chybějící věc (`sim/sim_world.gd`) - a to by nebyl důkaz
+    # o téhle bráně. "NEMĚŘENO" musí pojmenovat, CO chybí (`docs/08 §8.6`).
+    duvod = gate.pending_reason or ""
+    ok = gate.verdict() == NEMERENO and OFFLINE in duvod
+    print(f"[{NAME}] self-test nemereno (bez {OFFLINE}): ocekavano {NEMERENO} "
+          f"s duvodem o {OFFLINE}, vyslo {gate.verdict()} ({duvod[:60]!r}) "
+          f"{'OK' if ok else 'CHYBA'}")
+    if not ok:
+        for e in gate.errors:
+            print(f"[{NAME}]   duvod: {e}")
+        print(f"[{NAME}]   pending: {gate.pending_reason}")
+    return VADA if (vysledek != OK or not ok) else OK
 
 
 def main() -> int:

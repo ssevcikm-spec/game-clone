@@ -793,8 +793,13 @@ MODULY = {
             ("zoom se oreze na spatne meze (hodnota utece)",
              "var omezene: float = clampf(novy, ZOOM_MIN, ZOOM_MAX)",
              "var omezene: float = novy"),
+            # ⚠ NAMERENO 2026-10-09: tahle mutace drive SMAZALA jediny prikaz
+            # v `if _camera != null:` (world_view.gd:450-452), takze vznikl
+            # PRAZDNY BLOK = parse error. Mutant se vubec nenacetl a case to
+            # hlasil jako "NENI HOTOV" - a harness to (do opravy vys) pocital
+            # jako CHYCENO. Telo bloku se proto nahrazuje `pass`, ne prazdnem.
             ("kamera nedostane zoom (svet se nezmensi)",
-             "\t\t_camera.zoom = Vector2(zoom, zoom)\n", ""),
+             "\t\t_camera.zoom = Vector2(zoom, zoom)\n", "\t\tpass\n"),
             ("vychozi zoom je 1,0 (rozhled se nezvetsi)",
              "const ZOOM_VYCHOZI: float = 0.75", "const ZOOM_VYCHOZI: float = 1.0"),
             ("cerny pas se deli spatnym zoomem (hrac mimo stred)",
