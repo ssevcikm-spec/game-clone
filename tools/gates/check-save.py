@@ -35,6 +35,24 @@ def evaluate(gate: Gate, rc: int, values: dict[str, str]) -> None:
         gate.error("state_hash() je prázdný řetězec (to není hash)")
     elif before != after:
         gate.error(f"round-trip: hash před != hash po ({before} != {after})")
+    # ⚠ ENTITY (od 2026-10-09): `entities` je stavový zdroj, takže se ukládají
+    # i mobily. Probe je schvalne osidluje - bez toho by round-trip meril jen
+    # prazdny svet a "mobily prezily save" by nebylo MERENE vubec (`docs/09`
+    # §9.4: hotovo = brana zavolala funkci a vysla konkretni hodnota).
+    mob_po = values.get("mobiles_after")
+    if mob_po is None:
+        gate.error("sim_probe neposlal `mobiles_after` - ukladani entit NEMĚŘENO")
+        return
+    gate.measure("mobiles_after", mob_po)
+    if values.get("mobiles_before") != mob_po:
+        gate.error("po load() je jiný počet mobilů: %s -> %s"
+                   % (values.get("mobiles_before"), mob_po))
+    if (values.get("pos_x"), values.get("pos_y"), values.get("pos_z")) != ("100", "200", "3"):
+        gate.error("nacteny mobil nema pozici 100,200,3 (naměřeno %s,%s,%s) - stav "
+                   "entity se neobnovil"
+                   % (values.get("pos_x"), values.get("pos_y"), values.get("pos_z")))
+    if values.get("telo") != "400":
+        gate.error("nacteny mobil nema telo 400 (naměřeno %s)" % values.get("telo"))
 
 
 def check(root: Path, gate: Gate) -> None:
@@ -45,11 +63,23 @@ def check(root: Path, gate: Gate) -> None:
 
 
 def selftest() -> int:
+    def dobre(**zmeny) -> dict:
+        d = {
+            "hash_before": "abc", "hash_after": "abc", "save": "true", "load": "true",
+            "mobiles_before": "3", "mobiles_after": "3",
+            "pos_x": "100", "pos_y": "200", "pos_z": "3", "telo": "400",
+        }
+        d.update(zmeny)
+        return d
+
     cases = [
-        ("dobry", (0, {"hash_before": "abc", "hash_after": "abc", "save": "true", "load": "true"}), OK),
-        ("vadny_rozdilny_hash", (0, {"hash_before": "abc", "hash_after": "abd", "save": "true", "load": "true"}), VADA),
-        ("vadny_save_false", (0, {"hash_before": "abc", "hash_after": "abc", "save": "false", "load": "true"}), VADA),
-        ("vadny_prazdny_hash", (0, {"hash_before": "", "hash_after": "", "save": "true", "load": "true"}), VADA),
+        ("dobry", (0, dobre()), OK),
+        ("vadny_rozdilny_hash", (0, dobre(hash_after="abd")), VADA),
+        ("vadny_save_false", (0, dobre(save="false")), VADA),
+        ("vadny_prazdny_hash", (0, dobre(hash_before="", hash_after="")), VADA),
+        ("vadny_mobily_ubyly", (0, dobre(mobiles_after="1")), VADA),
+        ("vadny_mobil_na_jine_pozici", (0, dobre(pos_x="0")), VADA),
+        ("vadny_bez_entit", (0, dobre(mobiles_after=None)), VADA),
         ("vadny_bez_vystupu", (1, {}), VADA),
     ]
     return selftest_cli(

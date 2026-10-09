@@ -14,7 +14,6 @@ const TextureCache = preload("res://render/texture_cache.gd")
 const WalkScript = preload("res://sim/world/walk.gd")
 const MovementScript = preload("res://sim/systems/movement.gd")
 const MobileScript = preload("res://sim/entity/mobile.gd")
-const RegistryScript = preload("res://sim/entity/registry.gd")
 const TimeScript = preload("res://sim/world/time.gd")
 const HueScript = preload("res://render/hue_cache.gd")
 # Prvni UI v projektu (11. session): `ui.hud` je CanvasLayer, ktery drzi okna
@@ -482,7 +481,10 @@ func _setup_player(view) -> void:
 	# Registr bytosti (granule `sim.entity_registry`) je JEDINE misto, kde se
 	# mobil hleda podle serialu: `sim.movement` z nej mobily bere a `render.anim`
 	# si z nej vyzvedava cislo tela (do 2026-10-06 bral `serial` jako telo).
-	registry = RegistryScript.new()
+	# ⚠ Od 2026-10-09 registr VLASTNI `SimWorld` (`sim.registry`), ne `app`:
+	# svet ho potrebuje jako stavovy zdroj (`sources["entities"]`), aby se
+	# mobily vubec ukladaly. Dve instance by znamenaly, ze se ulozi jen jedna.
+	registry = sim.registry
 	registry.register(player)
 	movement = MovementScript.new(walk, sim.clock(), sim.events(), "", registry)
 	movement.player_serial = serial

@@ -2,7 +2,7 @@
 """Vsechny brany v zavaznem poradi (docs/08 §8.2) - vstupni bod pro CI.
 
 Poradi je dane zadanim: G1 -> G3 -> G5 -> G2 -> G4 -> G6 -> G7 -> G8 -> G9 ->
-G11 -> G10 -> G13 (schema je prvni, protoze rozpor v zadani zneplatnuje
+F1 -> G11 -> G10 -> G13 (schema je prvni, protoze rozpor v zadani zneplatnuje
 vsechno ostatni).
 
 Vysledek:
@@ -46,6 +46,9 @@ ORDER = [
     ("G7", "check-save.py"),
     ("G8", "check-determinism.py"),
     ("G9", "check-replay.py"),
+    # F1 (svet ma vlastni cas) patri podle docs/08 §8.2 ZA G9: meri dobeh sveta,
+    # ktery stoji na `sim.scheduler` + `sim.save` (milnik MK).
+    ("F1", "check-world-clock.py"),
     ("G11", "smoke.py"),
     ("G10", "check-render.py"),
 ]

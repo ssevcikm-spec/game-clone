@@ -17,11 +17,12 @@ extends RefCounted
 #   * nikdy se necte `Time`, `OS`, `Input` ani `randf()` (docs/09 §9.10.4).
 #
 # CO ZATIM NENI (pojmenovane, ne tichy dluh):
-#   * **stav planovace neni v `SimWorld.state_hash()` ani v save.** Zahrnuti
-#     zmeni hash, a tim pre-pinuje `tests/replays/*.json` - to je ZMENA SPECU
-#     (docs/09 §9.5) a musi byt zapsana a odsouhlasena, ne provedena mimochodem.
-#     Do te doby plati: planovac je deterministicky z konstrukce a testuje se
-#     vlastnim pripadem (`tests/cases/scheduler.gd`),
+#   * **stav planovace JE v `SimWorld.state_hash()` i v save** od 2026-10-09
+#     (`register_state_source("scheduler", ...)`) - zmena TVARU hashe byla
+#     ZMENA SPECU odsouhlasena uzivatelem a replaye jsou pre-pinute
+#     (`tests/replays/README.md`, "Historie hashů"; doklad
+#     `_analyza/p30-replay-legacy-hash.gd`). Vlastni case
+#     (`tests/cases/scheduler.gd`) meri dal chovani planovace,
 #   * **timer wheel z reference se nezavadi.** ModernUO ma 4096 slotu / 8 ms
 #     (`_src/modernuo/Server/Timer/TimerWheel.cs:30-131`), ale udalosti tu
 #     budou radove stovky - O(n) pruchod ma co merit. Wheel je optimalizace,

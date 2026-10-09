@@ -285,6 +285,14 @@ MODULY = {
              "_mobily.erase(serial)", "_mobily.erase(0)"),
             ("registr prijme i mobil bez kladneho serialu",
              "if m == null or int(m.serial) <= 0:", "if m == null:"),
+            # ⚠ 2026-10-09 (granule `sim.offline`): registr je stavovy zdroj.
+            # Vzory meri case `entity_state` (`--registry-script`).
+            ("state() vraci mobily v poradi vlozeni (ne podle serialu)",
+             "\tfor m in all():", "\tfor m in _mobily.values():"),
+            ("restore() nevyprázdní stary stav",
+             "\t_mobily.clear()\n", ""),
+            ("restore() mobily vubec neprevezme",
+             "\t\tif int(m.serial) > 0:\n\t\t\t_mobily[int(m.serial)] = m", "\t\tpass"),
         ],
     },
     "pathfind": {
@@ -1051,6 +1059,46 @@ MODULY = {
             ("zurnal nema velikost (text se nevykresli)",
              "label.custom_minimum_size = velikost\n\t\tlabel.size = velikost",
              "label.custom_minimum_size = Vector2.ZERO\n\t\tlabel.size = Vector2.ZERO"),
+        ],
+    },
+    # --- 2026-10-09: druha cast milniku MK (`sim.offline`, stav entit) --------
+    # Vzory pro `sim/offline.gd`: kazda vada musi chytit case `offline`
+    # (`--offline-script`). Brana F1 ma vlastni mutacni dukaz
+    # (`check-world-clock.py --mutace`); tenhle seznam dokazuje, ze to same
+    # odhali i TESTY (dve nezavisla mereni tehoz).
+    "offline": {
+        "soubor": ROOT / "sim" / "offline.gd",
+        "prefix": "sim.offline",
+        "prepinac": "--offline-script",
+        "mutace": [
+            ("dobeh se vubec neprovede",
+             "\tvar from_ms: int = int(_world.world_time())",
+             "\tvar from_ms: int = int(_world.world_time())\n\treturn _empty_report(0)"),
+            ("dobeh se pocita od aktualniho casu, ne absolutne (zavisi na davkach)",
+             "var at: int = (from_ms / every + 1) * every", "var at: int = from_ms + every"),
+            ("cas se pricte dvakrat (dobeh neni absolutni)",
+             "_world.advance_offline(to_ms - current)", "_world.advance_offline(to_ms)"),
+            ("strop dobehu se ignoruje (rok absence se dobehne cely)",
+             "if target > from_ms + MAX_CATCHUP_MS:", "if false:"),
+            ("dobeh se ohlasí jako 0 kroku",
+             "\t\tsteps += 1", "\t\tsteps += 0"),
+        ],
+    },
+    # Vzory pro `sim/entity/mobile.gd` (stav mobila). Chytá je case
+    # `entity_state` (`--mobile-script`).
+    "mobile": {
+        "soubor": ROOT / "sim" / "entity" / "mobile.gd",
+        "prefix": "entity.mobile",
+        "prepinac": "--mobile-script",
+        "mutace": [
+            ("state() ztrati pozici",
+             '"pos": [pos.x, pos.y, pos.z],', '"pos": [0, 0, 0],'),
+            ("state() necte strop skillu (legendarni svitek se ztrati)",
+             "caps.append(skills.cap(i) - SkillsScript.CAP_DEFAULT)", "caps.append(0)"),
+            ("restore() necte pozici z JSONu",
+             "if p is Array and p.size() >= 3:", "if false:"),
+            ("state() zapomene equip",
+             '"equip": _equip_state(),', '"equip": [],'),
         ],
     },
 }

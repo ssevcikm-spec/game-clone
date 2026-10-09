@@ -10,16 +10,19 @@ extends RefCounted
 #     (`SimWorld.register_state_source`) a musi umet `state()`/`restore(d)`.
 #     Modul stavy jen posbira, zapise a vrati - co je stav, vi zdroj sam.
 #
+# STAVOVE ZDROJE (stav 2026-10-09, po druhe casti milniku MK):
+#   * **`sim.scheduler`** (fronta budoucnosti sveta) - prvni zdroj; jeho
+#     zahrnuti do `state_hash()` byla ZMENA SPECU odsouhlasena uzivatelem,
+#   * **`entities`** (`sim.entity_registry`, tj. mobily) - druhy zdroj. Tim se
+#     mobily poprve opravdu ukladaji; i tahle zmena TVARU hashe ma doklad
+#     a replaye jsou pre-pinute (`tests/replays/README.md`, "Historie hashů").
+#
 # CO ZATIM NENI (pojmenovane, ne tichy dluh):
-#   * **entity (mobily, predmety) zdrojem nejsou.** `entity.mobile`
-#     a `sim.entity_registry` nemaji `state()`/`restore()` - to je dalsi krok,
-#     ktery se tyka jejich granul. Save proto nese `sources` (napr.
-#     `scheduler`), a NE prazdne `mobiles`/`items` (ty zustavaji v obalce
-#     kvuli zpetne kompatibilite a zmizi, az budou mit tvar).
-#   * **PRVNI stavovy zdroj je `sim.scheduler`** (fronta budoucnosti sveta).
-#     Zahrnuti jeho stavu do `state_hash()` je ZMENA SPECU odsouhlasena
-#     uzivatelem 2026-10-09: hash se tim zmeni a `tests/replays/*.json` se
-#     pre-pinuji (jeden zapsany prechod, ne ticha oprava).
+#   * **PREDMETY (`entity.item`, `entity.container`) zdrojem nejsou** - jejich
+#     stav zije v `container.contents` a ve slovniku predmetu, ktery si drzi
+#     `app`; az dostanou tvar, patri sem jako dalsi zdroj (a zase s dokladem),
+#   * **`world.spawn`** (`spawn_state` v obalce) - pripraveny klíč, plati az
+#     s granuli M5.
 #
 # VERZE: `1` = obalka (docs/04 §4.7), `2` = obalka + `sources`.
 # `migrate()` umi 1 -> 2 (doplni prazdne zdroje); novejsi verze se ODMITNE

@@ -1,4 +1,179 @@
-# Předání — UO-klon (19. session: SEDMNÁCT VAD ZE SNÍMKŮ — řazení hráče, zoom, patra, pohyb, otáčení, auto-run, staty; 2026-10-08)
+# Předání — game-clone (2026-10-09, DRUHÁ SESSION TÉHOŽ DNE: ENTITY JAKO STAVOVÝ ZDROJ, `sim.offline`, BRÁNA F1 — MK 3/9)
+
+> **Co je tenhle soubor:** **stav projektu** pro další session agenta. Přepisuje
+> se celý; historie je v `git log`. Nový blok je vždy **nahoře**; starší bloky se
+> needitují (jen doplňují), aby se neztratilo, co bylo naměřeno dřív.
+> **Současný stav se bere z tohoto bloku** a ověřuje se živě (§„Předletová
+> kontrola" níž je starší a **datovaná**).
+
+## ✅ CO JE NOVÉHO (2026-10-09, druhá session) — ENTITY JAKO STAVOVÝ ZDROJ, `sim.offline`, BRÁNA F1 (MK 3/9)
+
+**Zadání:** [`ZADANI-21-ENTITNI-STAV-A-OFFLINE.md`](ZADANI-21-ENTITNI-STAV-A-OFFLINE.md)
+(kroky 1–3), kontext [`PREDANI-SESSION-2026-10-09.md`](PREDANI-SESSION-2026-10-09.md).
+**Stav před session:** `MK 2/0/7`, 63 měřeně hotových granul, brány 11 OK / 0 chyb,
+testy 1 507 kontrol / 0 selhání, HEAD `5959f3b`.
+
+> ⚠ **Prostředí (naměřeno na začátku session):** session běžela v `workspace-write`
+> a brány hlásily **„chyb 2, čeká 1"** — G3/G7/G11 nemohly zapsat `user://` ani
+> `.cache/gates/*.json` (`PermissionError: [Errno 13]`, Godot „Failed to open
+> `user://logs/…`"). **Nebyla to vada projektu:** po přepnutí na plný přístup je
+> **11 OK / 0 chyb**. Třetí stav („neproběhlo (prostředí)") se nesmí číst jako
+> červená — `dsh-prostredi` §4e, `overovani` §7.13.
+
+### 1) Entity jsou stavový zdroj — mobily se poprvé OPRAVDU ukládají
+
+`sim/entity/mobile.gd` a `sim/entity/registry.gd` mají `state()`/`restore()`:
+
+* `mobile.state()` je **JSON-safe a celočíselný** (`Vector3i` → `[x,y,z]`, `equip`
+  jako **seřazený** seznam `[layer, serial]`, `ai.home` jako `[...]`); stropy
+  skillů se čtou **veřejným** API `entity.skills.cap()` (ne z cizího `_caps`),
+* `registry.state()` = mobily **seřazené podle serialu** (na pořadí vložení nesmí
+  záviset stav — stejné pravidlo jako `all()`), `restore()` mobily vytváří znovu,
+* **`SimWorld` registr VLASTNÍ** (`sim.registry`, `register_state_source("entities", …)`).
+  `app/main.gd` si ho bere odtud — dvě instance by znamenaly, že se uloží jen jedna.
+
+**Doklad, že to měří brána a ne jen test:** G7 (`check-save.py`) teď svůj probe
+**osidluje 3 mobily** a vyžaduje `mobiles_before == mobiles_after` + konkrétní
+pozici `100,200,3` a tělo `400`; naměřeno `hash 6946c1af…` **před == po**,
+`mobiles_after: 3`, `exit 0`.
+
+### 2) `sim/offline` — svět jde dál i bez hráče (nový soubor)
+
+`sim/offline.gd` (`advance_to(now_unix)`, `elapsed_report()`; granule `sim.offline`):
+
+* **čas je argument**, ne `Time`/`OS` (`sim/` nesmí číst hodiny — G2 to vynucuje),
+* doběh je **funkce času**: události padají na **absolutní násobky** intervalu
+  (`k * every_ms`), žádný stav se nedrží → je jedno, jak se dávkuje, a druhý
+  doběh na týž čas nic nemění,
+* **netiká systém** — `SimWorld.advance_offline(ms)` posune hodiny a vyřídí
+  splatné události (ty jdou do fronty jako `world_event`), ale **systémy ne**:
+  mimo obrazovku se simuluje funkce času, ne agenti,
+* **stropy:** `MAX_CATCHUP_MS` = 7 dní reálného času (`capped: true` se hlásí),
+  `MAX_EVENTS_PER_CATCHUP` = 512 událostí, `STEP_MS` = 1 herní hodina,
+* **mapa je vstup** (`_init(world, start_unix, map)`) — rozvrh doplnění spawnu
+  nese `map_blocks`; bez mapy je to **viditelná nula**, ne tiché vymyšlení.
+
+**Rozvrhy (3):** `spawn_refill` (6 herních h), `vendor_restock` (1 herní den),
+`price_update` (12 herních h). **Nikdo je zatím nekonzumuje** — vezme si je
+`world.spawn` (M5) a `sim.vendor` (MK); je to pojmenované v hlavičce modulu.
+
+### 3) Brána F1 `tools/gates/check-world-clock.py` (nový soubor, v `run-all.py` za G9)
+
+**5 kontrol** (vše headless, **nula příkazů od hráče**, na **fixture mapě**
+`tests/fixtures/world/map0` → běží i v CI, kde `assets/uo/` není):
+
+| # | Co je „v pořádku" | Naměřeno |
+|---|---|---|
+| K1 | svět se hýbe bez hráče: hash se změní **A** doběh naplánuje časové události | `53f7860a…` → `d90b944f…`, `events 210`, `steps 720` |
+| K2 | tyž seed a tyž vstup dvakrát = tyž hash | `hash_again == hash_end` |
+| K3 | netiká celý svět (a kontrola není prázdná): 200 mobilů, 3 „agentní" systémy, `agent_ticks ≤ 500`; navíc platí strop | `agent_ticks 0`, `agent_systemů 3`, `capped 1`, `604800000 == MAX_CATCHUP_MS` |
+| K4 | doběh je idempotentní a čas se přičte **přesně jednou** | `advanced_ms == expected_ms == 216000000`, 2. volání `0 ms`, hash beze změny |
+| K5 | nezáleží na dávkování (jedním krokem == po hodinách) | `hash_batch == hash_end`, `events_batch == events_total == 210` |
+
+**Self-test:** 13 případů (známý správný i **vadný vstup pro každou kontrolu**),
+0 chyb. **Mutační důkaz `--mutace`: 5 z 5 chyceno** a každou chytila **ta**
+kontrola, kvůli které mutace existuje (`M1` K1, `M2` K2, `M3` K3, `M4` K4,
+`M5` K5) + **smlouva vstupu** (neexistující cesta k měřenému souboru měření
+shodí) + baseline (KOPIE originálů) projde. Mutuje se **jen kopie**
+v `.cache/gates/mutace/f1/`, originál se na konci ověří hashem.
+
+**Dvě pasti, které to stálo (obojí naměřeno, patří k téhle bráně):**
+1. **Kopie `sim/sim_world.gd` se `class_name` se nenačte** —
+   `Parse Error: Class "SimWorld" hides a global script class`. Mutant se proto
+   zapisuje **bez** `class_name` (probe načítá cestou, ne jménem třídy);
+2. **náhodná hodnota v PAYLOADU vyřízené události se nechytí** — událost se
+   doběhem vyřídí a z plánovače zmizí, takže se do hashe vůbec nedostane.
+   Mutace `M2` proto plánuje náhodnou **budoucí** událost.
+
+**Testy k tomu (`tests/cases/`, nové):** `offline.gd` (doba běhu, idempotence,
+dávkování, strop, **0 ticků agentů**, `map_blocks` z fixture) a
+`entity_state.gd` (stav mobila/registru, JSON round-trip, save/load světa
+s mobily, `state_hash` měnící se s pozicí mobila). Obě berou měřenou cestu
+**argumentem** (`-- --offline-script=…`, `--mobile-script=…`, `--registry-script=…`),
+aby na nich šel pustit mutační harness.
+
+**Mutační důkaz testů:** `python tools/gates/mutace-tests.py --only offline,mobile,registry`
+→ **16 z 16 chyceno**, smlouva vstupu OK, baseline **1551 kontrol / 0 selhání**.
+Do `mutace-tests.py` přibyly moduly `offline` (5 vzorů), `mobile` (4) a 3 vzory
+pro `registry`; nic existujícího se nepřepisovalo (vzory se přidávají na konec).
+
+### 4) `state_hash()` se změnil PODRUHÉ — s dokladem, replaye přepnuty
+
+`entities` je druhý stavový zdroj, takže se změnil **tvar vstupu** do hashe.
+Podle postupu v `tests/replays/README.md` („Historie hashů") to **není** tichá
+oprava; je k tomu doklad a replaye se přepnuly **s ním**:
+
+| Replay | Bylo (pinované) | Je (nové) | `hash_legacy` (tvar PŘED entitami) |
+|---|---|---|---|
+| `tic_200.json` | `451d0a79…` | `b203767b…` | **`451d0a79…` = přesně to staré** |
+| `tic_1000.json` | `d1e0db5c…` | `3f94a925…` | **`d1e0db5c…` = přesně to staré** |
+
+Doklad: nová sonda **`_analyza/p31-replay-legacy-hash-entities.gd`** (odehraje
+týž replay a spočítá hash se vstupy ve tvaru z 2026-10-09 **před** entitami).
+Sonda `p30-…` (první změna, `scheduler`) se **nepřepisovala** — každá změna má
+vlastní doklad. G9 po přepnutí: `hash == očekávaný` u obou replayů, `exit 0`.
+
+### 5) Naměřená čísla (celá v této session)
+
+| Co | Hodnota |
+|---|---|
+| Testy (G3) | **1 551 kontrol / 0 selhání**, `case souboru spusteno: 61 z 61` (bylo 1 507 / 59) |
+| Brány `run-all.py` | **12 měřeno / 0 čeká / 0 chyb**, `exit 0` (11 + **F1**) |
+| `plan-status.py` | před commitem `MK 2 / 1 / 6` (63 hotových) — **soubor `sim/offline.gd` ještě není v gitu**; po commitu má být `MK 3 / 0 / 6`, **64 hotových** (ověřeno níž) |
+| Dokumentové brány | `check-docs-refs`, `check-zadani`, `roadmap-gen --check` → všechny `exit 0` |
+| G7 | `hash_before == hash_after = 6946c1af…`, `mobiles_after 3`, self-test **8 případů / 0 chyb** |
+| F1 self-test / mutace | 13 případů / 0 chyb · **5 z 5 mutací chyceno** + smlouva vstupu OK |
+| Mutační harness testů | **16 z 16** (`offline`, `mobile`, `registry`), baseline 1551/0 |
+
+### 6) Nálezy a pasti, které stojí za zapsání
+
+* **Homoglyf v identifikátoru:** do nové brány se mi **7×** dostalo **cyrilské
+  `а` (U+0430)** do jména `kontrola`. Python to přežije (vypadá to správně),
+  ale je to vada zápisu — táž třída jako rozbitá uvozovka (`dsh-prostredi` §4d).
+  Nová kontrola `_analyza/p32-homoglyfy.py` (jen hlásí, nepřepisuje) to najde.
+* **`--mutace` musí vyžadovat, že vadu chytila TA kontrola** — první verze
+  stačilo „brana vrátila VADA", a mutant se tak „chytil" tím, že **spadl při
+  načtení** (parse error) nebo že probe **nedoběhl** (chybělo 9 z 23 hodnot).
+  Dnes se vyžaduje: mutace provedena + probe vrátil **všech 23 hodnot** +
+  chyba začíná značkou kontroly (`K1`…`K5`).
+* **Jedna mutace (M2) jednou proběhla jako „probe nedoběhl" (14 z 23 hodnot)
+  a už se to nezopakovalo** (10/10 běhů téhož mutanta OK, ~3 s/run). Nebylo to
+  reprodukovatelné a **nemám pro to příčinu** — proto to tu je zapsané a brána
+  to hlásí jako `NECHYCENA` (konzervativně), ne jako chycenou vadu.
+* **`plan-status.py` měří „v gitu" = sledované gitem** — necommitnutý soubor je
+  pro něj „soubor je, test není", i když test existuje. „Hotovo" se tedy smí
+  vykazovat až po commitu.
+
+### 7) Co zůstává otevřené (pojmenované, ne zamlčené)
+
+1. **`docs/08 §8.2` pořád říká u F1 „čeká na MK"** a **`docs/04 §4.7`
+   nevyjmenovává `sources`** (a tím ani `entities`) v obsahu save — **dokumenty
+   jsou teď stale**. Agent `docs/` needituje (`docs/09 §9.10 bod 7`), takže to
+   čeká na uživatele / novou session (viz „Co čeká na tebe").
+2. **Předměty (`entity.item`, `entity.container`) stavovým zdrojem NEJSOU** —
+   ukládají se **mobily**. Je to pojmenované v `sim/save.gd` (jejich stav žije
+   v `container.contents` a ve slovníku, který si drží `app`).
+3. **Doběh nemá konzumenta:** `spawn_refill`/`vendor_restock`/`price_update` jsou
+   události v plánovači, které si vezme až `world.spawn` (M5) a `sim.vendor` (MK).
+   Po doběhu je `pending: 0` (vše splatné se vyřídí), takže stav plánovače nese
+   jen `next_id` — kdo bude chtít „vidět, co svět plánuje", musí plánovat i první
+   událost **za** cílem.
+4. **`sim.offline` není zapojený do hry** (`app/` ho nevolá): app zatím svět
+   neukládá ani nenačítá, takže by nebylo co dohánět. První konzument je M5/MK.
+5. **Doklad hashe není v gitu** — `_analyza/` je v `.gitignore`, takže
+   `p30`/`p31` (a všechny sondy) vidí jen ten, kdo je má na disku. Stejný stav
+   jako předtím; kdo klonuje repo, doklad nemá (návrh k rozhodnutí).
+6. **`sim_world.snapshot()` pořád vrací `mobiles: []`** (klientský pohled) —
+   mobily se ukládají, ale klientovi se neposílají; mění se to až s M5.
+7. Strop `MAX_AGENT_TICKS = 500` je „řádově stovky" podle návrhu; dnešní správná
+   hodnota je **0** a vada (tiknutí systémů) dá **2 160** (720 kroků × 3 systémy).
+
+**Co jsem NEMĚNIL:** `docs/**`, `.forge/roadmap.json`, `project.godot`,
+`tests/fixtures/**`, existující testy, `godot-uo-client`, `uo-shadows`.
+`tests/**` a `tools/gates/**` jsem zapsat **směl**, protože to `ZADANI-21` §3
+výslovně žádá (jinak to `docs/09 §9.10 bod 7` zakazuje).
+
+---
 
 > ⚠⚠ **DVA AGENTI V JEDNOM WORKSPACE (2026-10-08): tenhle soubor přebírá ten,
 > kdo končí POZDĚJI — a NESMÍ při tom zmizet sekce toho prvního.**
@@ -1581,6 +1756,14 @@ zavřenými i otevřenými dveřmi, test kroku na schod nahoru/dolů, obojí s m
 (`--only walk` **12/12**), `run_tests.gd` **537/0**, `run-all.py` **0 vad**.
 
 ## Co čeká na tebe
+
+**⚠ 2026-10-09 (druhá session téhož dne): dvě věci, které agent nesmí udělat sám
+(`docs/` je pro granule zakázané a `_analyza/` je mimo git):**
+
+| # | Na co se čeká | Co to blokuje | Cena / cesta zpět |
+|---|---|---|---|
+| **D1** | **`docs/08 §8.2` a `docs/04 §4.7` jsou po `ZADANI-21` STALE.** U brány F1 tabulka pořád říká „čeká na `MK`" (a „do `run-all.py` se zapíšou, až budou soubory bran existovat"), ačkoli brána **existuje, je v `run-all.py` za G9 a měří (12 OK / 0 chyb)**. `docs/04 §4.7` („Obsah") vyjmenovává obálku save **bez `sources`** — a tím i bez `entities`, ve kterých od 2026-10-09 mobily bydlí. | věrohodnost smlouvy: kdo ji čte, myslí si, že F1 není a že se entity neukládají | Agent `docs/` needituje (`docs/09 §9.10 bod 7`); stačí pokyn „uprav `docs/08` §8.2 a `docs/04` §4.7" a je to pár řádků. Cesta zpět: dokumenty jsou jen text, nic se podle nich nepočítá (brány čtou kód) |
+| **D2** | **Doklad ke změně `state_hash()` NENÍ v gitu.** `_analyza/` je v `.gitignore`, takže `p30-…` (první změna) i `p31-…` (druhá) vidí jen ten, kdo je má na disku — a `tests/replays/README.md` se na ně odvolává jako na doklad. | reprodukovatelnost dokladu po klonu repa | Návrh: přesunout legacy-hash sonda do `tools/gates/` (komentovaná cesta) nebo `_analyza/` z gitignore vyjmout pro `p2x-*`/`p3x-*`. Je to změna konvence → patří uživateli |
 
 **✅ 2026-10-08: uživatel zadal „Pokračuj a témata čekající na mě rozhodni podle
 svého úsudku" — rozhodovací pravomoc nad touhle sekcí tím přenesl na agenta.

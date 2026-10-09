@@ -64,3 +64,46 @@ func remove(serial: int) -> void:
 
 func size() -> int:
 	return _mobily.size()
+
+
+# -- stav (od 2026-10-09 JE registr stavovy zdroj; granule `sim.offline`, MK) --
+#
+# PROC: mobily se do 2026-10-09 neukladaly. Registr je JEDINE misto, kde mobily
+# jsou (`get_mobile`/`all`), takze je i jedine misto, ktere z nich umi udelat
+# stav. `SimWorld` ho registruje jako zdroj `entities`.
+#
+# PORADI je dane `all()` (serazene podle serialu), ne poradim vlozeni: na tom
+# uz stoji `state_hash()` i replay (viz hlavicka vyse) - a `restore()` ho musi
+# dodrzet taky, jinak by dva behy se stejnym stavem daly jiny hash.
+#
+# `restore()` MOBILY VYTVARI znovu (`preload` tady, ne v `mobile` - registr je
+# ten, kdo vi, z ceho je); existujici mobily se zahodi. Kdo ma mobil v ruce
+# (napr. hrac v `app/`), si po nacteni musi vzit novy pres `get_mobile`.
+
+const MobileScript = preload("res://sim/entity/mobile.gd")
+
+
+func state() -> Dictionary:
+	var rows: Array = []
+	for m in all():
+		rows.append(m.state())
+	return {"mobiles": rows}
+
+
+func restore(d: Dictionary) -> void:
+	_mobily.clear()
+	if d == null:
+		return
+	var rows = d.get("mobiles", [])
+	if not (rows is Array):
+		# Stav, ktery neni seznam, je vada vstupu - ne ticha nula. Prazdny
+		# registr po neuspesnem restore by vypadal jako "svet bez mobili".
+		push_warning("sim.entity_registry.restore: 'mobiles' neni seznam (%s)" % str(rows))
+		return
+	for row in rows:
+		if not (row is Dictionary):
+			continue
+		var m = MobileScript.new()
+		m.restore(row)
+		if int(m.serial) > 0:
+			_mobily[int(m.serial)] = m

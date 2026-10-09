@@ -33,6 +33,20 @@ Replaye vznikají až s `sim.world_loop` (M0/M2). Do té doby je brána G9
 
 ## Historie hashů (přepnutí je změna specu, ne údržba)
 
+* **2026-10-09 (druhá změna téhož dne)** — `state_hash()` dostal **druhý stavový
+  zdroj: `entities`** (`sim.entity_registry`), takže se mobily poprvé **opravdu
+  ukládají** a jsou v hashi (granule `sim.offline`, krok 1). Očekávané hashe se
+  tím **přepnuly podruhé**: `tic_200` z `451d0a79…` na `b203767b…`,
+  `tic_1000` z `d1e0db5c…` na `3f94a925…`.
+  **Doklad, že se nezměnilo chování:** sonda
+  `_analyza/p31-replay-legacy-hash-entities.gd` odehraje týž replay a spočítá
+  `hash_legacy` se **vstupy ve tvaru z 2026-10-09 před entitami**
+  (`collect({"scheduler": …})`) — a ten se oběma replayům **přesně rovná dosud
+  pinovaným hashům** (`451d0a79…`, `d1e0db5c…`). Oba replaye mají **0 mobilů**,
+  takže se v nich nezměnil ani svět, jen tvar vstupu do hashe.
+  (První změna, `sim.scheduler`, má vlastní doklad
+  `_analyza/p30-replay-legacy-hash.gd`; historická sonda se nepřepisuje.)
+
 * **2026-10-09** — `state_hash()` začal zahrnovat **stavové zdroje** světa
   (první je `sim.scheduler` = fronta budoucích událostí; granule `sim.save`).
   Očekávané hashe obou replayů se tím **přepnuly**: `tic_200` z `281e7802…`

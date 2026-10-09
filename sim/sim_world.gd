@@ -30,6 +30,7 @@ const SimHash = preload("res://core/hash.gd")
 const SimCommands = preload("res://sim/commands.gd")
 const SimScheduler = preload("res://sim/scheduler.gd")
 const SimSave = preload("res://sim/save.gd")
+const EntityRegistry = preload("res://sim/entity/registry.gd")
 
 # Verze schematu save je v `sim/save.gd` (`SimSave.SAVE_VERSION`) - tady se
 # nedrzi druha, aby nemohly vzniknout dve pravdy o tom, co je v souboru.
@@ -43,6 +44,12 @@ var seed: int = 0
 var player_serial: int = 0
 var systems: Dictionary = {}
 var data_version: String = ""
+# Registr bytosti (granule `sim.entity_registry`): JEDINE misto, kde se mobil
+# hleda podle serialu. Do 2026-10-09 si ho `app/main` delal sam - tim padem ho
+# ale `SimWorld` nevidel a nemohl ho registrovat jako stavovy zdroj, takze se
+# mobily NEUKLADALY (pojmenovany dluh v `sim/save.gd`). Ted je vlastnikem svet
+# a `app/main` si ho bere odtud (`sim.registry`), aby existovala JEDNA instance.
+var registry
 
 var _clock
 var _rng
@@ -67,7 +74,12 @@ func _init(seed_value: int = 0, data: Dictionary = {}) -> void:
 	_commands = SimCommands.new()
 	_save = SimSave.new()
 	_scheduler = SimScheduler.new(_clock)
+	registry = EntityRegistry.new()
 	register_state_source("scheduler", _scheduler)
+	# Entity (mobily) jsou stavovy zdroj od 2026-10-09: `registry.state()` da
+	# vsechny mobily serazene podle serialu. Zmena TVARU vstupu do hashe -
+	# doklad a prepnuti replayu je v `tests/replays/README.md` ("Historie hashů").
+	register_state_source("entities", registry)
 	data_version = _hash.of_state([data])
 
 
@@ -107,6 +119,29 @@ func tick(ms: int) -> void:
 		_commands.dispatch(self, command)
 
 
+func advance_offline(ms: int) -> Array[Dictionary]:
+	# DOBEH SVETA (granule `sim.offline`, milnik MK): posune hodiny sveta
+	# a vyrize, co je v planovaci splatne - ale NETIKUJE systemy.
+	#
+	# PROC TAK: mimo obrazovku je svet FUNKCE CASU, ne simulace agentu
+	# (`docs/01 §1.8` F1; `NAVRH-BRAN-FEEL-2026-10-09.md` §2). Kdyby dobeh
+	# tickoval vsechno, stal by jeden navrat po tydnu absenci hodiny CPU
+	# a byl by nereprodukovatelny - presne to hlida kontrola 3 brany F1.
+	# Prikazy se taky nevyrizuji: nikdo nehraje, fronta je prazdna.
+	#
+	# Vraci vyrizene udalosti, aby je volajici mohl dat do logu (stejna
+	# smlouva jako `sim.scheduler.advance_to`).
+	if ms <= 0:
+		return []
+	_clock.advance(ms)
+	var out: Array[Dictionary] = []
+	for due in _scheduler.advance_to(_clock.now_ms()):
+		var e: Dictionary = due
+		push_event("world_event", e)
+		out.append(e)
+	return out
+
+
 func snapshot() -> Dictionary:
 	# Read-only pohled pro klienta; udalosti se vybiraji jednou za frame
 	# (docs/04 §4.4), proto je snapshot rovnou vydava a fronta se vyprazdni.
@@ -135,9 +170,11 @@ func state_hash() -> String:
 		names,
 		[],
 		[],
-		# Stavove zdroje (od 2026-10-09; prvni je `sim.scheduler`): bez nich by
-		# hash netvrdil nic o BUDOUCNOSTI sveta - dva behy s jinou frontou
-		# udalosti by daly stejny hash a replay by tise prosel.
+		# Stavove zdroje (od 2026-10-09; prvni je `sim.scheduler`, od teto
+		# session i `entities` = mobily): bez nich by hash netvrdil nic
+		# o BUDOUCNOSTI sveta (fronta udalosti) ani o TELECH ve svete.
+		# Dve prazdna pole vyse jsou obalka v1 (`mobiles`/`items`) - zustavaji
+		# kvuli `docs/04 §4.7`, ale stav entit je ve zdroji `entities`.
 		_save.collect(_sources),
 	])
 
@@ -155,12 +192,18 @@ func save(path: String) -> bool:
 		# hodnoty > 2^53 ukladaji jako desetinovy retezec a cte se pres int().
 		"rng_state": {"state": str(_rng.state()["state"]), "inc": str(_rng.state()["inc"])},
 		"next_serial": next_serial_value(),
+		# ⚠ OBALKA v1 (`mobiles`, `items`, `spawn_state`) zustava, i kdyz ma stav
+		# entit od 2026-10-09 svuj domov ve `sources["entities"]`: `docs/04 §4.7`
+		# ji porad vyjmenovava a `spawn_state` je pripraveny klíč pro `world.spawn`
+		# (M5). Prazdny seznam tady NENI tvrzeni "zadni mobily" - pravda je
+		# v `sources` (a `load()` cte jen ji); kdo je chce naplnit, at je naplni
+		# stavovym zdrojem, ne druhou kopii.
 		"mobiles": [],
 		"items": [],
 		"spawn_state": [],
 		"player_serial": player_serial,
 		"position_serial": 0,
-		# Stavove zdroje (docs/04 §4.7; prvni je `sim.scheduler`). Uklada se
+		# Stavove zdroje (docs/04 §4.7; `scheduler` + `entities`). Uklada se
 		# CELEK, ne cast - castecny save by rozbil vazby (research/08 bod 13).
 		"sources": _save.collect(_sources),
 	}
