@@ -36,7 +36,7 @@ Stejná past jako u otočení a animace: `Constants.cs:17 TURN_DELAY = 80` (oto�
 místě) a `Constants.cs:13 CHARACTER_ANIMATION_DELAY = 80` (frame animace) jsou dvě
 různé věci se stejnou hodnotou — proto je tabulka výš uvádí jako dva řádky.
 
-### 5.1.2 Algoritmus průchodnosti (jádro věrnosti)
+### 5.1.2 Algoritmus průchodnosti (jádro shody s referencí)
 
 Konstanty: `PERSON_HEIGHT = 16`, `STEP_HEIGHT = 2`.
 

@@ -48,7 +48,7 @@ v `.forge/roadmap.json`.
 |---|---|---|---|
 | `world.tiledata` | `sim/world/tiledata.gd` | `flags(tile:int)->int`, `height(tile:int)->int`, `layer(tile:int)->int`, `weight(item:int)->int`, `value(item:int)->int`, `name(tile:int)->String`, `is_land(tile:int)->bool`, **`texture(tile:int)->int`** (TexID z land záznamu = index do `texmaps.mul`; u předmětů 0) — doplněno 2026-10-07 pro svahy; data z `assets/uo/manifest.json` + `data/tiles.json` | závisí na vyřešení §3.3.1 |
 | `world.map` | `sim/world/map.gd` | `_init(prefix:String = "res://assets/uo/world/map0")` — **cesty jsou vstup, ne konstanta** (`assets/uo` je v `.gitignore`, takže v CI nejsou); `land_at(x:int,y:int)->int`, `z_at(x:int,y:int)->int`, `statics_at(x:int,y:int)->Array[Dictionary]` — vrací **celý blok 8×8**, každý záznam `{tile,x,y,z,hue}` s **lokálním** `x`,`y` (0..7), světová dlaždice je `(bx*8+x, by*8+y)`; `load_block(bx:int,by:int)->void`, `is_loaded(bx:int,by:int)->bool` | čte `.land`/`.statics` po blocích; **není to „statiky na dlaždici"** — filtr na dlaždici si dělá volající (`world.walk`, `render.chunk`); viz §4.2.1 |
-| `world.walk` | `sim/world/walk.gd` | `_init(map = null, tiledata = null, stairs = null, doors = null)` — **závislosti konstruktorem, ne konstantou** (jinak by `can_step` nešel změřit bez `assets/uo`); `can_step(from:Vector3i, dir:int, height:int = PERSON_HEIGHT, is_player:bool = true)->Dictionary` → `{ok:bool, z:int, reason:String}`; `surface_z(x:int,y:int)->int` | **jádro věrnosti pohybu**, algoritmus v §5.1; **od 2026-10-07 se výška počítá z ROHŮ dlaždice** (`landLow`/`landCenter`/`startTop`) a `Bridge` půlí výšku — viz §4.2.1; `reason == "blocked"` (voda/zeď/dveře) vs `"height"` (povrch je výš než strop); dveře rozhoduje `world.doors.is_open` (oba stavy mají v `tiledata` `Impassable`), statiky se ptají `tiledata` s `+0x4000`; viz §4.2.1 |
+| `world.walk` | `sim/world/walk.gd` | `_init(map = null, tiledata = null, stairs = null, doors = null)` — **závislosti konstruktorem, ne konstantou** (jinak by `can_step` nešel změřit bez `assets/uo`); `can_step(from:Vector3i, dir:int, height:int = PERSON_HEIGHT, is_player:bool = true)->Dictionary` → `{ok:bool, z:int, reason:String}`; `surface_z(x:int,y:int)->int` | **jádro shody s referencí pohybu**, algoritmus v §5.1; **od 2026-10-07 se výška počítá z ROHŮ dlaždice** (`landLow`/`landCenter`/`startTop`) a `Bridge` půlí výšku — viz §4.2.1; `reason == "blocked"` (voda/zeď/dveře) vs `"height"` (povrch je výš než strop); dveře rozhoduje `world.doors.is_open` (oba stavy mají v `tiledata` `Impassable`), statiky se ptají `tiledata` s `+0x4000`; viz §4.2.1 |
 | `world.doors` | `sim/world/doors.gd` | `is_door(tile:int)->bool` (**i pro otevřený art**), `is_open(tile:int)->bool`, `toggle(tile:int)->int` (`art + 1` / `art - 1`; `0` = není dveře), `category(tile:int)->int`, `orientation(tile:int)->int` (index v `doors.txt`, 0..7), `open_tile(cat:int, index:int)->int` | data z `doors.txt`: **art je zavřený, `art + 1` otevřený** (měřeno 2026-10-07 nad 230 arty; důkazy v hlavičce modulu a docs/03 §3.6) |
 | `world.teleport` | `sim/world/teleport.gd` | `teleport_target(x:int,y:int,z:int)->Variant` (`{x,y,z}` nebo `null`) | data z `teleprts.txt` + moongates z `data/moongates.json` |
 | `world.stairs` | `sim/world/stairs.gd` | `is_stair(tile:int)->bool`, `stair_group(tile:int)->Dictionary` | data z `stairs.txt` |
@@ -467,7 +467,7 @@ změnil, je tu i **původní znění** — historie se nepřepisuje, jen doplňu
 s `t` (typ) a jsou validované v `sim/commands.gd`. Neplatný příkaz se
 **zahodí s hláškou do žurnálu**, nikdy nespadne.
 
-| `t` | Pole | Význam | Poznámka k věrnosti |
+| `t` | Pole | Význam | Poznámka k referenci |
 |---|---|---|---|
 | `move` | `dir:int(0..7)`, `run:bool`, `seq:int` | krok | klient posune sprite hned (predikce), sim potvrdí/odmítne a případně vrátí zpět (`snap-back`) |
 | `turn` | `dir:int` | otočení na místo | 80 ms, bez pohybu |
@@ -591,7 +591,7 @@ Vector3i  # pozice: x, y = dlaždice (int), z = světová výška (int)
 
 ## 4.6 Smlouvy klíčových toků (přijímací kritéria)
 
-Tyto toky jsou **jádro věrnosti**; každý má test s konkrétní hodnotou.
+Tyto toky jsou **jádro shody s referencí**; každý má test s konkrétní hodnotou.
 
 ### 4.6.1 Krok hráče (pohyb)
 

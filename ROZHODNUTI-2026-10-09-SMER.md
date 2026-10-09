@@ -20,16 +20,25 @@
 
 | Co | Hodnota | Jak změřeno 2026-10-09 |
 |---|---|---|
-| Trvání a velikost práce | 2026-10-02 → 2026-10-09, **127 commitů** | `git log --oneline \| Measure-Object -Line`; data z `git log --format=%ad --date=short` |
-| Herní kód | **10 617 řádků** GDScriptu (sim 4 198, app 3 169, render 2 399, ui 575, core 276) | součet `Measure-Object -Line` přes `sim/ app/ render/ ui/ core/` (jen `.gd`) |
-| Testy | **12 170 řádků** | totéž nad `tests/` |
-| Nástroje | **12 662 řádků** Pythonu (extrakce UO 5 771, brány 5 068) | totéž nad `tools/` |
+| Trvání a velikost práce | 2026-10-02 → 2026-10-09; **127 commitů před touhle session** (HEAD `39ee290`), **129** po jejích commitech | `git rev-list --count HEAD`; data z `git log --format=%ad --date=short \| Sort-Object -Unique` |
+| Herní kód | **10 617 řádků** (sim 4 198, app 3 169, render 2 399, ui 575, core 276) | `Measure-Object -Line` (neprázdné řádky) přes `sim/ app/ render/ ui/ core/`, přípony `.gd` a `.tscn` — **není to „jen `.gd`"**: `app/main.tscn` přidává 27 řádků (čistě `.gd` = 10 590) |
+| Testy | **12 170 řádků** (jen `.gd` = 11 468) | totéž nad `tests/`, přípony `.gd .json .py .md` |
+| Nástroje | **12 662 řádků** (extrakce UO 5 771, brány 5 068) | totéž nad `tools/`, přípony `.py` a `.gd` — **není to jen Python**: `tools/gates/sim_probe.gd` přidává 100 řádků (čistě Python = 12 562) |
 | Data z UO | `items.json` **8 748** záznamů, `recipes.json` **1 053**, `skills.json` **58** | `ConvertFrom-Json` a počet top-level záznamů |
-| Extrahované assety | 77 atlasových stran, **40** PNG animací (těla 400 a 401), 12 náhledů artu, `world/map0.land` + `statics.bin/.idx` | `Get-ChildItem assets\uo -Recurse`; sonda `.tmp\sonda-anim.py` |
-| Rozhraní klon ↔ klient | `manifest.json` 10,27 MB (77 stran, **49 705** spritů), `tiles.json` (item 65 536 × 9 polí, land 16 384 × 3), `hues.json` (375 skupin, 3 000 sad), `anim-manifest.json` (**586** těl), `content-report.json` (13 souborů bez generátoru, 1 362 nerozřešených jmen) | sonda `.tmp\sonda-manifestu.py` (čte jen, nic nezapisuje) |
+| Extrahované assety | 77 atlasových stran, **40** PNG animací (těla 400 a 401; v `anim-sheets.json` je **30** z nich), 12 náhledů artu, `world/map0.land` + `statics.bin/.idx` | `Get-ChildItem assets\uo -Recurse`; sondy `.tmp\sonda-anim.py` a `sonda-3-presna.py` |
+| Rozhraní klon ↔ klient | `manifest.json` 10 271 078 B (77 stran, **49 705** spritů), `tiles.json` (item 65 536 × 9 polí, land 16 384 × 3), `hues.json` (375 skupin × **8** záznamů = 3 000 sad), `anim-manifest.json` (**586** těl), `content-report.json` (13 souborů bez generátoru, 1 362 nerozřešených jmen) | sondy v `.tmp/` (čtou jen, nic nezapisují) |
 | Granule | **112** v `.forge/roadmap.json`; **stav se v roadmapě nevede** | `ConvertFrom-Json` + `Group-Object status` (prázdné) |
 | Stav granulí | **61 měřeně hotových**, 4 „soubor je, test není", 47 chybí | `python tools/plan-status.py` (hotovo = soubor v gitu **A** existuje test); po milnících: M0 16/17, M1 16/23, M2 20/34, **M3 1/5, M4 5/6, M5 0/11, M6 0/3, M7 0/7, M8 0/3**, M9 3/3 |
-| `uo-shadows` (sousední projekt) | GDD 34 kB, ADD 26 kB, TDD 49 kB; roadmapa 21 granulí; M0 hotové, 113 kontrol | dokumenty a `HANDOFF.md` projektu — **ne měření této session** |
+| `uo-shadows` (sousední projekt) | GDD **35 439 B**, ADD 26 125 B, TDD 48 864 B; roadmapa **21** granulí; „113 kontrol" je tvrzení z jeho `HANDOFF.md` | velikosti a počet granulí naměřeny nezávislým ověřením 2026-10-09; **jeho Godot sadu jsem nespouštěl** |
+
+> **Přeměřeno nezávislým ověřovatelem (2026-10-09, read-only):** všechna čísla
+> výš se reprodukují **jedním postupem** uvedeným v tabulce. Ověřovatel zároveň
+> našel **čtyři vady popisků** („jen `.gd`", „řádků Pythonu", „jen `.gd`" u testů,
+> 34 kB u GDD), které jsou **opravené tady**, a **pět vad smlouvy klienta**
+> (`godot-uo-client/docs/01-data-uo.md`), které jsou opravené tamtéž. Dvě z nich
+> vznikly vadou měřidla: sonda tiskla u dictu jen první dvě položky a nejvýš
+> 12 klíčů, takže se do schématu dopsalo, co se nevytisklo. **Poučení: měřidlo,
+> které tiše zkrátí výstup, vyrobí falešné schéma.**
 
 ### 1.2 Rozdíl, na kterém rozhodnutí stojí
 
@@ -54,7 +63,9 @@ Je to **přestat platit za C jako cíl** a nechat C v platnosti jako **nástroj*
 **Rozhodnutí uživatele:** na dotaz „který z těch dvou má být produkt"
 (`game-clone` vs. `uo-shadows`) — **`game-clone`**.
 
-**Důvod:** má svět, data i nejlepší ověření (1 422 kontrol, 11 bran), a hlavně
+**Důvod:** má svět, data i nejlepší ověření (**1 422 kontrol** podle `HANDOFF.md`
+z 20. session — touto session neměřeno; **11 bran** pouští `tools/gates/run-all.py`,
+`docs/08` jich popisuje **13** — dva čítače téhož slova), a hlavně
 **kostru, na které stojí i to, co uživatel chce** (autorita v `sim/`, vstup jen
 přes `Command`, běh headless). `uo-shadows` zůstává **držená opce** (D6).
 

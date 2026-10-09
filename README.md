@@ -4,6 +4,13 @@ Tenhle adresář **není hra**. Je to **zadání pro AI**, které má hru postav
 věrný single-player klon Ultima Online nad originálními datovými soubory
 UO Classic, které jsou na této stanici.
 
+> **⚠ 2026-10-09 — CÍL SE ZMĚNIL (rozhodnutí uživatele).** **Věrná kopie není
+> cíl.** Cílem je **„feel" bez omezení staré hry** (plynulý pohyb, hráč ví, kde
+> je a co vidí, rutinu nemusí odklikat), hra **modifikovatelná a rozšiřitelná**,
+> **svět jde dál i beze hráče** a **automatizace smí provést, co hráč rozhodl**
+> (nesmí rozhodnout za něj). **Věta výš je historická** — závazné je
+> `ROZHODNUTI-2026-10-09-SMER.md` a `docs/01`.
+
 > **Stavba už běží — tenhle soubor je zadání, ne stav.** Co je hotové a ověřené,
 > se bere z **[`HANDOFF.md`](HANDOFF.md)** (přepisuje se každou session);
 > ponaučení a pasti z **[`LESSONS.md`](LESSONS.md)**.
@@ -14,7 +21,7 @@ UO Classic, které jsou na této stanici.
 |---|---|
 | **Člověk**, který zadání předává AI | [`ZADANI-UO-KLON.md`](ZADANI-UO-KLON.md) — hlavní zadání, dá se vložit celé |
 | **AI agent**, který má pracovat | `ZADANI-UO-KLON.md` → `docs/01` → `docs/04` → `docs/07` → `docs/08` → `docs/09` |
-| **Orchestrátor** (automatické vydávání práce) | [`.forge/roadmap.json`](.forge/roadmap.json) — 100 granulí s DAG, `owns`, `acceptance` |
+| **Orchestrátor** (automatické vydávání práce) | [`.forge/roadmap.json`](.forge/roadmap.json) — 112 granulí s DAG, `owns`, `acceptance` |
 
 ## Mapa balíčku
 
@@ -27,7 +34,7 @@ docs/
   04-architektura-a-smlouvy.md vrstvy, 100 komponent, Command/Event, TVARY DAT, kritéria
   05-mechaniky.md            pohyb, interakce, souboj, magie, skilly, sběr, výroba, obchod
   06-obsah.md                předměty, nástroje, zbraně, zbroje, monstra, vendory, svět
-  07-granule-a-milniky.md    milníky M0–M8, vlny, pravidla granulí
+  07-granule-a-milniky.md    milníky M0–M9, vlny, pravidla granulí
   08-brany-a-overovani.md    13 bran, mutační testy, co znamená zelená
   09-pravidla-pro-agenta.md  jak pracovat, definice hotovo, zakázané zkratky
   10-rizika-a-pasti.md       23 naměřených pastí (každá se už jednou stala)

@@ -53,6 +53,13 @@ měří **regresi** („něco se rozbilo"), ne cíl.
 |---|---|---|---|
 | V1 | **Ovládání jako UO** | levá myš = výběr/cíl, dvojklik = použij, pravý klik = kontext, drag & drop předmětů, kurzor pro target, makra na klávesách, chůze po kliknutí (klik-to-move) i šipkami | §5.3 |
 | V2 | **Pohyb po krocích** | 8 směrů, diskrétní krok za 400 ms (běh 200 ms), spotřeba staminy, blokování terénem, výšky a schody, doors/teleporty jako v datech klienta | §5.1 |
+
+> **„Plynulý pohyb" ≠ volný pohyb.** Nový cíl (§1.1) žádá, aby pohyb **nebyl
+> trhavý** — to ale **neznamená zrušit kroky**: krok zůstává diskrétní
+> (400 ms / běh 200 ms) a **plynulý je přechod mezi dlaždicemi** (interpolace
+> obrazu mezi dvěma polohami). Přesně to dělá i originál v podání ClassicUO
+> a v klonu to řeší `REVIZE-POHYB-2026-10-07.md` §5 oprava B. Kdo by „plynulost"
+> četl jako volný pohyb, rozbije V2 i brány na kadenci.
 | V3 | **Interakce mezi objekty** | dvojklik otevře/použije, použití nástroje na cíl, předmět na předmět, předmět na tile, kontejnery, řetězení (ore → forge → ingot), hlášky místo tichého selhání | §5.2 |
 | V4 | **Manipulace** | zvednout/položit/přesunout, stackování, váha a nosnost, equip/unequip na vrstvy, reach (dosah), decay na zemi, zamčené kontejnery | §5.4 |
 | V5 | **Souboj** | war/peace, útočný cíl, swing timer dle DEX a zbraně, hit chance, damage, parry, luk a munice, healing obvazy, smrt a tělo | §5.5 |
@@ -117,7 +124,7 @@ tím, co je nejblíž. Odůvodnění a ceny: `ROZHODNUTI-2026-10-09-SMER.md` (ro
 | Faceta | **0 (Felucca)** z `map0LegacyMUL.uop` | klasická Britannia, nejvíc obsahu, T2A éra |
 | Rozsah dlaždic | **celá faceta** 7168 × 4096 dlaždic | mapa se streamuje po blocích; ořezávat svět nemá důvod |
 | Startovní město | **Britain** (okolí 1495 × 1630) | největší město, všechny služby |
-| Ostatní facety | **mimo rozsah** (door pro později: načtení jiné facety je jen jiný `map_id`) | jeden svět stačí na věrný zážitek |
+| Ostatní facety | **mimo rozsah** (door pro později: načtení jiné facety je jen jiný `map_id`) | jeden svět stačí na zážitek blízký originálu |
 | Dungeony | **3 ručně vybrané** (Deceit, Despise, Shame) jako ověření spawn a AI | víc dungeonů = jen data, ale musí být nejdřív funkční jeden vzor |
 | Budovy/housing | **jen statické budovy z mapy**, stavění domů mimo rozsah | housing je samostatný systém (multi komponenty), nepatří do základu |
 | Lodě | **mimo rozsah** (voda je neprůchodná) | vyžaduje multi + pohyb na vodě |

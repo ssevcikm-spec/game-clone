@@ -130,7 +130,7 @@ granuli, jejíž soubor v `main` je a jejíž API jde zavolat.**
 | Smlouva je nejasná | zastav, oprav smlouvu v `docs/`, pokračuj |
 | Potřebuji cizí soubor | není to tvoje granule, zapiš požadavek |
 | Vychází jiná hodnota než v datech | **data vyhrávají** nad dojmem; ověř měřením |
-| Dvě možnosti, obě věrné | vyber tu, která je v `docs/` zdůvodněná; když tam není, zapiš rozhodnutí |
+| Dvě možnosti, obě shodné s referencí | vyber tu, která je v `docs/` zdůvodněná; když tam není, zapiš rozhodnutí |
 | Něco je rychlejší/„lepší" než UO | QoL (méně klikání, lepší čitelnost) **smí**; **výsledek** pravidel ne — viz `§9.10` bod 10 |
 
 ## 9.10 Zakázané zkratky (tvrdý seznam)

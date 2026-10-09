@@ -30,7 +30,7 @@ UO je klient/server. Všechny jeho charakteristické vlastnosti (krokový pohyb
 s prodlevou, target cursor, gumpy, „swing" timer, zpožděné sesílání, fronta
 příkazů, kterou server může odmítnout) pocházejí z toho, že klient **posílá
 záměr** a server **rozhoduje**. Když klon slepí ovládání a simulaci dohromady,
-věrnost se rozsype a kód se stane netestovatelným.
+**shoda s referencí se rozsype** a kód se stane netestovatelným.
 
 Proto:
 

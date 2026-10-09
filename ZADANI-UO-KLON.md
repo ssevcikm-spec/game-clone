@@ -1,5 +1,8 @@
 # ZADÁNÍ: Věrný klon Ultima Online (single-player, offline)
 
+> **⚠ Název je historický** (zadání vzniklo 2026-10-02). **Věrná kopie už není
+> cíl** — platí ⚠ poznámka níž a `ROZHODNUTI-2026-10-09-SMER.md`.
+
 > **Tohle je hlavní zadání.** Je psané tak, aby se dalo předat AI agentovi
 > (nebo týmu agentů) jako jediný vstupní dokument. Všechno podstatné je v něm;
 > detaily jsou v `docs/`, na které se odkazuje.
@@ -27,7 +30,7 @@
    → `docs/08` (brány) → `docs/09` (pravidla pro agenta).
 2. **Pracuj po granulích.** Granule = jeden soubor, jednoznačné zadání,
    ověřitelný výsledek. Strojově čitelný seznam je `.forge/roadmap.json`
-   (klíč `grains`, 100 granul, DAG).
+   (klíč `grains`, 112 granul — dřív 100, plán se doplňuje, DAG).
 3. **Nikdy nepřeskakuj úroveň.** Cíl → požadavky → architektura → smlouvy →
    granule. Když narazíš na něco, co nemá předka v zadání, **zastav a nahlas
    to** — je to drift, ne úkol.
@@ -43,14 +46,15 @@
 
 ---
 
-## 1. Co má vzniknout (cíl a měřitelná věrnost)
+## 1. Co má vzniknout (dřív „cíl a měřitelná věrnost" — dnes: co bereme z reference)
 
 **Cíl jednou větou:** jedna hratelná offline hra s izometrickým světem
 z dlaždic 44×44, pohybem po krocích, předměty které se berou/nosí/používají/
 vyrábějí, NPC se kterými se obchoduje a soubojem se skilly, které rostou
 používáním — nad originálními daty UO Classic.
 
-**Dvanáct věrnostních bodů** (každý musí být ve hře dohledatelný a ověřitelný):
+**Dvanáct bodů, které bereme z reference** (dřív „dvanáct věrnostních bodů";
+každý musí být ve hře dohledatelný a ověřitelný):
 
 | # | Bod | Detail |
 |---|---|---|
@@ -245,7 +249,7 @@ Celý registr (23 položek, každá naměřená): `docs/10-rizika-a-pasti.md`.
 | Číslo není nikde ověřené (stamina při běhu, stat loss, světelný cyklus) | `UNVERIFIED` + konfigurační flag + zapsat do `docs/11` §11.6 |
 | Smlouva je nejasná | zastav, oprav **nejdřív smlouvu v `docs/`**, pak kód |
 | Potřebuješ cizí soubor | není to tvoje granule — zapiš požadavek a skonči |
-| Dvě možnosti, obě věrné | vyber podle `docs/`, a když tam rozhodnutí není, zapiš ho tam |
+| Dvě možnosti, obě shodné s referencí | vyber podle `docs/`, a když tam rozhodnutí není, zapiš ho tam |
 
 ---
 
