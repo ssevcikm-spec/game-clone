@@ -21,7 +21,7 @@ UO Classic, které jsou na této stanici.
 |---|---|
 | **Člověk**, který zadání předává AI | [`ZADANI-UO-KLON.md`](ZADANI-UO-KLON.md) — hlavní zadání, dá se vložit celé |
 | **AI agent**, který má pracovat | `ZADANI-UO-KLON.md` → `docs/01` → `docs/04` → `docs/07` → `docs/08` → `docs/09` |
-| **Orchestrátor** (automatické vydávání práce) | [`.forge/roadmap.json`](.forge/roadmap.json) — 112 granulí s DAG, `owns`, `acceptance` |
+| **Orchestrátor** (automatické vydávání práce) | [`.forge/roadmap.json`](.forge/roadmap.json) — 118 granulí s DAG, `owns`, `acceptance` |
 
 ## Mapa balíčku
 
@@ -34,7 +34,7 @@ docs/
   04-architektura-a-smlouvy.md vrstvy, 100 komponent, Command/Event, TVARY DAT, kritéria
   05-mechaniky.md            pohyb, interakce, souboj, magie, skilly, sběr, výroba, obchod
   06-obsah.md                předměty, nástroje, zbraně, zbroje, monstra, vendory, svět
-  07-granule-a-milniky.md    milníky M0–M9, vlny, pravidla granulí
+  07-granule-a-milniky.md    milníky M0–M9 + MK (krátká smyčka), vlny, pravidla granulí
   08-brany-a-overovani.md    13 bran, mutační testy, co znamená zelená
   09-pravidla-pro-agenta.md  jak pracovat, definice hotovo, zakázané zkratky
   10-rizika-a-pasti.md       23 naměřených pastí (každá se už jednou stala)

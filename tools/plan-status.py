@@ -35,7 +35,10 @@ for _s in (sys.stdout, sys.stderr):
 
 ROOT = Path(__file__).resolve().parents[1]
 ROADMAPA = ROOT / ".forge" / "roadmap.json"
-MILNIKY = ["M0", "M1", "M2", "M3", "M4", "M5", "M6", "M7", "M8", "M9"]
+MILNIKY = ["M0", "M1", "M2", "M3", "M4", "MK", "M5", "M6", "M7", "M8", "M9"]
+# `MK` = krátká smyčka (2026-10-09, `ROZHODNUTI-2026-10-09-SMER.md` §2 D4):
+# prioritní větev vložená mezi M4 a M5 — nepotřebuje souboj ani magii.
+# Stejný seznam je v `tools/roadmap-gen.py` (`MILNIKY_PORADI`) a v `docs/07 §7.2`.
 # ⚠ `M9` tady do 2026-10-08 CHYBEL, i kdyz ho `tools/roadmap-gen.py`
 # (`MILNIKY_PORADI`) i `docs/07 §7.2` maji - takze se granule milniku M9
 # v prehledu "po milnicich" VUBEC nezobrazovaly (a stav 0/3 se nedal precist).

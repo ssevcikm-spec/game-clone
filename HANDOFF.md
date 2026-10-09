@@ -65,10 +65,22 @@ v `game-clone`, v klientu i v `uo-shadows/docs`.
 **Návrh k rozhodnutí:** udělat z ní bránu (`G14`) — dnes to není, protože brány
 jsou specifikované v `docs/08` a přidání brány je změna smlouvy, ne úklid.
 
-**Otevřená témata (neprovedená, §6 záznamu):** roadmapa pro `K1`–`K6` (6.1),
-podmínky v politice (6.2), „vidět do uvažování postavy" (6.3), „feel" jako
-měřitelná definice (6.4), **AI interakce / komplexní robot — námět k rozhodnutí**
-(6.5), modifikovatelnost (6.6).
+**Plán doplněn (2026-10-09):** vznikl milník **`MK` — krátká smyčka**
+(9 granulí: `sim.scheduler`, `sim.save`, `sim.offline`, `sim.policy`,
+`sim.executor`, `sim.decision_log` + obchod `data.vendors`, `sim.vendor`,
+`ui.vendor_gump` přesunutý z M7), vložený **mezi M4 a M5** — krátká smyčka
+nepotřebuje souboj ani magii. **Měřeno** po přegenerování: granul **118**
+(bylo 112), `MK` **0/0/9**, M7 spadlo na 4 granule, pokrytí vlnami **80 z 118**
+(přidány vlny W13/W14), DAG konzistentní, žádná kolize `owns`. Milník je
+zadrátovaný na **třech místech** (`MILNIKY_PORADI`, `MILNIKY`, `docs/07` §7.2) —
+stejný postup, jaký projekt už má pro „vlastní milník `A`" u zvuku.
+
+**Otevřená témata (neprovedená, §6 záznamu):** roadmapa pro `K1`–`K6` je
+**hotová** (§6.1), stejně jako náměty „podmínky v politice" (`sim.policy`) a
+„vidět do uvažování postavy" (`sim.decision_log`) — zůstávají jako granule;
+dál otevřené: „feel" jako měřitelná definice (6.4), **AI interakce / komplexní
+robot — námět k rozhodnutí** (6.5), modifikovatelnost (6.6), brána na rozbité
+tabulky (6.7).
 
 ---
 

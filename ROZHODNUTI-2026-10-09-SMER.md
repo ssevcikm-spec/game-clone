@@ -27,8 +27,8 @@
 | Data z UO | `items.json` **8 748** záznamů, `recipes.json` **1 053**, `skills.json` **58** | `ConvertFrom-Json` a počet top-level záznamů |
 | Extrahované assety | 77 atlasových stran, **40** PNG animací (těla 400 a 401; v `anim-sheets.json` je **30** z nich), 12 náhledů artu, `world/map0.land` + `statics.bin/.idx` | `Get-ChildItem assets\uo -Recurse`; sondy `.tmp\sonda-anim.py` a `sonda-3-presna.py` |
 | Rozhraní klon ↔ klient | `manifest.json` 10 271 078 B (77 stran, **49 705** spritů), `tiles.json` (item 65 536 × 9 polí, land 16 384 × 3), `hues.json` (375 skupin × **8** záznamů = 3 000 sad), `anim-manifest.json` (**586** těl), `content-report.json` (13 souborů bez generátoru, 1 362 nerozřešených jmen) | sondy v `.tmp/` (čtou jen, nic nezapisují) |
-| Granule | **112** v `.forge/roadmap.json`; **stav se v roadmapě nevede** | `ConvertFrom-Json` + `Group-Object status` (prázdné) |
-| Stav granulí | **61 měřeně hotových**, 4 „soubor je, test není", 47 chybí | `python tools/plan-status.py` (hotovo = soubor v gitu **A** existuje test); po milnících: M0 16/17, M1 16/23, M2 20/34, **M3 1/5, M4 5/6, M5 0/11, M6 0/3, M7 0/7, M8 0/3**, M9 3/3 |
+| Granule | **118** v `.forge/roadmap.json` (naměřeno po vložení milníku `MK` téhož dne; **před** ním 112); **stav se v roadmapě nevede** | `ConvertFrom-Json` + `Group-Object status` (prázdné) |
+| Stav granulí | **61 měřeně hotových**, 4 „soubor je, test není", 53 chybí | `python tools/plan-status.py` (hotovo = soubor v gitu **A** existuje test); po milnících: M0 16/17, M1 16/23, M2 20/34, **MK 0/9, M3 1/5, M4 5/6, M5 0/11, M6 0/3, M7 0/4, M8 0/3**, M9 3/3 |
 | `uo-shadows` (sousední projekt) | GDD **35 439 B**, ADD 26 125 B, TDD 48 864 B; roadmapa **21** granulí; „113 kontrol" je tvrzení z jeho `HANDOFF.md` | velikosti a počet granulí naměřeny nezávislým ověřením 2026-10-09; **jeho Godot sadu jsem nespouštěl** |
 
 > **Přeměřeno nezávislým ověřovatelem (2026-10-09, read-only):** všechna čísla
@@ -153,10 +153,10 @@ podle `REVIZE-SMER-2026-10-07.md` §2.5 jen tehdy, když se offline doběh
 **nepočítá jako simulace agentů** (past: aktivace podle sektorů kolem hráče bez
 hráče nefunguje, takže mimo obrazovku musí být svět **funkcí času**, ne AI).
 **Měřený kontext k tomu** (`tools/plan-status.py`, 2026-10-09): plná osmička vět
-je `M3`–`M8`, což je **35 granulí, z nichž 29 chybí celých** (M5 0/11,
-M6 0/3, M7 0/7, M8 0/3, M3 1/5, M4 5/6). Krátká smyčka je tedy **menší než
-třetina** toho, co ještě zbývá do „plné" hry — a nepotřebuje z toho ani souboj,
-ani magii, ani smrt.
+je `M3`–`M8`, což je **32 granulí, z nichž 26 chybí celých** (M5 0/11, M6 0/3,
+M7 0/4, M8 0/3, M3 1/5, M4 5/6). Krátká smyčka (`MK`) má **9 granulí** — je tedy
+**menší než třetina** toho, co ještě zbývá do „plné" hry, a nepotřebuje z toho
+ani souboj, ani magii, ani smrt.
 
 **Co to NEMAŽE:** `M3`–`M8` zůstávají v plánu i v roadmapě. Jen přestávají být
 „to, co je nejblíž" — souboj a magie se dodělají, až bude smyčka hratelná.
@@ -245,6 +245,8 @@ cíl** a přesunout session do práce, kterou uživatel chce (D4, D5, D3).
 | 9 | Hlavní zadání označeno jako v cíli překonané (nemaže se, jen doplňuje) | `ZADANI-UO-KLON.md` hlavička |
 | 10 | Rozcestník balíčku popisuje nový cíl místo „měřitelné věrnosti" | `README.md` řádek o `docs/01` |
 | 11 | V `docs/01` přejmenovány popisky, které by tvrdily opak („věrnostní bod" → „co bereme z reference", „pravidlo věrnosti" → „pravidlo odchylky", „věrnostní audit" → „audit") | `docs/01-cil-a-scope.md` §1.2, §1.7 |
+| 12 | Do plánu vložen milník **`MK` (krátká smyčka)** s 9 granulemi, obchod přesunut z M7, přidány vlny W13/W14 — roadmapa přegenerovaná | `tools/roadmap-gen.py`, `tools/plan-status.py`, `docs/07` §7.2/§7.3, `.forge/roadmap.json` |
+| 13 | Rozbité markdown tabulky opraveny (3×) a zapsána třída vady | `docs/01`, `HANDOFF.md`, §6.7 |
 
 **Co zůstalo beze změny a je to tak správně:** `docs/02`–`docs/08`, `docs/10`,
 `docs/11`, brány, `project.godot`, `.forge/roadmap.json` — **plán se tímhle
@@ -254,24 +256,42 @@ rozhodnutím neškrtá** (§6.1).
 
 ## 6. Otevřená témata (pojmenovaná, ne provedená)
 
-### 6.1 Roadmapa pro krátkou smyčku
+### 6.1 Roadmapa pro krátkou smyčku — ✅ PROVEDENO 2026-10-09
 
-`K1`–`K6` dnes v `.forge/roadmap.json` nejsou jako samostatné granule
-(vendor je uvnitř `M7`). Až se plán doplní, mají vzniknout granule pro:
-prodej/nákup, uložení světa, **scheduler**, **offline doběh**, **politiku
-s podmínkami**, **log rozhodnutí**. Odhadem `[O]` 6–10 granulí (měřený kontext
-k tomu je v §2 D4). Do té doby
-platí: **nic se z roadmapy nemaže**, jen se mění pořadí, co je nejblíž.
+Vznikl **nový milník `MK` (krátká smyčka)**, vložený **mezi M4 a M5** — krátká
+smyčka nepotřebuje souboj ani magii, takže by na ně čekala zbytečně. Nese
+**9 granulí**:
 
-### 6.2 Podmínky v politice (uživatelův námět)
+| Granule | Co řeší |
+|---|---|
+| `sim.scheduler` | plánovač událostí (timer wheel) místo „tiká všechno" |
+| `sim.save` | uložení a načtení **světa** (dnes obálka s prázdnými `mobiles`/`items`) + migrace |
+| `sim.offline` | svět jde dál i bez hráče — **funkce času, ne simulace agentů** |
+| `sim.policy` | politika: pravidla s podmínkami a prioritami (data, ne kód) |
+| `sim.executor` | vykonavatel: mění rozhodnutí na `Command`, nikdy nesahá na stav |
+| `sim.decision_log` | „vidět do uvažování postavy" — které pravidlo se vyhodnotilo a proč |
+| `data.vendors`, `sim.vendor`, `ui.vendor_gump` | **přesunuté z M7** — bez obchodu nejde „prodám výrobek prodejci" |
+
+**Měřeno po změně** (`tools/plan-status.py`): granul **118** (bylo 112),
+`MK` 0/0/**9**, M7 spadlo na 4 granule, pokrytí vlnami **80 z 118** (přidány
+vlny W13 a W14), DAG konzistentní, žádná kolize `owns`. Rozšíření milníku je na
+**třech místech** (`MILNIKY_PORADI`, `MILNIKY`, `docs/07` §7.2) — stejný postup,
+jaký projekt už má pro trať zvuku („vlastní milník `A`").
+**Nic se přitom nemazalo:** `M5`–`M8` zůstávají v platnosti, jen přestaly být
+tím, co je nejblíž.
+
+### 6.2 Podmínky v politice (uživatelův námět) — ✅ v plánu jako `sim.policy`
 
 „Udělej tunu mečů" je cíl; „když nastane toto, udělej tamto" je politika.
 Návrh tvaru: **pravidla s prioritou a fallbackem**, data (JSON), ne kód —
 aby se dala ladit a testovat bez zásahu do simulace. **Past:** politika musí
 být **deterministická** (jinak padá replay a hash testy, což je nejsilnější
 zbraň projektu).
+**Stav:** tvarem se zabývá granule `sim.policy` (§6.1); **otevřené zůstává, jak
+hluboké podmínky mají být** — jestli stačí data (podmínka + priorita), nebo má
+vzniknout malý jazyk pravidel. To je rozhodnutí uživatele, ne agenta.
 
-### 6.3 „Vidět do uvažování postavy" (uživatelův námět)
+### 6.3 „Vidět do uvažování postavy" (uživatelův námět) — ✅ v plánu jako `sim.decision_log`
 
 Aby se dalo dívat, jak si hra hraje sama, musí být vidět **důvod**, ne jen
 akce: které pravidlo se vyhodnotilo, které ne a proč („nemám materiál",
@@ -280,6 +300,8 @@ deterministická a událostní, takže se dá **logovat rozhodnutí**, ne jen
 následek. A je to **testovatelné**: pravidlo + stav světa → očekávané
 rozhodnutí je brána. Návrh: `ui/journal` je přirozené místo („co se stalo,
 když jsi nebyl") a `ui/debug_overlay` místo pro živý pohled.
+**Stav:** zapsáno jako granule `sim.decision_log` (§6.1) — zapisuje důvod jako
+události, zobrazuje `ui.journal` (ta se needituje, patří své granuli).
 
 ### 6.4 „Feel" jako měřitelná definice
 

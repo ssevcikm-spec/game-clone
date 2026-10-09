@@ -52,9 +52,10 @@ kontrola (snímek + projití scénáře).
 | **M2** | **Pohyb a interakce** | hráč chodí (400/200 ms), **najde cestu (click-to-move)**, otevírá dveře, projde teleportem, používá předměty kurzorem; postava je vidět **v pořadí kreslení** (mezi statiky) | G3, G4, G9 |
 | **M3** | **Předměty a manipulace** | zvedne, položí, nasadí, dá do batohu a truhly; váha a stacky sedí; equippované věci jsou vidět na postavě | G3, G7, G10 |
 | **M4** | **Skilly, sběr, výroba** | vytěží rudu, vytaví ingot, vyková dagger; skill roste; gump výroby funguje | G3, G5, G9 |
+| **MK** | **Krátká smyčka** (prioritní větev vložená mezi M4 a M5 — viz poznámka pod tabulkou) | **koupí krumpáč, vytěží rudu, vyková a PRODÁ výrobek**; zavře hru, vrátí se a **svět se posunul beze mě**; **postava provede, co jsem jí zadal** (pravidla s podmínkami) a v žurnálu je vidět **proč** | G3, G7, G9 |
 | **M5** | **Souboj a smrt** | zabije kostlivce, dostane loot, umře, stane se duchem, nechá se vzkřísit; **monstrum se ve světě objeví samo** (spawn — rozhodnutí D1 v plánu `PLAN-NPC-A-SOUBOJ-2026-10-08.md` v kořeni repa, §3: `data.spawns` a `world.spawn` se **přesunuly z M7 do M5**, protože bez nich milník nejde splnit) | G3, G8, G9 |
 | **M6** | **Magie** | sesílá kouzla 1.–8. kruhu s many a reagenty; spellbook a svitky | G3, G5 |
-| **M7** | **Ekonomika a svět** | koupí a prodá u vendora, uloží zlato do banky, potká spawny ve 3 dungeonech, **funguje den/noc a světlo (`render.light`)** | G3, G5, G9, G12 |
+| **M7** | **Ekonomika a svět** | uloží zlato do banky (**obchod je od 2026-10-09 v MK**), potká spawny ve 3 dungeonech, **funguje den/noc a světlo (`render.light`)** | G3, G5, G9, G12 |
 | **M8** | **Trvanlivost a uzavření** | uložení/načtení, determinismus, replaye, výkon, makra, credits, vydání (**zvuk a hudba je od 2026-10-07 VLASTNÍ TRAŤ** — viz poznámka pod tabulkou) | G7, G8, G9, G12, G13 |
 | **M9** | **Modernizace** | typovaná konfigurace, dávkové kreslení bloků (mesh), měření výkonu a parity cache; **pravidlo: modernizace nesmí ubrat žádné měření** (každá změna má stejnou nebo silnější bránu) | G1–G13 (nesmí jich ubýt) |
 
@@ -68,6 +69,16 @@ vlastní milník `A`, musí rozšířit `MILNIKY_PORADI` v `tools/roadmap-gen.py
 `MILNIKY` v `tools/plan-status.py` a tuhle tabulku — jinak se granule přestane
 řadit.
 
+**`MK` — krátká smyčka je od 2026-10-09 taky vlastní milník** (rozhodnutí
+uživatele, `ROZHODNUTI-2026-10-09-SMER.md` §2 D4). Je vložený **mezi M4 a M5**,
+aby bylo v plánu vidět, že **nejbližší cíl nejsou M5–M8** (souboj, magie, smrt):
+krátká smyčka je nepotřebuje. Nese **9 granulí**: `sim.scheduler`, `sim.save`,
+`sim.offline`, `sim.policy`, `sim.executor`, `sim.decision_log` +
+přesunuté `data.vendors`, `sim.vendor`, `ui.vendor_gump` (byly v M7 — bez
+obchodu nejde „prodám výrobek prodejci"). Rozšíření je na **třech místech**
+(`MILNIKY_PORADI`, `MILNIKY`, tahle tabulka) a **nic se přitom nemaže** —
+M5–M8 zůstávají v platnosti, jen přestaly být tím, co je nejblíž.
+
 ## 7.3 Vlny (co může běžet paralelně)
 
 | Vlna | Granule (paralelně, disjunktní `owns`) |
@@ -80,17 +91,20 @@ vlastní milník `A`, musí rozšířit `MILNIKY_PORADI` v `tools/roadmap-gen.py
 | **W5** | `ui.hud`, `ui.journal`, `ui.status_bar`, `ui.paperdoll`, `ui.target_cursor`, `ui.context_menu`, `ui.dragdrop`, `ui.tooltip` |
 | **W6** | `sim.skill_gain`, `sim.harvest`, `sim.craft`, `ui.craft_gump`, `ui.skill_list` |
 | **W7** | `sim.combat`, `sim.poison`, `sim.ai`, `sim.loot`, `sim.death`, `ui.backpack`, `ui.container_window` |
-| **W8** | `sim.magic`, `ui.spellbook`, `sim.vendor`, `ui.vendor_gump` |
+| **W8** | `sim.magic`, `ui.spellbook` |
 | **W9** | `world.spawn`, `app.char_create`, `ui.options`, `ui.hotkeys`, `ui.macros`, `render.effects`, `audio.playback` |
 | **W10** | `sim.entity_registry`, `sim.pathfind` (po `world.walk`), `app.scene`, `app.player_view`, `app.player_controller` (integrace scény) |
 | **W11** | `app.config`, `app.metrics`, `render.chunk_mesh` (M9 — až po M8) |
 | **W12** | `sim.ai`, `data.spawns`, `render.names`, `app.pick` (NPC a souboj — přidáno 2026-10-08 z plánu; `world.spawn` se pouští **až po** `sim.ai`) |
+| **W13** | `sim.scheduler`, `sim.save`, `sim.offline`, `sim.policy`, `sim.executor`, `sim.decision_log` (MK — krátká smyčka, přidáno 2026-10-09) |
+| **W14** | `data.vendors`, `sim.vendor`, `ui.vendor_gump` (obchod přesunutý z M7 do MK; `sim.vendor` **až po** `data.vendors`) |
 
 **Granule bez vlny (a proč):** `boot.*` (bootstrap — zakládá je člověk),
 `assets.*` (extrakce dat — sekvenční, jedna po druhé, viz W1) a `app.*` integrační
 uzly, které se dotýkají scény. Naměřeno 2026-10-06 (`python tools/plan-status.py`):
 vlny pokrývaly **62 z 111** granul (číslo **ve svém čase správné**); po vložení
-vlny W12 a granul z plánu naměřeno 2026-10-08: **73 z 112**. Zbytek jsou právě
+vlny W12 a granul z plánu naměřeno 2026-10-08: **73 z 112**; po vložení `MK`
+(vlny W13 a W14) naměřeno 2026-10-09: **80 z 118**. Zbytek jsou právě
 tyhle tři druhy.
 **Pravidlo: granule, která není ani ve vlně, ani v tomhle seznamu, se nesmí vydat** —
 nejdřív se zařadí (jinak se nedá poznat, co může běžet paralelně).

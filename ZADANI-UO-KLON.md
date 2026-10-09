@@ -30,7 +30,8 @@
    → `docs/08` (brány) → `docs/09` (pravidla pro agenta).
 2. **Pracuj po granulích.** Granule = jeden soubor, jednoznačné zadání,
    ověřitelný výsledek. Strojově čitelný seznam je `.forge/roadmap.json`
-   (klíč `grains`, 112 granul — dřív 100, plán se doplňuje, DAG).
+   (klíč `grains`, 118 granul — plán se doplňuje: bylo 100, pak 112, 2026-10-09
+   přibyl milník `MK` s 9 granulemi, DAG).
 3. **Nikdy nepřeskakuj úroveň.** Cíl → požadavky → architektura → smlouvy →
    granule. Když narazíš na něco, co nemá předka v zadání, **zastav a nahlas
    to** — je to drift, ne úkol.

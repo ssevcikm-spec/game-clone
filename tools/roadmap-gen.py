@@ -407,6 +407,45 @@ g("data.recipes", "Data receptů", ["data/recipes.json"],
   acceptance=["content", "schema"], milestone="M4", kind="data",
   prompt="Vygeneruj z research/04-craft-data.json (docs/06 §6.3). Každý recept musí odkazovat na existující materiály a výsledek.")
 
+# ---------------------------------------------------------------- MK krátká smyčka
+# Vloženo 2026-10-09 na pokyn uživatele (`ROZHODNUTI-2026-10-09-SMER.md` §2 D4):
+# nejbližší cíl NENÍ plná osmička vět (M3-M8), ale KRÁTKÁ SMYČKA — dojít
+# k prodejci, koupit krumpáč, vytěžit rudu, vykovat a prodat, zavřít hru,
+# vrátit se a vidět, že svět šel dál — a zadat postavě, co má dělat.
+# `MK` je proto v pořadí mezi M4 a M5: krátká smyčka nepotřebuje souboj ani
+# magii, a bez obchodu (přesunutého sem z M7) by na ně čekala.
+# Hranice automatizace (co smí a co ne): `docs/01` §1.5 bod 8.
+g("sim.scheduler", "Plánovač událostí (timer wheel)", ["sim/scheduler.gd"],
+  deps=["core.clock", "sim.world_loop"],
+  provides=["after(ms, event, payload) -> id", "cancel(id)", "tick(now_ms)", "pending()"],
+  acceptance=["tests", "determinism"], milestone="MK", size="<= 120", model="strong",
+  prompt="Dnes tiká všech 15 systémů každých 50 ms, ale spawn, restock, decay a hlad jsou ŘÍDKÉ události (docs/05 §5.12). Vzor je naměřený: ModernUO timer wheel 4096 slotů, rozlišení 8 ms, O(1) vložení i zrušení a smyčka spí, když není co dělat (`_src/modernuo/Server/Timer/TimerWheel.cs:30-131`, `Main.cs:757-763`). Deterministicky: pořadí událostí ve stejném tiku je pevné (docs/02 §2.3). Test: tři události ve stejné ms se vyřídí v pořadí vložení a `cancel` je O(1).")
+g("sim.save", "Uložení a načtení světa", ["sim/save.gd"],
+  deps=["sim.world_loop", "core.hash"],
+  provides=["save(path)", "load(path)", "migrate(payload, from_version)"],
+  acceptance=["tests", "save", "determinism"], milestone="MK", size="<= 150", model="strong",
+  prompt="NAMĚŘENO 2026-10-09 v `sim/sim_world.gd`: obálka save má 'mobiles': [] a 'items': [] (řádky 104-105 a 138-139), takže se svět neukládá. Naplň ji entitami, verzuj schéma a přidej migrace (research/08-multiplayer-poucky.md bod 5). Texty pro člověka česky, klíče anglicky. Test: hash stavu před uložením == po načtení (docs/08 G7) a load odmítne save z jiné verze dat.")
+g("sim.offline", "Svět jde dál i bez hráče", ["sim/offline.gd"],
+  deps=["sim.save", "sim.scheduler", "world.time"],
+  provides=["advance_to(now_unix)", "elapsed_report()"],
+  acceptance=["tests", "determinism", "replay"], milestone="MK", size="<= 120", model="strong",
+  prompt="Past, kterou je potřeba dodržet: mimo obrazovku NESMÍ tiknout celý svět jako simulace agentů — trik „aktivace podle sektorů kolem hráče“ bez hráče nefunguje, takže svět mimo obrazovku je FUNKCE ČASU (rozvrhy, doplnění spawnu, ceny), viz `REVIZE-SMER-2026-10-07.md` §2.5. Strop `maxCount` a denní strop výnosů zůstávají. Test: dva běhy se stejným časovým skokem dají stejný hash a populace v regionu zůstane v rozpočtu.")
+g("sim.policy", "Politika: pravidla s podmínkami (data)", ["sim/policy.gd"],
+  deps=["sim.commands", "entity.skills"],
+  provides=["load(json)", "evaluate(state) -> [rozhodnuti]", "priority_of(rule)"],
+  acceptance=["tests", "replay"], milestone="MK", size="<= 150", model="strong",
+  prompt="Tři vrstvy z rozhodnutí uživatele (`ROZHODNUTI-2026-10-09-SMER.md` §2 D3): ÚMYSL zadává hráč, POLITIKA jsou pravidla s podmínkami a prioritami („udělej 500 ingotů; když dojde krumpáč, kup nový; když je plný batoh, jdi k prodejci“) a PROVEDENÍ dělá simulace. Pravidla jsou DATA (JSON v `user://`), ne kód, aby se dala ladit a testovat bez zásahu do simulace. Deterministická: stejný stav světa + stejná pravidla = stejné rozhodnutí (jinak padá replay a hash, docs/02 §2.3). Hra NESMÍ rozhodnout za hráče (docs/01 §1.5 bod 8). Test: pravidlo s podmínkou se vyhodnotí podle stavu světa a nevyhodnotí se, když podmínka neplatí.")
+g("sim.executor", "Vykonavatel politiky (co hra provede)", ["sim/executor.gd"],
+  deps=["sim.policy", "sim.commands", "sim.movement"],
+  provides=["step(state) -> [Command]", "status()"],
+  acceptance=["tests", "replay"], milestone="MK", size="<= 120", model="strong",
+  prompt="Vykonavatel mění rozhodnutí politiky na `Command` pro simulaci — NIKDY nesahá na stav přímo (docs/04 §4.1) a funguje i beze hráče (navazuje na `sim.offline`). Když nemůže pokračovat, ZASTAVÍ SE a zapíše důvod (nedostatek materiálu, plný batoh, blokovaná cesta); tiché čekání je vada. Test: vykonavatel vyšle jen `Command`; po vyčerpání zásoby se zastaví a důvod je v `sim.decision_log`.")
+g("sim.decision_log", "Vidět do uvažování postavy", ["sim/decision_log.gd"],
+  deps=["core.events", "sim.policy"],
+  provides=["decision(rule_id, why, state_ref)", "skipped(rule_id, why)", "since(tick)"],
+  acceptance=["tests"], milestone="MK",
+  prompt="Zadání uživatele 2026-10-09: „rád bych viděl, jak by si hra mohla hrát sama, abych viděl do uvažování té postavy“. Zapisuj DŮVOD, ne jen akci: které pravidlo se vyhodnotilo, které ne a proč (nemám materiál, cesta blokovaná, priorita níž). Zápis jde jako události (`core.events`), zobrazuje je `ui.journal` — tu needituj, patří granuli `ui.journal`. Test: pravidlo + stav světa → očekávané rozhodnutí; při replayi stejný výstup.")
+
 # ---------------------------------------------------------------- M5 souboj
 # POZNÁMKA (2026-10-08, plán `PLAN-NPC-A-SOUBOJ-2026-10-08.md`): cesty ke zdrojům
 # mají prefix `_src/` a počty jsou NAMĚŘENÉ, ne odhadnuté — původní prompty
@@ -466,9 +505,13 @@ g("ui.spellbook", "Spellbook", ["ui/spellbook.gd"],
   prompt="Naučená kouzla z události, sesílání přes Command{t:'cast'}.")
 
 # ---------------------------------------------------------------- M7 ekonomika a svět
+# POZNÁMKA (2026-10-09, `ROZHODNUTI-2026-10-09-SMER.md` §2 D4): obchod
+# (`data.vendors`, `sim.vendor`, `ui.vendor_gump`) se PŘESUNUL z M7 do MK — bez
+# něj nejde splnit „prodám výrobek prodejci“ a krátká smyčka by čekala na
+# souboj a magii. M7 zůstává ekonomika a svět (banka, profese, menu, světlo).
 g("data.vendors", "Data vendorů a obchodů", ["data/vendors.json"],
   deps=["data.gen_content"], provides=["vendory: zboží, ceny, restock, profese"],
-  acceptance=["content", "schema"], milestone="M7", kind="data",
+  acceptance=["content", "schema"], milestone="MK", kind="data",
   prompt="Z research/06 **§2.2 + §5** (docs/06 §6.6) — POZOR, dřív tu stálo „§4“, což je oddíl o spawnu; v §2.2 je naměřeno 54 klasických shop vendorů (roadmapa dřív uváděla 25). Ceny: buy = 1.90 × sell (docs/05 §5.9).")
 # POZNÁMKA (2026-10-08, plán NPC a souboje, rozhodnutí D1): `data.spawns` a
 # `world.spawn` patří do M5 — bez nich nejde splnit „zabije kostlivce“
@@ -487,11 +530,11 @@ g("data.professions", "Profese pro tvorbu postavy", ["data/professions.json"],
   prompt="3 klasické z Prof.txt (Warrior/Mage/Blacksmith, ověřeno) + zbytek jako ROZHODNUTÍ s `source: decision` (docs/11.1, O8).")
 g("sim.vendor", "Obchod", ["sim/systems/vendor.gd"],
   deps=["entity.container", "data.vendors", "world.tiledata"], provides=["stock(v)", "buy_price(v, item, amount)", "sell_price(...)", "buy(m,v,lines)", "sell(m,v,lines)", "restock()"],
-  acceptance=["tests", "replay"], milestone="M7", size="<= 120", model="strong",
+  acceptance=["tests", "replay"], milestone="MK", size="<= 120", model="strong",
   prompt="buy = 1.90 × sell, restock 60 min, gump max 250 řádků (docs/05 §5.9). Test: prodej 10 kusů vrátí 10 × sell_price.")
 g("ui.vendor_gump", "Obchodní gump", ["ui/vendor_gump.gd"],
   deps=["sim.vendor"], provides=["seznam k prodeji/koupi, množství, cena, potvrzení"],
-  acceptance=["tests"], milestone="M7",
+  acceptance=["tests"], milestone="MK",
   prompt="UI jen zobrazuje ceny ze simulace (docs/05 §5.3).")
 g("world.spawn", "Správa spawnu", ["sim/world/spawn.gd"],
   deps=["data.spawns", "sim.ai"], provides=["register(point)", "tick()", "alive_at(point_id)", "state()", "restore(d)"],
@@ -587,7 +630,7 @@ g("render.chunk_mesh", "Dávkové kreslení bloků", ["render/chunk_mesh.gd"],
   prompt="Modernizace (M9): místo tisíce draw callů na dlaždici jedna dávka na blok. Vzor: ClassicUO `src/ClassicUO.Client/Game/Map/ChunkMesh.cs:121` (+ `MeshLayer.cs`, `TextureBucketTracker`). Musí zůstat STEJNÝ obraz jako `render.chunk` - dokázat snímkem a paritním testem, ne tvrzením.")
 
 # Pořadí milníků pro kontrolu "závislost nesmí být později" (revize 2026-10-06).
-MILNIKY_PORADI = ["M0", "M1", "M2", "M3", "M4", "M5", "M6", "M7", "M8", "M9"]
+MILNIKY_PORADI = ["M0", "M1", "M2", "M3", "M4", "MK", "M5", "M6", "M7", "M8", "M9"]
 
 
 def main() -> int:
@@ -661,6 +704,7 @@ def main() -> int:
             {"id": "M2", "title": "Pohyb a interakce"},
             {"id": "M3", "title": "Předměty a manipulace"},
             {"id": "M4", "title": "Skilly, sběr, výroba"},
+            {"id": "MK", "title": "Krátká smyčka (prioritní větev mezi M4 a M5)"},
             {"id": "M5", "title": "Souboj a smrt"},
             {"id": "M6", "title": "Magie"},
             {"id": "M7", "title": "Ekonomika a svět"},

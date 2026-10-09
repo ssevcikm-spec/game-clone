@@ -31,6 +31,10 @@
       "title": "Skilly, sběr, výroba"
     },
     {
+      "id": "MK",
+      "title": "Krátká smyčka (prioritní větev mezi M4 a M5)"
+    },
+    {
       "id": "M5",
       "title": "Souboj a smrt"
     },
@@ -1926,6 +1930,164 @@
       "prompt": "Vygeneruj z research/04-craft-data.json (docs/06 §6.3). Každý recept musí odkazovat na existující materiály a výsledek."
     },
     {
+      "id": "sim.scheduler",
+      "title": "Plánovač událostí (timer wheel)",
+      "kind": "code",
+      "owns": [
+        "sim/scheduler.gd"
+      ],
+      "depends_on": [
+        "core.clock",
+        "sim.world_loop"
+      ],
+      "provides": [
+        "after(ms, event, payload) -> id",
+        "cancel(id)",
+        "tick(now_ms)",
+        "pending()"
+      ],
+      "consumes": [],
+      "acceptance": [
+        "tests",
+        "determinism"
+      ],
+      "size_lines": "<= 120",
+      "model": "strong",
+      "milestone": "MK",
+      "prompt": "Dnes tiká všech 15 systémů každých 50 ms, ale spawn, restock, decay a hlad jsou ŘÍDKÉ události (docs/05 §5.12). Vzor je naměřený: ModernUO timer wheel 4096 slotů, rozlišení 8 ms, O(1) vložení i zrušení a smyčka spí, když není co dělat (`_src/modernuo/Server/Timer/TimerWheel.cs:30-131`, `Main.cs:757-763`). Deterministicky: pořadí událostí ve stejném tiku je pevné (docs/02 §2.3). Test: tři události ve stejné ms se vyřídí v pořadí vložení a `cancel` je O(1)."
+    },
+    {
+      "id": "sim.save",
+      "title": "Uložení a načtení světa",
+      "kind": "code",
+      "owns": [
+        "sim/save.gd"
+      ],
+      "depends_on": [
+        "sim.world_loop",
+        "core.hash"
+      ],
+      "provides": [
+        "save(path)",
+        "load(path)",
+        "migrate(payload, from_version)"
+      ],
+      "consumes": [],
+      "acceptance": [
+        "tests",
+        "save",
+        "determinism"
+      ],
+      "size_lines": "<= 150",
+      "model": "strong",
+      "milestone": "MK",
+      "prompt": "NAMĚŘENO 2026-10-09 v `sim/sim_world.gd`: obálka save má 'mobiles': [] a 'items': [] (řádky 104-105 a 138-139), takže se svět neukládá. Naplň ji entitami, verzuj schéma a přidej migrace (research/08-multiplayer-poucky.md bod 5). Texty pro člověka česky, klíče anglicky. Test: hash stavu před uložením == po načtení (docs/08 G7) a load odmítne save z jiné verze dat."
+    },
+    {
+      "id": "sim.offline",
+      "title": "Svět jde dál i bez hráče",
+      "kind": "code",
+      "owns": [
+        "sim/offline.gd"
+      ],
+      "depends_on": [
+        "sim.save",
+        "sim.scheduler",
+        "world.time"
+      ],
+      "provides": [
+        "advance_to(now_unix)",
+        "elapsed_report()"
+      ],
+      "consumes": [],
+      "acceptance": [
+        "tests",
+        "determinism",
+        "replay"
+      ],
+      "size_lines": "<= 120",
+      "model": "strong",
+      "milestone": "MK",
+      "prompt": "Past, kterou je potřeba dodržet: mimo obrazovku NESMÍ tiknout celý svět jako simulace agentů — trik „aktivace podle sektorů kolem hráče“ bez hráče nefunguje, takže svět mimo obrazovku je FUNKCE ČASU (rozvrhy, doplnění spawnu, ceny), viz `REVIZE-SMER-2026-10-07.md` §2.5. Strop `maxCount` a denní strop výnosů zůstávají. Test: dva běhy se stejným časovým skokem dají stejný hash a populace v regionu zůstane v rozpočtu."
+    },
+    {
+      "id": "sim.policy",
+      "title": "Politika: pravidla s podmínkami (data)",
+      "kind": "code",
+      "owns": [
+        "sim/policy.gd"
+      ],
+      "depends_on": [
+        "sim.commands",
+        "entity.skills"
+      ],
+      "provides": [
+        "load(json)",
+        "evaluate(state) -> [rozhodnuti]",
+        "priority_of(rule)"
+      ],
+      "consumes": [],
+      "acceptance": [
+        "tests",
+        "replay"
+      ],
+      "size_lines": "<= 150",
+      "model": "strong",
+      "milestone": "MK",
+      "prompt": "Tři vrstvy z rozhodnutí uživatele (`ROZHODNUTI-2026-10-09-SMER.md` §2 D3): ÚMYSL zadává hráč, POLITIKA jsou pravidla s podmínkami a prioritami („udělej 500 ingotů; když dojde krumpáč, kup nový; když je plný batoh, jdi k prodejci“) a PROVEDENÍ dělá simulace. Pravidla jsou DATA (JSON v `user://`), ne kód, aby se dala ladit a testovat bez zásahu do simulace. Deterministická: stejný stav světa + stejná pravidla = stejné rozhodnutí (jinak padá replay a hash, docs/02 §2.3). Hra NESMÍ rozhodnout za hráče (docs/01 §1.5 bod 8). Test: pravidlo s podmínkou se vyhodnotí podle stavu světa a nevyhodnotí se, když podmínka neplatí."
+    },
+    {
+      "id": "sim.executor",
+      "title": "Vykonavatel politiky (co hra provede)",
+      "kind": "code",
+      "owns": [
+        "sim/executor.gd"
+      ],
+      "depends_on": [
+        "sim.policy",
+        "sim.commands",
+        "sim.movement"
+      ],
+      "provides": [
+        "step(state) -> [Command]",
+        "status()"
+      ],
+      "consumes": [],
+      "acceptance": [
+        "tests",
+        "replay"
+      ],
+      "size_lines": "<= 120",
+      "model": "strong",
+      "milestone": "MK",
+      "prompt": "Vykonavatel mění rozhodnutí politiky na `Command` pro simulaci — NIKDY nesahá na stav přímo (docs/04 §4.1) a funguje i beze hráče (navazuje na `sim.offline`). Když nemůže pokračovat, ZASTAVÍ SE a zapíše důvod (nedostatek materiálu, plný batoh, blokovaná cesta); tiché čekání je vada. Test: vykonavatel vyšle jen `Command`; po vyčerpání zásoby se zastaví a důvod je v `sim.decision_log`."
+    },
+    {
+      "id": "sim.decision_log",
+      "title": "Vidět do uvažování postavy",
+      "kind": "code",
+      "owns": [
+        "sim/decision_log.gd"
+      ],
+      "depends_on": [
+        "core.events",
+        "sim.policy"
+      ],
+      "provides": [
+        "decision(rule_id, why, state_ref)",
+        "skipped(rule_id, why)",
+        "since(tick)"
+      ],
+      "consumes": [],
+      "acceptance": [
+        "tests"
+      ],
+      "size_lines": "<= 60",
+      "model": "any",
+      "milestone": "MK",
+      "prompt": "Zadání uživatele 2026-10-09: „rád bych viděl, jak by si hra mohla hrát sama, abych viděl do uvažování té postavy“. Zapisuj DŮVOD, ne jen akci: které pravidlo se vyhodnotilo, které ne a proč (nemám materiál, cesta blokovaná, priorita níž). Zápis jde jako události (`core.events`), zobrazuje je `ui.journal` — tu needituj, patří granuli `ui.journal`. Test: pravidlo + stav světa → očekávané rozhodnutí; při replayi stejný výstup."
+    },
+    {
       "id": "data.weapons",
       "title": "Data zbraní",
       "kind": "data",
@@ -2248,7 +2410,7 @@
       ],
       "size_lines": "<= 60",
       "model": "any",
-      "milestone": "M7",
+      "milestone": "MK",
       "prompt": "Z research/06 **§2.2 + §5** (docs/06 §6.6) — POZOR, dřív tu stálo „§4“, což je oddíl o spawnu; v §2.2 je naměřeno 54 klasických shop vendorů (roadmapa dřív uváděla 25). Ceny: buy = 1.90 × sell (docs/05 §5.9)."
     },
     {
@@ -2349,7 +2511,7 @@
       ],
       "size_lines": "<= 120",
       "model": "strong",
-      "milestone": "M7",
+      "milestone": "MK",
       "prompt": "buy = 1.90 × sell, restock 60 min, gump max 250 řádků (docs/05 §5.9). Test: prodej 10 kusů vrátí 10 × sell_price."
     },
     {
@@ -2371,7 +2533,7 @@
       ],
       "size_lines": "<= 60",
       "model": "any",
-      "milestone": "M7",
+      "milestone": "MK",
       "prompt": "UI jen zobrazuje ceny ze simulace (docs/05 §5.3)."
     },
     {
