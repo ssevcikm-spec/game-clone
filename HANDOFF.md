@@ -6,6 +6,51 @@
 > **Současný stav se bere z tohoto bloku** a ověřuje se živě (§„Předletová
 > kontrola" níž je starší a **datovaná**).
 
+## ✅ CO JE NOVÉHO (2026-10-09, TŘETÍ SESSION TÉHOŽ DNE) — TELEFON JE ZMĚŘENÝ: GODOT NA NĚM BĚŽÍ, TESTY 0 SELHÁNÍ
+
+**Zadání:** [`ZADANI-22-TELEFON-A-HOSTING.md`](ZADANI-22-TELEFON-A-HOSTING.md),
+analýza `NAVRH-BRAN-FEEL-2026-10-09.md` §6. **Plný záznam s tabulkou čísel
+a příkazy: [`MERENI-TELEFON-2026-10-09.md`](MERENI-TELEFON-2026-10-09.md).**
+**Nic ve hře se nezměnilo** (kvůli tomuhle zadání žádný soubor hry) a **nic jsem
+necommitoval** — v pracovním stromě byla v tu dobu rozdělaná práce druhé session.
+
+**Naměřeno 2026-10-09, 18:29–19:05 SELČ, Redmi Note 8, `192.168.109.104`:**
+
+| Co | Hodnota |
+|---|---|
+| `uname -m` | `aarch64`, kernel 4.14.357 (LineageOS 23.2 / Android 16) |
+| **`nproc`** | **není konstanta:** app doména **4** (18:29) i **6** (19:05), maska `0-2,5-7`; **root/magisk 8** (`0-7`) |
+| `free -m` | total **3627 MB**, **available 1345–1453 MB**, zram swap 3071 MB |
+| `df -h /data` | **107 GB**, volných **103 GB** |
+| Teplota CPU | **30–34 °C** idle → **60–64 °C** po zátěži |
+| Baterie | 69 % → 61 % za 36 min (`AC powered: false` — telefon nebyl zapojený) |
+| **`godot --headless --version`** | **`4.7.2.stable.official.ed1daf0bf`, exit 0** (chroot pod rootem) |
+| **Naše testy** | **61/61 case souborů, 1466 kontrol, 0 selhání, exit 0, 28 s** (bez `assets/uo`, jako v CI) |
+| LAN telefon→PC | 100 MB / 4,24 s = **189 Mbit/s** |
+| Internet | download 70 Mbit/s, **upload 24 Mbit/s** |
+| **NEMĚŘENO** | tik ≤ 2 ms, soak 24 h, upload/NAT zvenčí |
+
+**Dvě věci, které příští session potřebuje vědět:**
+
+* **`proot-distro` na tomhle telefonu NEFUNGUJE** (Ubuntu 24.04 = glibc 2.43
+  s `clone3()`, Termux má proot 5.1.107.96 z 2021 → první externí příkaz se
+  zacyklí: stav `t`, 1,5 M ctxt switchů, 6 min CPU, nula výstupu). Funguje
+  **`chroot` pod rootem** (`adb shell su -c`; Termux `su` nefunguje). Root SSH
+  (`cetnik`) tedy nemá smysl.
+* **`Host cetnik` v `~/.ssh/config` byl smazán** (mířil na `192.168.109.101` =
+  tuto stanici; záloha `~/.ssh/config.bak-2026-10-09-cetnik`) — platí **jen
+  `Host redmi`**. Uživatel to 2026-10-09 schválil.
+
+**Rozhodnutí role:** **hostitel LAN session pro 2–4 hráče (podmíněně); `always-on`
+i veřejný server = NE.** `D9` se nemění (session u hostitele první, `always-on`
+odložený) — **hosting ale přestal být jen analýza: má čísla.**
+
+**Odloženo na uživatele / na další session:** změřit **tik ≤ 2 ms** (sonda nad `sim`;
+na telefonu už je Godot i projekt), a rozhodnout, zda se má doinstalovat **novější
+proot** (upstream 5.5.0, 2026-10-06), aby server šel spouštět i bez rootu.
+
+---
+
 ## ✅ CO JE NOVÉHO (2026-10-09, druhá session) — ENTITY JAKO STAVOVÝ ZDROJ, `sim.offline`, BRÁNA F1 (MK 3/9)
 
 **Zadání:** [`ZADANI-21-ENTITNI-STAV-A-OFFLINE.md`](ZADANI-21-ENTITNI-STAV-A-OFFLINE.md)

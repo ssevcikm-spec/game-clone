@@ -435,7 +435,7 @@ Uživatel schválil brány **pod označením `F1` a `F4`**; jsou zapsané v `doc
 §8.2 a **čekají na implementaci spolu s `MK`** (do té doby vrací `2` = neměřeno).
 Návrh s kontrolami a mutacemi: `NAVRH-BRAN-FEEL-2026-10-09.md`.
 
-### 6.9 Multiplayer a hosting — ✅ ROZHODNUTO (D9); hosting zůstává analýzou
+### 6.9 Multiplayer a hosting — ✅ ROZHODNUTO (D9); hosting MÁ ČÍSLA (doplněno 2026-10-09)
 
 Tvar je rozhodnutý: **session u hostitele první, `always-on` odložený**, a platí
 pravidlo „**hodiny světa v simulaci, offline = bez připojeného klienta**".
@@ -443,6 +443,26 @@ Počet hráčů zatím neurčen. **Hosting je analýza, ne rozhodnutí** — Ora
 uzel to umí, ale platí se za latenci z vytížení, bezpečnostní dosah, sdílený osud
 a provoz; chybí k tomu dvě měření (kapacita uzlu, tik při buildu).
 Detaily: `NAVRH-BRAN-FEEL-2026-10-09.md` §5–§6.1b.
+
+**DOPLNĚNO 2026-10-09 (třetí session téhož dne, zadání `ZADANI-22`): telefon je
+změřený, a tím se ruší jen poslední věta předchozího odstavce („hosting zůstává
+analýzou"). Čísla a příkazy: [`MERENI-TELEFON-2026-10-09.md`](MERENI-TELEFON-2026-10-09.md).**
+
+* **Engine fit je prokázaný:** Godot 4.7.2 ARM64 na telefonu běží
+  (`--headless --version` → `4.7.2.stable.official.ed1daf0bf`, exit 0) a **naše
+  testovací sada na něm projde: 61/61 case souborů, 1466 kontrol, 0 selhání, 28 s**
+  (bez `assets/uo`, jako v CI). Cesta: **`chroot` pod rootem** — `proot-distro`
+  na tomhle telefonu **nefunguje** (Ubuntu 24.04 = glibc 2.43 s `clone3()`,
+  Termux proot 5.1.107.96 z 2021 → zacyklení na prvním externím příkazu).
+* **Rozhodnutí role telefonu:** **hostitel LAN session pro 2–4 hráče
+  (podmíněně); `always-on` i veřejný server = NE.** Pro: prokázaný engine fit,
+  LAN 189 Mbit/s, 103 GB volných, stabilní adresa. Proti `always-on`: 1,3–1,5 GB
+  volné RAM, 60–64 °C při krátké zátěži, jádra pro app doménu jen 4–6 (a mění se
+  v čase), start serveru vyžaduje chroot pod rootem, domácí upload 24 Mbit/s za NAT.
+* **D9 se nemění.** `always-on` zůstává odložený; **NEMĚŘENO** zůstávají: tik
+  ≤ 2 ms (chybí sonda nad `sim`), soak 24 h a upload/NAT zvenčí.
+* Riziko, které k telefonu patří dál: statická `192.168.109.104` **leží v rozsahu,
+  který router rozdává** (stav paralelní session, `redmi-server/STAV.md` §2).
 
 ---
 
