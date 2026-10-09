@@ -405,6 +405,12 @@ func _setup_world() -> void:
 	if backpack != null:
 		backpack.nastav_textury(textures)
 	view.setup(map, textures)
+	# ⚠ 2026-10-09 (bod 5.5): STAVBA SEZNAMU PO CASTECH. Cela stavba stoji
+	# **179-199 ms** (`_analyza/p29-zasek.gd`: spike 145 ms na framu, kdy
+	# `prestaveb` stouplo; atlas to NENI - `hold 0`, `ceka 0`) a byla to jedina
+	# zbylá pricina zaseku pri chuzi. Hra proto stavi po castech, stejne jako
+	# davka (`_STAVBA_MS`); kdo si view postavi sam, dostane synchronni cestu.
+	view.stavba_ms = view.stavba_ms_hry()
 	# ⚠ 2026-10-09 (bod 5.2): `gui_odsazeni` se UZ NENASTAVUJE tady - dela ho
 	# `_prepocitej_geometrii()` (jedno misto pro cely layout). Vola se po
 	# `setup()`, aby kamera i seznam objektu znaly hotovy svet.

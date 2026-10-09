@@ -128,7 +128,7 @@ Pořadí je dané tím, co blokuje uživatelovo hlášení:
 | ~~5.2~~ | ~~**Rozhled oknem, ne zoomem < 1**~~ **HOTOVO 2026-10-09** — viz §5.2 níže | `viewport == okno`, svět = okno − pás; fullsize = celé okno |
 | ~~5.3~~ | ~~**Z-pásma podle hráče** (`playerZ ± 14/16`, strop 150)~~ **HOTOVO 2026-10-09** — viz §5.3 níže | rozdíl proti referenci **0** na 1369 místech; strop 150 měřeně 0 objektů |
 | ~~5.4~~ | ~~**Střechy/patro: fade na alfu 0** místo vyhození~~ **HOTOVO 2026-10-09** — viz §5.4 níže | snímek v průběhu fade (`_analyza/p28-fade-5f.png`); frame časy během fade 20–25 ms |
-| 5.5 | **Záseky**: dokončit cestu „runtime atlas bez překreslení na GPU" (známá z R6) | 2 → 0 framů > 33 ms z 2300; `peak` v overlayi |
+| ~~5.5~~ | ~~**Záseky**~~ **HOTOVO 2026-10-09** — viz §5.5 níže | max frame **145,6 → 55,5 ms**; framů > 66 ms: **1 → 0** |
 
 ### 5.1 HOTOVO (2026-10-09, commit `f606511`)
 
@@ -252,6 +252,53 @@ mimo mesh, `ChunkMesh.cs:878-882`) — dávka je zapečená a alfa by v ní zamr
 objeví, nakreslí nová dávka **rovnou s alfou 255**; reference mu alfu
 `CalculateAlpha` zase **zvyšuje** (`:425-435`). Je to vidět jako skok při
 odchodu z budovy — zapsáno, ne zamlčeno.
+
+### 5.5 HOTOVO (2026-10-09, `render/chunk_renderer.gd` + `render/sort.gd`)
+
+**Zadání:** „Záseky při chůzi (dnes 2 framy z ~2 300 na ~130 ms)". Hypotéza
+z 18. session byla „překreslení runtime atlasu na GPU" — **ta se NEPOTVRDILA**.
+
+| Co se naměřilo | Číslo |
+|---|---|
+| Výchozí stav (`_analyza/p29-zasek.gd`, 1200 framů, 1280×720) | frame 576 = **145,6 ms** přesně ve framu, kdy `prestaveb` stouplo z 1 na 2; `hold 0`, `ceka 0` → **atlas to není** |
+| Rozpad blokující stavby seznamu (nové měření po fázích) | grid ~21–33 ms, land ~59–61, statiky ~53–56, klíče ~46, **celkem 179–199 ms** |
+| Druhý nález (vlastní, z bodu 5.4) | `_zachyt_fade` stavěl klíč (řetězec) pro **každý** objekt při KAŽDÉ přestavbě, i když se skrývání nezměnilo → ~100 ms na 16 000 objektech |
+
+**Co je hotové:**
+1. **Stavba seznamu po částech** (`visible(..., rozpocet_ms)`, `-1` =
+   synchronně): fáze grid → land → statiky → klíče (po 256) → prohození, každá
+   s rozpočtem `STAVBA_MS = 8 ms`; dokud není hotová, vrací se **starý** seznam
+   (žádné díry). Rozpočet platí na **celý frame** (`_krok_frame`), protože
+   `_list()` se volá několikrát za frame. Tempo injektuje **kompoziční kořen**
+   (`app/main`: `view.stavba_ms = view.stavba_ms_hry()`), takže testy a sondy
+   mají synchronní cestu.
+2. **`render.sort` rozdělen** na `klice()`/`serad()` (+ `klic_objektu`), aby se
+   počítání klíčů dalo dělit po částech (C++ `sort()` zůstává vcelku).
+3. **Fade se chytá jen při změně skrývání** (`_skryvani_zmeneno`).
+4. **Pojistka proti zaseknutí stavby** (200 000 kroků + `push_error`) — přidána
+   po tom, co se stavba opravdu zacyklila (viz níže).
+
+| Důkaz | Číslo |
+|---|---|
+| Živá sonda po opravě (1280×720) | max frame **145,6 → 55,5 ms**; **framů > 66 ms: 1 → 0** |
+| Živá sonda po opravě (1600×900) | max frame **145,6 → 67,8 ms**; framů > 66 ms: **1** (dřív 1×145) |
+| Test + mutace | nový `tests/cases/stavba_seznamu.gd` (6 kontrol, včetně **parity**: dělený seznam je STEJNÝ jako synchronní); mutace (zrušené dělení) → spadne kontrola „první volání nedodá hotový seznam" |
+| Testy / brány | **1450 → 1457 kontrol / 0 selhání**; brány **11 měřeno / 0 chyb** |
+
+**⚠ CO ZŮSTÁVÁ (naměřeno, neopraveno):** základní frame čas je **~35 ms
+(25–29 fps) při 1280×720 a ~40 ms při 1600×900** — tedy *všechny* framy jsou
+nad hranicí 33 ms, takže „0 framů > 33 ms" v tomto nastavení nejde splnit bez
+širšího výkonnostního průchodu. Není to regrese této práce: sonda `p21-chuze.gd`
+naměřila tytéž hodnoty i před ní (median 31,9 ms). Příčina (GPU/kompozitor vs.
+GDScript) **NEMĚŘENA** — je to otevřené téma, ne tvrzení.
+
+**⚠ Past, na kterou jsem při tom narazil (stojí za zapsání):** první verze dělení
+měla v land fázi `>` místo `>=` a `range(pos, end + 1)` místo `range(pos, end)`
+— tím se zpracoval řádek/sloupec, který do oblasti nepatří, přístup do mřížky
+rohů šel mimo pole a **GDScript při chybě PŘERUŠÍ funkci**, takže se `_st_y += 1`
+nikdy neprovedlo a stavba se zacyklila (naměřeno: 200 000 kroků, 600 000
+objektů). Zjistilo se to jen díky počítadlům v `_faze_*` a pojistce.
+
 **Citace z reference (k bodu 5.4):**
 
 | Co reference dělá | Citace a čísla |

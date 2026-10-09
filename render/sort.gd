@@ -132,24 +132,51 @@ func draw_order(objects: Array) -> Array:
 	# je GDScript a pri 6 095 objektech to je ~76 000 volani, dohromady
 	# **85,7 ms** na prestavbu seznamu. Dnes se klic a poradi vstupu sliji do
 	# JEDNOHO int64 a radi se built-in `sort()` (C++): stejne poradi, zlomek casu.
+	#
+	# ⚠ 2026-10-09 (bod 5.5): rozdelene na `klice()` + `serad()`, aby se dala
+	# stavba seznamu delat PO CASTECH (pocitani klicu je GDScript a je to
+	# nejdrazsi cast; `klice.sort()` je C++ a je levne). `draw_order` zustava
+	# jako slozeni obojiho - pouzivaji ho testy i synchronni cesta.
+	return serad(objects, klice(objects))
+
+
+func klice(objects: Array) -> PackedInt64Array:
+	# Klic kazdeho objektu + jeho poradi vstupu v jednom int64 (viz `draw_order`).
 	var n: int = objects.size()
+	var shift: int = klice_shift(n)
+	var out := PackedInt64Array()
+	out.resize(n)
+	for i in n:
+		out[i] = klic_objektu(objects[i], i, shift)
+	return out
+
+
+func klice_shift(n: int) -> int:
+	# Kolik bitu potrebuje PORADI VSTUPU, aby se veslo do klice (`serad` i
+	# stavba po castech musi pocitat stejnym vzorcem - jinak by se rozesly).
 	var shift: int = 1
 	while (1 << shift) < n:
 		shift += 1
-	var mask: int = (1 << shift) - 1
-	var klice := PackedInt64Array()
-	klice.resize(n)
-	var neznamych: int = 0
-	for i in n:
-		var obj: Dictionary = objects[i]
-		neznamych += 0 if KIND_LAYER.has(str(obj.get("kind", ""))) else 1
-		klice[i] = (sort_key(obj) << shift) | i
-	if neznamych > 0 and not _warned:
+	return shift
+
+
+func klic_objektu(obj: Dictionary, i: int, shift: int) -> int:
+	# Klic JEDNOHO objektu. Pouziva ho `klice()` i stavba seznamu po castech
+	# (`render.chunk_renderer._faze_klice`), aby se logika nezdvojovala.
+	if not KIND_LAYER.has(str(obj.get("kind", ""))) and not _warned:
 		_warned = true
-		push_warning("render.sort: %d objektu neznamy `kind` - kresli se jako mobilni" % neznamych)
-	klice.sort()
+		push_warning("render.sort: objekt s neznamym `kind` - kresli se jako mobilni")
+	return (sort_key(obj) << shift) | i
+
+
+func serad(objects: Array, klice_v: PackedInt64Array) -> Array:
+	# Seradi objekty podle klicu z `klice()` (C++ `sort()` + jedno projiti).
+	var n: int = objects.size()
+	var shift: int = klice_shift(n)
+	var mask: int = (1 << shift) - 1
+	klice_v.sort()
 	var out: Array = []
 	out.resize(n)
 	for i in n:
-		out[i] = objects[int(klice[i] & mask)]
+		out[i] = objects[int(klice_v[i] & mask)]
 	return out

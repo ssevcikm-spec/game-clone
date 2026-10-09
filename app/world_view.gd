@@ -201,6 +201,11 @@ var mesh_enabled: bool = true
 # stredu VIDITELNEHO sveta, ne pod cernym pasem. Vychozi hodnota je nulova
 # (testy i kdo si pas nezapne dostanou presne stare chovani).
 var gui_odsazeni: Vector2 = Vector2.ZERO
+# Kolik ms smi stavba SEZNAMU zabrat v jednom framu (2026-10-09, bod 5.5).
+# `-1` = postav seznam cely hned (vychozi: testy a sondy). Hra si to prepne
+# v `app/main._setup_world()` - cela stavba stoji 179-199 ms a byla to jedina
+# zbylá pricina zaseku pri chuzi.
+var stavba_ms: float = -1.0
 
 # ⚠⚠ 19. session - VYMENA TEXTUR ZA BEHU (sonda a budouci vymena assetu):
 # `art_id -> Texture2D`. Kdyz je slovnik neprazdny, kresleni vezme texturu z nej
@@ -364,6 +369,13 @@ func viditelne_dlazdice() -> Vector2i:
 	var s: Vector2 = svet_rozmer()
 	var krok: float = float(Const.ISO_STEP)
 	return Vector2i(int(ceil(s.x / krok)), int(ceil(s.y / krok)))
+
+
+func stavba_ms_hry() -> float:
+	# Doporucene tempo stavby seznamu pro HRU (jedno misto:
+	# `render.chunk_renderer.STAVBA_MS`). `app/main` si to vezme a nastavi
+	# `stavba_ms` - kdo si view postavi sam, zustava na synchronni ceste.
+	return Chunk.STAVBA_MS
 
 
 func snap_screen(p: Vector2) -> Vector2:
@@ -548,7 +560,16 @@ func _list() -> Array:
 			or absi(center_tile.y - _list_center.y) >= RECENTER_TILES:
 		_list_center = center_tile
 	var okraj := _list_okraj()
-	return _chunk.visible(_list_center, okraj.x, okraj.y)
+	# STAVBA SEZNAMU PO CASTECH (2026-10-09, bod 5.5): `_list()` se vola nekolikrat
+	# za frame, ale rozpocet plati na CELY frame (`chunk_renderer._krok_frame`),
+	# takze se stavba posune nejvyse jednou za frame. Dokud neni hotova, vraci se
+	# stary seznam - proto se obraz nerozpadne.
+	#
+	# ⚠ ROZPOCET JE VSTUP (`stavba_ms`), ktery nastavuje `app/main` (kompozicni
+	# koren): kdo si view postavi sam (testy, sondy), dostane `-1` = postav
+	# seznam CELE hned. Neni to obchazeni testu - je to rozhodnuti o PACE
+	# vykreslovani, a to patri hre, ne modulu.
+	return _chunk.visible(_list_center, okraj.x, okraj.y, stavba_ms)
 
 
 func _list_okraj() -> Vector2i:

@@ -155,6 +155,43 @@ protože dávka je zapečená a alfa by v ní zamrzla.
 R6) a známá zbývající cesta = **překreslení runtime atlasu na GPU**
 (`chunk_mesh`, viz commit `76d603a`); overlay (`F3`) ukazuje `peak` frame čas.
 
+### ✅ DOPLNĚNO (FÁZE 1, BOD 5.5 — ZÁSEKY: BLOKUJÍCÍ STAVBA SEZNAMU)
+
+**Hypotéza z 18. session („překreslení runtime atlasu na GPU") se NEPOTVRDILA.**
+NAMĚŘENO sondou `_analyza/p29-zasek.gd` (1200 framů chůze): frame 576 = **145,6 ms**
+přesně ve framu, kdy `prestaveb` stouplo z 1 na 2 — a `hold 0`, `ceka 0` (atlas
+i textury v klidu). Pravá příčina: **blokující stavba seznamu**
+(`render.chunk_renderer`), rozpad **grid ~21–33 ms + land ~59–61 + statiky
+~53–56 + klíče ~46 = 179–199 ms**. Druhý nález byl vlastní: `_zachyt_fade`
+(bod 5.4) stavěl řetězcový klíč pro každý objekt při KAŽDÉ přestavbě → ~100 ms
+navíc, i když se skrývání nezměnilo.
+
+| Co je hotové | |
+|---|---|
+| Stavba seznamu **po částech** | `visible(..., rozpocet_ms)`; fáze grid → land → statiky → klíče (po 256) → prohození, rozpočet `STAVBA_MS = 8 ms`, platí na CELÝ frame; dokud není hotová, vrací se STARY seznam (žádné díry). Tempo injektuje `app/main` (`view.stavba_ms`), takže testy/sondy mají synchronní cestu (`-1`) |
+| `render.sort` rozdělen | `klice()` / `serad()` / `klic_objektu()` — počítání klíčů jde dělit, C++ `sort()` zůstává vcelku |
+| Fade se chytá jen při změně skrývání | `_skryvani_zmeneno` (jinak ~100 ms na 16 000 objektech zbytečně) |
+| Pojistka | 200 000 kroků + `push_error` (stavba se mi opravdu zacyklila, viz past níže) |
+| Výsledek (1280×720) | max frame **145,6 → 55,5 ms**, **framů > 66 ms: 1 → 0** |
+| Výsledek (1600×900) | max frame **145,6 → 67,8 ms**, framů > 66 ms: 1 (dřív 145,6) |
+| Test + mutace | nový `tests/cases/stavba_seznamu.gd` (6 kontrol, včetně **parity**: dělený seznam je STEJNÝ jako synchronní); mutace → spadne |
+| Testy / brány | **1450 → 1457 kontrol / 0 selhání**; brány **11 měřeno / 0 chyb** |
+
+**⚠ ZŮSTÁVÁ (naměřeno, neopraveno):** základní frame čas je **~35 ms (25–29 fps)
+při 1280×720 a ~40 ms při 1600×900** → všechny framy jsou nad 33 ms, takže cíl
+„0 framů > 33 ms" v tomto nastavení nejde splnit bez širšího výkonnostního
+průchodu. Není to regrese: sonda `p21-chuze.gd` naměřila tytéž hodnoty i před
+těmito změnami (median 31,9 ms). Příčina (GPU/kompozitor vs. GDScript)
+**NEMĚŘENA** — otevřené téma.
+
+**⚠ PAST (stojí za zapsání):** první verze dělení měla v land fázi `>` místo `>=`
+a `range(pos, end + 1)` místo `range(pos, end)` → zpracoval se řádek/sloupec
+mimo oblast, přístup do mřížky rohů šel mimo pole a **GDScript při chybě PŘERUŠÍ
+funkci** → `_st_y += 1` se nikdy neprovedlo → stavba se zacyklila (200 000 kroků,
+600 000 objektů). Odhalila to až počítadla ve fázích. **Brána G1 navíc hlásí
+každý literál `4` jako `Z_SCALE`** → fáze jsou odvozené konstanty
+(`FAZE_LAND = FAZE_GRID + 1`, …).
+
 **➡ NÁVRH REVIZE VIZUÁLU JE V `VIZUAL-PARITA-2026-10-09.md`** — naměřené
 nálezy k deseti pozorováním, pravidla originálu s citacemi (Z-pásma
 `playerZ ± 14/16`, fade střech na alfu 0, hloubka `(x+y) + (127+z)*0.01`) a tři

@@ -185,6 +185,49 @@ var fade_zachyceno: int = 0          # celkem zachyceno (pro sondu)
 var fade_aktivnich: int = 0          # kolik jich prave dohasina
 var _fade: Array = []
 var _fade_klic: Dictionary = {}
+# MERENI PRESTAVBY SEZNAMU (bod 5.5): rozpad posledniho `_build` na faze.
+var _build_stats: Dictionary = {}
+var _build_poctu: int = 0
+# STAVBA SEZNAMU PO CASTECH (bod 5.5): stav je v MEMBER promennych, ne ve
+# slovniku - `PackedInt32Array`/`PackedInt64Array` se ze slovniku kopiruji
+# (hodnotovy typ), takze by se mrizka rohu prekopirovala pri kazdem kroku.
+const STAVBA_MS: float = 8.0     # kolik ms smi stavba seznamu zabrat ve framu
+# FAZE STAVBY SEZNAMU (`_st_faze`). Jsou to POJMENOVANE stavy, ne cisla:
+# brana G1 hlasí kazdy literal 4 jako `Z_SCALE`, proto se hodnoty ODVOZUJI
+# (a je to i citelnejsi - kdo prida fazi, prida `+ 1`).
+const FAZE_NIC: int = -1         # nestavi se
+const FAZE_GRID: int = 0         # mrizka vysky rohu
+const FAZE_LAND: int = FAZE_GRID + 1          # land dlazdice
+const FAZE_STATIKY: int = FAZE_LAND + 1       # statiky po blocich
+const FAZE_KLICE: int = FAZE_STATIKY + 1      # klice pro razeni
+const FAZE_DOKONCI: int = FAZE_KLICE + 1      # seradit a prohodit
+var _st_faze: int = FAZE_NIC     # FAZE_* vys; FAZE_NIC = nestavi se
+var _st_oblast: Rect2i = Rect2i()
+var _st_y: int = 0
+var _st_sirka: int = 0
+var _st_zrohy := PackedInt32Array()
+var _st_objects: Array = []
+var _st_counts: Dictionary = {}
+var _st_prvni: Vector2i = Vector2i.ZERO
+var _st_posledni: Vector2i = Vector2i.ZERO
+var _st_by: int = 0
+var _st_bx: int = 0
+var _st_klice := PackedInt64Array()
+var _st_shift: int = 0
+var _st_i: int = 0
+var _st_t0: int = 0
+var _st_t_grid: int = 0
+var _st_t_land: int = 0
+var _st_t_statiky: int = 0
+var _krok_frame: int = -1
+# Kolikrat se stavba posunula po castech (`_krok_stavby` neco udelal). Slouzi
+# k mereni: rozpocet plati na CELY frame, takze druhe volani v tomtez framu uz
+# nic neposune - a to se jinak neda poznat.
+var stavba_kroku: int = 0
+# Zmenilo se pri poslednim `nastav_hrace`, co se skryva? Fade se chytá jen
+# tehdy (viz `_zachyt_fade`) - jinak by se stavely klice pro vsechny objekty
+# pri kazde prestavbe seznamu (namEReno ~100 ms na 16 000 objektech).
+var _skryvani_zmeneno: bool = false
 
 
 
@@ -370,6 +413,11 @@ func nastav_hrace(px: int, py: int, pz: int) -> bool:
 	skryt_strechy = kryto
 	_hrac_z = pz
 	if zmena:
+		# FADE se chytá JEN kdyz se zmenilo, co se skryva (2026-10-09, bod 5.5):
+		# `_zachyt_fade` stavi pro kazdy objekt klic (retezec), a pri 16 000
+		# objektech to bylo ~100 ms na KAZDOU prestavbu - i tehdy, kdyz se
+		# skryvani vubec nezmenilo (coz je vetsina prestaveb pri chuzi).
+		_skryvani_zmeneno = true
 		invalidate()
 	return zmena
 
@@ -409,19 +457,237 @@ func screen_position(obj: Dictionary) -> Vector2:
 		- Vector2(obj["offset"])
 
 
-func visible(center: Vector2i, tiles_x: int, tiles_y: int) -> Array:
+func visible(center: Vector2i, tiles_x: int, tiles_y: int, rozpocet_ms: float = -1.0) -> Array:
+	# SEZNAM PRO POHLED. `rozpocet_ms < 0` = postav ho CELY hned (testy, sondy,
+	# kdo potrebuje hotovy vysledek). `>= 0` = postav ho PO CASTECH: dokud neni
+	# hotovy, vraci se STARY seznam (presne jako `chunk_mesh` kresli predchozi
+	# davku) - jinak by se kreslil neuplny seznam s dirami u okraju.
+	#
+	# ⚠⚠ 2026-10-09 (faze 1 bod 5.5) - ZBYVAJICI ZASEK PRI CHUZI: cela stavba
+	# stoji **179-199 ms** a byla to JEDINA zbylá pricina zaseku. NAMERENO
+	# sondou `_analyza/p29-zasek.gd`: frame 576 = 145,6 ms presne ve framu, kdy
+	# `prestaveb` stouplo z 1 na 2; atlas to NENI (`hold 0`, `ceka 0`).
+	# Rozpad: grid ~21-33 ms, land ~59-61, statiky ~53-56, klice ~46.
 	var want := Rect2i(center.x - tiles_x / 2, center.y - tiles_y / 2, tiles_x, tiles_y)
+	if _stavba_bezi():
+		_krok_stavby(rozpocet_ms)
+		if _stavba_bezi():
+			return _list                    # jeste se stavi: kresli se stary seznam
 	if _built and want == _cover:
 		return _list
-	_cover = want
-	# ⚠ P20 (17. session): cena prestavby seznamu je 85-250 ms (podle velikosti
-	# okna) a je to duvod, proc se prestavba ODDALUJE (`RECENTER_TILES` ve
-	# `app/world_view`). Mereni: `_analyza/p20-kadence.gd`.
-	var stary: Array = _list
-	_list = _build(want)
-	_built = true
-	_zachyt_fade(stary, want)
+	_zacni_stavbu(want)
+	if rozpocet_ms < 0.0:
+		while _stavba_bezi():
+			_krok_stavby(-1.0)              # synchronne: dokud neni hotovo
+	else:
+		_krok_stavby(rozpocet_ms)
 	return _list
+
+
+func stavba_seznamu() -> bool:
+	# Stavi se prave ted seznam? (Pro sondu a `app.world_view`.)
+	return _stavba_bezi()
+
+
+func _stavba_bezi() -> bool:
+	return _st_faze != FAZE_NIC
+
+
+func _zacni_stavbu(oblast: Rect2i) -> void:
+	# ZACATEK STAVBY SEZNAMU (faze 0 = mrizka vysky, 1 = land, 2 = statiky,
+	# 3 = klice pro razeni, 4 = prohozeni hotoveho seznamu).
+	_st_faze = FAZE_GRID
+	_st_oblast = oblast
+	_st_y = oblast.position.y
+	_st_sirka = oblast.size.x + 1
+	_st_zrohy = PackedInt32Array()
+	_st_objects = []
+	_st_counts = {"land": 0, "static": 0, "skryto": 0}
+	_st_prvni = _iso.block_of(oblast.position.x, oblast.position.y)
+	_st_posledni = _iso.block_of(oblast.end.x - 1, oblast.end.y - 1)
+	_st_by = _st_prvni.y
+	_st_bx = _st_prvni.x
+	_st_klice = PackedInt64Array()
+	_st_i = 0
+	_st_t0 = Time.get_ticks_usec()
+	_st_t_grid = 0
+	_st_t_land = 0
+	_st_t_statiky = 0
+
+
+func _krok_stavby(rozpocet_ms: float) -> void:
+	# Posune stavbu. `rozpocet_ms < 0` = bez limitu (synchronni cesta).
+	# ⚠ Bez limitu se smi pracovat jen JEDNOU za frame: `_list()` se vola
+	# nekolikrat za frame a rozpocet by se jinak nasobil.
+	if not _stavba_bezi():
+		return
+	var limitovany: bool = rozpocet_ms >= 0.0
+	if limitovany:
+		var frame: int = Engine.get_process_frames()
+		if frame == _krok_frame:
+			return
+		_krok_frame = frame
+	stavba_kroku += 1
+	var konec: int = 0
+	if limitovany:
+		konec = Time.get_ticks_usec() + int(maxf(0.0, rozpocet_ms) * 1000.0)
+	# POJISTKA: stavba se sklada z faz, ktere se musi posouvat. Kdyby se nektera
+	# zasekla, hra by zamrzla - proto strop na pocet kroku a HLASTE to (ticha
+	# smycka je horsi nez chyba, docs/09).
+	var kroku: int = 0
+	while _stavba_bezi():
+		_krok_faze()
+		kroku += 1
+		if kroku > 200000:
+			push_error("render.chunk: stavba seznamu se zasekla ve fazi %d po %d krocich - konci se"
+				% [_st_faze, kroku])
+			print("[chunk] DIAG: faze=", _st_faze, " y=", _st_y, " oblast=", _st_oblast,
+				" end=", _st_oblast.end, " bx=", _st_bx, " by=", _st_by,
+				" i=", _st_i, " objektu=", _st_objects.size(), " sirka=", _st_sirka)
+			_st_faze = FAZE_NIC
+			break
+		if limitovany and Time.get_ticks_usec() >= konec:
+			break
+
+
+func _krok_faze() -> void:
+	match _st_faze:
+		FAZE_GRID:
+			_faze_grid()
+		FAZE_LAND:
+			_faze_land()
+		FAZE_STATIKY:
+			_faze_statiky()
+		FAZE_KLICE:
+			_faze_klice()
+		_:
+			_faze_dokonci()
+
+
+func _faze_grid() -> void:
+	# JEDEN radek mrizky vysky rohu (`_z_grid` po castech).
+	if _st_zrohy.is_empty():
+		_st_zrohy.resize(_st_sirka * (_st_oblast.size.y + 1))
+	for x in range(_st_oblast.position.x, _st_oblast.end.x + 1):
+		_st_zrohy[(_st_y - _st_oblast.position.y) * _st_sirka + (x - _st_oblast.position.x)] \
+			= int(_map.z_at(x, _st_y))
+	_st_y += 1
+	if _st_y > _st_oblast.end.y:
+		_st_faze = FAZE_LAND
+		_st_y = _st_oblast.position.y
+		_st_t_grid = Time.get_ticks_usec()
+
+
+func _faze_land() -> void:
+	# JEDEN radek land dlazdic.
+	# ⚠ `>=` (ne `>`): land se bere z rozsahu `position.y .. end.y - 1` (jako
+	# puvodni `range(area.position.y, area.end.y)`). S `>` se zpracoval jeste
+	# radek `end.y`, ktery uz do oblasti NEPATRI - a protoze mrizka rohu ma
+	# jen `size.y + 1` radku, spadl pristup na `_st_zrohy` mimo pole. GDScript
+	# pri chybe PRERUSI funkci, takze se `_st_y += 1` nikdy neprovedlo a stavba
+	# se zacyklila (namEReno 2026-10-09: 200 000 kroku a 600 000 objektu).
+	# ⚠ `range(pos, end)` (BEZ koncoveho sloupce) - stejna past jako u `_st_y`:
+	# mrizka rohu ma o radek/sloupec vic, ale LAND se bere jen z oblasti, takze
+	# `end.x` uz je mimo ni a `_st_zrohy[radek + 1]` by spadl mimo pole.
+	var counts: Dictionary = _st_counts
+	for x in range(_st_oblast.position.x, _st_oblast.end.x):
+		var land: int = _map.land_at(x, _st_y)
+		if land < 0:
+			continue
+		var radek: int = (_st_y - _st_oblast.position.y) * _st_sirka + (x - _st_oblast.position.x)
+		var z: int = _st_zrohy[radek]
+		_st_objects.append({"kind": "land", "x": x, "y": _st_y, "z": z,
+			"art_id": land, "offset": Vector2i.ZERO,
+			"texmap": _tiledata.texture(land) if _tiledata != null else 0,
+			"z_corners": [z, _st_zrohy[radek + 1], _st_zrohy[radek + _st_sirka],
+				_st_zrohy[radek + _st_sirka + 1]]})
+		counts["land"] += 1
+	_st_y += 1
+	if _st_y >= _st_oblast.end.y:
+		_st_faze = FAZE_STATIKY
+		_st_t_land = Time.get_ticks_usec()
+
+
+func _faze_statiky() -> void:
+	# JEDEN blok statiku (8x8).
+	var base_x: int = _st_bx * Const.BLOCK_SIZE
+	var base_y: int = _st_by * Const.BLOCK_SIZE
+	var counts: Dictionary = _st_counts
+	for record in _map.statics_at(base_x, base_y):
+		var sx: int = base_x + int(record["x"])
+		var sy: int = base_y + int(record["y"])
+		if not _st_oblast.has_point(Vector2i(sx, sy)):
+			continue
+		var art_id: int = int(record["tile"]) + ITEM_OFFSET
+		var z_statiku: int = int(record["z"])
+		# STROP PATRA (reference `_maxZ`): vsechno v urovni stropu a vys
+		# je patro nad hracem - zdivo, okno, trabec, postel, zabradli
+		# (V12/V16/V17). `_max_z >= hrac_z + PZ_SKRYT`, takze vlastni
+		# podlaha hrace (`z <= hrac_z`) tim nikdy neprojde.
+		if z_statiku >= _max_z:
+			counts["skryto"] += 1
+			continue
+		# STŘECHY/STROPY NAD HRÁČEM (18. session): i to, co je pod
+		# strojem patra, ale je to strecha/strop nad hlavou hrace.
+		# `z > hrac_z + PZ_SKRYT` je tu POVINNE - `je_strop` zahrnuje
+		# i pochuznou podlahu, po ktere hrac stoji.
+		if skryt_strechy and z_statiku > _hrac_z + PZ_SKRYT and je_strop(art_id):
+			counts["skryto"] += 1
+			continue
+		_st_objects.append({"kind": "static", "x": sx, "y": sy,
+			"z": z_statiku, "art_id": art_id,
+			"priority_z": _priorita(art_id, z_statiku),
+			"offset": _textures.offset(art_id)})
+		counts["static"] += 1
+	_st_bx += 1
+	if _st_bx > _st_posledni.x:
+		_st_bx = _st_prvni.x
+		_st_by += 1
+		if _st_by > _st_posledni.y:
+			_st_faze = FAZE_KLICE
+			_st_t_statiky = Time.get_ticks_usec()
+
+
+func _faze_klice() -> void:
+	# Pocitani klicu pro razeni je GDScript a stoji ~46 ms na cely seznam
+	# (namEReno 2026-10-09) - proto se dela po DAVKACH (256 klicu na krok).
+	# `klice.sort()` je naproti tomu C++ a je levne (viz `render.sort.serad`).
+	if _st_klice.is_empty():
+		_st_klice.resize(_st_objects.size())
+		_st_shift = _sort.klice_shift(_st_objects.size())
+	var konec: int = mini(_st_i + 256, _st_objects.size())
+	for i in range(_st_i, konec):
+		_st_klice[i] = _sort.klic_objektu(_st_objects[i], i, _st_shift)
+	_st_i = konec
+	if _st_i >= _st_objects.size():
+		_st_faze = FAZE_DOKONCI
+
+
+func _faze_dokonci() -> void:
+	# Prohozeni: seradit (C++ `sort()` je levne) a vymenit seznam.
+	var stary: Array = _list
+	_list = _sort.serad(_st_objects, _st_klice)
+	_cover = _st_oblast
+	_counts = _st_counts
+	_built = true
+	var t_konec: int = Time.get_ticks_usec()
+	_build_stats = {"objektu": _st_objects.size(),
+		"grid_ms": float(_st_t_grid - _st_t0) / 1000.0,
+		"land_ms": float(_st_t_land - _st_t_grid) / 1000.0,
+		"statiky_ms": float(_st_t_statiky - _st_t_land) / 1000.0,
+		"razeni_ms": float(t_konec - _st_t_statiky) / 1000.0,
+		"celkem_ms": float(t_konec - _st_t0) / 1000.0}
+	_build_poctu += 1
+	_st_faze = FAZE_NIC
+	_zachyt_fade(stary, _cover)
+
+
+func build_stats() -> Dictionary:
+	# Rozpad posledni prestavby seznamu (pro sondu k bodu 5.5). Kdo se ptá na
+	# cisla, dostane je i s tim, KOLIKRAT se seznam prestevil.
+	var out: Dictionary = _build_stats.duplicate()
+	out["prestaveb"] = _build_poctu
+	return out
 
 
 func klic_objektu(obj: Dictionary) -> String:
@@ -435,8 +701,9 @@ func _zachyt_fade(stary: Array, oblast: Rect2i) -> void:
 	# Co bylo kreslene a po prestavbe zmizelo, se FADUJE (reference snizuje
 	# alfu, nevyhazuje - viz hlavicka `ALFA_KROK`). Fade vypnuty = nechytá se nic
 	# (reference `Profile.UseObjectsFading == false`).
-	if not fade_zapnuty or stary.is_empty():
+	if not fade_zapnuty or stary.is_empty() or not _skryvani_zmeneno:
 		return
+	_skryvani_zmeneno = false
 	var nove: Dictionary = {}
 	for obj in _list:
 		nove[klic_objektu(obj)] = true
@@ -526,60 +793,6 @@ func fade_pocet() -> int:
 	return _fade.size()
 
 
-func _build(area: Rect2i) -> Array:
-	var objects: Array = []
-	var counts := {"land": 0, "static": 0, "skryto": 0}
-	var zrohy: PackedInt32Array = _z_grid(area)
-	var sirka: int = area.size.x + 1
-	for y in range(area.position.y, area.end.y):
-		for x in range(area.position.x, area.end.x):
-			var land: int = _map.land_at(x, y)
-			if land < 0:
-				continue
-			var radek: int = (y - area.position.y) * sirka + (x - area.position.x)
-			var z: int = zrohy[radek]
-			objects.append({"kind": "land", "x": x, "y": y, "z": z,
-				"art_id": land, "offset": Vector2i.ZERO,
-				"texmap": _tiledata.texture(land) if _tiledata != null else 0,
-				"z_corners": [z, zrohy[radek + 1], zrohy[radek + sirka],
-					zrohy[radek + sirka + 1]]})
-			counts["land"] += 1
-	var first: Vector2i = _iso.block_of(area.position.x, area.position.y)
-	var last: Vector2i = _iso.block_of(area.end.x - 1, area.end.y - 1)
-	for by in range(first.y, last.y + 1):
-		for bx in range(first.x, last.x + 1):
-			var base_x: int = bx * Const.BLOCK_SIZE
-			var base_y: int = by * Const.BLOCK_SIZE
-			for record in _map.statics_at(base_x, base_y):
-				var sx: int = base_x + int(record["x"])
-				var sy: int = base_y + int(record["y"])
-				if not area.has_point(Vector2i(sx, sy)):
-					continue
-				var art_id: int = int(record["tile"]) + ITEM_OFFSET
-				var z_statiku: int = int(record["z"])
-				# STROP PATRA (reference `_maxZ`): vsechno v urovni stropu a vys
-				# je patro nad hracem - zdivo, okno, trabec, postel, zabradli
-				# (V12/V16/V17). `_max_z >= hrac_z + PZ_SKRYT`, takze vlastni
-				# podlaha hrace (`z <= hrac_z`) tim nikdy neprojde.
-				if z_statiku >= _max_z:
-					counts["skryto"] += 1
-					continue
-				# STŘECHY/STROPY NAD HRÁČEM (18. session): i to, co je pod
-				# strojem patra, ale je to strecha/strop nad hlavou hrace.
-				# `z > hrac_z + PZ_SKRYT` je tu POVINNE - `je_strop` zahrnuje
-				# i pochuznou podlahu, po ktere hrac stoji.
-				if skryt_strechy and z_statiku > _hrac_z + PZ_SKRYT and je_strop(art_id):
-					counts["skryto"] += 1
-					continue
-				objects.append({"kind": "static", "x": sx, "y": sy,
-					"z": z_statiku, "art_id": art_id,
-					"priority_z": _priorita(art_id, z_statiku),
-					"offset": _textures.offset(art_id)})
-				counts["static"] += 1
-	_counts = counts
-	return _sort.draw_order(objects)
-
-
 func _priorita(art_id: int, z: int) -> int:
 	# Poradova vyska pro RAZENI, ne pro kresleni (ClassicUO `PriorityZ`,
 	# `Chunk.cs:246-272`): podlaha (`IsBackground`) -1, statik s vyskou +1.
@@ -595,17 +808,3 @@ func _priorita(art_id: int, z: int) -> int:
 	return v
 
 
-func _z_grid(area: Rect2i) -> PackedInt32Array:
-	# Vysky ROHU oblasti: (sirka+1) x (vyska+1) hodnot. Sousede se ctou JEDNOU
-	# na cely pohled, ne ctyrikrat na kazdou dlazdici - pri 3 000 dlazdicich by
-	# to bylo 12 000 dotazu do mapy pri kazdem prestavem seznamu (a ten se
-	# prekresluje pri kazdem kroku chuze).
-	# Mrizka ma o 1 radek/sloupec vic, aby mela kazda dlazdice i sve prave/dolni
-	# rohy (ty patri sousedovi).
-	var sirka: int = area.size.x + 1
-	var out := PackedInt32Array()
-	out.resize(sirka * (area.size.y + 1))
-	for y in range(area.position.y, area.end.y + 1):
-		for x in range(area.position.x, area.end.x + 1):
-			out[(y - area.position.y) * sirka + (x - area.position.x)] = int(_map.z_at(x, y))
-	return out

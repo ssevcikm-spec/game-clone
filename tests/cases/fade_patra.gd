@@ -179,16 +179,24 @@ func run(t) -> void:
 			% ch2.fade_zachyceno)
 
 	# 3) Objekt, ktery zustal ve starem pohledu, ale je MIMO novy, se nechytá.
+	#    ⚠ Aby ta kontrola neprosla zE SPATNEHO duvodu (`_zachyt_fade` se od
+	#    2026-10-09 pousti jen kdyz se zmenilo, co se skryva), musi se skryvani
+	#    opravdu zmenit: druha strecha na (41,41) udela z (40,40) kandidata.
 	var s3: Array = _sestav()
 	var ch3 = s3[0]
+	var mapa3 = s3[1]
+	mapa3.podle_dlazdice[Vector2i(41, 41)] = [{"art": STŘECHA, "z": 45}]
 	ch3.nastav_hrace(90, 90, 20)
 	ch3.visible(Vector2i(90, 90), pokryti, pokryti)
-	# Pohled odjede tak, ze strecha na (100,100) v novem pokryti NENI.
-	ch3.nastav_hrace(40, 40, 20)
+	t._check(ch3.nastav_hrace(40, 40, 20) == true,
+		"render.chunk (fade): posun na druhou strechu zmeni skryvani (predpoklad testu)")
 	ch3.visible(Vector2i(40, 40), 20, 20)
-	t._check(ch3.fade_pocet() == 0,
-		"render.chunk (fade): objekt mimo novy pohled se nefaduje (namEReno %d)"
-			% ch3.fade_pocet())
+	var chyta_prvni: bool = false
+	for zaznam in ch3.fade_objekty(0):
+		if ch3.klic_objektu(zaznam["obj"]) == _klic(ch3):
+			chyta_prvni = true
+	t._check(not chyta_prvni,
+		"render.chunk (fade): objekt mimo novy pohled se nefaduje (chycen %s)" % str(chyta_prvni))
 
 	# 5) Objekt, ktery je znovu videt, z fade VYPADNE (nekresli se dvakrat).
 	var s4: Array = _sestav()
