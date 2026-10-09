@@ -38,6 +38,11 @@ const JournalScript = preload("res://ui/journal.gd")
 # a stavu na obrazovce, aby se zachytily se screenshotem (navrh uzivatele:
 # "Staci mozna vlepit na obrazovku at se to zachyti se screenshotem").
 const DebugOverlayScript = preload("res://ui/debug_overlay.gd")
+# GEOMETRIE OKNA (granule `app.window`, 2026-10-09, faze 1 bod 5.2): kde je
+# svet, kde cerny pas GUI a kde bydli okna HUDu. Je to SAMOSTATNY modul proto,
+# ze se pocita z AKTUALNI velikosti okna (pri startu, pri zmene velikosti
+# a pri prepnuti fullsize) - a aby se dala merit bez okna.
+const WindowScript = preload("res://app/window.gd")
 # 20. session: BATOH (granule `ui.backpack`). UI je tenky klient - obsah mu plni
 # `app/main` z `entity.container` a ikony dostava INJEKCI z `render` (ui/ na
 # render/ sahat nesmi, docs/04 §4.1).
@@ -72,8 +77,10 @@ const ITEM_OFFSET: int = 0x4000         # tiledata id -> art id (docs/03 §3.4)
 # ⚠ 18. session - CERNY PAS PRO GUI (prani uzivatele: stary zpusob UO): svet ma
 # sve okno a GUI bydli v cernem pase VPRAVO a DOLE, aby zurnal nezakryval
 # vyhled. Viz `_setup_ui()` a `app/world_view.gui_odsazeni`.
-const GUI_PAS_VPRAVO: int = 320
-const GUI_PAS_DOLE: int = 120
+# ⚠⚠ 2026-10-09 (faze 1 bod 5.2): geometrie UZ NENI konstanta tady - je
+# v `app/window.gd` (`PAS_VPRAVO`/`PAS_DOLE`) a pocita se z AKTUALNI velikosti
+# okna. NAMERENO (`_analyza/p26-okno.gd`): se starym kodem zustalo pri okne
+# 1600x900 platno i svet na 1280x720, takze vetsi okno nepridalo ani dlazdici.
 # Jak casto se prekresluje DEBUG OVERLAY (s). Kazdy frame by zbytecne prehanel
 # text i `get_minimum_size()`; 0,2 s je pro hledani vady v obrazku dost.
 const DEBUG_OVERLAY_S: float = 0.2
@@ -114,6 +121,10 @@ var world_view = null            # `app.world_view` (pro metriky)
 var textures = null              # `render.textures` (pro metriky)
 var _last_status_text: String = ""
 var _metrics_s: float = 0.0
+var window_geom = null           # `app.window` - geometrie okna (bod 5.2)
+var _fullsize: bool = false      # prepina `F2` (`app/player_controller`)
+var _pas_vpravo: ColorRect = null
+var _pas_dole: ColorRect = null
 var _debug_s: float = 0.0
 # NEJDELSI FRAME od posledniho prekresleni overlaye (ms): uzivatel hlasi
 # "zaseky 2 framy z ~2300 na ~130 ms" (2026-10-09) a klouzavy prumer
@@ -253,9 +264,7 @@ func _setup_ui() -> void:
 	# nezakryva vyhled. Pas kresli vlastni `CanvasLayer` (layer 1) POD HUD
 	# (layer 2); kamera se posune o polovinu pásu (`view.gui_odsazeni`), aby
 	# hrac stal ve stredu VIDITELNEHO sveta.
-	var rozm: Vector2 = get_viewport_rect().size
-	if rozm.x <= 0.0 or rozm.y <= 0.0:
-		rozm = Vector2(1280, 720)      # NEMERENO (bez okna): deklarovane okno
+	var rozm: Vector2 = _rozmery_okna()
 	var pas := CanvasLayer.new()
 	pas.name = "GuiPas"
 	pas.layer = 1
@@ -263,32 +272,27 @@ func _setup_ui() -> void:
 	var vpravo := ColorRect.new()
 	vpravo.name = "PasVpravo"
 	vpravo.color = Color(0.0, 0.0, 0.0, 1.0)
-	vpravo.position = Vector2(rozm.x - float(GUI_PAS_VPRAVO), 0.0)
-	vpravo.size = Vector2(float(GUI_PAS_VPRAVO), rozm.y)
 	pas.add_child(vpravo)
+	_pas_vpravo = vpravo
 	var dole := ColorRect.new()
 	dole.name = "PasDole"
 	dole.color = Color(0.0, 0.0, 0.0, 1.0)
-	dole.position = Vector2(0.0, rozm.y - float(GUI_PAS_DOLE))
-	dole.size = Vector2(rozm.x - float(GUI_PAS_VPRAVO), float(GUI_PAS_DOLE))
 	pas.add_child(dole)
+	_pas_dole = dole
 	hud = HudScript.new()
 	hud.layer = 2                      # GUI lezi NA cernem pásu, ne na svete
 	add_child(hud)
 	status_bar = StatusBarScript.new()
 	hud.add_child(status_bar)
-	if not hud.register_window("status_bar", status_bar,
-			Vector2(8.0, rozm.y - float(GUI_PAS_DOLE) + 8.0)):
+	if not hud.register_window("status_bar", status_bar, Vector2.ZERO):
 		push_warning("app.main: status bar se nepodarilo zaregistrovat v HUD")
 	# Zurnal (granule `ui.journal`, 16. session): okno v pravem pásu. Zpravy do
 	# nej predava `app/loop.gd:_deliver_events` - UI je tenky klient.
 	journal = JournalScript.new()
 	journal.name = "Journal"
 	hud.add_child(journal)
-	var sirka_zurnalu: float = float(GUI_PAS_VPRAVO) - 16.0
-	journal.velikost = Vector2(sirka_zurnalu, rozm.y - 24.0)
-	if not hud.register_window("journal", journal,
-			Vector2(rozm.x - float(GUI_PAS_VPRAVO) + 8.0, 8.0)):
+	journal.velikost = Vector2(float(WindowScript.PAS_VPRAVO) - 16.0, rozm.y - 24.0)
+	if not hud.register_window("journal", journal, Vector2.ZERO):
 		push_warning("app.main: zurnal se nepodarilo zaregistrovat v HUD")
 	if loop != null:
 		loop.journal = journal
@@ -321,8 +325,69 @@ func _setup_ui() -> void:
 	hud.add_child(debug_overlay)
 	print("[main] debug overlay: viditelny (F3 prepina, hodnoty kazdych ",
 		int(DEBUG_OVERLAY_S), " s)")
-	print("[main] UI: okna ", hud.layout().keys(), ", cerny pas vpravo ", GUI_PAS_VPRAVO,
-		" px, dole ", GUI_PAS_DOLE, " px (svet ", rozm - Vector2(GUI_PAS_VPRAVO, GUI_PAS_DOLE), ")")
+	# GEOMETRIE (2026-10-09, bod 5.2): prvni prepocet - a od te doby se dela
+	# PRI KAZDE ZMENE VELIKOSTI OKNA. Do tohoto dne se pocitala jen tady
+	# jednou, takze vetsi okno nepridalo ani dlazdici (viz hlavicka modulu).
+	_prepocitej_geometrii()
+	var vp := get_viewport()
+	if vp != null and not vp.size_changed.is_connected(_prepocitej_geometrii):
+		vp.size_changed.connect(_prepocitej_geometrii)
+	print("[main] UI: okna ", hud.layout().keys(), " (geometrie z `app.window`)")
+
+
+func _rozmery_okna() -> Vector2:
+	# AKTUALNI velikost okna. Kdyz ji viewport nema (headless bez okna), bere se
+	# DEKLAROVANA velikost z `project.godot` - stejna obrana jako ve
+	# `world_view.viewport_size()`, jen tady kvuli layoutu.
+	var rozm: Vector2 = get_viewport_rect().size
+	if rozm.x <= 0.0 or rozm.y <= 0.0:
+		rozm = Vector2(
+			float(ProjectSettings.get_setting("display/window/size/viewport_width", 1600)),
+			float(ProjectSettings.get_setting("display/window/size/viewport_height", 900)))
+	return rozm
+
+
+func _prepocitej_geometrii() -> void:
+	# JEDNO MISTO pro cely layout (2026-10-09, bod 5.2): svet, cerny pas,
+	# `world_view.gui_odsazeni` a pozice oken HUDu. Vola se pri startu, pri
+	# zmene velikosti okna a pri prepnuti fullsize. Kdyby si to pocital kazdy
+	# uzel sam, rozejdou se - presne to se stalo (pocitalo se to jednou).
+	if window_geom == null:
+		window_geom = WindowScript.new()
+	var rozm: Vector2 = _rozmery_okna()
+	var p: Vector2 = window_geom.pas(rozm, _fullsize)
+	var svet: Rect2 = window_geom.svet_obal(rozm, _fullsize)
+	if _pas_vpravo != null:
+		_pas_vpravo.visible = not _fullsize
+		_pas_vpravo.position = Vector2(rozm.x - p.x, 0.0)
+		_pas_vpravo.size = Vector2(p.x, rozm.y)
+	if _pas_dole != null:
+		_pas_dole.visible = not _fullsize
+		_pas_dole.position = Vector2(0.0, svet.size.y)
+		_pas_dole.size = Vector2(svet.size.x, p.y)
+	if hud != null:
+		var okna: Dictionary = window_geom.pozice_oken(rozm, _fullsize)
+		for id in okna.keys():
+			hud.set_position(str(id), okna[id])
+	if journal != null:
+		journal.velikost = Vector2(float(WindowScript.PAS_VPRAVO) - 16.0, rozm.y - 24.0)
+	if world_view != null and world_view.has_method("nastav_gui_odsazeni"):
+		# Kamera se posune o POLOVINU pasu: hrac pak stoji ve stredu
+		# VIDITELNEHO sveta, ne pod cernym pasem.
+		world_view.nastav_gui_odsazeni(p / 2.0)
+	print("[main] geometrie okna: ", rozm, " | svet ", svet.size, " | pas ", p,
+		" | fullsize ", _fullsize, " | stred sveta ",
+		window_geom.stred_sveta(rozm, _fullsize))
+
+
+func prepni_fullsize() -> bool:
+	# FULLSIZE (reference `_src/classicuo/.../OptionsGump.cs:4113-4133`:
+	# "fullsize" prepinac nastavi ram sveta na cele okno): cerny pas zmizi
+	# a svet dostane cele okno. Vraci NOVY stav - volajici ho hlasi hracovi
+	# (ticho by znamenalo, ze hrac nevi, jestli neco zmackl).
+	_fullsize = not _fullsize
+	_prepocitej_geometrii()
+	return _fullsize
 
 
 func _setup_world() -> void:
@@ -334,15 +399,16 @@ func _setup_world() -> void:
 		push_warning("app.main: ve scene chybi uzel WorldView - mapa se nevykresli")
 		return
 	world_view = view
-	# Kamera se posune o polovinu pásu, aby hrac stal ve stredu VIDITELNEHO
-	# sveta (ne pod cernym pásem) - viz `app/world_view.gui_odsazeni`.
-	view.gui_odsazeni = Vector2(float(GUI_PAS_VPRAVO) / 2.0, float(GUI_PAS_DOLE) / 2.0)
 	map = MapScript.new()
 	textures = TextureCache.new()
 	# Ikony do batohu jdou INJEKCI (`ui/` nesmi na `render/`, docs/04 §4.1).
 	if backpack != null:
 		backpack.nastav_textury(textures)
 	view.setup(map, textures)
+	# ⚠ 2026-10-09 (bod 5.2): `gui_odsazeni` se UZ NENASTAVUJE tady - dela ho
+	# `_prepocitej_geometrii()` (jedno misto pro cely layout). Vola se po
+	# `setup()`, aby kamera i seznam objektu znaly hotovy svet.
+	_prepocitej_geometrii()
 	print("[main] svet: ", view.visible_count(), " objektu (", view.counts(), "), textury ",
 		textures.stats())
 	_setup_player(view)
@@ -456,6 +522,7 @@ func _setup_player(view) -> void:
 	controller.setup(player, sim, loop.input_map, movement, view, loop)
 	controller.backpack = backpack      # klavesa `B` prepina okno batohu
 	controller.debug_overlay = debug_overlay   # klavesa `F3` prepina overlay
+	controller.okno = self              # klavesa `F2` prepina fullsize (bod 5.2)
 	print("[main] hrac: serial ", serial, " na ", player.pos, " (", map.land_at(player.pos.x, player.pos.y),
 		" land), hue ", player.hue, " (0 = bez barvy), barvy: ", view.hue_stats(),
 		", nastroju v batohu ", nastroju, ", pocatecnich skillu ", skillu,

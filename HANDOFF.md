@@ -57,6 +57,41 @@ měřená v `zoom_prevod.gd`.
 okno 1600×900, pás GUI dopočítaný, `fullsize`), pak 5.3/5.4 (Z-pásma, střechy)
 a 5.5 (záseky). Zadání a citace z reference: `VIZUAL-PARITA-2026-10-09.md` §5 a §10.
 
+### ✅ DOPLNĚNO (FÁZE 1, BOD 5.2 — RÁM SVĚTA JE VOLITELNÝ)
+
+**Co bylo špatně:** geometrie okna se počítala JEDNOU v `app/main._setup_ui()`
+a `project.godot` držel plátno napevno (`canvas_items` + `scale_mode=integer`) —
+naměřeno: okno 1600×900 → viewport i svět zůstaly 1280×720, větší okno
+nepřidalo ani dlaždici.
+
+**Co je hotové:** nový modul **`app/window.gd`** (čisté funkce: `pas`,
+`svet_obal`, `stred_sveta`, `pozice_oken`) je JEDNO místo pro geometrii;
+`app/main._prepocitej_geometrii()` z něj staví uzly a volá se při startu,
+při **změně velikosti okna** (`Viewport.size_changed`) a při fullsize;
+`project.godot` má `stretch/mode="disabled"` + výchozí **1600×900**;
+`world_view.nastav_gui_odsazeni()` posune kameru a **vynutí přestavbu seznamu**
+(objektů), aby po zvětšení okna nezůstaly u okrajů díry; **`F2`** přepíná
+fullsize (svět = celé okno, černý pás zmizí) — vzor
+`_src/classicuo/.../OptionsGump.cs:4113-4133`; `HRA.cmd` spouští 1600×900.
+
+| Důkaz | Číslo |
+|---|---|
+| `_analyza/p26-okno.gd` (okno 1600×900 i 1280×720, s pásem i fullsize) | `viewport == okno`; svět = okno − pás; ve fullsize pás (0,0) a oba pásy neviditelné; **0 chyb** |
+| Snímky | `_analyza/p26-okno-pas-1600x900.png` (svět 1280×780), `_analyza/p26-okno-fullsize-1600x900.png` (svět 1600×900, HUD plave nad světem) |
+| Před → po (okno 1600×900) | plátno 1280×720 → **1600×900**; viditelný svět 960×600 → **1280×780**; kreslená plocha 78×44 → **97×55** dlaždic; `pick` (426,280) → **(640,390)** |
+| Test + mutace | nový `tests/cases/window.gd` (17 kontrol); mutace „svět z pevného okna“ → **6 selhání**, „fullsize se ignoruje“ → **3 selhání** |
+| ⚠ Nález o měřidle | první mutace zavedená do `pas()` **nebyla chycena** — šířka pásu na velikosti okna nezávisí (jen se ořezává); správné místo je `svet_obal()`. Mutační test musí mířit na místo, které na vstupu opravdu závisí |
+| Testy / brány | **1404 → 1422 kontrol / 0 selhání**; brány **11 měřeno / 0 chyb** (G10 dál fotí při `--resolution 1280x720`) |
+
+**Co zůstává (pojmenované):** tažení rámu myší (reference
+`WorldViewportGump.cs:128-150`) se nedělá — rám se mění velikostí okna;
+`fullsize` je klávesa, ne gump; rozložení HUDu ve fullsize je rozhodnutí
+o rozložení (popsané v `app/window.gd`).
+
+**➡ Další bod fáze 1 je 5.3** (Z-pásma podle hráče: `playerZ ± 14/16`, strop 150
+— `GameSceneDrawingSorting.cs:87-88`, `:564-568`, `RenderLists.cs:274`), pak 5.4
+(střechy fade na alfu 0 — `:357-368`) a 5.5 (záseky).
+
 **➡ NÁVRH REVIZE VIZUÁLU JE V `VIZUAL-PARITA-2026-10-09.md`** — naměřené
 nálezy k deseti pozorováním, pravidla originálu s citacemi (Z-pásma
 `playerZ ± 14/16`, fade střech na alfu 0, hloubka `(x+y) + (127+z)*0.01`) a tři

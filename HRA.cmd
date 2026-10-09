@@ -81,12 +81,17 @@ if not exist "%HRA%assets\uo\world" (
 )
 
 rem --- 4) spusteni ---------------------------------------------------------
-echo Spoustim UO klon - Godot %GODOT_VERZE%, okno 1280x720, opengl3
+echo Spoustim UO klon - Godot %GODOT_VERZE%, okno 1600x900, opengl3
 echo   sipky nebo numpad 1-9 = chuze, jedno zmacknuti = jeden krok
+echo   F2 = fullsize (svet pres cele okno, bez cerneho pasu GUI)
+echo   F3 = debug overlay (lokace, zoom, fps, spicka frame casu)
 echo   Esc = zavrit okno
 echo   APPDATA ^(user://^) = %USERDATA%
 echo.
-"%GODOT%" --path "%HRA%." --rendering-driver opengl3 --resolution 1280x720 %*
+rem ⚠ 2026-10-09 (bod 5.2): rozliseni je 1600x900 a `project.godot` ma
+rem `stretch/mode=disabled`, takze platno = okno a vetsi okno PRIDAVA svet.
+rem Kdo si hru zvetsi (maximalizuje), uvidi vic mapy - coz je zadani uzivatele.
+"%GODOT%" --path "%HRA%." --rendering-driver opengl3 --resolution 1600x900 %*
 set "KOD=%ERRORLEVEL%"
 if not "%KOD%"=="0" (
   echo.

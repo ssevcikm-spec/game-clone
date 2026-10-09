@@ -395,6 +395,22 @@ func nastav_zoom(novy: float) -> void:
 	queue_redraw()
 
 
+func nastav_gui_odsazeni(nove: Vector2) -> void:
+	# ZMENA PASU GUI ZA BEHU (2026-10-09, faze 1 bod 5.2 - volitelny ram sveta).
+	# Meni se tim STŘED viditelneho sveta i JEHO VELIKOST, takze plati stejna
+	# past jako u zoomu (`nastav_zoom`):
+	#   * seznam objektu je postaveny pro stary stred/okno, takze pri zvetseni
+	#     okna by u okraju zustaly DIRY - vynuti se prestavba (sentinel),
+	#   * kamera se musi posunout, jinak by hrac zustal mimo stred.
+	# Promenna zustava verejna (`gui_odsazeni`) - testy ji nastavuji primo
+	# (`tests/cases/world_view.gd`), takze menit ji na privátni by rozbilo spec.
+	gui_odsazeni = nove
+	_list_center = Vector2i(-99999, -99999)
+	if _camera != null:
+		look_at_tile(center_tile, int(_player.pos.z) if _player != null else 0, _player_offset)
+	queue_redraw()
+
+
 func zoom_krok(smer: int) -> void:
 	# Nasobny krok: 1 krok = ZOOM_KROK. Vetsi cislo = vetsi priblizeni (mensi
 	# rozhled), takze "oddalit" je `smer < 0`.

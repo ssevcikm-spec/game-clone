@@ -18,21 +18,22 @@ config/features=PackedStringArray("4.7", "GL Compatibility")
 
 [display]
 
-window/size/viewport_width=1280
-window/size/viewport_height=720
-window/stretch/mode="canvas_items"
-window/stretch/aspect="keep"
-; ⚠⚠ 19. session (2026-10-08) - VADA V5 ZE ZADANI 19: "pri pohybu cela obrazovka
-; jakoby zrni". NAMERENO (`_analyza/p22-teren-zrno.gd`): kdyz okno NENI presne
-; 1280x720 (napr. maximalizovane 1300x740), `canvas_items` stretch skaluje canvas
-; zlomkem (1,0156x) a **prevzorkovava CELY obraz i pri zoomu 1,0** - zbytek po
-; nejlepsim posunu obrazovky **96,74 %** pixelu (pri okne presne 1280x720 je to
-; 0,00 % = cista translace). `integer` skaluje jen na CELY nasobek, takze se
-; obraz neprevzorkovava; cenou je, ze pri okne, ktere neni nasobkem zakladni
-; velikosti, zustane cerny okraj (rozhodnuti uzivatele 2026-10-08: "zmenit
-; natrvalo"). Kdo bude merit, at vi, ze hodnota `integer` je v Godotu 4.7.2
-; platna (`hint_string 'fractional,integer'`, `_analyza/p22-stretch-sonda.gd`).
-window/stretch/scale_mode="integer"
+window/size/viewport_width=1600
+window/size/viewport_height=900
+; ⚠⚠ 2026-10-09 (faze 1 bod 5.2) - RAM SVETA JE VOLITELNY: `stretch/mode` je
+; `disabled`, takze platno (viewport) = velikost okna. Do tohoto dne tu bylo
+; `canvas_items` + `integer`: platno zustalo napEVNO 1280x720 a vetsi okno
+; nepridalo ANI DLAZDICI (namEReno `_analyza/p26-okno.gd`: okno systemu
+; 1600x900 -> viewport i svet 1280x720, dlazdice 78x44 tytéž).
+; Reference ma ram sveta volitelny taky: `Camera.Bounds` se uklada a meni
+; (`_src/classicuo/.../GameScene.cs:102-105`), hrac ho tahne za ram
+; (`WorldViewportGump.cs:128-150`) a je i prepinac "fullsize"
+; (`OptionsGump.cs:4113-4133`). U nas velikost okna meni ram sveta a `F2`
+; prepina fullsize (svet = cele okno, bez cerneho pasu GUI).
+; ⚠ PROČ SE NEHODI `canvas_items`: pri okne, ktere neni presnym nasobkem platna,
+; prevzorkuje CELY obraz - namEReno 96,74 % pixelu pri okne 1300x740
+; (`_analyza/p22-teren-zrno.txt`). Bez skalovani je obraz 1:1.
+window/stretch/mode="disabled"
 
 [rendering]
 

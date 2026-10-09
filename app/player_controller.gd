@@ -141,6 +141,10 @@ const UI_KEYS := {
 	# (navrh uzivatele, aby se info zachytilo se screenshotem). Je to DEBUG
 	# klavesa, ne herni - proto `F3` a ne pismeno, ktere hra pouziva.
 	"debug_overlay_toggle": [KEY_F3],
+	# FULLSIZE (2026-10-09, faze 1 bod 5.2): svet = cele okno, cerny pas GUI
+	# zmizi. Reference ma tentýz prepinac v nastaveni
+	# (`_src/classicuo/.../OptionsGump.cs:4113-4133`).
+	"fullsize_toggle": [KEY_F2],
 }
 
 # Doba jednoho animacniho framu (docs/05 §5.1.1 = `core/const.gd` TURN_MS).
@@ -160,6 +164,7 @@ var camera: Camera2D = null
 # prepina viditelnost - obsah plni `app/main` (UI je tenky klient).
 var backpack = null
 var debug_overlay = null           # `ui.debug_overlay` - F3 ho prepina
+var okno = null                    # `app.main` - F2 prepina fullsize (bod 5.2)
 
 var _iso
 var _last_tile: Vector2i = Vector2i(-9999, -9999)
@@ -336,6 +341,14 @@ func _process(_delta: float) -> void:
 			and input_map.akce_just_pressed("debug_overlay_toggle"):
 		var videt: bool = bool(debug_overlay.toggle())
 		print("[controller] debug overlay: ", "ZAPNUT" if videt else "VYPNUT")
+	# FULLSIZE (2026-10-09, bod 5.2): `F2` prepne svet na cele okno (a zpet).
+	# Geometrii prepocita `app.main` (jedno misto pro layout) a stav se hlasi.
+	if okno != null and input_map != null \
+			and input_map.akce_just_pressed("fullsize_toggle"):
+		if okno.has_method("prepni_fullsize"):
+			var plna: bool = bool(okno.prepni_fullsize())
+			print("[controller] fullsize: ", "ZAPNUT (svet = cele okno)" if plna \
+				else "VYPNUT (cerny pas GUI zpet)")
 	# ⚠⚠ KAMERA SE POSOUVA KAZDY FRAME (17. session, 2026-10-08) - VADA
 	# "obraz se pohybuje skokove, ne plynule": do teto session se stred kamery
 	# prepsal JEN kdyz se zmenila DLAZDICE (`if tile != _last_tile: _follow()`),
