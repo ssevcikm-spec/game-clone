@@ -31,6 +31,12 @@ const SimCommands = preload("res://sim/commands.gd")
 const SimScheduler = preload("res://sim/scheduler.gd")
 const SimSave = preload("res://sim/save.gd")
 const EntityRegistry = preload("res://sim/entity/registry.gd")
+# Politika (milnik MK, `ZADANI-24`): pravidla -> rozhodnuti -> `Command`.
+# Nactou se JEN kdyz je nekdo preda (`set_policy`/`load_policy`); bez politiky
+# je cely krok no-op, takze se NEMENI ani hash, ani replaye.
+const SimPolicy = preload("res://sim/policy.gd")
+const SimExecutor = preload("res://sim/executor.gd")
+const SimDecisionLog = preload("res://sim/decision_log.gd")
 
 # Verze schematu save je v `sim/save.gd` (`SimSave.SAVE_VERSION`) - tady se
 # nedrzi druha, aby nemohly vzniknout dve pravdy o tom, co je v souboru.
@@ -50,6 +56,13 @@ var data_version: String = ""
 # mobily NEUKLADALY (pojmenovany dluh v `sim/save.gd`). Ted je vlastnikem svet
 # a `app/main` si ho bere odtud (`sim.registry`), aby existovala JEDNA instance.
 var registry
+# Politika a vykonavatel (granule `sim.policy`, `sim.executor`,
+# `sim.decision_log`). `decision_log` existuje vzdy (je to diagnostika, ne
+# stav sveta); `policy`/`executor` jsou null, dokud se politika nenacte.
+var policy = null
+var executor = null
+var decision_log
+var _state_provider = null
 
 var _clock
 var _rng
@@ -80,6 +93,10 @@ func _init(seed_value: int = 0, data: Dictionary = {}) -> void:
 	# vsechny mobily serazene podle serialu. Zmena TVARU vstupu do hashe -
 	# doklad a prepnuti replayu je v `tests/replays/README.md` ("Historie hashů").
 	register_state_source("entities", registry)
+	# Log rozhodnuti dostava svet jako `sink`: kazda ZMENA rozhodnuti jde do
+	# fronty jako udalost `message`, takze ji vidi `ui.journal`. Neni to stavovy
+	# zdroj - do save ani hashe nepatri (historie by jinak byla soucasti stavu).
+	decision_log = SimDecisionLog.new(self)
 	data_version = _hash.of_state([data])
 
 
@@ -87,7 +104,13 @@ func _init(seed_value: int = 0, data: Dictionary = {}) -> void:
 
 func enqueue(command: Dictionary) -> void:
 	if command is Dictionary:
-		_queue.append(command)
+		# OZNACENI PUVODU: ve stejne fronte jsou prikazy hrace i politiky, takze
+		# se musi dat rozlisit (`src`). `sim.commands.validate` cte jen klice
+		# ze smlouvy, takze `src` nic nemeni - je to jen pro zurnal a mereni.
+		var c: Dictionary = command.duplicate()
+		if not c.has("src"):
+			c["src"] = "player"
+		_queue.append(c)
 	else:
 		push_event("message", {"text": "Invalid command (not a dictionary).", "kind": "system"})
 
@@ -101,6 +124,17 @@ func tick(ms: int) -> void:
 	# nebyl" - `ui.journal`); planovac sam nic nevykonava, jen rika co a kdy.
 	for due in _scheduler.advance_to(_clock.now_ms()):
 		push_event("world_event", due)
+	# POLITIKA (milnik MK): vykonavatel vyrobi `Command` a jde do STEJNE fronty
+	# jako prikazy hrace - ale jen kdyz je politika nactena. Bez politiky je
+	# tenhle blok no-op (`executor == null`), takze replaye a hash zustavaji
+	# beze zmeny. Hracovy prikazy uz ve fronte jsou (klient je zaradil PRED
+	# `tick`), takze jdou v davce prvni - jeho vule vyhrava (D3: hra smi
+	# provest, nesmi rozhodnout za hrace).
+	if executor != null:
+		decision_log.set_tick(_clock.now_ms())
+		for command in executor.step(policy_state()):
+			command["src"] = "policy"
+			enqueue(command)
 	var batch: Array[Dictionary] = _queue
 	_queue = []
 	# ⚠ PORADI JE PRAVIDLO, NE DETAIL (namEReno 2026-10-07, vada V1 z
@@ -273,6 +307,74 @@ func scheduler():
 	# spawneru). Stav planovace JE v `state_hash()` i v save od 2026-10-09
 	# (jako stavovy zdroj) - zmena specu odsouhlasena uzivatelem.
 	return _scheduler
+
+
+# -- politika (granule `sim.policy`, `sim.executor`, `sim.decision_log`) ----
+
+func set_policy(new_policy) -> void:
+	# Nactena politika = zapnuty vykonavatel. `null` ho vypne (a krok je zase
+	# no-op). Vymena za behu je povolena - hrac meni pravidla, ne svet.
+	policy = new_policy
+	executor = null if policy == null else SimExecutor.new(policy, decision_log)
+
+
+func load_policy(path: String) -> bool:
+	# Nacte pravidla z JSONu (stejna cesta jako save: `user://...`). Vraci
+	# false, kdyz soubor neni nebo data nedavaji smysl - "politika se necte"
+	# se NESMI tvarit jako "politika je prazdna" (`errors()` to rekne).
+	if not FileAccess.file_exists(path):
+		push_event("message", {"text": "Policy load failed: no file at " + path, "kind": "system"})
+		return false
+	var nova = SimPolicy.new()
+	# Text se predava politice (ta si JSON parsuje sama pres `JSON.new()`) -
+	# `JSON.parse_string` umi u vady vypsat `ERROR:` do logu enginu.
+	if not nova.load(FileAccess.get_file_as_string(path)):
+		push_event("message", {"text": "Policy load failed: " + str(nova.errors()), "kind": "system"})
+		return false
+	set_policy(nova)
+	return true
+
+
+func clear_policy() -> void:
+	set_policy(null)
+
+
+func set_state_provider(provider) -> void:
+	# Kdo vi vic o stavu nez svet (napr. `app/` vi, co je v batohu), muze
+	# dodat dalsi klice do `policy_state()`. Bez providera zustavaji chybejici
+	# klice CHYBEJICI (podminka rekne "stav nezna"), nedoplnuji se nulou.
+	_state_provider = provider
+
+
+func policy_state() -> Dictionary:
+	# Stav, ze ktereho se vyhodnocuji pravidla (`sim/policy.gd`). Co svet nevi,
+	# sem NEPATRI jako nula - chybejici klic znamena "nevim" a je to videt
+	# v duvodu (`docs/09 §9.6`). Dnes chybi `inventory` a `backpack`: predmety
+	# vlastni `app/` (viz `set_state_provider`).
+	var st: Dictionary = {
+		"world_time_ms": world_time(),
+		"player": player_serial,
+		"flags": {},
+	}
+	var m = null
+	if registry != null and registry.has_method("get_mobile"):
+		m = registry.get_mobile(player_serial)
+	if m != null:
+		st["pos"] = [m.pos.x, m.pos.y, m.pos.z]
+		st["dir"] = int(m.dir)
+		st["hp"] = int(m.hp)
+		var skills: Dictionary = {}
+		if m.skills != null:
+			# `values` je verejny stav `entity.skills` (cte ho i `mobile.state()`).
+			for i in m.skills.values.size():
+				skills[str(i)] = int(m.skills.values[i])
+		st["skills"] = skills
+	if _state_provider != null and _state_provider.has_method("policy_state"):
+		var extra = _state_provider.policy_state()
+		if extra is Dictionary:
+			for k in extra.keys():
+				st[k] = extra[k]
+	return st
 
 
 func register_state_source(name: String, source) -> void:

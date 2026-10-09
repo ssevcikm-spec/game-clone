@@ -1106,6 +1106,92 @@ MODULY = {
              '"equip": _equip_state(),', '"equip": [],'),
         ],
     },
+    # --- 2026-10-09 (ZADANI-24): treti cast milniku MK ----------------------
+    # Vzory pro `sim/policy.gd` (pravidla s podminkami). Chytá je case
+    # `policy` (`--policy-script`). Kazda vada vraci do kódu to, co by udelalo
+    # z "hra provede, co hrac rozhodl" "hra rozhodne za hrace".
+    "policy": {
+        "soubor": ROOT / "sim" / "policy.gd",
+        "prefix": "sim.policy",
+        "prepinac": "--policy-script",
+        "mutace": [
+            ("podminka se vyhlasi za splnenou, i kdyz neni",
+             "var ok: bool = (have < need) if kind == \"item_below\" else (have >= need)",
+             "var ok: bool = true"),
+            ("priorita se ignoruje (rozhoduje poradi v datech)",
+             "\tvar pa: int = priority_of(a)\n\tvar pb: int = priority_of(b)",
+             "\tvar pa: int = 0\n\tvar pb: int = 0"),
+            ("chybejici stav se cte jako nula (pravidlo se vyhodi z niceho)",
+             "if not state.has(\"inventory\"):\n\t\treturn _met(false, \"stav nezna: inventory\")",
+             "if not state.has(\"inventory\"):\n\t\tstate[\"inventory\"] = {}"),
+            ("duvod preskoceni se nevyplni (zustane jen akce)",
+             "_skipped.append({\"rule_id\": str(rule[\"id\"]), \"why\": why})",
+             "_skipped.append({\"rule_id\": str(rule[\"id\"]), \"why\": \"\"})"),
+            ("vadna data se prijmou (neznamy druh podminky)",
+             "if not (when.get(\"kind\", \"\") in CONDITION_KINDS):",
+             "if false:"),
+        ],
+    },
+    # Vzory pro `sim/executor.gd` (rozhodnuti -> `Command`). Chytá je case
+    # `executor` (`--executor-script`).
+    "executor": {
+        "soubor": ROOT / "sim" / "executor.gd",
+        "prefix": "sim.executor",
+        "prepinac": "--executor-script",
+        "mutace": [
+            ("prikaz se neposle (jen se to rozhodne)",
+             "\tout.append(command)", "\tpass"),
+            ("neplatny prikaz se posle do sveta",
+             "if not bool(verdict.get(\"ok\", false)):", "if false:"),
+            ("vykonavatel saha na stav (meni ho)",
+             "\tvar decisions: Array = _policy.evaluate(state)",
+             "\tvar decisions: Array = _policy.evaluate(state)\n\tif state is Dictionary:\n\t\tstate[\"vynulovano\"] = true"),
+            ("zastaveni se ignoruje (stop nezastavi)",
+             "\tif _stopped:", "\tif false:"),
+            ("nizsi priorita se zahodi TISE (bez duvodu)",
+             "_skip(str(decisions[i].get(\"rule_id\", \"\")), \"lower priority (decided: \" + _last_rule + \")\")",
+             "_skip(str(decisions[i].get(\"rule_id\", \"\")), \"\")"),
+        ],
+    },
+    # Vzory pro `sim/decision_log.gd` (duvod a historie). Chytá je case
+    # `decision_log` (`--decision-log-script`).
+    "decision_log": {
+        "soubor": ROOT / "sim" / "decision_log.gd",
+        "prefix": "sim.decision_log",
+        "prepinac": "--decision-log-script",
+        "mutace": [
+            ("duvod se nezapise (zustane jen pravidlo)",
+             "\t\t\"why\": why,", "\t\t\"why\": \"\","),
+            ("since() vraci i starsi zaznamy, nez se ptal",
+             "if int(e.get(\"tick\", 0)) >= int(tick_value):",
+             "if int(e.get(\"tick\", 0)) >= 0:"),
+            ("strop se ignoruje (log roste bez omezeni)",
+             "while _entries.size() > MAX_ENTRIES:", "while false:"),
+            ("stejna zprava se do zurnalu sype porad",
+             "if text == _published:\n\t\treturn", "if false:\n\t\treturn"),
+        ],
+    },
+    # Vzory pro ZAPOJENI politiky do `SimWorld` (`sim/sim_world.gd`). Chytá je
+    # case `policy_hook` (`--world-script`, prefix `sim.policy_hook`) - proto
+    # je to samostatny modul: `world_loop` meri tick systemu, tenhle zmenu
+    # chovani pri nactene politice. Mutuje se TYZ SOUBOR, ale jiny vzor.
+    "policy_hook": {
+        "soubor": ROOT / "sim" / "sim_world.gd",
+        "prefix": "sim.policy_hook",
+        "prepinac": "--world-script",
+        "mutace": [
+            ("vykonavatel se v ticku vubec nevola (politika nic nedela)",
+             "\tif executor != null:", "\tif false:"),
+            ("prikaz politiky se tvari jako prikaz hrace (src)",
+             "\t\t\tcommand[\"src\"] = \"policy\"", "\t\t\tcommand[\"src\"] = \"player\""),
+            ("prikaz hrace se neoznaci (puvod se neda rozlisit)",
+             "if not c.has(\"src\"):\n\t\t\tc[\"src\"] = \"player\"",
+             "if false:\n\t\t\tc[\"src\"] = \"player\""),
+            ("politika se zaregistruje jako stavovy zdroj (zmeni se hash)",
+             "\tpolicy = new_policy\n\texecutor = null if policy == null else SimExecutor.new(policy, decision_log)",
+             "\tpolicy = new_policy\n\texecutor = null if policy == null else SimExecutor.new(policy, decision_log)\n\tif policy != null:\n\t\tregister_state_source(\"policy\", _scheduler)"),
+        ],
+    },
 }
 
 
@@ -1153,7 +1239,8 @@ def main() -> int:
                     help="sort, map, walk, doors, movement, registry, pathfind, textures, "
                          "item, container, interaction, skill_gain, hud, status_bar, "
                          "chunk_renderer, world_view, input, player_controller, chunk_mesh, "
-                         "config, metrics, harvest, craft, journal (nebo vic carkami)")
+                         "config, metrics, harvest, craft, journal, policy, executor, "
+                         "decision_log, policy_hook (nebo vic carkami)")
     args = ap.parse_args()
     if godot_bin() is None:
         print("CHYBA: Godot nenalezen (nastav $GODOT) - mutace by nic nemerily")

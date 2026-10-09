@@ -61,6 +61,9 @@ const ConfigScript = preload("res://app/config.gd")
 const MetricsScript = preload("res://app/metrics.gd")
 
 const DEFAULT_SEED: int = 1234
+# PRAVIDLA POLITIKY (ZADANI-24): JSON v `user://` - hrac je muze menit bez
+# zasahu do kodu a `sim.policy` je cte jako DATA (`sim/sim_world.gd:load_policy`).
+const POLICY_PATH := "user://policy.json"
 const BRITAIN := Vector2i(1495, 1630)   # namesti Britainu (docs/01 §1.4)
 const PLAYER_BODY: int = 400            # 400 = muz (tělo je jen v anim.mul)
 # VSECHNY NASTROJE DO BATOHU (pokyn uzivatele 2026-10-08: "do pytliku pridej
@@ -147,6 +150,13 @@ func _ready() -> void:
 	add_child(loop)
 	_setup_ui()
 	_setup_world()
+	# POLITIKA (ZADANI-24, `sim.policy`/`sim.executor`): kdyz ma hrac pravidla
+	# v `user://policy.json`, nactou se pri startu a kazdy tik je vyhodnoti.
+	# Bez souboru je to NO-OP (proto se ptame na existenci - hlaska o chybejicim
+	# souboru by byla v zurnalu kazdy start). Vykonavatel je tim dosazitelny
+	# z produkce; pravidla jsou data, ne kod.
+	if FileAccess.file_exists(POLICY_PATH) and sim.load_policy(POLICY_PATH):
+		print("[main] politika nactena z ", POLICY_PATH)
 	print("[main] sim spusten (seed ", DEFAULT_SEED, ", datovych souboru ", data.size(), ")")
 
 
