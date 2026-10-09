@@ -151,13 +151,35 @@ necommitoval** — v pracovním stromě byla v tu dobu rozdělaná práce druhé
   tuto stanici; záloha `~/.ssh/config.bak-2026-10-09-cetnik`) — platí **jen
   `Host redmi`**. Uživatel to 2026-10-09 schválil.
 
-**Rozhodnutí role:** **hostitel LAN session pro 2–4 hráče (podmíněně); `always-on`
-i veřejný server = NE.** `D9` se nemění (session u hostitele první, `always-on`
-odložený) — **hosting ale přestal být jen analýza: má čísla.**
+**Rozhodnutí role (upřesněno po doměření tiku a soaku):** **hostitel LAN session
+pro MALÝ svět (do ~25 mobilních entit); `always-on` i veřejný server = NE; není to
+stroj na buildy.** `D9` se nemění (session u hostitele první, `always-on` odložený) —
+**hosting ale přestal být jen analýza: má čísla.**
 
-**Odloženo na uživatele / na další session:** změřit **tik ≤ 2 ms** (sonda nad `sim`;
-na telefonu už je Godot i projekt), a rozhodnout, zda se má doinstalovat **novější
-proot** (upstream 5.5.0, 2026-10-06), aby server šel spouštět i bez rootu.
+**Doměřeno tentýž den (podrobně v [`MERENI-TELEFON-2026-10-09.md`](MERENI-TELEFON-2026-10-09.md) §5–§9):**
+
+| Co | Telefon | PC (Ryzen 5 2600) |
+|---|---|---|
+| **Tik**, 0 / 37 / 200 / 1000 mobilů | **1,42 / 2,27 / 5,90 / 22,5 ms** | 0,46 / 0,82 / 2,53 / 11,2 ms |
+| `state_hash()`, 37 mobilů | 39,9 ms | 17,2 ms |
+| **Soak 20 min** (37 mobilů, 20 Hz) | **23 214 tiků, 19,84 Hz, paměť PLOCHÁ** (25,3 MB static, RSS 99,5 MB), 58–68 °C, 0 zabití, 4× save 78–115 ms | — |
+| Baterie v zátěži | drží **70 % / `Not charging`** (limit funguje i v zátěži) | — |
+
+* **Rozpočet `tik ≤ 2 ms` telefon plní jen do ~25 mobilních entit** (prázdný tik
+  stojí 1,42 ms = 71 % rozpočtu, každý mobil +0,023 ms); při 37 entitách je
+  **o 14 % nad** ním — ale jen 4,5 % z 50ms slotu.
+* **`state_hash()` nesmí do smyčky tiku** (39,9 ms při 37 mobilech).
+* **Hashe stavu jsou na ARM64 bit po bitu shodné s x86_64** → determinismus není
+  vázaný na architekturu.
+* **Dvě meze telefonu:** build na něm **zabil Termux (OOM; lowmemorykiller, ne
+  phantom limit)** — telefon jsem vrátil rebootem (autostart SSH fungoval sám);
+  a **kill obalu `chroot` nezabije vnitřní proces** (nechal jsem sirotka) → pro
+  always-on je potřeba řídit procesy, ne jen obal.
+* **OPRAVA vlastní domněnky:** proot **nejde ani s Ubuntu 20.04 / glibc 2.31** →
+  příčina **není `clone3`**, ale kombinace proot 5.1.107.96 × Android 16.
+  Ověřená cesta zůstává **`chroot` pod rootem**.
+* **Zbývá NEMĚŘENO:** soak **24 h** (proxy bylo 20 min), **tik na reálné mapě
+  s kolidemi** (sonda má stub tiledata) a **upload/NAT zvenčí**.
 
 ---
 

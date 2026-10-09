@@ -452,15 +452,35 @@ analýzou"). Čísla a příkazy: [`MERENI-TELEFON-2026-10-09.md`](MERENI-TELEFO
   (`--headless --version` → `4.7.2.stable.official.ed1daf0bf`, exit 0) a **naše
   testovací sada na něm projde: 61/61 case souborů, 1466 kontrol, 0 selhání, 28 s**
   (bez `assets/uo`, jako v CI). Cesta: **`chroot` pod rootem** — `proot-distro`
-  na tomhle telefonu **nefunguje** (Ubuntu 24.04 = glibc 2.43 s `clone3()`,
-  Termux proot 5.1.107.96 z 2021 → zacyklení na prvním externím příkazu).
-* **Rozhodnutí role telefonu:** **hostitel LAN session pro 2–4 hráče
-  (podmíněně); `always-on` i veřejný server = NE.** Pro: prokázaný engine fit,
-  LAN 189 Mbit/s, 103 GB volných, stabilní adresa. Proti `always-on`: 1,3–1,5 GB
-  volné RAM, 60–64 °C při krátké zátěži, jádra pro app doménu jen 4–6 (a mění se
-  v čase), start serveru vyžaduje chroot pod rootem, domácí upload 24 Mbit/s za NAT.
-* **D9 se nemění.** `always-on` zůstává odložený; **NEMĚŘENO** zůstávají: tik
-  ≤ 2 ms (chybí sonda nad `sim`), soak 24 h a upload/NAT zvenčí.
+  na tomhle telefonu **nefunguje**.
+* **Rozhodnutí role telefonu:** **hostitel LAN session pro MALÝ svět (do ~25
+  mobilních entit); `always-on` i veřejný server = NE; není to stroj na buildy.**
+  Pro: prokázaný engine fit, LAN 189 Mbit/s, 103 GB volných, stabilní adresa.
+  Proti `always-on`: **tik nad rozpočtem už při 37 entitách** (viz níž), 1,3–1,5 GB
+  volné RAM, **58–68 °C v trvalé zátěži**, jádra pro app doménu jen 4–6 (a mění se
+  v čase), **build na telefonu shodí Termux (OOM)**, start serveru vyžaduje chroot
+  pod rootem, domácí upload 24 Mbit/s za NAT.
+
+**DOPLNĚNO 2026-10-09 (dokončení téhož zadání — sonda na tik + soak):**
+
+* **Tik (200 tiků/50 ms, fixture mapa, stub tiledata, stejná sonda na obou strojích):**
+  telefon **1,42 ms** (0 entit) / **2,27 ms** (37) / 5,90 ms (200) / 22,5 ms (1000);
+  PC 0,46 / 0,82 / 2,53 / 11,2 ms. → Rozpočet **tik ≤ 2 ms plní telefon jen do ~25
+  mobilních entit** (prázdný tik = 71 % rozpočtu, každý mobil +0,023 ms); při 37
+  entitách je **o 14 % nad** ním, ale jen 4,5 % z 50ms slotu.
+* **`state_hash()`** 39,9 ms při 37 mobilech (PC 17,2) → **nesmí do smyčky tiku**.
+* **Soak 20 min** (37 mobilů, 20 Hz, proxy za 24 h): 23 214 tiků, **19,84 Hz,
+  paměť plochá** (static 25,3 MB, RSS 99,5 MB), 4× `save()` 78–115 ms,
+  **žádné zabití procesu**, baterie drží **70 % / `Not charging`** i v zátěži.
+* **Hashe stavu jsou na ARM64 shodné s x86_64** → determinismus není vázaný na
+  architekturu (další argument pro `F1`/replay).
+* **Dvě meze naměřené mimoděk:** build (4× clang) **zabil Termux OOM** (ne phantom
+  limit — ten je `null`); a **kill obalu `chroot` nezabije vnitřní proces** (sirotek).
+* **Oprava domněnky:** proot **nejde ani s Ubuntu 20.04 / glibc 2.31** → příčina
+  **není `clone3`**, ale kombinace proot 5.1.107.96 × Android 16. Novější proot
+  (5.5.0) je nabíledni další krok, ale na telefonu se stavět nezkoušel (OOM).
+* **D9 se nemění.** **NEMĚŘENO** zůstávají: soak **24 h**, **tik na reálné mapě
+  s kolidemi** (sonda má stub tiledata) a **upload/NAT zvenčí**.
 * Riziko, které k telefonu patří dál: statická `192.168.109.104` **leží v rozsahu,
   který router rozdává** (stav paralelní session, `redmi-server/STAV.md` §2).
 
