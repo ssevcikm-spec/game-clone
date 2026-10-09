@@ -65,6 +65,26 @@ v `game-clone`, v klientu i v `uo-shadows/docs`.
 **Návrh k rozhodnutí:** udělat z ní bránu (`G14`) — dnes to není, protože brány
 jsou specifikované v `docs/08` a přidání brány je změna smlouvy, ne úklid.
 
+**MK — první granule hotová (2026-10-09): `sim.scheduler`.**
+⚠ **Nalezeno PŘED implementací:** `core/clock.gd` **timery už má** (`after`,
+`cancel`, `advance`, otestované v `tests/cases/clock.gd`), ale **žádný produkční
+systém je nevolal** (v `sim/` se `clock()` používal jen pro `now_ms()`) — zadaná
+granule by tedy vyrobila **druhý timer**. Zadání granule je proto opravené
+(`tools/roadmap-gen.py` i `docs/07`): `sim.scheduler` je **typovaná vrstva
+řídkých událostí NAD `core.clock`** — událost je `kind` + `payload` (data, ne
+closure), pořadí `(at, id)`, `state()`/`restore()` pro budoucnost. **Timer wheel
+z ModernUO se nezavádí** — nemá co měřit (řádově stovky událostí).
+**Hotovo:** `sim/scheduler.gd` + `tests/cases/scheduler.gd` (+21 kontrol),
+zapojen do `SimWorld.tick()` **před** systémy a příkazy (vyřízené události jdou
+do fronty jako `world_event`, aby byly vidět v žurnálu), `SimWorld.scheduler()`.
+**Naměřeno:** testy **1 487 kontrol / 0 selhání** (bylo 1 466), brány
+**11 OK / 0 chyb**, G7/G8/G9 beze změny hashů.
+**⚠ Otevřené a pojmenované:** stav plánovače **není** v `state_hash()` ani
+v save — zahrnutí změní hash a **pre-pinuje `tests/replays/*.json`**, což je
+**změna specu** (`docs/09` §9.5), ne tichá oprava. Do té doby je plánovač
+deterministický z konstrukce a měří ho vlastní case. **Nikdo do něj zatím
+neplánuje** — první uživatelé budou `world.spawn` a `sim.offline`.
+
 **Plán doplněn (2026-10-09):** vznikl milník **`MK` — krátká smyčka**
 (9 granulí: `sim.scheduler`, `sim.save`, `sim.offline`, `sim.policy`,
 `sim.executor`, `sim.decision_log` + obchod `data.vendors`, `sim.vendor`,

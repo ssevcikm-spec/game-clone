@@ -337,7 +337,7 @@ smyčka nepotřebuje souboj ani magii, takže by na ně čekala zbytečně. Nese
 
 | Granule | Co řeší |
 |---|---|
-| `sim.scheduler` | plánovač událostí (timer wheel) místo „tiká všechno" |
+| `sim.scheduler` | **typovaná vrstva řídkých událostí NAD `core.clock`** — ne druhý timer (naměřeno: `core.clock` timery má, ale nikdo je nevolal) |
 | `sim.save` | uložení a načtení **světa** (dnes obálka s prázdnými `mobiles`/`items`) + migrace |
 | `sim.offline` | svět jde dál i bez hráče — **funkce času, ne simulace agentů** |
 | `sim.policy` | politika: pravidla s podmínkami a prioritami (data, ne kód) |

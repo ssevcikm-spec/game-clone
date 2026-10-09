@@ -28,6 +28,7 @@ const SimSerial = preload("res://core/serial.gd")
 const SimEvents = preload("res://core/events.gd")
 const SimHash = preload("res://core/hash.gd")
 const SimCommands = preload("res://sim/commands.gd")
+const SimScheduler = preload("res://sim/scheduler.gd")
 
 const SAVE_VERSION: int = 1
 # Poradi z tabulky docs/04 §4.2; `spawn` je svetovy system, jde za nimi.
@@ -47,6 +48,7 @@ var _serials
 var _events
 var _hash
 var _commands
+var _scheduler
 var _queue: Array[Dictionary] = []
 var _serials_issued: int = 0
 
@@ -59,6 +61,7 @@ func _init(seed_value: int = 0, data: Dictionary = {}) -> void:
 	_events = SimEvents.new()
 	_hash = SimHash.new()
 	_commands = SimCommands.new()
+	_scheduler = SimScheduler.new(_clock)
 	data_version = _hash.of_state([data])
 
 
@@ -73,6 +76,13 @@ func enqueue(command: Dictionary) -> void:
 
 func tick(ms: int) -> void:
 	_clock.advance(ms)
+	# RIDKE UDALOSTI SVETA (granule `sim.scheduler`, milnik MK): cas uz plyne,
+	# takze se vyrizi, co je splatne - PRED systemy i prikazy (stejne jako
+	# reference: server nejdriv zpracuje frontu timeru, teprve pak packet).
+	# Udalost jde do fronty udalosti, aby byla VIDET ("co se stalo, kdyz jsem
+	# nebyl" - `ui.journal`); planovac sam nic nevykonava, jen rika co a kdy.
+	for due in _scheduler.advance_to(_clock.now_ms()):
+		push_event("world_event", due)
 	var batch: Array[Dictionary] = _queue
 	_queue = []
 	# ⚠ PORADI JE PRAVIDLO, NE DETAIL (namEReno 2026-10-07, vada V1 z
@@ -201,6 +211,14 @@ func world_time() -> int:
 
 func clock():
 	return _clock
+
+
+func scheduler():
+	# Ridke udalosti sveta (docs/05 §5.12: jeden world tick misto tisicu
+	# spawneru). ⚠ Stav planovace ZATIM neni v `state_hash()` ani v save -
+	# zahrnuti zmeni hash a pre-pinuje replaye, takze je to zapsana ZMENA SPECU
+	# (viz hlavicka `sim/scheduler.gd`), ne ticha oprava.
+	return _scheduler
 
 
 func rng():

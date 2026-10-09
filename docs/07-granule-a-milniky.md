@@ -72,12 +72,14 @@ vlastní milník `A`, musí rozšířit `MILNIKY_PORADI` v `tools/roadmap-gen.py
 **`MK` — krátká smyčka je od 2026-10-09 taky vlastní milník** (rozhodnutí
 uživatele, `ROZHODNUTI-2026-10-09-SMER.md` §2 D4). Je vložený **mezi M4 a M5**,
 aby bylo v plánu vidět, že **nejbližší cíl nejsou M5–M8** (souboj, magie, smrt):
-krátká smyčka je nepotřebuje. Nese **9 granulí**: `sim.scheduler`, `sim.save`,
-`sim.offline`, `sim.policy`, `sim.executor`, `sim.decision_log` +
-přesunuté `data.vendors`, `sim.vendor`, `ui.vendor_gump` (byly v M7 — bez
-obchodu nejde „prodám výrobek prodejci"). Rozšíření je na **třech místech**
-(`MILNIKY_PORADI`, `MILNIKY`, tahle tabulka) a **nic se přitom nemaže** —
-M5–M8 zůstávají v platnosti, jen přestaly být tím, co je nejblíž.
+krátká smyčka je nepotřebuje. Nese **9 granulí**: `sim.scheduler` (**typovaná
+vrstva řídkých událostí nad `core.clock`** — ne druhý timer; naměřeno
+2026-10-09, že `core/clock.gd` timery už má a žádný produkční systém je
+nevolal), `sim.save`, `sim.offline`, `sim.policy`, `sim.executor`,
+`sim.decision_log` + přesunuté `data.vendors`, `sim.vendor`, `ui.vendor_gump`
+(byly v M7 — bez obchodu nejde „prodám výrobek prodejci"). Rozšíření je na
+**třech místech** (`MILNIKY_PORADI`, `MILNIKY`, tahle tabulka) a **nic se přitom
+nemaže** — M5–M8 zůstávají v platnosti, jen přestaly být tím, co je nejblíž.
 
 ## 7.3 Vlny (co může běžet paralelně)
 

@@ -415,11 +415,11 @@ g("data.recipes", "Data receptů", ["data/recipes.json"],
 # `MK` je proto v pořadí mezi M4 a M5: krátká smyčka nepotřebuje souboj ani
 # magii, a bez obchodu (přesunutého sem z M7) by na ně čekala.
 # Hranice automatizace (co smí a co ne): `docs/01` §1.5 bod 8.
-g("sim.scheduler", "Plánovač událostí (timer wheel)", ["sim/scheduler.gd"],
+g("sim.scheduler", "Plánovač řídkých událostí světa", ["sim/scheduler.gd"],
   deps=["core.clock", "sim.world_loop"],
-  provides=["after(ms, event, payload) -> id", "cancel(id)", "tick(now_ms)", "pending()"],
-  acceptance=["tests", "determinism"], milestone="MK", size="<= 120", model="strong",
-  prompt="Dnes tiká všech 15 systémů každých 50 ms, ale spawn, restock, decay a hlad jsou ŘÍDKÉ události (docs/05 §5.12). Vzor je naměřený: ModernUO timer wheel 4096 slotů, rozlišení 8 ms, O(1) vložení i zrušení a smyčka spí, když není co dělat (`_src/modernuo/Server/Timer/TimerWheel.cs:30-131`, `Main.cs:757-763`). Deterministicky: pořadí událostí ve stejném tiku je pevné (docs/02 §2.3). Test: tři události ve stejné ms se vyřídí v pořadí vložení a `cancel` je O(1).")
+  provides=["schedule(kind, at_ms, payload) -> id", "schedule_in(kind, delay_ms, payload) -> id", "cancel(id)", "advance_to(now_ms) -> Array", "pending() -> int", "state() -> Dictionary", "restore(d) -> void"],
+  acceptance=["tests", "determinism", "replay"], milestone="MK", size="<= 120", model="strong",
+  prompt="⚠ NAMĚŘENO 2026-10-09 PŘED IMPLEMENTACÍ: `core/clock.gd` **UŽ timery má** (`after(delay_ms, cb) -> id`, `cancel(id)`, `advance(ms)` vybírá splatné podle (čas, id) deterministicky; ověřeno `tests/cases/clock.gd`) — ale **žádný produkční systém je nevolá** (naměřeno: `clock()` se v `sim/` používá jen pro `now_ms()`, systémy se tickují každý frame). **Ten modul proto NESMÍ být druhý timer.** Je to **typovaná vrstva řídkých událostí NAD `core.clock`**: událost je `kind` + `payload` (data, ne closure), aby se dala uložit, obnovit a zapsat do logu; čas se bere z `clock.now_ms()` a vyřizuje se v `advance_to(now_ms)` v pořadí (at, id). Vzor z reference pro pozdější optimalizaci: ModernUO timer wheel 4096 slotů / 8 ms (`_src/modernuo/Server/Timer/TimerWheel.cs:30-131`) — **zavádět ho teď nemá co měřit** (událostí budou řádově stovky). Test: tři události ve stejné ms se vyřídí v pořadí vložení; `cancel` nevyřídí nic; `state()`/`restore()` dá stejné budoucí chování; dvě stejné sekvence dají stejné pořadí.")
 g("sim.save", "Uložení a načtení světa", ["sim/save.gd"],
   deps=["sim.world_loop", "core.hash"],
   provides=["save(path)", "load(path)", "migrate(payload, from_version)"],
