@@ -145,6 +145,9 @@ const UI_KEYS := {
 	# zmizi. Reference ma tentýz prepinac v nastaveni
 	# (`_src/classicuo/.../OptionsGump.cs:4113-4133`).
 	"fullsize_toggle": [KEY_F2],
+	# OKNO PRAVIDEL (2026-10-09, D3 jako HUD): `P` jako "politika". Okno je JEN
+	# CTENI (pravidla se needituji ve hre) - klavesa ho jen ukaze/schova.
+	"policy_toggle": [KEY_P],
 }
 
 # Doba jednoho animacniho framu (docs/05 §5.1.1 = `core/const.gd` TURN_MS).
@@ -162,6 +165,7 @@ var camera: Camera2D = null
 # ⚠ 20. session: okno batohu (injektuje `app/main.gd`). Kontroller na nem jen
 # prepina viditelnost - obsah plni `app/main` (UI je tenky klient).
 var backpack = null
+var policy_panel = null            # `ui.policy_panel` - P ho prepina (D3 jako HUD)
 var debug_overlay = null           # `ui.debug_overlay` - F3 ho prepina
 var okno = null                    # `app.main` - F2 prepina fullsize (bod 5.2)
 
@@ -339,6 +343,13 @@ func _process(_delta: float) -> void:
 	if backpack != null and input_map != null and input_map.akce_just_pressed("backpack_toggle"):
 		var otevreny: bool = bool(backpack.toggle())
 		print("[controller] batoh: ", "OTEVREL" if otevreny else "ZAVREL")
+	# OKNO PRAVIDEL (2026-10-09, D3 jako HUD): `P` ho ukaze/schova. Obsah plni
+	# `app.main._osvezi_politiku()`; okno samo o pravidlech nic nevi (tenky
+	# klient) a NIC needituje - je to jen to, co dosud ve hre nebylo videt.
+	if policy_panel != null and input_map != null \
+			and input_map.akce_just_pressed("policy_toggle"):
+		var pravidla_videt: bool = bool(policy_panel.toggle())
+		print("[controller] okno pravidel: ", "OTEVREL" if pravidla_videt else "ZAVREL")
 	# DEBUG OVERLAY (2026-10-09): `F3` ho schova/zapne. Stav se hlasi do
 	# konzole - ticho by znamenalo, ze hrac nevi, jestli neco zmackl.
 	# Overlay je jen pro cloveka; kdyz neni (test), klavesa nic nedeje.

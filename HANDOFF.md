@@ -6,6 +6,166 @@
 > **Současný stav se bere z tohoto bloku** a ověřuje se živě (§„Předletová
 > kontrola" níž je starší a **datovaná**).
 
+## ✅ CO JE NOVÉHO (2026-10-09, ČTVRTÁ SESSION TÉHOŽ DNE) — `D3` JE JAKO HUD: PRAVIDLA JE KONEČNĚ VIDĚT (okno pravidel)
+
+**Co bylo zadáno (uživatel, 2026-10-09):** „Pokračuj. D3 — přijmu jen jako HUD,
+protože bych omylem celý soubor rozkopal.“ → varianta **(a) z věci `D3`** v „Co
+čeká na tebe“ NÍŽ: pravidla se mají **jen zobrazit** (ne editovat, ne ukládat).
+Uživatel zároveň schválil zápis do `app/main.gd` (bez registrace okna by okno
+v HUDu nikdy nevzniklo).
+
+**Stav před session:** `MK 6/0/3`, 67 měřeně hotových, brány 12 OK / 0 chyb, testy
+**1 650 kontrol / 0 selhání** (session D), HEAD `5ff4f2c`.
+**Stav po session:** testy **1 674 kontrol / 0 selhání** (66 case souborů),
+`run-all.py` **měřeno 12 / 0 chyb**, mutace nového modulu **7 z 7 chyceno**,
+`check-docs-refs` + `check-zadani` + `roadmap-gen --check` → `exit 0`.
+⚠ **Není to nová granule v roadmapě:** `ui.policy_panel` vědomě **NENÍ**
+v `.forge/roadmap.json` (viz „Co zůstává otevřené“ 1) — proto je `MK` dál
+**6/9** a `plan-status.py` hlásí **67** hotových (beze změny).
+
+### 1) Co je hotové a čím je to doložené
+
+| Co | Soubor | Naměřené |
+|---|---|---|
+| Okno pravidel (JEN ČTENÍ) | `ui/policy_panel.gd` (nový, 217 řádků) | Tenký klient: dostane řádky `{id, priority, reason}` + stav vykonavatele a vykreslí je. Nezná `sim/`, `render/`, `Input`, `Time`; **netřídí** (pořadí dostává hotové — jinak by si UI vymyslelo pravidlo). Prazdno hlásí: `(zadna pravidla)`, neznámý stav `(stav nevykonavatele neni znamy)`, chybějící důvod `-`. |
+| Zapojení (ne mrtvý kód) | `app/main.gd` (`_osvezi_politiku()`, registrace okna `policy_panel`) | `sim.policy.evaluate()` dá `why` u rozhodnutí, která prošla, `last_skipped()` u těch, která ne → řádky do okna. Přepočet **5×/s** (vlastní časovač, naměřeno 10 volání `evaluate()` na 120 framů), **překresluje se jen při změně** — a **poprvé vždy**, i pro prázdný vstup (viz past 3). |
+| Klávesa `P` | `app/player_controller.gd` (`UI_KEYS["policy_toggle"]`) + `main` injektuje okno | `policy_toggle` je v `InputMap` na `KEY_P` (nová kontrola v `tests/cases/player_controller.gd`); bez toho by okno bylo mrtvý kód. |
+| Test chování | `tests/cases/policy_panel.gd` (nový) | Měří: text řádku (`#priorita id - důvod`), **důvod**, pořadí vstupu, kopie (`radky()`/`stav()`), `flush()` jen při změně, prázdno, hlavičku **jako uzel**, a že v okně jsou **oba** řádky (čte uzly). |
+| Mutační důkaz | `tools/gates/mutace-tests.py` (klíč `policy_panel`) | `--only policy_panel` → **7 z 7 chyceno** + smlouva vstupu OK; baseline 1 674 / 0. |
+
+**Co okno ukazuje (příklad z reálného běhu, sonda `_analyza/p33-panel-zapojeni.gd`,
+9 kontrol / 0 selhání):**
+
+```text
+PRAVIDLA (2) | ceka: no rule matched | pravidlo: - | prikazu: 0
+#50 kup_krumpac - stav nezna: inventory
+#10 cekej_na_skill - skill 45: 300 < 200
+```
+
+To je jádro `D3`: u každého pravidla je vidět **priorita**, **id** a **důvod**
+(„stav nezná: inventory“ = chybějící stav se nečte jako nula), a v hlavičce stav
+vykonavatele. Dřív šlo pravidla zapsat jen ručně do `user://policy.json` a ve hře
+je nebylo vidět.
+
+### 2) Dvě věci, které našel až SNÍMEK a mutace (obojí naměřené)
+
+1. **Hlavička se nekreslila.** První verze držela stav vykonavatele v proměnné
+   `_hlavicka` a vystavila ho přes `hlavicka_text()` — do uzlů se ale NIKDY
+   nedostal. **Všechny testy byly zelené** (vracely správný řetězec) a na
+   obrazovce byly jen řádky pravidel. Našel to až snímek
+   (`_analyza/p33-panel-obraz.gd`, `read_image`). Oprava: hlavička je `Label`
+   (`_ensure_hlavicka()`), test kontroluje **uzel**.
+   **Ponaučení: text v proměnné není text na obrazovce.**
+2. **Dvě mutace prošly a každá z jiného důvodu** (`4 z 5` → po opravě `5 z 5`):
+   (a) `child.free()` → `pass` **nemění chování** — `_vycisti()` volá
+   `remove_child()` před `free()`, takže uzel je z `get_child_count()` pryč i bez
+   uvolnění (mutace měnila jen paměť); (b) zkrácení smyčky ve `flush()` prošlo
+   proto, že kontrola porovnávala text uzlu s `telo_text()` **z téže smyčky** —
+   obě strany se zkrátily stejně. Oprava testu: čte **uzly** a porovnává
+   s očekávaným seznamem.
+
+### 3) Prostředí (naměřeno, ne domněnka)
+
+V `workspace-write` režimu byla sada **24 selhání** (zápis do `.cache` zakázán:
+`app.config` fixture, `sim.save`/`policy_hook` přes `user://`, `render.textures`
+assety). Po přesměrování `APPDATA` do `.tmp` zůstalo **12** (jen `.cache` assety),
+s plným přístupem **0** (`1671 kontrol, 0 selhání` v tu chvíli). **Není to regrese
+kódu** — postup a čísla jsou v `LESSONS.md` (2026-10-09, „Sandbox
+`workspace-write` blokuje `.cache`“).
+
+### 4) Co zůstává otevřené (pojmenované, ne zamlčené)
+
+1. **`ui.policy_panel` NENÍ v roadmapě** — záměrné rozhodnutí: `.forge/roadmap.json`
+   je generovaný z `tools/roadmap-gen.py` a `docs/07` §7.1 bod 5 zakazuje
+   agentům `docs/`, `.forge/` a `tools/gates/` editovat. Nová granule by
+   znamenala zásah do generátoru, roadmapy a smlouvy (`docs/04 §4.2`) — to patří
+   uživateli. **Důsledek:** v `check-wiring` (G4) se nový soubor neposuzuje
+   (bere jen soubory granul). `plan-status.py` ho nevidí → **67** hotových zůstává.
+2. **Zápis do `app/main.gd`, `app/player_controller.gd`,
+   `tests/cases/player_controller.gd` a `tools/gates/mutace-tests.py`** — uživatel
+   schválil jen `main.gd` (registrace okna). Zápisy jsou aditivní (~135 řádků,
+   nic se nemazalo) a jsou pojmenované i v `LESSONS.md`; **cesta zpět:** smazat
+   `ui/policy_panel.gd` + `tests/cases/policy_panel.gd`, vrátit čtyři soubory
+   v gitu a smazat klíč `policy_panel` z `mutace-tests.py`.
+3. **`app/main.gd` nemá mutační modul — oprava V1 proto NENÍ KRYTÁ ŽÁDNOU
+   BRÁNOU** (naměřeno verifikátorem: `tests/cases/policy_panel.gd` o `main.gd`
+   netvrdí nic, blok 13 je jen „panel-side“ polovina, `_analyza/p33-*.gd`
+   nespouští žádná brána). Kdyby někdo odstranil `poprve` z `_osvezi_politiku()`,
+   sada zůstane zelená. Dnes to kryje **jen lidské/rutinní spuštění sondy**
+   `_analyza/p33-panel-ve-hre.gd` **bez** `user://policy.json`. Náprava je nová
+   práce: mutační modul pro `app/main.gd` (a tím i pro `app/loop.gd`) — to je
+   změna `tools/gates/` a patří uživateli.
+4. **Dlouhý seznam pravidel se do okna nevejde** (300×320 px, žádný scroll) —
+   `VYSKA` je konstanta, rámeček okna a posun myší nejsou. S dnešními pravidly
+   (jednotky) to nikoho netrápí; scroll patří `ui.hud`/`ui.container` (kotvy).
+5. **`sim.decision_log`: filtr opakování propouští střídavá pravidla.** Sonda
+   vypsala na každý tik `policy: kup_krumpac skipped: …` + `cekej_na_skill skipped: …`
+   + `executor skipped: no rule matched` (řádově 10× za sekundu do žurnálu,
+   `MAX_LINES = 200` se tím plní; log sondy měl **6 MB**). `_publish()`
+   přeskakuje jen **bezprostředně stejný** text (`sim/decision_log.gd:115`),
+   takže střídavá pravidla ho minou. **Je to nález z práce na HUDu, ne jeho
+   vada.** Doporučení: klíč `(kind, rule_id, why)` s razítkem času (potlačit,
+   dokud se nezmění text) a k tomu kontrola v testu.
+6. **Pozice okna ve hře** (340, 520) je změřená snímkem v celé hře (po opravě
+   geometrie), ale **chování při přepnutí fullsize** a to, jestli se okno
+   nepere s žurnálem, jsem pohledem neověřil — patří lidské kontrole u milníku `MK`.
+7. **Zbytková slepá místa druhé vlny (všechna neškodná, naměřeno):** 4 mutace
+   velikostí/odsazení (`MEZERA` se nepřičte, ignorovaná výška hlavičky, řádek bez
+   `custom_minimum_size`, box bez obou velikostí) dají 0 selhání, ale **správný
+   výsledek** — box bez obou velikostí má dokonce **bajtově shodný snímek**
+   s originálem (`sha256 7bebf33324e51024` u obou), protože velikost boxu udělají
+   `custom_minimum_size` jeho dětí. Komentář „velikost je povinná“ je tím
+   **nepřesný** (povinná je `custom_minimum_size` dětí); konvence nastavovat obě
+   (jako `ui/backpack`) zůstává.
+
+### 5) Nezavislé ověření (teammate `verifier-d3`) — našlo 2 vady a slepou kontrolu
+
+Práci ověřoval **druhý agent** (bez mého kontextu), a **nebylo to formalita**:
+našel dvě skutečné vady, jednu slepou kontrolu a dva nepřesné texty. `app/main.gd`
+jsem kvůli tomu přepsal, takže **platná čísla jsou až ta po opravách**: testy
+`1 674 kontrol / 0 selhání`, `run-all` 12/0, mutace `7 z 7`. Verifikátor
+**přeměřil zmrazený strom** a potvrdil (a)–(g): hashe, testy, brány, mutace,
+prázdný stav v celé hře (první flush ve framu 6, bez ručního volání),
+frekvenci **14 volání `evaluate()` / 3,011 s = 4,65/s** (dřív 119/120 framů)
+a geometrii (`hlavicka do y=23`, `obsah od y=27`, `prekryv=false`).
+
+1. **V1 (vada, vysoká): prázdný stav byl v produkci tichý.** Bez
+   `user://policy.json` (výchozí stav!) je `sim.policy` i `sim.executor` null,
+   takže `radky=[]`/`stav={}` se **rovnalo počátečnímu stavu okna** → `flush()`
+   se nezavolal **ani jednou**, okno mělo 0 dětí a `P` ukázalo prázdno bez
+   vysvětlení. Větev „(zadna pravidla)“ byla **mrtvý kód** (test ji měřil jen
+   ručním zavoláním). **Oprava:** poprvé se kreslí vždy
+   (`poprve = prebaveni() == 0`), ve hře ověřeno bez `policy.json`:
+   `PRAVIDLA (0) | (stav nevykonavatele neni znamy)` + `(zadna pravidla)`
+   (`_analyza/p33-panel-ve-hre.gd`, snímek).
+2. **V2 (vada): „5× za sekundu“ bylo ve skutečnosti každý frame.** Volání
+   `_osvezi_politiku()` skončilo **mimo** blok `DEBUG_OVERLAY_S`, takže se
+   `evaluate()` + `policy_state()` + `last_skipped()` + `rules()` dělaly každý
+   frame i se zavřeným oknem — a **komentář i `HANDOFF` tvrdily „5×/s“**.
+   Verifikátor to naměřil (119 volání na 120 framů). **Oprava:** vlastní časovač
+   `_politika_s`; po opravě **10 volání na 120 framů** (5 Hz).
+3. **Slepá kontrola (0 selhání z 1 671):** obsah se posouval na pevných 20 px,
+   ale hlavička je 23 px vysoká → **první řádek se s ní překrýval**. Mutace
+   „posun na (0,0)“ procházela. **Oprava:** pozice se počítá
+   z `hlavicka.get_combined_minimum_size().y` a test měří **překryv rectů**;
+   nový mutační vzor je chycený.
+4. **Dva nepřesné texty (opravené):** (a) prázdný stav měl podle komentáře
+   „rovnou připomenout `user://policy.json`“, ale vykresloval jen
+   `(zadna pravidla)` — hráč se tedy **nedozvěděl, kam pravidla psát** (přesně to,
+   kvůli čemu bylo D3 přijato „jen jako HUD“); teď okno kreslí i
+   `pravidla se pisou do user://policy.json` a je na to mutační vzor.
+   (b) `_osvezi_politiku()` bez argumentu je po prvním flushi **tichý no-op** —
+   komentář to teď říká (dřív tvrdil, že „dokreslí, co okno má“).
+5. Verifikátor dál naměřil (a potvrdil): `1671/0` testů před opravami,
+   `run-all` 12/0, mutace s **reálnými** FAIL hláškami (ne „soubor chybí“),
+   `check-docs-refs`/`check-zadani`/`roadmap-gen --check` → 0, zapojení není
+   mrtvý kód, a že obě mé „pýchy“ (falešná mutace `free()`; nevykreslená
+   hlavička) jsou popsané správně. **Nic z toho neopravoval sám** — poslal
+   nález a čekal (pravidlo `AGENTS.md`). Přiznal i **vlastní neplatné měření**
+   (první běh jeho V1 sondy měřil wall-clock a skončil po 1 framu) a opravil ho.
+
+---
+
 ## ✅ CO JE NOVÉHO (2026-10-09, SESSION D) — POLITIKA, VYKONAVATEL, LOG ROZHODNUTÍ (`ZADANI-24`, MK 6/9)
 
 **Zadání:** [`ZADANI-24-AUTOMATIZACE-POLITIKA.md`](ZADANI-24-AUTOMATIZACE-POLITIKA.md),
@@ -2014,7 +2174,7 @@ zavřenými i otevřenými dveřmi, test kroku na schod nahoru/dolů, obojí s m
 
 | # | Na co se čeká | Co to blokuje | Cena / cesta zpět |
 |---|---|---|---|
-| **D3** | **Politika nemá obsluhu v UI ani ukázkový soubor.** Pravidla se zadávají tak, že hráč zapíše `user://policy.json` **ručně** — a `user://` je mimo repo, takže v gitu není ani **příklad**, ze kterého by se dalo vyjít. Kód se ptá jen na existenci souboru (`app/main.gd`), takže dnes je politika „hotová, ale neviditelná“. | „idle sandbox“ z `D4` stojí na tom, že hráč **zadá, co má postava dělat**; bez obsluhy to umí jen ten, kdo zná tvar JSONu z hlavičky `sim/policy.gd` | Doporučení (dvě na sobě nezávislé věci): **(a)** `data/policy.example.json` + pár řádků v `docs/05`/`docs/04` (ukázka, jak se pravidla píšou) — je to datový soubor, ne zásah do kódu; **(b)** až bude `ui.vendor_gump`/`entity.container`, malý seznam pravidel v HUDu. Cesta zpět: soubor i gump smazat, kód se ptá jen na existenci `user://policy.json`. |
+| **D3** | ✅ **VYŘEŠENO 2026-10-09 (čtvrtá session) — uživatel zvolil variantu (b), „jen jako HUD“.** Pravidla se **jen zobrazují**: okno `ui.policy_panel` (`P`) ukazuje prioritu, id a **důvod** u každého pravidla + stav vykonavatele. **Nic se needituje, nic neukládá** (rozhodnutí uživatele: „D3 přijmu jen jako HUD, protože bych omylem celý soubor rozkopal“). Původní znění věci (pro historii): **Politika nemá obsluhu v UI ani ukázkový soubor.** Pravidla se zadávají tak, že hráč zapíše `user://policy.json` **ručně** — a `user://` je mimo repo, takže v gitu není ani **příklad**, ze kterého by se dalo vyjít. Kód se ptá jen na existenci souboru (`app/main.gd`), takže dnes je politika „hotová, ale neviditelná“. | „idle sandbox“ z `D4` stojí na tom, že hráč **zadá, co má postava dělat**; bez obsluhy to umí jen ten, kdo zná tvar JSONu z hlavičky `sim/policy.gd` | Hotovo: `ui/policy_panel.gd` + test + zapojení v `app/main.gd` (klávesa `P`) + mutační důkaz 5/5. **Zbývá (věc (a), ukázkový soubor):** `data/policy.example.json` + pár řádků v `docs/05`/`docs/04` — to je datový soubor a editace `docs/`, tedy rozhodnutí uživatele, ne agenta. Cesta zpět: smazat okno i test, vrátit čtyři soubory v gitu (viz nový blok nahoře, bod 4.2). |
 
 **⚠ 2026-10-09 (druhá session téhož dne): dvě věci, které agent nesmí udělat sám
 (`docs/` je pro granule zakázané a `_analyza/` je mimo git):**

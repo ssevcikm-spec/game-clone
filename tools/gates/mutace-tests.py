@@ -1192,6 +1192,72 @@ MODULY = {
              "\tpolicy = new_policy\n\texecutor = null if policy == null else SimExecutor.new(policy, decision_log)\n\tif policy != null:\n\t\tregister_state_source(\"policy\", _scheduler)"),
         ],
     },
+    # --- 2026-10-09: D3 jako HUD (`ui/policy_panel.gd`) ----------------------
+    # Uzivatel rekl "D3 prijmu jen jako HUD": pravidla se z `user://policy.json`
+    # konecne daji VIDET ve hre, ale jen CTENI (okno nic needituje ani neuklada).
+    # Chytá je case `policy_panel` (`--policy-panel-script`).
+    #
+    # ⚠ Kazda vada je v CHOVANI, ne v textu (docs/09 §9.6): kdyz se zmeni jen
+    # text hlasky, test to chytit NEMA - proto se mutuje plneni radku, poradi,
+    # duvod a uvolnovani uzlu.
+    #
+    # ⚠ PORADI V TESTU JE "NAHODNE" (priorita 10 pred 50) ZAMERNE: kdyby test
+    # mel vstup uz setrideny, vada "UI tridi podle priority" by prosla - a to
+    # je presne to, co UI delat NESMI (tridi `sim.policy`, ne UI).
+    "policy_panel": {
+        "soubor": ROOT / "ui" / "policy_panel.gd",
+        "prefix": "ui.policy_panel",
+        "prepinac": "--policy-panel-script",
+        "mutace": [
+            ("duvod pravidla se do radku vubec neda (okno ukaze jen '-')",
+             '"reason": str(radek.get("reason", "")),', '"reason": "",'),
+            ("UI si pravidla prehazi (poradi rozhoduje, ne priorita v sim)",
+             '\t\t})\n\t_stav = stav.duplicate(true) if stav is Dictionary else {}',
+             '\t\t})\n\t_radky.reverse()\n\t_stav = stav.duplicate(true) if stav is Dictionary else {}'),
+            ("prazdny seznam se tvari jako chybejici stav (neni videt, ze nic neni)",
+             "const BEZ_PRAVIDEL: String = \"(zadna pravidla)\"",
+             "const BEZ_PRAVIDEL: String = \"(stav nevykonavatele neni znamy)\""),
+            # ⚠ Nasel verifikator 2026-10-09 (nepresny komentar, ktery se tvaril
+            # jako hotova vec): okno melo v prazdnem stavu "rovnou pripomenout
+            # `user://policy.json`", ale vykreslovalo jen "(zadna pravidla)" -
+            # hrac se tedy nedozvedel, KAM pravidla psat (a to je presne duvod,
+            # proc bylo D3 prijato "jen jako HUD"). Vzor tu vetu odstrani.
+            ("prazdne okno nerekne, kam se pravidla pisou",
+             "\t\tvar kde := Label.new()\n\t\tkde.name = \"KdePravidla\"\n\t\tkde.text = KDE_PRAVIDLA\n\t\tbox.add_child(kde)\n",
+             ""),
+            ("radek ztrati prioritu (rozhodnuti se neda dohledat)",
+             "return \"#%d %s - %s\" % [", "return \"%s - %s\" % ["),
+            # ⚠ ZDE BYLY DVE MUTACE, KTERE PROSLY (obe namERene 2026-10-09, a
+            # kazda z jineho duvodu - viz `LESSONS.md`):
+            #   (a) "stare radky zustanou v okne" = `child.free()` -> `pass`.
+            #       NEBYLA to chyba testu: `_vycisti` vola `remove_child()` PRED
+            #       `free()`, takze uzel je z `get_child_count()` pryc i bez
+            #       uvolneni - mutace menila jen pamet, ne obsah.
+            #   (b) "do okna se dostane jen prvni pravidlo" = zkraceni smyčky
+            #       v `flush()`. Byla to CHYBA TESTU: pritomna kontrola
+            #       porovnavala text uzlu s `telo_text()`, a ten se skladá
+            #       z TÉŽ smyčky - obe strany se zkratily stejne. Opraveno
+            #       kontroli "v okne jsou OBA radky", ktera cte UZLY (nezavisly
+            #       zdroj); vzor je proto tady znovu a tentokrat musi projit.
+            ("do okna se dostane jen prvni pravidlo (seznam se ztrati)",
+             "for radek in _radky:\n\t\tvar radek_uzel := Label.new()",
+             "for radek in _radky.slice(0, 1):\n\t\tvar radek_uzel := Label.new()"),
+            # ⚠ Nasel verifikator 2026-10-09 (slepa kontrola, 0 selhani z 1671):
+            # obsah zacinal o 3 px vys nez konci hlavicka (konstanta 20 px vs
+            # skutecnych 23 px textu) a prvni radek se s ni prekryl. Vzor vraci
+            # presne tuhle vadu - pozice se pocita z hlavicky.
+            ("obsah se posune nahoru (kresli se pres hlavicku)",
+             "\tvar pod_hlavickou: float = maxf(HLAVICKA_VYSKA, hlavicka.get_combined_minimum_size().y)\n\tbox.position = Vector2(0.0, pod_hlavickou + MEZERA)",
+             "\tbox.position = Vector2(0.0, 0.0)"),
+            # ⚠ POZOR: vada V1 ("prazdny vstup se nevykresli") je v
+            # `app/main.gd` (`poprve`), a ten NEMA vlastni mutacni modul - do
+            # tohohle seznamu nepatri, protoze by se hledal vzor v jinem
+            # souboru. Jeji doklad je jiny: `tests/cases/policy_panel.gd`
+            # ("prazdny vstup se VYKRESLI") + sonda `_analyza/p33-panel-ve-hre.gd`
+            # v CELE hre bez `user://policy.json` (okno ukazalo
+            # "PRAVIDLA (0) | (stav nevykonavatele neni znamy)" a "(zadna pravidla)").
+        ],
+    },
 }
 
 

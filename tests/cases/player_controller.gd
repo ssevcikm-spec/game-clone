@@ -114,6 +114,19 @@ func run(t) -> void:
 		"player_controller: vsech 8 akci 'turn_*' ma v InputMap Ctrl (namEReno %d, chybi %s)"
 			% [s_ctrl, str(bez_ctrl)])
 
+	# ⚠ 2026-10-09 (D3 jako HUD): UI klavesy (`UI_KEYS`) se zakladaji v `InputMap`
+	# a NEEJSOU v `default_bindings()` (nejsou to prikazy pro sim). Kdyby se
+	# nezakladaly, klavesa by nic nedelala - a okno pravidel by bylo jen mrtvy
+	# kod v HUDu. Kontroluje se KONKRETNI klavesa `P` u `policy_toggle`.
+	script.register_actions()
+	t._check(InputMap.has_action("policy_toggle"),
+		"player_controller: akce 'policy_toggle' je v InputMap (okno pravidel, D3)")
+	var ma_p: bool = false
+	for event in InputMap.action_get_events("policy_toggle"):
+		if event is InputEventKey and (event as InputEventKey).keycode == KEY_P:
+			ma_p = true
+	t._check(ma_p, "player_controller: 'policy_toggle' je na klavese P")
+
 	# 3) smer z vazby musi dat stejne cislo jako `core/const.gd` a `input_map`
 	#    ⚠ 18. session: BEH JE VYCHOZI (`app/input_map.always_run = true`, UO ma
 	#    beh jako vychozi pohyb) - proto se meri OBA rezimy. Kdyby se meril jen

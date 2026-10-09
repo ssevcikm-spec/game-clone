@@ -50,6 +50,11 @@ const BackpackScript = preload("res://ui/backpack.gd")
 # z `sim.interaction` (par "kladivo + kovadlina"); kliknuti na recept se vrati
 # jako pozadavek a `app/main` z nej posle `Command{t:"craft"}`.
 const CraftGumpScript = preload("res://ui/craft_gump.gd")
+# 2026-10-09 (D3 jako HUD, `ui.policy_panel`): okno PRAVIDEL POLITIKY. Pravidla
+# se zadavaji rucne do `user://policy.json` a do teto chvile nebyla ve hre
+# VIDET (`HANDOFF` "Co ceka na tebe" D3). Okno je JEN CTENI - pravidla needituje
+# ani neuklada (rozhodnuti uzivatele 2026-10-09: "D3 prijmu jen jako HUD").
+const PolicyPanelScript = preload("res://ui/policy_panel.gd")
 # 20. session (2026-10-08): obecna interakce. `sim.interaction` se registruje
 # TADY (integraci misto) - do teto session nebyl v behu hry vubec, takze kazdy
 # prikaz `use`/`use_on`/`interact` skoncil hlaskou "Not available yet".
@@ -109,6 +114,7 @@ var status_bar = null
 var journal = null
 var backpack = null              # `ui.backpack` (20. session)
 var craft_gump = null            # `ui.craft_gump` (20. session)
+var policy_panel = null          # `ui.policy_panel` (2026-10-09, D3 jako HUD)
 var debug_overlay = null         # `ui.debug_overlay` (2026-10-09)
 var _batoh_klic: Array = []      # posledni obsah batohu (neplnit UI kazdy frame)
 var tiledata = null
@@ -128,6 +134,7 @@ var _fullsize: bool = false      # prepina `F2` (`app/player_controller`)
 var _pas_vpravo: ColorRect = null
 var _pas_dole: ColorRect = null
 var _debug_s: float = 0.0
+var _politika_s: float = 0.0     # casovac okna pravidel (5x/s, D3 jako HUD)
 # NEJDELSI FRAME od posledniho prekresleni overlaye (ms): uzivatel hlasi
 # "zaseky 2 framy z ~2300 na ~130 ms" (2026-10-09) a klouzavy prumer
 # (`app.metrics`) takovy spickovy frame SCHOVA. Overlay ho ukaze a vynuluje.
@@ -178,6 +185,19 @@ func _process(_delta: float) -> void:
 	# muze byt vypnuty klavesou (F3) - hodnoty se pak pocitaji dal, jen se
 	# nekresli (vypnuti nesmi znamenat "nic se nemeri").
 	_peak_ms = maxf(_peak_ms, _delta * 1000.0)
+	# OKNO PRAVIDEL (D3 jako HUD): aktualizuje se 5x za sekundu (stejny takt jako
+	# debug overlay), ale VLASTNIM casovacem - kdyby viselo na `debug_overlay`,
+	# prestalo by se obnovovat ve chvili, kdy overlay neni.
+	# ⚠ PRVNI VERZE tohohle volani byla BEZ podminek (`_osvezi_politiku()` na
+	# urovni tela `_process`), takze se `sim.policy.evaluate()` +
+	# `policy_state()` + `last_skipped()` + `rules()` delaly KAZDY FRAME, i se
+	# zavrenym oknem - a komentar pritom tvrdil "5x za sekundu". NamEReno
+	# verifikaci 2026-10-09: **119 volani `evaluate()` na 120 framu**.
+	# Tvrzeni v komentari musi platit na KOD, ne naopak.
+	_politika_s += _delta
+	if _politika_s >= DEBUG_OVERLAY_S:
+		_politika_s = 0.0
+		_osvezi_politiku(true)
 	if debug_overlay != null:
 		_debug_s += _delta
 		if _debug_s >= DEBUG_OVERLAY_S:
@@ -325,6 +345,15 @@ func _setup_ui() -> void:
 		push_warning("app.main: okno vyroby se nepodarilo zaregistrovat v HUD")
 	if loop != null:
 		loop.gump_okna.append(craft_gump)
+	# OKNO PRAVIDEL (2026-10-09, D3 jako HUD): ZAVRENE, dokud hrac nezmackne `P`
+	# (klavesa je v `app/player_controller.UI_KEYS`, stejne jako `B` u batohu).
+	# Obsah plni `_osvezi_politiku()` - UI samo o pravidlech nic nevi.
+	policy_panel = PolicyPanelScript.new()
+	policy_panel.name = "PolicyPanel"
+	hud.add_child(policy_panel)
+	policy_panel.visible = false
+	if not hud.register_window("policy_panel", policy_panel, Vector2(340.0, 520.0)):
+		push_warning("app.main: okno pravidel se nepodarilo zaregistrovat v HUD")
 	# DEBUG OVERLAY: neni to okno (nema titul ani se neposouva) - je to vrstva
 	# textu v levem hornim rohu, VIDITELNA od startu, aby ji zachytil screenshot.
 	# `F3` ji prepina (`app/player_controller`). Hodnoty plni `_debug_values()`.
@@ -539,6 +568,7 @@ func _setup_player(view) -> void:
 		return
 	controller.setup(player, sim, loop.input_map, movement, view, loop)
 	controller.backpack = backpack      # klavesa `B` prepina okno batohu
+	controller.policy_panel = policy_panel   # klavesa `P` ukaze okno pravidel
 	controller.debug_overlay = debug_overlay   # klavesa `F3` prepina overlay
 	controller.okno = self              # klavesa `F2` prepina fullsize (bod 5.2)
 	print("[main] hrac: serial ", serial, " na ", player.pos, " (", map.land_at(player.pos.x, player.pos.y),
@@ -663,6 +693,67 @@ func _recept() -> void:
 	print("[main] vyroba: recept ", int(pozadavek.get("recipe", -1)),
 		" x", int(pozadavek.get("count", 1)))
 	sim.enqueue(pozadavek)
+
+
+func _osvezi_politiku(prebavit: bool = false) -> void:
+	# Obsah okna pravidel (2026-10-09, D3 jako HUD). TADY se potkava `sim` s UI:
+	# `sim.policy` da pravidla a `sim.executor` stav; okno dostane hotove radky
+	# a jen je vykresli (`ui/` o politice nevi).
+	#
+	# DUVOD u kazdeho pravidla (to je jadro, ne dekorace): `evaluate()` vraci
+	# `why` u rozhodnuti, ktera PROSLA, a `last_skipped()` u tech, ktera
+	# NEprosla ("stav nezna: inventory") - oboji je vstup z `sim/`, ne vymysl UI.
+	#
+	# ⚠ PRVNI RADEK JE POVINNY, NECHCENY SPECIALNI PRIPAD (namEReno verifikaci
+	# 2026-10-09): bez `user://policy.json` je `sim.policy` i `sim.executor` null,
+	# takze `radky=[]` a `stav={}` - a to je PRESNE pocatecni stav panelu, takze
+	# se `flush()` nezavolal ANI JEDNOU a okno zustalo prazdne (hráč zmackl `P`
+	# a videl prazdno BEZ vysvetleni). Vetev "(zadna pravidla)" tim byla v
+	# produkci MRTVY KOD. Kdo se pta jen "zmenilo se neco?", zapomene, ze
+	# poprve se musí nakreslit i to, co se "nezmenilo".
+	#
+	# `prebavit = true` znamena "prepocitej z `sim`" (vola ho casovac v `_process`
+	# 5x/s). Bez argumentu funkce po prvnim prebaveni NIC nedela (jen se vrati) -
+	# kdo ji chce vynutit obnovu, posle `true`; kdo ji zavola bez argumentu po
+	# prvnim flushi, nedostane nic (namEReno verifikaci 2026-10-09: sonda to
+	# takhle volala a spolehala na to, ze se neco stane).
+	if policy_panel == null:
+		return
+	var poprve: bool = policy_panel.prebaveni() == 0
+	if not (prebavit or poprve):
+		return
+	var radky: Array = []
+	if sim != null and sim.policy != null:
+		var duvody: Dictionary = {}
+		var rozhodnuti: Array = sim.policy.evaluate(sim.policy_state())
+		for rozhodnuti_radek in rozhodnuti:
+			if not (rozhodnuti_radek is Dictionary):
+				continue
+			duvody[str(rozhodnuti_radek.get("rule_id", ""))] = str(rozhodnuti_radek.get("why", ""))
+		var preskocena: Dictionary = {}
+		for preskoceny_radek in sim.policy.last_skipped():
+			if not (preskoceny_radek is Dictionary):
+				continue
+			preskocena[str(preskoceny_radek.get("rule_id", ""))] = str(preskoceny_radek.get("why", ""))
+		for pravidlo in sim.policy.rules():
+			var id: String = str(pravidlo.get("id", ""))
+			var duvod: String = ""
+			if duvody.has(id):
+				duvod = str(duvody[id])
+			elif preskocena.has(id):
+				duvod = str(preskocena[id])
+			radky.append({
+				"id": id,
+				"priority": sim.policy.priority_of(pravidlo),
+				"reason": duvod,
+			})
+	var stav: Dictionary = {}
+	if sim != null and sim.executor != null:
+		stav = sim.executor.status()
+	# PREBAVI se jen kdyz se obsah opravdu zmenil (5x/s se jen porovnava).
+	if poprve or radky != policy_panel.radky() or stav != policy_panel.stav():
+		policy_panel.nastav_pravidla(radky, stav)
+		policy_panel.flush()
 
 
 func _batoh() -> void:

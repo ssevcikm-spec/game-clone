@@ -24,6 +24,110 @@ Typy: `chyba` (moje vada) · `past-nástroje` (prostředí/nástroj, ne logika) 
 
 ---
 
+# 2026-10-09 (D3 jako HUD) — OKNO PRAVIDEL V HUDU: SNÍMEK NAŠEL NEVYKRESLENOU HLAVIČKU
+
+### 2026-10-09 — „Změnilo se něco?“ na prvním vykreslení mlčí (chyba)
+**Co se stalo:** okno pravidel se mělo překreslit, jen když se obsah změní —
+`if radky != okno.radky() or stav != okno.stav()`. Bez `user://policy.json`
+(výchozí stav) je ale vstup `[]` + `{}`, což je **přesně počáteční stav okna** →
+podmínka nikdy neplatila, `flush()` se nezavolal **ani jednou** a okno zůstalo
+prázdné (0 dětí). Hráč zmáčkl `P` a viděl prázdno bez vysvětlení; větev
+„(žádná pravidla)“ byla v produkci **mrtvý kód**. Našel to až nezávislý
+verifikátor, který spustil **celou hru bez configu** — moje testy volaly
+`flush()` ručně, takže byly zelené.
+**Doklad:** `_analyza/p33-panel-ve-hre.gd` (hra bez `policy.json`) → okno
+`PRAVIDLA (0) | (stav nevykonavatele neni znamy)` + `(zadna pravidla)`;
+před opravou sonda hlásila `pocet=0 deti=0 prebaveni=0`.
+**Ponaučení:** u „kresli jen při změně“ musí být **první vykreslení výjimka**
+(`poprve = prebaveni() == 0`). A test, který si obsah nastaví a `flush()` zavolá
+sám, netvrdí nic o tom, co udělá **produkční cesta** — ta se musí spustit
+v celé hře (nebo aspoň jejím kusem).
+
+### 2026-10-09 — Komentář tvrdil 5×/s, kód dělal práci každý frame (chyba)
+**Co se stalo:** do `app/main._process()` jsem přidal `_osvezi_politiku()`
+s komentářem „aktualizuje se ve stejném taktu jako debug overlay (5× za
+sekundu)“ — ale volání skončilo **mimo** blok `if _debug_s >= DEBUG_OVERLAY_S`,
+tedy na úrovni těla `_process`. Naměřeno verifikátorem: **119 volání
+`evaluate()` na 120 framů** (a to i se zavřeným oknem). Oprava: vlastní časovač
+`_politika_s`, po opravě **10 volání na 120 framů**.
+**Doklad:** sonda `.tmp/overeni/v2-frekvence.gd` (počítadlo obalu místo
+`sim.policy`), před/po.
+**Ponaučení:** když komentář tvrdí číslo („5×/s“), je to **tvrzení o kódu
+a musí se měřit** — stačí vložit počítadlo do volané metody. A „dostal jsem
+volání do bloku“ se nepozná odsazením, ale **měřením**; odsazení se mi rozhodilo
+při vkládání a testy to nevidí.
+
+### 2026-10-09 — Překryv se nepozná z obsahu, ale z rectů (past-nástroje)
+**Co se stalo:** obsah okna jsem posouval na `Vector2(0, HLAVICKA_VYSKA)` =
+20 px, ale hlavička má **23 px** — první řádek se s ní překrýval. Mutace „posun
+obsahu na (0,0)“ prošla **všemi 1671 kontrolami** (0 selhání): testy měřily
+texty, ne geometrii.
+**Doklad:** verifikátorova sonda geometrie (`prekryv=true`) + snímek
+nečitelného okna; oprava na `maxf(HLAVICKA_VYSKA, hlavicka.get_combined_minimum_size().y)`
+a nová kontrola `obsah_rect.intersects(hlava_rect)` + mutační vzor.
+**Ponaučení:** u rozložení UI měř **recty** (`position` + `get_combined_minimum_size()`,
+což Godot zná i bez okna), ne jen obsah. Konstantní odhad výšky textu je jen
+dolní mez — font bývá vyšší.
+
+### 2026-10-09 — Text v proměnné není text na obrazovce (chyba)
+**Co se stalo:** okno pravidel mělo nést stav vykonavatele („čeká / zastaveno,
+pravidlo, příkazů“). První verze ho skládala do `_hlavicka` a vystavila přes
+`hlavicka_text()` — jenže do uzlů se NIKDY nedostala. Testy byly zelené, protože
+`hlavicka_text()` vracel správný řetězec; chybu ukázal až snímek
+(`_analyza/p33-panel-obraz.gd`): na obrazovce byly jen řádky pravidel, hlavička
+nikde. Oprava: `_ensure_hlavicka()` + `flush()` nastaví `Label.text`
+a `tests/cases/policy_panel.gd` kontroluje **uzel**, ne jen návratovou hodnotu.
+**Doklad:** snímek před opravou (2 řádky, žádná hlavička) vs po opravě
+(`PRAVIDLA (2) | čeká: no rule matched | pravidlo: - | příkazů: 0`), `.tmp/p33-panel.png`.
+**Ponaučení:** u vizuální změny nestačí test „text se vyrobí“ — test musí tvrdit,
+že text je **v uzlu**. A pořadí je dané: `read_image` je součást ověření, ne
+bonus (naměřeno už 2026-10-07, ale ta past se vrací v nové podobě).
+
+### 2026-10-09 — Dvě různé příčiny, proč mutace PROJDE (past-nástroje)
+**Co se stalo:** u nového okna prošly dvě mutace a každá z jiného důvodu.
+(a) „staré řádky zůstanou v okně“ = `child.free()` → `pass`: **vada nebyla vidět**,
+protože `_vycisti()` volá `remove_child()` PŘED `free()`, takže uzel je
+z `get_child_count()` pryč i bez uvolnění — mutace měnila jen paměť, ne obsah.
+(b) „do okna se dostane jen první pravidlo“ = zkrácení smyčky ve `flush()`:
+**byla to vada TESTU** — kontrola porovnávala text uzlu s `telo_text()`, a ten se
+skládá z TÉŽ smyčky, takže se obě strany zkrátily stejně a „sedly si“.
+Oprava: kontrola čte **uzly** (`get_children()` → texty) a porovnává je
+s očekávaným seznamem; pak mutaci (b) chytí.
+**Doklad:** `tools/gates/mutace-tests.py --only policy_panel` — nejdřív
+`4 z 5`, po opravě testu `5 z 5`; obě příčiny jsou v komentáři u vzorů.
+**Ponaučení:** „mutace prošla“ má **dva** významy a rozhoduje až čtení kódu +
+ruční běh mutanta: (1) test je slepý (vada testu), (2) mutace nemění chování
+(vada vzoru). Nikdy neopravuj test podle verdiktu harnessu bez toho druhého kroku.
+A zvlášť: **dvě strany porovnání nesmí pocházet ze stejné smyčky** — jinak se
+zkrátí obě a kontrola mlčí.
+
+### 2026-10-09 — `_process()` v UI modulu dělá test nedeterministickým (past-nástroje)
+**Co se stalo:** okno mělo `flush()` v `_process()` (vzor `ui.backpack`). Test
+tvrdil „druhý `flush()` bez změny nic nepřepočítá“ a spadl: **engine zavolal
+`_process` mezi dvěma voláními testu**, takže první `flush()` spotřeboval engine
+a test měřil jiné číslo, než si myslel. Oprava: okno si `_process()` **nedrží**
+a `flush()` volá volající (`app/main._osvezi_politiku()`) — vykreslování je pak
+deterministické.
+**Doklad:** `tests/cases/policy_panel.gd` (před opravou `prebaveni 1 -> 2`),
+komentář v `ui/policy_panel.gd` u `flush()`.
+**Ponaučení:** automatický `_process()` v modulu, který test volá, je skrytý
+druhý volající. Když test měří počet přepočtů, patří přepočet **volajícímu**,
+ne enginu.
+
+### 2026-10-09 — Sandbox `workspace-write` blokuje `.cache` → 12 testů „padá“ (past-nástroje)
+**Co se stalo:** první běh sady hlásil `1637 kontrol, 24 selhání`. Nebyla to
+regrese: zapisovat do `.cache` bylo zakázané (`UnauthorizedAccessException`), takže
+padaly `app.config` (fixture do `.cache/test-config`), `sim.save`/`policy_hook`
+(`user://` = `.cache/godot-appdata`) a `render.textures` (assety v `.cache`).
+Po přesměrování `APPDATA` do `.tmp\godot-appdata` zůstalo **12** selhání (jen
+`.cache` assety/fixture) a s plným přístupem **0** (`1670 kontrol, 0 selhání`).
+**Doklad:** `.tmp/baseline-d3.txt` (24) → `.tmp/baseline2.txt` (12) →
+`.tmp/test-full-d3.txt` (0); `run-all.py` `SOUHRN: měřeno 12, čeká 0, chyb 0`.
+**Ponaučení:** **počet selhání je vlastnost prostředí, ne kódu** — než začneš
+hledat regresi, zjisti, do kterých cest sada zapisuje, a ověř, že je smí zapsat.
+
+---
+
 # 20. session, druhá část (2026-10-08) — RECEPTY NA TYPY, VÝHEŇ VE SVĚTĚ, BATOH, VÝROBA
 
 ### 2026-10-08 — Mutační harness počítá chycenou mutaci podle PREFIXU hlášky (past-nástroje)
