@@ -177,9 +177,15 @@ vlastní doklad. G9 po přepnutí: `hash == očekávaný` u obou replayů, `exit
 ### 6) Nálezy a pasti, které stojí za zapsání
 
 * **Homoglyf v identifikátoru:** do nové brány se mi **7×** dostalo **cyrilské
-  `а` (U+0430)** do jména `kontrola`. Python to přežije (vypadá to správně),
+  male pismeno "a" (U+0430)** do jména `kontrola`. Python to přežije (vypadá to správně),
   ale je to vada zápisu — táž třída jako rozbitá uvozovka (`dsh-prostredi` §4d).
   Nová kontrola `_analyza/p32-homoglyfy.py` (jen hlásí, nepřepisuje) to najde.
+  **⚠ Dvě věci k témuž, obě naměřené:** (a) **tenhle dokument měl tu ukázku
+  napsanou DOSLOVNĚ** a kontrola ji právem ohlásila jako vadu dokumentu — přesně
+  past ze skillu `dsh-prostredi` §7: *ukázku rozbitého kódování popisuj slovem*;
+  (b) první verze kontroly hlásila i **řecké** písmeno (`Δ` na starém řádku 877
+  je záměrné v matematice) — dnes je **cyrilice VADA** a **řečtina POZOR**
+  (falešný poplach se hledá hůř než slepé místo).
 * **`--mutace` musí vyžadovat, že vadu chytila TA kontrola** — první verze
   stačilo „brana vrátila VADA", a mutant se tak „chytil" tím, že **spadl při
   načtení** (parse error) nebo že probe **nedoběhl** (chybělo 9 z 23 hodnot).
