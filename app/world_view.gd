@@ -206,6 +206,21 @@ var gui_odsazeni: Vector2 = Vector2.ZERO
 # v `app/main._setup_world()` - cela stavba stoji 179-199 ms a byla to jedina
 # zbylá pricina zaseku pri chuzi.
 var stavba_ms: float = -1.0
+# Jak dlouho trvalo POSLEDNI `_draw` (CPU cast, v ms). Měří se proto, aby se
+# dalo rict, jestli je frame cas CPU (nase prace) nebo GPU (fill rate):
+# 2026-10-09, otazka "muzeme mit 60 fps?".
+var cas_draw_ms: float = 0.0
+# Rozpad `_draw` na pripravu davky a vlastni kresleni (2026-10-09). NamEReno:
+# 27,3 ms z 31,5 ms framu je CPU v `_draw` a roste s poctem kvadru - tahle dvojice
+# cisel rekne, jestli to dela priprava (GDScript) nebo vydani davky (engine).
+var cas_priprava_ms: float = 0.0
+var cas_kresleni_ms: float = 0.0
+# Cache klice hrace (2026-10-09): klic zavisi jen na seznamu a dlazdici hrace,
+# ale pocita se pruchodem celeho seznamu - bez cache to bylo 27 ms na frame.
+var _klic_seznam: Array = []
+var _klic_pos: Vector3i = Vector3i(2147483647, 2147483647, 2147483647)
+var _klic_hodnota: int = -1
+var klic_hrace_vypoctu: int = 0
 
 # ⚠⚠ 19. session - VYMENA TEXTUR ZA BEHU (sonda a budouci vymena assetu):
 # `art_id -> Texture2D`. Kdyz je slovnik neprazdny, kresleni vezme texturu z nej
@@ -620,8 +635,19 @@ func klic_hrace_stats() -> Dictionary:
 
 
 func _draw() -> void:
+	# ⚠ MERENI (2026-10-09, otazka uzivatele "muzeme mit klasickych 60 fps?"):
+	# `_draw` je jedine misto, kde se da oddelit CPU prace (nase kresleni
+	# a vydavani davky) od GPU/casu prezentace. NamEReno: bez kresleni sveta je
+	# frame **0,46 ms**, s nim **30,6 ms** pri 1280x720 - a `cas_draw_ms` rekne,
+	# kolik z toho je CPU (kdyz je maly, je to fill rate na GPU).
 	if _textures == null:
 		return
+	var t0: int = Time.get_ticks_usec()
+	_draw_telo()
+	cas_draw_ms = float(Time.get_ticks_usec() - t0) / 1000.0
+
+
+func _draw_telo() -> void:
 	_drawu += 1
 	# M9: nejdriv se zkusi davka (1-2 draw cally). Kdyz neni postavena (runtime
 	# atlas se naplnil), kresli se puvodni cestou - obraz musi byt spravny vzdy.
@@ -635,10 +661,14 @@ func _draw() -> void:
 	# neprekazela) stoji pri okne 1600x900 **~320 ms/frame** (19 485 objektu) -
 	# na hru se zaseky to je neprijatelne.
 	if mesh_enabled and _mesh != null:
+		var _tp: int = Time.get_ticks_usec()
 		var st: int = _priprav_mesh()
+		cas_priprava_ms = float(Time.get_ticks_usec() - _tp) / 1000.0
 		if st == 0:
 			_chunk.spust_fade()
+			var _tk: int = Time.get_ticks_usec()
 			_kresli_mesh(false)
+			cas_kresleni_ms = float(Time.get_ticks_usec() - _tk) / 1000.0
 			_davek += 1
 			_draw_fade()
 			return
@@ -646,7 +676,9 @@ func _draw() -> void:
 		# prekresluje (`hold`), kresli se PREDCHOZI davka - ta na starou stranku
 		# sedi presne. Puvodni cesta stoji ~35 ms/frame.
 		if st == 1:
+			var _tk2: int = Time.get_ticks_usec()
 			_kresli_mesh(true)
+			cas_kresleni_ms = float(Time.get_ticks_usec() - _tk2) / 1000.0
 			_predchozich += 1
 			_draw_fade()
 			return
@@ -853,9 +885,25 @@ func _klic_hrace() -> int:
 	# ⚠ 19. session: klic se pocita z REALNEHO seznamu objektu (`_list()`), proto
 	# si ho `_draw` a `_priprav_mesh` berou touhle funkci (ne primo
 	# `_sort_key_of_player`), aby se nemohly rozejit.
+	#
+	# ⚠⚠ 2026-10-09 (otazka uzivatele "muzeme mit klasickych 60 fps?"): vypocet
+	# je PRUCHOD CELÉHO seznamu (16 000 objektu, kazdy s dotazem do slovniku)
+	# a volal se KAZDY frame z `_priprav_mesh` - NAMERENO `_analyza/p30-fps.gd`:
+	# **27,3 ms z 31,3 ms framu** (vydani davky pritom stoji 0,09 ms). Klic
+	# zavisi JEN na seznamu a na dlazdici hrace, takze se drzi v cache; pocita se
+	# znovu jen kdyz se zmeni seznam (nova instance z `chunk_renderer`) nebo
+	# pozice hrace. Pocet vypoctu je VIDET (`klic_hrace_vypoctu`) - bez toho by
+	# cache byla jen tvrzeni.
 	if _player == null:
 		return -1
-	return _sort_key_of_player(_list())
+	var seznam: Array = _list()
+	if is_same(seznam, _klic_seznam) and _player.pos == _klic_pos:
+		return _klic_hodnota
+	_klic_seznam = seznam
+	_klic_pos = _player.pos
+	_klic_hodnota = _sort_key_of_player(seznam)
+	klic_hrace_vypoctu += 1
+	return _klic_hodnota
 
 
 func _nacti_mesh_stats() -> void:

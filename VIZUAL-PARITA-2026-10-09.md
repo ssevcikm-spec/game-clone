@@ -328,6 +328,44 @@ testem s mutačním důkazem a zápisem v `HANDOFF.md`.
 frame čas ~35–40 ms (25–29 fps) — příčina NEMĚŘENA, tažení rámu světa myší
 (5.2), a vše, co patří do fáze 2 (kontrakt + paritní harness).
 
+### ✅ ZÁKLADNÍ FRAME ČAS JE VYŘEŠENÝ (2026-10-09, dotaz „můžeme mít 60 fps?")
+
+**Odpověď je měřená: ano, a s velkou rezervou.** Příčina, která tu byla zapsaná
+jako NEMĚŘENÁ, je změřená — a byla v našem kódu, ne v GPU.
+
+| Měření (`_analyza/p21-chuze.gd`, 2400 framů chůze) | PŘED | PO |
+|---|---|---|
+| median frame 1280×720 | 31,90 ms (31 fps) | **0,55 ms** |
+| median frame 1600×900 | 37,50 ms (27 fps) | **0,58 ms** |
+| framy ≤ 1 ms (z 2319) | 0 | **2007–2018** |
+| framy > 66 ms | 1 | **0** |
+| max frame | 129,8 ms | **55,9–58,7 ms** (jen přestavba dávky) |
+
+**Příčina (sonda `_analyza/p30-fps.gd`):** `_klic_hrace()` — klíč hráče pro
+dělení dávky na „před hracem"/„po hrači" — se **počítal každý frame** a je to
+**průchod celého seznamu** (16 000 objektů, každý s dotazem do slovníku).
+V `_priprav_mesh()` to bylo **27,3 ms z 31,3 ms** framu; vlastní vydání dávky
+stojí **0,09 ms**. Klíč závisí jen na seznamu objektů a dlaždici hráče → **cache**
+(`_klic_seznam`, `_klic_pos`, počítadlo `klic_hrace_vypoctu`).
+
+**Co to NEBYLO (měřeno a vyloučeno, ne dohad):**
+* GPU / fill rate: bez kreslení světa je frame **0,46 ms**, se světem 31 ms, ale
+  rozpad `_draw` ukázal **CPU** (příprava vs. vydání dávky);
+* thrashing texturové cache: limit 384 MB → **1 GB nic nezměnil**;
+* VSync / limit fps: displej **75 Hz**, vsync vypnutý, `max_fps 0`;
+* DPI scaling (1,0) a sim/UI/overlay (dohromady 0,46 ms).
+
+**⚠ Past měřidla:** první verze sondy tiskla `_draw` z POSLEDNÍHO framu fáze a
+trefila se do framu, kdy se stavěla dávka — vypadalo to jako „28 ms je CPU
+v `_draw`". Správně se měří **průměr** a zvlášť **„klidové" framy** (nic se
+nestaví); teprve to ukázalo 27 ms v `_priprav_mesh` na framu, kde se nestavělo.
+
+**⚠ Co zbývá:** při přestavbě dávky je frame **33–59 ms** (7–10 framů z 2319 =
+~0,4 % při chůzi); se základem 0,58 ms jsou to vidět. Zlevnit ji by znamenalo
+sáhnout na stavbu dávky (~270–315 ms, děleno po 8 ms) — **NEMĚŘENO**, jestli
+menší rozpočet pomůže.
+
+
 
 **Citace z reference (k bodu 5.4):**
 

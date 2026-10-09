@@ -192,6 +192,44 @@ funkci** → `_st_y += 1` se nikdy neprovedlo → stavba se zacyklila (200 000 k
 každý literál `4` jako `Z_SCALE`** → fáze jsou odvozené konstanty
 (`FAZE_LAND = FAZE_GRID + 1`, …).
 
+### ✅ DOPLNĚNO (2026-10-09 — „MŮŽEME MÍT 60 FPS?" → ANO, A S REZERVOU)
+
+**Otázka uživatele:** „Můžeme mít klasických 60 fps?" **Odpověď je měřená: ano
+a s velkou rezervou** — frame čas při chůzi spadl z **31,9 ms na 0,58 ms**.
+
+| Měření (sonda `_analyza/p21-chuze.gd`, 2400 framů chůze) | PŘED | PO |
+|---|---|---|
+| median frame (1280×720) | 31,90 ms (31 fps) | **0,55 ms (~1800 fps)** |
+| median frame (1600×900) | 37,50 ms (27 fps) | **0,58 ms (~1700 fps)** |
+| framy ≤ 1 ms (z 2319) | 0 | **2007–2018** |
+| framy > 33 ms | 8 / 2239 | **7 / 10** (jen při přestavbě dávky) |
+| max frame | 129,8 ms | **55,9 / 58,7 ms** |
+| framy > 66 ms | 1 | **0** |
+
+**KDE to bylo (naměřeno sondou `_analyza/p30-fps.gd`, ne dohad):**
+1. **`_klic_hrace()` se počítal KAŽDÝ frame** — a je to **průchod celého seznamu**
+   (16 000 objektů, každý s dotazem do slovníku). V `_priprav_mesh()` to bylo
+   **27,3 ms z 31,3 ms framu**; vydání dávky přitom stojí **0,09 ms**. Klíč závisí
+   jen na seznamu a dlaždici hráče → **cache** (`_klic_seznam`, `_klic_pos`,
+   počítadlo `klic_hrace_vypoctu`). Test `tests/cases/klic_hrace_cache.gd`
+   (5 kontrol) + **mutace** (vyřazená kontrola posunu hráče → klíč zůstal
+   8 009 768 místo 8 010 368 = přesně vada, kterou řešila 19. session).
+2. **Co to NEBYLO** (měřeno a vyloučeno): GPU/fill rate (bez kreslení světa byl
+   frame **0,46 ms** a se světem 31 ms, ale rozdělení `_draw` ukázalo CPU),
+   thrashing texturové cache (limit 384 MB → 1 GB **nic nezměnil**),
+   VSync/limit fps (refresh displeje **75 Hz**, vsync vypnutý, `max_fps 0`),
+   DPI scaling (scale 1.0) a sim/UI/overlay (dohromady 0,46 ms).
+3. **Past měřidla (zapsaná):** první verze sondy tiskla `_draw` z POSLEDNÍHO
+   framu fáze — a trefila se do framu, kdy se stavěla dávka. Vypadalo to jako
+   „28 ms je CPU v `_draw`", což bylo měření měřicího přístroje. Správně se měří
+   **průměr** a zvlášť **„klidové" framy** (nic se nestaví).
+
+**⚠ CO ZŮSTÁVÁ:** při přestavbě dávky je frame **33–59 ms** (10 framů z 2319 =
+0,4 % při chůzi) — základ je teď 0,58 ms, takže jsou to viditelné, i když vzácné
+záseky; další zmenšení by znamenalo zlevnit stavbu dávky (`render.chunk_mesh`,
+~270–315 ms na stavbu, děleno po 8 ms) nebo rozdělení na hráče (`split_ms 1,6`).
+**NEMĚŘENO:** zda by pomohl menší rozpočet `_STAVBA_MS`/`STAVBA_MS`.
+
 ### ✅ FÁZE 1 JE KOMPLETNÍ (5.1 → 5.5, vše hotové a doložené)
 
 | Bod | Důkaz (číslo) | Test + mutace |
