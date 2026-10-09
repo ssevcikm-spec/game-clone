@@ -8,6 +8,46 @@
 > **Kdo soubor přepisuje celý, ať tyhle bloky nechá** — nebo si je přesune;
 > zkontroluj to **hledáním**, ne pamětí (`docs/09 §9.7`).
 
+## ✅ ROZHODNUTÍ O SMĚRU (2026-10-09 — PRODUKT, „FEEL" MÍSTO KOPIE, KRÁTKÁ SMYČKA, KLIENT JAKO NOVÝ PROJEKT)
+
+**Zadání uživatele (doslova):** „přesná kopie hry nedává smysl… zbavit se
+technologických omezení a nedostatků… jediné, co může zůstat, je feel… musí to
+být modifikovatelné a rozšiřitelné… mohlo by mě bavit hrát UO like jako idle
+sandbox" + „není přechod už moc komplikovaný, i kdybychom to forkovali?"
+
+**Rozhodnutí (všechna uživatelova; plný záznam s důvody a cenami je
+`ROZHODNUTI-2026-10-09-SMER.md`):**
+
+| # | Rozhodnutí | Co z toho plyne |
+|---|---|---|
+| D1 | **Produkt je `game-clone`** | produktem je tenhle repozitář; `uo-shadows` zůstává **držená opce**, nezavírá se |
+| D2 | **Cílem je „feel", ne kopie** | `docs/01` §1.1/§1.2 přeoznačeny: V1–V12 platí jako *co bereme z reference*, ne jako cíl; brány zůstávají (měří **regresi**) |
+| D3 | **Hra smí provést, co hráč rozhodl — nesmí rozhodnout za hráče** | `docs/01` §1.5 bod 8; `docs/09` §9.9 + §9.10 bod 10; `START-TADY.md` §4 bod 4; `ZADANI-DALSI-VYVOJ.md` §7 označen jako překonaný |
+| D4 | **Nejmenší hratelné = KRÁTKÁ SMYČKA + svět bez hráče** (`K1`–`K6`) | nejbližší cíl **není** `M3`–`M8`; chybí vendor, offline doběh, scheduler, politika s podmínkami; odhad `[O]` **6–10 granulí** |
+| D5 | **Moderní klient = nový projekt** `E:\Workspaces\godot-uo-client` | rozhraní: klon generuje `assets/uo/`, klient čte **tentýž výstup**; klient nesmí vlastnit stav světa ani číst `.mul`/`.uop` |
+| D6 | `uo-shadows` = držená opce | srovnán jen jeho non-goal `N9` (stejná hranice jako D3) |
+
+**Co to NEZMĚNILO:** plán se neškrtá (`M3`–`M8` zůstávají v roadmapě), `tests/`,
+`tools/gates/`, `project.godot`, `.forge/roadmap.json` nedotčeny.
+
+**⚠ Poznámka k `docs/09` §9.10 bodu 7** („neupravovat `docs/`"): `docs/01`,
+`docs/09`, `START-TADY.md`, `ZADANI-DALSI-VYVOJ.md` a `HANDOFF.md` byly v téhle
+session upraveny **na pokyn uživatele** (změna cíle), ne v rámci granule.
+Pro granule platí zákaz dál.
+
+**Naměřeno v téhle session** (postup u každého čísla v §1.1 záznamu):
+127 commitů (2.–9. 10.), **10 617** řádků herního kódu, **12 170** testů,
+**12 662** nástrojů; `assets/uo/` má **77** atlasových stran, **49 705** spritů,
+**40** PNG animací (těla 400 a 401), rozhraní `manifest.json` / `tiles.json` /
+`hues.json` / `anim-manifest.json` / `world/map0.*`.
+
+**Otevřená témata (neprovedená, §6 záznamu):** roadmapa pro `K1`–`K6` (6.1),
+podmínky v politice (6.2), „vidět do uvažování postavy" (6.3), „feel" jako
+měřitelná definice (6.4), **AI interakce / komplexní robot — námět k rozhodnutí**
+(6.5), modifikovatelnost (6.6).
+
+---
+
 ## ✅ CO JE NOVÉHO (2026-10-09 — TŘI VADY ZE HRY, DEBUG OVERLAY, NÁVRH VIZUÁLNÍ REVIZE)
 
 **Zadání uživatele (doslova):** 10 pozorování ze hry (stamina, animace běhu,

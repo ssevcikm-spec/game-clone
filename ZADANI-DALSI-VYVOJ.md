@@ -11,6 +11,11 @@
 > Tenhle soubor ho **nenahrazuje** — zužuje ho na to, co je potřeba udělat
 > **teď**, protože audit našel tři věci, které v plánu nejsou a bez nich
 > zůstane hotový kód mrtvý.
+>
+> **⚠ 2026-10-09: cíl se změnil** (uživatel) — věrná kopie už není cíl, cílem je
+> „feel" bez omezení staré hry; **zadání níž proto platí dál jen tam, kde
+> neodporuje** `ROZHODNUTI-2026-10-09-SMER.md` a `docs/01`. Konkrétní
+> překonaný bod je označený v §7.
 
 ---
 
@@ -261,6 +266,10 @@ uvolňovat, musí být jasné, který počet je správný — a to je rozhodnut�
   vady zadání se **hlásí**, neopravují (`docs/09 §9.10.7`).
 - **Nepřidávat „vylepšení", která UO nemá** (auto-loot, rychlé cestování) —
   věrnost je cíl, ne pohodlí (`START-TADY.md` §4).
+  > ⚠ **Překonáno 2026-10-09** (záznam se nepřepisuje, jen doplňuje): cíl už
+  > není věrnost, ale „feel". Zakázané zůstávají **výsledky** pravidel
+  > (auto-loot, rychlé cestování); **provést, co hráč rozhodl, hra smí** —
+  > `ROZHODNUTI-2026-10-09-SMER.md`, `docs/01` §1.5 bod 8.
 - **Nepřejmenovávat soubory kvůli zelené bráně.** `run-all.py` vracející
   `exit 1` je **pravdivý stav**; přejmenování gaty neošálí, jen schová důkaz.
 - **Neopravovat brány kvůli tomu, že v sandboxu nemohou zapsat** — to je

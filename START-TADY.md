@@ -157,8 +157,11 @@ neúplné — doplň ji podle `LESSONS.md`.
 3. **Nevěřit modelu, který „sedí na velikost souboru".** Dvě mřížky klidně
    vyjdou přesně; rozhoduje test na **celém** souboru proti **nulovému modelu**
    (`docs/10` P24 — stálo mě to jednu chybnou „verifikaci").
-4. **Nepřidávat vylepšení, která UO nemá** (auto-loot, rychlé cestování,
-   moderní inventář). Věrnost je cíl, ne pohodlí.
+4. **Hra smí provést, co hráč rozhodl — nesmí rozhodnout za hráče.** Zakázané
+   zůstávají **výsledky** pravidel, které UO nemělo (auto-loot, rychlé
+   cestování, moderní inventář); dovolené je méně klikání, lepší čitelnost,
+   offline doběh a pravidla s podmínkami. **Změna cíle 2026-10-09** —
+   podrobnosti `ROZHODNUTI-2026-10-09-SMER.md`, hranice v `docs/01` §1.5 bod 8.
 5. **Nedělat `tiledata.mul` znovu.** Je vyřešený: dva bloky se skupinovými
    hlavičkami, rezerva 0 B (`docs/03` §3.3.1). Čtyři sporné body, které
    zbyly, se rozhodují **testem**, ne dojmem (`docs/03` §3.5.4).

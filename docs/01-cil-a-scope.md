@@ -3,8 +3,26 @@
 > Tento oddíl odpovídá na otázku **„co má vzniknout"**. Všechno ostatní v zadání
 > je odvozené odsud. Když se nějaký požadavek v jiném oddílu nedá dovést sem,
 > je to drift a patří smazat (viz `09-pravidla-pro-agenta.md`).
+>
+> **⚠ 2026-10-09 — CÍL SE ZMĚNIL (rozhodnutí uživatele).** **Věrná kopie není
+> cíl.** Cílem je **feel** — hratelná hra s pocitem Ultimy Online, ale **bez
+> technologických omezení a vad staré hry** (trhavý pohyb, nejistota „kde jsem
+> a co vidím", brutální závislost na ručním klikání) a **modifikovatelná
+> a rozšiřitelná**. Reference se dál používá — jako **orákulum** (naměřené
+> pravidlo je levnější než vymyšlené), ne jako cíl. Rozhodnutí, důvody a ceny:
+> `ROZHODNUTI-2026-10-09-SMER.md` (root). **Změněné oddíly níž: §1.1, §1.2
+> (úvod), §1.3 (nejbližší cíl), §1.5 bod 8.** Ostatní platí beze změny.
 
 ## 1.1 Cíl jednou větou
+
+**Cíl od 2026-10-09:** *vytvoř jednu hratelnou, offline, single-player hru
+s **feelingem** Ultimy Online — a to bez omezení, která si stará hra nesla
+s sebou: pohyb je plynulý, hráč pozná, kde je a co vidí, rutinu nemusí
+odklikat. Hra je **modifikovatelná a rozšiřitelná** a **svět jde dál i beze
+hráče**.*
+
+*Původní formulace (2. 10. 2026, ve svém čase správná — zůstává jako popis
+chování, které z reference bereme):*
 
 **Vytvoř jednu hratelnou, offline, single-player hru, která se principielně
 chová jako Ultima Online (éra T2A/Renaissance + AoS prvky): izometrický svět
@@ -19,11 +37,17 @@ Vše, co v UO dělal server, dělá v klonu simulace v jednom procesu — ale
 protože právě ono dělá UO tím, čím je (zpožděné akce, target cursor, gumpy,
 krokové timery).
 
-## 1.2 Co je „věrná kopie" — měřitelná definice
+## 1.2 Co bereme z reference — měřitelná definice (dřív „věrná kopie")
 
-„Věrnost" není dojem. Následujících **12 bodů je zadání a zároveň kontrolní
-seznam**; každý bod musí být dohledatelný v hotové hře a ověřitelný bez
-spuštění originálního klienta. Tabulka je zároveň mapováním na oddíly zadání.
+**Od 2026-10-09 to není cíl, ale smlouva o chování.** Následujících **12 bodů**
+je seznam toho, **co z originálu bereme**; každý bod musí být dohledatelný
+v hotové hře a ověřitelný bez spuštění originálního klienta. Tabulka je zároveň
+mapováním na oddíly zadání.
+
+**Co se od 2026-10-09 nevyžaduje:** doslovná shoda s originálem (pixel, hash,
+kadence na milisekundu) **jako cíl**. Vyžaduje se, aby chování šlo **dohledat
+k referenci** a aby ho **hráč poznal**. Brány měřící paritu obrazu zůstávají —
+měří **regresi** („něco se rozbilo"), ne cíl.
 
 | # | Věrnostní bod | Co to konkrétně znamená | Kde je spec |
 |---|---|---|---|
@@ -64,6 +88,28 @@ do konce bez ručního zásahu do souborů:
 Když kterákoliv z těch osmi vět nefunguje, hra **není hotová**, i kdyby
 všechny testy svítily zeleně (viz `08-brany-a-overovani.md`).
 
+### Nejbližší cíl: KRÁTKÁ SMYČKA (rozhodnutí 2026-10-09)
+
+Osmička výš je **plná** definice hry. Než se dodělá, musí fungovat tenhle menší
+celek — a **nic z něj nezávisí na souboji, magii ani smrti**:
+
+| # | Věta krátké smyčky | Stav (2026-10-09) |
+|---|---|---|
+| K1 | Dojdu k prodejci a koupím krumpáč | **chybí** — obchod je v plánu až v `M7` |
+| K2 | Vytěžím rudu | hotové (naměřeno 16. session) |
+| K3 | U forge vytavím ingoty a vykovu předmět | hotové (naměřeno: 624 rudy → 624 ingotů → dýka) |
+| K4 | Prodám výrobek prodejci | **chybí** — totéž jako K1 |
+| K5 | Zavřu hru, vrátím se a svět se posunul beze mě | **chybí** — offline doběh ani scheduler neexistují |
+| K6 | Zadám, co má postava dělat, a ona to provede (pravidla s podmínkami) | **chybí** — nová práce podle §1.5 bodu 8 |
+
+**Past u K5 (patří do zadání, ne do kódu):** mimo obrazovku **nesmí** tiknout
+celý svět jako simulace agentů — trik „aktivace podle sektorů kolem hráče" bez
+hráče nefunguje. Svět mimo obrazovku je **funkce času** (rozvrhy, doplnění
+spawnu, ceny), ne AI. Viz `REVIZE-SMER-2026-10-07.md` §2.5.
+
+`M3`–`M8` (souboj, magie, obchod, spawn) se tím **neruší** — jen přestávají být
+tím, co je nejblíž. Odůvodnění a ceny: `ROZHODNUTI-2026-10-09-SMER.md` (root).
+
 ## 1.4 Rozsah světa — rozhodnutí
 
 | Rozhodnutí | Hodnota | Důvod |
@@ -97,8 +143,19 @@ vyrábí druhý zdroj pravdy a rozbíjí plán:
    z instalace UO (licence, §3.1).
 7. **Žádné překladání názvů předmětů.** Názvy se berou z dat UO (tiledata /
    cliloc). Lokalizace UI je jedna vrstva navíc, ne přepis dat.
-8. **Žádné „vylepšování" mechanik.** Když je v UO něco nepohodlné (např. váha
-   zlata, pomalý běh), zůstává to — věrnost je cíl, ne pohodlí.
+8. **Automatizace smí provést, nesmí rozhodnout (změněno 2026-10-09).** Hra
+   **smí provést, co hráč rozhodl** — i když u hry není (offline doběh), a to
+   i podle pravidel s podmínkami („udělej toto; když nastane tamto, udělej
+   tamto"). Hra **nesmí rozhodnout za hráče**: co se má dělat, určuje hráč.
+   QoL smí zkracovat klikání a zlepšovat čitelnost; **výsledek pravidel se
+   nemění** (žádný loot navíc, žádné zkrácení časovačů, žádná výhoda, kterou
+   by hráč neměl v UO s Razorem nebo UO Assist). Odpověď na „co je tvoje
+   dovednost, když nemusíš klikat" je **plánování a rozhodnutí**, ne klikací
+   zručnost. Podrobnosti a tři vrstvy (úmysl / politika / provedení):
+   `ROZHODNUTI-2026-10-09-SMER.md` §2 D3.
+   *Původní znění (do 2026-10-09, ve svém čase správné): „Žádné ‚vylepšování'
+   mechanik. Když je v UO něco nepohodlné (např. váha zlata, pomalý běh),
+   zůstává to — věrnost je cíl, ne pohodlí."*
 9. **Žádné čtení cizí vrstvy.** UI nikdy nemění stav simulace přímo; posílá
    příkazy. Simulace nikdy nesahá na uzly scény.
 10. **Žádné mazání existujícího API** při úpravě souboru — změna je aditivní,

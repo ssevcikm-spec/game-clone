@@ -131,7 +131,7 @@ granuli, jejíž soubor v `main` je a jejíž API jde zavolat.**
 | Potřebuji cizí soubor | není to tvoje granule, zapiš požadavek |
 | Vychází jiná hodnota než v datech | **data vyhrávají** nad dojmem; ověř měřením |
 | Dvě možnosti, obě věrné | vyber tu, která je v `docs/` zdůvodněná; když tam není, zapiš rozhodnutí |
-| Něco je rychlejší/„lepší" než UO | **neimplementuj** — věrnost je cíl |
+| Něco je rychlejší/„lepší" než UO | QoL (méně klikání, lepší čitelnost) **smí**; **výsledek** pravidel ne — viz `§9.10` bod 10 |
 
 ## 9.10 Zakázané zkratky (tvrdý seznam)
 
@@ -144,4 +144,11 @@ granuli, jejíž soubor v `main` je a jejíž API jde zavolat.**
 7. Neupravovat `tests/`, `tools/gates/`, `project.godot`, `.forge/`, `docs/`.
 8. Neoznačit granuli `done`, dokud soubor není v `main` a brána nezavolala jeho funkci.
 9. Nezapisovat „prošlo" u kontroly, která se přeskočila.
-10. Nepřidávat „vylepšení", která UO nemá (auto-loot, rychlé cestování, moderní inventář).
+10. Nepřidávat **výsledky** pravidel, které UO nemělo (loot navíc, rychlejší
+    časovače, rychlé cestování). **Provést, co hráč rozhodl, hra smí** — i beze
+    hráče (offline doběh) a podle pravidel s podmínkami. Hranice: *hra smí
+    provést, nesmí rozhodnout za hráče* (`01-cil-a-scope.md` §1.5 bod 8;
+    `ROZHODNUTI-2026-10-09-SMER.md` §2 D3).
+    *Do 2026-10-09 platilo: „Nepřidávat ‚vylepšení', která UO nemá (auto-loot,
+    rychlé cestování, moderní inventář)." — ve svém čase správné; auto-loot
+    a rychlé cestování zůstávají zakázané, protože mění **výsledek**.*
