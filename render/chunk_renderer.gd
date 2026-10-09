@@ -109,6 +109,21 @@ const PZ_SKRYT: int = 16             # `pz16 = playerZ + 16` (reference)
 # Je to `Const.Z_MAX`, ale konstanta se vypisuje, aby bylo videt, ze to cislo
 # ma v referenci vyznam (a aby se nedalo splest s `hrac_z + 16`).
 const STROP_NIC: int = 127
+# ⚠⚠ NEJNIŽŠÍ `z` SOUVISLÉ STŘECHY (2026-10-09, faze 1 bod 5.3). Reference
+# NENASTAVI strop po nalezu strechy na jeji `z`, ale na
+# `Map.CalculateNearZ(tileZ, x+1, y+1, tileZ)`
+# (`_src/classicuo/src/ClassicUO.Client/Game/Map/Map.cs:164-219`): flood fill po
+# souvisle strese (kazdy krok |z - z_souseda| <= 6, `:192`) a vraci NEJMENSI
+# `z` teto strechy = OKAP. Teprve to je `_maxGroundZ`, a tedy `_maxZ`
+# (`GameSceneDrawingSorting.cs:180-185` a `:203`); `ProcessAlpha` (`:339`) pak
+# skryje vsechno s `obj.Z >= _maxZ`.
+# NAMERENO 2026-10-09 (`_analyza/p27-patra-sonda.gd`): nas kod daval `z`
+# NALEZENE strechy (hreben) - strop vysel az o 9 jednotek vys (49 misto 40 na
+# (1477,1612)) a patro se kreslilo. V okoli Britainu se to tykalo 85 z 1369
+# proskenovanych dlazdic.
+const NEAR_Z_TOLERANCE: int = 6      # `Map.cs:192` (`Math.Abs(z - obj.Z) > 6`)
+const NEAR_Z_LIMIT: int = 20000      # pojistka (reference ma mrizku 64x64)
+const NEAR_Z_NENI: int = -32768      # "na te dlazdici strecha neni"
 
 var _map = null
 var _textures = null
@@ -126,6 +141,21 @@ var _hrac_z: int = -9999
 # Strop patra (reference `_maxZ`): kresli se jen statiky s `z < _max_z`.
 # `STROP_NIC` = nad hracem nic neni a neskryva se.
 var _max_z: int = STROP_NIC
+# MERENI flood fillu (`near_z`): kolik dlazdic prosla posledni vypocet a jestli
+# narazila na pojistku. Nula a "nevim" musi byt videt (docs/08 §8.6).
+var near_z_kroku: int = 0
+var near_z_limit: bool = false
+# Kolikrat se `strop_patra` opravdu POCITAL (cache zásah se nepocita). Slouzi
+# k dokazu, ze cache funguje - bez nej by se flood fill delal kazdy frame.
+var strop_vypoctu: int = 0
+# CACHE stropu podle pozice hrace. Reference pocita `UpdateMaxDrawZ()` JEN kdyz
+# se zmeni dlazdice nebo vyska hrace (`GameSceneDrawingSorting.cs:63-68`,
+# `_oldPlayerX/Y/Z`); nam se `strop_patra` vola z `nastav_hrace` KAZDY frame
+# (pres `look_at_tile`) a s flood filleme by to bylo 2 492 dlazdic na frame
+# (namEReno v Britanii). Cache je proto soucast chovani, ne optimalizace:
+# bez ni by se hra zasekavala a `near_z` by byl drazsi nez uzitek.
+var _strop_klic: String = ""
+var _strop_vysledek: Dictionary = {}
 
 
 
@@ -173,6 +203,64 @@ func pod_strechou(px: int, py: int, pz: int) -> bool:
 	return false
 
 
+func strecha_na(x: int, y: int, z: int) -> int:
+	# Prvni statik na dlazdici, ktery je STŘECHA a jehoz `z` je od `z` nejvys
+	# o `NEAR_Z_TOLERANCE` - doslovny prepis vnitrku `Map.CalculateNearZ`
+	# (`Map.cs:180-197`). Vraci `z` strechy, nebo `NEAR_Z_NENI`.
+	if _tiledata == null:
+		return NEAR_Z_NENI
+	for record in _statiky_na(x, y):
+		if (_tiledata.flags(int(record["tile"]) + ITEM_OFFSET) & F_ROOF) == 0:
+			continue
+		var tz: int = int(record["z"])
+		if absi(tz - z) > NEAR_Z_TOLERANCE:
+			continue
+		return tz
+	return NEAR_Z_NENI
+
+
+func near_z(default_z: int, x: int, y: int, z: int) -> int:
+	# DOSLOVNY PREPIS `Map.CalculateNearZ` (`Map.cs:164-219`): projde SOUVISLOU
+	# strechu a vrati jeji NEJMENSI `z` (okap). Reference to pouziva jako strop
+	# po nalezu strechy na (x+1, y+1) - viz hlavicka `NEAR_Z_TOLERANCE`.
+	#
+	# Odchylky od reference (obě pojmenovane):
+	#   * reference rekurzuje, my mame explicitni zasobnik (v GDScriptu by
+	#     rekurze pres stovky dlazdic mohla prekrocit strop zasobniku),
+	#   * navstivene dlazdice se drzi ve stejne mrizce 64x64 jako reference
+	#     (`(x & 0x3F) + ((y & 0x3F) << 6)`, `Map.cs:166`), takze i "preskoceni"
+	#     dlazdice vzdalene o nasobek 64 je stejne jako v referenci,
+	#   * navic je POJISTKA `NEAR_Z_LIMIT` a pocitadlo `near_z_kroku`: kdyby
+	#     data mela strechu pres cele mapy, nesmi to zamrznout. Narazeni na
+	#     pojistku se hlasi (`near_z_limit`), ne zamlci.
+	near_z_kroku = 0
+	near_z_limit = false
+	var nejnizsi: int = default_z
+	var zasobnik: Array = [Vector3i(x, y, z)]
+	var videno: Dictionary = {}
+	while not zasobnik.is_empty():
+		var bod: Vector3i = zasobnik.pop_back()
+		var klic: int = ((bod.x & 0x3F) << 6) | (bod.y & 0x3F)
+		if videno.has(klic):
+			continue
+		videno[klic] = true
+		near_z_kroku += 1
+		if near_z_kroku > NEAR_Z_LIMIT:
+			near_z_limit = true
+			push_warning("render.chunk: near_z narazil na pojistku %d dlazdic - strop patra muze byt vyssi, nez ma byt" % NEAR_Z_LIMIT)
+			break
+		var tz: int = strecha_na(bod.x, bod.y, bod.z)
+		if tz == NEAR_Z_NENI:
+			continue
+		if tz < nejnizsi:
+			nejnizsi = tz
+		# Reference predava SOUSEDUM `z` teto dlazdice (`Map.cs:212-215`), ne
+		# puvodni `z` - proto se souvislost pocita po krocich.
+		for smer in [Vector2i(-1, 0), Vector2i(1, 0), Vector2i(0, -1), Vector2i(0, 1)]:
+			zasobnik.append(Vector3i(bod.x + smer.x, bod.y + smer.y, tz))
+	return nejnizsi
+
+
 func strop_patra(px: int, py: int, pz: int) -> Dictionary:
 	# STROP PATRA - doslovny prepis `UpdateMaxDrawZ()`
 	# (`GameSceneDrawingSorting.cs:74-212`). Vraci
@@ -180,7 +268,15 @@ func strop_patra(px: int, py: int, pz: int) -> Dictionary:
 	# true, kdyz se strop opravdu snizil (reference `_noDrawRoofs`).
 	#
 	# Poradi vetvi je z reference a NENI zamenne: druha smycka je jen pro
-	# STŘECHU bez `Surface` na (x+1,y+1) a jen ta meni `maxground` (radek 200).
+	# STŘECHU bez `Surface` na (x+1,y+1) a jen ta meni `maxground` (radek 200)
+	# - a to pres `near_z()` (`Map.CalculateNearZ`), ne na `z` te strechy.
+	#
+	# ⚠ CACHE podle pozice hrace (2026-10-09): reference pocita `UpdateMaxDrawZ`
+	# jen pri zmene dlazdice/vysky (`:63-68`); nam se sem chodi kazdy frame.
+	var klic: String = "%d,%d,%d" % [px, py, pz]
+	if klic == _strop_klic and not _strop_vysledek.is_empty():
+		return _strop_vysledek
+	strop_vypoctu += 1
 	var maxz: int = STROP_NIC
 	var kandidat: bool = false
 	if _tiledata == null:
@@ -205,14 +301,19 @@ func strop_patra(px: int, py: int, pz: int) -> Dictionary:
 			var f2: int = _tiledata.flags(int(record["tile"]) + ITEM_OFFSET)
 			if (f2 & (F_TRANSPARENT | F_SURFACE)) == 0 and (f2 & F_ROOF) != 0:
 				maxz = tz2
-				maxground = tz2
+				# ⚠ `CalculateNearZ`, ne `tz2` (reference `:180-185`): strop je
+				# NEJNIŽŠÍ `z` souvisle strechy (okap), ne `z` nalezene dlazdice.
+				maxground = near_z(tz2, px + 1, py + 1, tz2)
 				kandidat = true
 		tempz = maxground
 	maxz = maxground
 	# 3) strop nikdy nejde pod `pz + 16` (radky 205-209)
 	if tempz < pz + PZ_SKRYT:
 		maxz = pz + PZ_SKRYT
-	return {"maxz": maxz, "kandidat": kandidat}
+	var vysledek: Dictionary = {"maxz": maxz, "kandidat": kandidat}
+	_strop_klic = klic
+	_strop_vysledek = vysledek
+	return vysledek
 
 
 func max_draw_z() -> int:

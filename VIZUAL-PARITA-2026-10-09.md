@@ -126,7 +126,7 @@ Pořadí je dané tím, co blokuje uživatelovo hlášení:
 |---|---|---|
 | ~~5.1~~ | ~~**Zoom: jeden převodní pár `svět ↔ obrazovka`**~~ **HOTOVO 2026-10-09** — viz §5.1 níže | `pick` == skutečný střed postavy pro zoom 0,5 / 0,75 / 1,0 / 1,5 / 2,0 (naměřeno **0,00 px**) |
 | ~~5.2~~ | ~~**Rozhled oknem, ne zoomem < 1**~~ **HOTOVO 2026-10-09** — viz §5.2 níže | `viewport == okno`, svět = okno − pás; fullsize = celé okno |
-| 5.3 | **Z-pásma podle hráče** (`playerZ ± 14/16`, strop 150) v `render.chunk_renderer`/`render.sort` | snímek místa, kde je vidět zeď z podkroví: se stejným pravidlem se nezobrazí; číslo `maxZ` v overlayi |
+| ~~5.3~~ | ~~**Z-pásma podle hráče** (`playerZ ± 14/16`, strop 150)~~ **HOTOVO 2026-10-09** — viz §5.3 níže | rozdíl proti referenci **0** na 1369 místech; strop 150 měřeně 0 objektů |
 | 5.4 | **Střechy: fade na alfu 0** místo vyhození (dnešní stav je binární vidím/nevidím → „krok stranou a je to jinak") | dva snímky téhož místa s hráčem pod střechou a vedle |
 | 5.5 | **Záseky**: dokončit cestu „runtime atlas bez překreslení na GPU" (známá z R6) | 2 → 0 framů > 33 ms z 2300; `peak` v overlayi |
 
@@ -201,6 +201,35 @@ o rozložení**, ne pravidlo z reference — je tak popsané v `app/window.gd`.
 `app/main.gd` (geometrie se dnes počítá jednou) a `ui/hud.gd` (pozice oken) —
 odhadem 1 session; 5.3/5.4 jsou změny v `render/` s paritní branou, také
 ~1 session. Nic z toho se nezačalo.
+
+### 5.3 HOTOVO (2026-10-09, `render/chunk_renderer.gd`)
+
+**Co se měřilo:** uživatelovo pozorování č. 8 („zobrazuje se i kousek zdi
+z vyšší úrovně, ale ne stále — krok nebo dva stranou už ne"). Sonda
+`_analyza/p27-patra-sonda.gd` proskenovala **1369 dlaždic** okolo Britainu
+(±18 od 1495,1630) a pro každou spočítala náš strop patra a **strop podle
+reference** (vlastní přepis `Map.CalculateNearZ` jako druhý názor).
+
+| Nález | Číslo |
+|---|---|
+| Míst s kandidátem na strop (střecha na dlaždici hráče nebo na (x+1,y+1)) | **85 z 1369** |
+| **Odchylka od reference:** my brali `z` NALEZENÉ střechy (hřeben), reference `Map.CalculateNearZ` = **nejnižší `z` souvislé střechy (okap)** (`Map.cs:164-219`, tolerance ±6 na krok) — náš strop vyšel až o **9 jednotek výš** (49 místo 40 na 1477,1612) | opraveno: `near_z()` je doslovný přepis (iterativně, mřížka 64×64 jako reference, pojistka 20 000 dlaždic + počítadla `near_z_kroku`/`near_z_limit`) |
+| Po opravě: rozdíl náš vs. referenční strop | **0 na všech 1369 místech** |
+| ⚠ **Viditelný dopad v Británii: 0 objektů** — v pásu `[okap, hřeben)` na těch 85 místech nebyl ani jeden kreslený objekt. Oprava je tedy věrnost pravidla, ne viditelná změna na tom místě | naměřeno, ne zamlčeno |
+| Strop **150** (`GameScene.cs:669`, `AddTileToRenderList(..., 150, ...)`) — náš kód ho nemá | objektů s horní hranou (`z + výška`) nad 150 v seznamu: **0** (mapa má `Z ≤ 127`, `core/const.gd`), takže chybějící strop je měřeně bez dopadu |
+| **Cache** (`strop_patra` podle pozice hráče) | reference počítá `UpdateMaxDrawZ` jen při změně dlaždice/výšky (`:63-68`); nám se sem chodí každý frame a flood fill projde **161 dlaždic** (naměřeno v Británii) — bez cache by to byl flood fill na každý frame |
+| Snímek (pohledem) | `_analyza/p27-strop-1477-1612.png` — strop 40, `holes=0`, nic nechybí (kontrola, že se neskrylo, co vidět má být) |
+| Test + mutace | nový `tests/cases/near_z.gd` (10 kontrol: okap vs hřeben, nesouvislá střecha se nepočítá, bez střechy vstup beze změny, `pz+16` strop, cache); mutace „hřeben místo okapu" → **2 selhání** |
+| Testy / brány | **1422 → 1433 kontrol / 0 selhání**; brány **11 měřeno / 0 chyb** |
+
+**➡ Co z toho plyne pro uživatelovo pozorování:** „kousek zdi z vyšší úrovně,
+krok stranou už ne" **je chování originálu**, ne naše vada: `_maxZ` zůstává
+**127** (tj. nic se neskrývá), dokud na dlaždici hráče nebo na (x+1,y+1) není
+střecha — a to se krokem mění. Naměřeno: **904 z 1369** pozic má nad hráčem
+(+14) kreslené objekty patra, protože kandidát není. Co na tom působí divně,
+je **tvrdý skok** (žádné prolínání) — a to je přesně bod 5.4: reference objekty
+v úrovni stropu a výš **faduje na alfu 0** (`ProcessAlpha`, `:339-368`), nezahazuje.
+
 
 ---
 

@@ -92,6 +92,46 @@ o rozložení (popsané v `app/window.gd`).
 — `GameSceneDrawingSorting.cs:87-88`, `:564-568`, `RenderLists.cs:274`), pak 5.4
 (střechy fade na alfu 0 — `:357-368`) a 5.5 (záseky).
 
+### ✅ DOPLNĚNO (FÁZE 1, BOD 5.3 — STROP PATRA PODLE REFERENCE)
+
+**Co se měřilo:** uživatelovo „zobrazuje se i kousek zdi z vyšší úrovně, ale ne
+stále". Sonda `_analyza/p27-patra-sonda.gd` proskenovala **1369 dlaždic** okolo
+Britainu a pro každou spočítala náš strop patra i strop podle reference
+(vlastní přepis `Map.CalculateNearZ` jako druhý názor).
+
+**Co bylo špatně:** po nálezu střechy na (x+1,y+1) jsme brali `z` NALEZENÉ
+střechy (hřeben), kdežto reference `Map.CalculateNearZ`
+(`_src/classicuo/.../Game/Map/Map.cs:164-219`) — flood fill po SOUVISLÉ střeše
+(tolerance ±6 na krok) vracející její **nejnižší `z` (okap)**. Náš strop vyšel
+až o **9 jednotek výš** (49 místo 40 na (1477,1612)).
+
+**Co je hotové:** `render/chunk_renderer.gd` má `strecha_na()` a `near_z()`
+(doslovný přepis, iterativně místo rekurze, mřížka 64×64 jako reference,
+pojistka 20 000 dlaždic + počítadla `near_z_kroku`/`near_z_limit`) a
+`strop_patra()` ji používá; navíc **cache podle pozice hráče** (reference počítá
+`UpdateMaxDrawZ` jen při změně dlaždice — `GameSceneDrawingSorting.cs:63-68`),
+protože flood fill projde 161 dlaždic a `strop_patra` se volá každý frame.
+
+| Důkaz | Číslo |
+|---|---|
+| Po opravě: rozdíl náš vs. referenční strop | **0 na všech 1369 místech** (před: až 9 jednotek, 85 míst s kandidátem) |
+| ⚠ Viditelný dopad v Británii | **0 objektů** — v pásu `[okap, hřeben)` na těch 85 místech nebyl ani jeden kreslený objekt (naměřeno, ne zamlčeno) |
+| Strop 150 (`GameScene.cs:669`) — náš kód ho nemá | objektů s `z + výška > 150`: **0** (mapa má `Z ≤ 127`) → měřeně bez dopadu |
+| Snímek | `_analyza/p27-strop-1477-1612.png` (strop 40, `holes=0`) |
+| Test + mutace | nový `tests/cases/near_z.gd` (10 kontrol); mutace „hřeben místo okapu" → **2 selhání** |
+| Testy / brány | **1422 → 1433 kontrol / 0 selhání**; brány **11 měřeno / 0 chyb** |
+
+**➡ DŮLEŽITÉ PRO UŽIVATELE:** „kousek zdi z vyšší úrovně, krok stranou už ne"
+**je chování originálu, ne naše vada.** `_maxZ` zůstává **127** (nic se
+neskrývá), dokud na dlaždici hráče nebo na (x+1,y+1) není střecha — a to se
+krokem mění (naměřeno: 904 z 1369 pozic má nad hráčem kreslené patro).
+Co působí divně, je **tvrdý skok** — a to je bod 5.4: reference objekty
+v úrovni stropu a výš **faduje na alfu 0** (`ProcessAlpha`,
+`GameSceneDrawingSorting.cs:339-368`), nezahazuje je.
+
+**➡ Další bod fáze 1 je 5.4** (fade střech/patra na alfu 0 místo vyhození),
+pak 5.5 (záseky: runtime atlas bez překreslování na GPU).
+
 **➡ NÁVRH REVIZE VIZUÁLU JE V `VIZUAL-PARITA-2026-10-09.md`** — naměřené
 nálezy k deseti pozorováním, pravidla originálu s citacemi (Z-pásma
 `playerZ ± 14/16`, fade střech na alfu 0, hloubka `(x+y) + (127+z)*0.01`) a tři
