@@ -180,6 +180,16 @@ stroj na buildy.** `D9` se nemění (session u hostitele první, `always-on` odl
   Ověřená cesta zůstává **`chroot` pod rootem**.
 * **Zbývá NEMĚŘENO:** soak **24 h** (proxy bylo 20 min), **tik na reálné mapě
   s kolidemi** (sonda má stub tiledata) a **upload/NAT zvenčí**.
+* **ZAŘAZENO DO PLÁNU (2026-10-09 večer):** vznikl nový milník **`MP` — Hosting
+  a malý multiplayer** (za `M9`), zapsaný na **třech synchronizovaných místech**
+  (`tools/roadmap-gen.py` `MILNIKY_PORADI`, `tools/plan-status.py` `MILNIKY`,
+  `docs/07` §7.2 + vlny `W15`/`W16`) se **4 granulemi**: `host.model`,
+  `mp.contract` (smlouva s tvarem dat), `mp.server_loop`, `mp.host_probe`
+  (doměří tik na reálné mapě, soak 24 h, upload/NAT). Plán má **122 granul**
+  (bylo 118), pokrytí vlnami **84 z 122**; `roadmap-gen --check` i
+  `gates/run-all.py` (**12 měřeno / 0 chyb**) zelené. Implementační granule pro
+  multiplayer v `MP` **záměrně nejsou** — chybí smlouva s tvarem dat
+  (`game-developer` §2).
 
 ---
 

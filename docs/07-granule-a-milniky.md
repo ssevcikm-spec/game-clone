@@ -58,6 +58,7 @@ kontrola (snímek + projití scénáře).
 | **M7** | **Ekonomika a svět** | uloží zlato do banky (**obchod je od 2026-10-09 v MK**), potká spawny ve 3 dungeonech, **funguje den/noc a světlo (`render.light`)** | G3, G5, G9, G12 |
 | **M8** | **Trvanlivost a uzavření** | uložení/načtení, determinismus, replaye, výkon, makra, credits, vydání (**zvuk a hudba je od 2026-10-07 VLASTNÍ TRAŤ** — viz poznámka pod tabulkou) | G7, G8, G9, G12, G13 |
 | **M9** | **Modernizace** | typovaná konfigurace, dávkové kreslení bloků (mesh), měření výkonu a parity cache; **pravidlo: modernizace nesmí ubrat žádné měření** (každá změna má stejnou nebo silnější bránu) | G1–G13 (nesmí jich ubýt) |
+| **MP** | **Hosting a malý multiplayer** (za `M9` — viz poznámka pod tabulkou; **hosting je už ZMĚŘENÝ**) | hostitel založí session a přítel se připojí a **vidí totéž**; autorita zůstává v `sim/` (klient posílá jen záměr); server jde spustit headless na telefonu a **tik drží rozpočet** | G2, G8, G9 + sonda kapacity (`mp.host_probe`) |
 
 **Pravidlo pro milníky:** milník není hotový, dokud **člověk** neprojde jeho
 scénář a neuvidí ho. Zelené brány k tomu **nestačí** (naměřeno: hráč nebyl
@@ -81,6 +82,23 @@ nevolal), `sim.save`, `sim.offline`, `sim.policy`, `sim.executor`,
 **třech místech** (`MILNIKY_PORADI`, `MILNIKY`, tahle tabulka) a **nic se přitom
 nemaže** — M5–M8 zůstávají v platnosti, jen přestaly být tím, co je nejblíž.
 
+**`MP` — hosting a malý multiplayer je od 2026-10-09 taky vlastní milník**
+(`ZADANI-22-TELEFON-A-HOSTING.md`, `ROZHODNUTI-2026-10-09-SMER.md`, oddíl 6.9, D9).
+Je **za `M9`** záměrně: session u hostitele dává smysl, až je co hrát — **hosting
+se ale měřil DOPŘEDU** (`MERENI-TELEFON-2026-10-09.md`): telefon zvládne
+Godot 4.7.2 ARM64 headless i naši testovací sadu (61/61 case, 1466 kontrol,
+0 selhání) a tik drží rozpočet 2 ms **do ~25 mobilních entit**. Nese
+**4 granule**: `host.model` (naměřený model nasazení a kapacita), `mp.contract`
+(**smlouva s tvarem dat** — co jde po drátě), `mp.server_loop` (headless obálka
+serveru) a `mp.host_probe` (tik na **reálné** mapě s kolidemi, soak 24 h,
+upload/NAT).
+
+**Implementační granule (snapshoty, zájem o okolí, predikce klienta, souběh
+postav) tu ZÁMĚRNĚ NEJSOU** — metodika (`game-developer` §2, „smlouva první")
+zakazuje psát granule bez smlouvy s **tvarem dat**; rozpadnou se z `mp.contract`
+v samostatné plánovací session. Rozšíření je na **třech místech**
+(`MILNIKY_PORADI`, `MILNIKY`, tahle tabulka) a **nic se přitom nemaže**.
+
 ## 7.3 Vlny (co může běžet paralelně)
 
 | Vlna | Granule (paralelně, disjunktní `owns`) |
@@ -100,14 +118,18 @@ nemaže** — M5–M8 zůstávají v platnosti, jen přestaly být tím, co je n
 | **W12** | `sim.ai`, `data.spawns`, `render.names`, `app.pick` (NPC a souboj — přidáno 2026-10-08 z plánu; `world.spawn` se pouští **až po** `sim.ai`) |
 | **W13** | `sim.scheduler`, `sim.save`, `sim.offline`, `sim.policy`, `sim.executor`, `sim.decision_log` (MK — krátká smyčka, přidáno 2026-10-09) |
 | **W14** | `data.vendors`, `sim.vendor`, `ui.vendor_gump` (obchod přesunutý z M7 do MK; `sim.vendor` **až po** `data.vendors`) |
+| **W15** | `host.model`, `mp.contract` (MP — naměřený hosting a smlouva pro multiplayer, přidáno 2026-10-09; obě bez závislostí, `owns` disjunktní) |
+| **W16** | `mp.server_loop`, `mp.host_probe` (MP — obálka serveru **až po** `mp.contract`; sonda kapacity **až po** `host.model`) |
 
 **Granule bez vlny (a proč):** `boot.*` (bootstrap — zakládá je člověk),
 `assets.*` (extrakce dat — sekvenční, jedna po druhé, viz W1) a `app.*` integrační
 uzly, které se dotýkají scény. Naměřeno 2026-10-06 (`python tools/plan-status.py`):
 vlny pokrývaly **62 z 111** granul (číslo **ve svém čase správné**); po vložení
 vlny W12 a granul z plánu naměřeno 2026-10-08: **73 z 112**; po vložení `MK`
-(vlny W13 a W14) naměřeno 2026-10-09: **80 z 118**. Zbytek jsou právě
-tyhle tři druhy.
+(vlny W13 a W14) naměřeno 2026-10-09: **80 z 118**; po vložení `MP` (vlny W15
+a W16) naměřeno 2026-10-09 večer: **84 z 122**. Zbytek jsou právě
+tyhle tři druhy. (Všechna ta čísla jsou **ve svém čase správná** — mění se
+s plánem, ne s měřidlem; měří je `python tools/plan-status.py`.)
 **Pravidlo: granule, která není ani ve vlně, ani v tomhle seznamu, se nesmí vydat** —
 nejdřív se zařadí (jinak se nedá poznat, co může běžet paralelně).
 

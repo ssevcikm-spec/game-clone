@@ -21,7 +21,7 @@ UO Classic, které jsou na této stanici.
 |---|---|
 | **Člověk**, který zadání předává AI | [`ZADANI-UO-KLON.md`](ZADANI-UO-KLON.md) — hlavní zadání, dá se vložit celé |
 | **AI agent**, který má pracovat | `ZADANI-UO-KLON.md` → `docs/01` → `docs/04` → `docs/07` → `docs/08` → `docs/09` |
-| **Orchestrátor** (automatické vydávání práce) | [`.forge/roadmap.json`](.forge/roadmap.json) — 118 granulí s DAG, `owns`, `acceptance` |
+| **Orchestrátor** (automatické vydávání práce) | [`.forge/roadmap.json`](.forge/roadmap.json) — 122 granulí s DAG, `owns`, `acceptance` (stav měří `python tools/plan-status.py`; zdroj je `tools/roadmap-gen.py`) |
 
 ## Mapa balíčku
 

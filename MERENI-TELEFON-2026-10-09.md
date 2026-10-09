@@ -109,9 +109,12 @@ zvenčí** (bez dotazu z internetu je to dohad).
 
 ## 5. Tik ≤ 2 ms (ZADÁNÍ bod 3) — NAMĚŘENO
 
+> Obě sondy (`p32`, `p33`) jsou v `_analyza/`, a ta je **v `.gitignore`** — stejně
+> jako ostatní měřicí skripty projektu (`p30-…`). V repu je tedy **postup**
+> (tady), ne skript; na telefonu leží v `/root/game-clone/.tmp/probe/`.
+
 Sonda [`_analyza/p32-telefon-tik.gd`](_analyza/p32-telefon-tik.gd) (na telefonu
-běžela z `res://.tmp/probe/tick_probe.gd`): 200 tiků po 50 ms na každé N, 30 tiků
-zahřátí, fixture mapa, **stub tiledata/doors/stairs**, každý mobil dostane každý
+běžela z `res://.tmp/probe/tick_probe.gd`): 200 tiků po 50 ms na každé N, 30 tikůzahřátí, fixture mapa, **stub tiledata/doors/stairs**, každý mobil dostane každý
 tik příkaz k chůzi, `--headless`. **Stejný soubor na PC i na telefonu.**
 
 | N mobilů | telefon (aarch64, chroot) | PC (Ryzen 5 2600, x86_64) | poměr |
@@ -214,3 +217,37 @@ mez**: souběžná těžká práce (build) shodí Termux (OOM). Pro `always-on` 
 jen „málo RAM", ale i **teplo 58–68 °C v trvalé zátěži**, nutnost hlídat procesy
 (sirotek po zabití obalu) a start serveru přes **chroot pod rootem**. `D9` se
 nemění: první multiplayer je session u hostitele, `always-on` odložený.
+
+## 10. Zařazení do plánu realizace (aby to nezůstalo jen v záznamu)
+
+Dne 2026-10-09 večer vznikl v plánu **nový milník `MP` — Hosting a malý
+multiplayer**, aby se naměřené a odložené věci neztratily. Změna je na
+**třech synchronizovaných místech** (tak to projekt vyžaduje):
+
+| Místo | Co přibylo |
+|---|---|
+| `tools/roadmap-gen.py` | `MP` v `MILNIKY_PORADI` (za `M9`) + **4 granule** |
+| `tools/plan-status.py` | `MP` v `MILNIKY` (+ komentář, proč je za `M9`) |
+| `docs/07-granule-a-milniky.md` | řádek v tabulce milníků, poznámka pod ní a **vlny `W15`/`W16`** |
+
+**Granule milníku `MP`** (stav měří `python tools/plan-status.py`: `MP 0/0/4`,
+celkem **122** granul, pokrytí vlnami **84 z 122**):
+
+| Granule | Co dělá | Závisí na |
+|---|---|---|
+| `host.model` | `docs/12-hosting.md` — **naměřený** model nasazení a kapacita (role telefonu, start přes chroot, co je NEMĚŘENO) | — |
+| `mp.contract` | `docs/13-multiplayer.md` — **smlouva s tvarem dat**: co jde po drátě, snapshot + zájem o okolí, predikce a snap-back | `sim.commands`, `sim.save` |
+| `mp.server_loop` | `app/server.gd` — headless obálka serveru (tik 20 Hz, příjem Commandů, odesílání snapshotů) | `mp.contract`, `sim.save`, `sim.offline` |
+| `mp.host_probe` | `tools/probes/mp-fit.gd` — **doměří to, co zůstalo NEMĚŘENO**: tik na reálné mapě s kolidemi, soak 24 h, upload/NAT | `host.model` |
+
+**Co v `MP` ZÁMĚRNĚ není a proč:** implementační granule (snapshoty, zájem
+o okolí, predikce klienta, souběh postav). Metodika `game-developer` §2
+(„smlouva první") zakazuje psát granule bez smlouvy s **tvarem dat** — rozpadnou
+se z `mp.contract` v samostatné plánovací session. Zapsat je teď by znamenalo
+vyrobit plán na něco, co ještě nemá tvar.
+
+**Ověřeno po změně:** `python tools/roadmap-gen.py --check` → DAG konzistentní
+(exit 0), `python tools/plan-status.py` → exit 0, `tools/check-docs-refs.py`
+→ OK, `tools/check-zadani.py` → OK, `tools/gates/run-all.py` → viz commit.
+Dvě čísla, která změna zastarala, jsou přeměřená: `README.md` (118 → **122**)
+a `docs/07` §7.3 (80 z 118 → **84 z 122**).

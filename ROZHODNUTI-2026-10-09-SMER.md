@@ -481,6 +481,14 @@ analýzou"). Čísla a příkazy: [`MERENI-TELEFON-2026-10-09.md`](MERENI-TELEFO
   (5.5.0) je nabíledni další krok, ale na telefonu se stavět nezkoušel (OOM).
 * **D9 se nemění.** **NEMĚŘENO** zůstávají: soak **24 h**, **tik na reálné mapě
   s kolidemi** (sonda má stub tiledata) a **upload/NAT zvenčí**.
+* **ZAŘAZENO DO PLÁNU (2026-10-09 večer):** hosting a malý multiplayer mají
+  vlastní milník **`MP`** (za `M9`) — `tools/roadmap-gen.py`, `tools/plan-status.py`
+  a `docs/07` §7.2 + vlny `W15`/`W16`. Nese 4 granule: `host.model` (naměřený
+  model nasazení), `mp.contract` (**smlouva s tvarem dat** pro drát),
+  `mp.server_loop` (headless obálka) a `mp.host_probe` (doměří tik na reálné
+  mapě, soak 24 h, upload/NAT). Implementační granule pro multiplayer tam
+  **záměrně nejsou** — rozpadnou se z `mp.contract`, až bude smlouva
+  (`game-developer` §2, „smlouva první").
 * Riziko, které k telefonu patří dál: statická `192.168.109.104` **leží v rozsahu,
   který router rozdává** (stav paralelní session, `redmi-server/STAV.md` §2).
 

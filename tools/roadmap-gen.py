@@ -629,8 +629,42 @@ g("render.chunk_mesh", "Dávkové kreslení bloků", ["render/chunk_mesh.gd"],
   acceptance=["render", "tests"], milestone="M9", size="<= 150", model="strong",
   prompt="Modernizace (M9): místo tisíce draw callů na dlaždici jedna dávka na blok. Vzor: ClassicUO `src/ClassicUO.Client/Game/Map/ChunkMesh.cs:121` (+ `MeshLayer.cs`, `TextureBucketTracker`). Musí zůstat STEJNÝ obraz jako `render.chunk` - dokázat snímkem a paritním testem, ne tvrzením.")
 
+# ------------------------------------------------ MP hosting a malý multiplayer
+# Zařazeno 2026-10-09 (session „telefon a hosting", `ZADANI-22`): hosting je
+# ZMĚŘENÝ (`MERENI-TELEFON-2026-10-09.md`) a rozhodnut je v
+# `ROZHODNUTI-2026-10-09-SMER.md` §6.9 (D9: session u hostitele první,
+# `always-on` odložený).
+#
+# `MP` je ZA `M9` záměrně: session u hostitele dává smysl, až je co hrát.
+# Hosting se ale dá měřit DOPŘEDU (a je změřený), proto `host.model` nezávisí
+# na ničem a jde udělat hned.
+#
+# ⚠ Implementační granule (snapshoty, zájem o okolí, predikce, souběh postav)
+# tu ZÁMĚRNĚ NEJSOU: metodika (`game-developer` §2, „smlouva první") zakazuje
+# psát granule bez smlouvy s TVAREM DAT — rozpadnou se z `mp.contract`
+# v samostatné plánovací session.
+g("host.model", "Model nasazení a naměřená kapacita", ["docs/12-hosting.md"],
+  provides=["role telefonu a Oracle uzlu s čísly", "jak se server spouští (telefon: chroot pod rootem)", "co je NEMĚŘENO a čím se to doměří", "cesta zpět (odinstalace kontejneru)"],
+  acceptance=["schema"], milestone="MP", kind="doc",
+  prompt="Sepiš, co je ZMĚŘENÉ a co ROZHODNUTÉ o hostingu. (a) Telefon Redmi Note 8 zvládne Godot 4.7.2 ARM64 headless a naši testovací sadu: 61/61 case souborů, 1466 kontrol, 0 selhání, 28 s. (b) Tik: 1,42 ms prázdný, 2,27 ms při 37 mobilních entitách (PC 0,46/0,82) -> rozpočet 2 ms plní do ~25 entit; `state_hash` 39,9 ms nesmí do smyčky. (c) Soak 20 min: paměť plochá (static 25,3 MB), 58-68 C, 0 zabití procesu. (d) `proot-distro` na telefonu NEFUNGUJE (ani s glibc 2.31) - server se startuje chrootem pod rootem. (e) Souběžný build shodí Termux (OOM). (f) NEMĚŘENO: soak 24 h, tik na reálné mapě s kolidemi, upload/NAT zvenčí. Zdroje: `MERENI-TELEFON-2026-10-09.md`, `NAVRH-BRAN-FEEL-2026-10-09.md` §6. Veřejný server se neslibuje bez čísel o uploadu a NAT.")
+g("mp.contract", "Smlouva pro multiplayer (co jde po drátě)", ["docs/13-multiplayer.md"],
+  deps=["sim.commands", "sim.save"],
+  provides=["tvar Command a Event na drátě", "snapshot + zájem o okolí (interest management)", "predikce klienta a snap-back", "přijímací kritéria pro server loop"],
+  acceptance=["schema"], milestone="MP", kind="doc",
+  prompt="Napiš smlouvu s TVAREM DAT, ne jen jména API: jak vypadá Command a Event na drátě a jak se serializuje, jak vypadá snapshot a kdo rozhoduje o zájmu o okolí, jak funguje predikce klienta a snap-back po odmítnutí. Vycházej z `NAVRH-BRAN-FEEL-2026-10-09.md` §5 (hotové už je: deterministický tik, hash stavu, replaye, autorita v `sim/`) a z pravidla, že klient NIKDY neposílá polohu, jen záměr (`docs/04`, brána `check-layers`). Každá smlouva musí mít přijímací kritérium - jak se pozná, že platí.")
+g("mp.server_loop", "Headless server loop", ["app/server.gd"],
+  deps=["mp.contract", "sim.save", "sim.offline"],
+  provides=["tik 20 Hz bez scény", "příjem Commandů a odesílání snapshotů", "start podle docs/12-hosting.md"],
+  acceptance=["tests", "determinism"], milestone="MP", size="<= 150", model="strong",
+  prompt="Server jako obálka zvlášť: `sim` zůstává jediná autorita (brána `check-layers`), server jen pumpuje `sim.tick(50)` a přenáší Commandy a snapshoty podle `mp.contract`. Žádná herní logika v `app/server.gd` - jen síť a smyčka. Musí jít spustit headless na telefonu (docs/12-hosting.md: chroot pod rootem) a bez připojeného klienta.")
+g("mp.host_probe", "Sonda kapacity hostitele (tik na reálné mapě, soak, síť)", ["tools/probes/mp-fit.gd"],
+  deps=["host.model"],
+  provides=["ms/tik na REÁLNÉ mapě s kolidemi", "soak 24 h (RSS, teplota, zabití procesu)", "upload a NAT zvenčí"],
+  acceptance=["tests"], milestone="MP", size="<= 120", model="strong",
+  prompt="Změř to, co zůstalo NEMĚŘENO (`MERENI-TELEFON-2026-10-09.md` §9): (1) tik na REÁLNÉ mapě s kolidemi a statiky - sonda `_analyza/p32-telefon-tik.gd` má stub tiledata, takže číslo je jen per-entitní část; rozšiř ji na `assets/uo/world` a hlídej, že bez assetů hlásí NEMĚŘENO, ne zelenou; (2) soak 24 h se vzorkováním RSS a teploty a kontrolou, že proces nikdo nezabil; (3) upload a NAT zvenčí - bez toho se veřejný server neslibuje. Každé číslo s postupem a časem; co nejde změřit, ať je vidět jako NEMĚŘENO.")
+
 # Pořadí milníků pro kontrolu "závislost nesmí být později" (revize 2026-10-06).
-MILNIKY_PORADI = ["M0", "M1", "M2", "M3", "M4", "MK", "M5", "M6", "M7", "M8", "M9"]
+MILNIKY_PORADI = ["M0", "M1", "M2", "M3", "M4", "MK", "M5", "M6", "M7", "M8", "M9", "MP"]
 
 
 def main() -> int:
