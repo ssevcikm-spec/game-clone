@@ -12,6 +12,9 @@
 (kroky 1–3), kontext [`PREDANI-SESSION-2026-10-09.md`](PREDANI-SESSION-2026-10-09.md).
 **Stav před session:** `MK 2/0/7`, 63 měřeně hotových granul, brány 11 OK / 0 chyb,
 testy 1 507 kontrol / 0 selhání, HEAD `5959f3b`.
+**Stav po session:** commit **`fd3bea2`**, `origin/main == HEAD` (push ověřen,
+`ahead 0`), `MK 3/9`, **64** měřeně hotových, brány **12 OK / 0 chyb**,
+testy **1 551 / 0**.
 
 > ⚠ **Prostředí (naměřeno na začátku session):** session běžela v `workspace-write`
 > a brány hlásily **„chyb 2, čeká 1"** — G3/G7/G11 nemohly zapsat `user://` ani
@@ -119,7 +122,7 @@ vlastní doklad. G9 po přepnutí: `hash == očekávaný` u obou replayů, `exit
 |---|---|
 | Testy (G3) | **1 551 kontrol / 0 selhání**, `case souboru spusteno: 61 z 61` (bylo 1 507 / 59) |
 | Brány `run-all.py` | **12 měřeno / 0 čeká / 0 chyb**, `exit 0` (11 + **F1**) |
-| `plan-status.py` | před commitem `MK 2 / 1 / 6` (63 hotových) — **soubor `sim/offline.gd` ještě není v gitu**; po commitu má být `MK 3 / 0 / 6`, **64 hotových** (ověřeno níž) |
+| `plan-status.py` | **po commitu `fd3bea2`: `MK 3 / 0 / 6`, 64 měřeně hotových** (bylo 63); před commitem hlásil `MK 2 / 1 / 6` — `sim/offline.gd` ještě nebyl v gitu a `plan-status` „v gitu" měří jako **sledované gitem**, ne existující na disku |
 | Dokumentové brány | `check-docs-refs`, `check-zadani`, `roadmap-gen --check` → všechny `exit 0` |
 | G7 | `hash_before == hash_after = 6946c1af…`, `mobiles_after 3`, self-test **8 případů / 0 chyb** |
 | F1 self-test / mutace | 13 případů / 0 chyb · **5 z 5 mutací chyceno** + smlouva vstupu OK |
