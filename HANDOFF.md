@@ -1,10 +1,120 @@
-# Předání — game-clone (2026-10-09, DRUHÁ SESSION TÉHOŽ DNE: ENTITY JAKO STAVOVÝ ZDROJ, `sim.offline`, BRÁNA F1 — MK 3/9)
+# Předání — game-clone (2026-10-09, SESSION D: POLITIKA + VYKONAVATEL + LOG ROZHODNUTÍ, `ZADANI-24` — MK 6/9)
 
 > **Co je tenhle soubor:** **stav projektu** pro další session agenta. Přepisuje
 > se celý; historie je v `git log`. Nový blok je vždy **nahoře**; starší bloky se
 > needitují (jen doplňují), aby se neztratilo, co bylo naměřeno dřív.
 > **Současný stav se bere z tohoto bloku** a ověřuje se živě (§„Předletová
 > kontrola" níž je starší a **datovaná**).
+
+## ✅ CO JE NOVÉHO (2026-10-09, SESSION D) — POLITIKA, VYKONAVATEL, LOG ROZHODNUTÍ (`ZADANI-24`, MK 6/9)
+
+**Zadání:** [`ZADANI-24-AUTOMATIZACE-POLITIKA.md`](ZADANI-24-AUTOMATIZACE-POLITIKA.md),
+hranice `D3` z [`ROZHODNUTI-2026-10-09-SMER.md`](ROZHODNUTI-2026-10-09-SMER.md) §2
+(„hra smí provést, co hráč rozhodl — nesmí rozhodnout za něj“); kontext
+[`PREDANI-SESSION-2026-10-09.md`](PREDANI-SESSION-2026-10-09.md).
+**Stav před session:** `MK 3/0/6`, 64 měřeně hotových, brány 12 OK / 0 chyb,
+testy **1 551** kontrol / 0 selhání, HEAD `fa1501b`.
+**Stav po session (commit `228ecdc`):** `MK 6/0/3`, **67** měřeně hotových,
+brány **12 měřeno / 0 chyb**, testy **1 650 kontrol / 0 selhání** (65 case
+souborů), mutace nových modulů **18 z 18 chyceno**, dokumentové brány
+`check-docs-refs` (v `tools/`, ne `tools/gates/`) + `check-zadani` +
+`roadmap-gen --check` → `exit 0`.
+
+> ⚠ **Prostředí (naměřeno na začátku session):** session běžela v `workspace-write`
+> a brány hlásily **„měřeno 9, čeká 1, chyb 2“** — G3/G7/G11 nemohly zapsat
+> `user://` ani `.cache/gates/*.json` (`PermissionError`, Godot „Failed to open
+> `user://logs/…`“). **Nebyla to vada projektu:** po přepnutí na plný přístup je
+> **12 OK / 0 chyb** — stejná past jako 2026-10-09 (druhá session), třetí stav
+> se nesmí číst jako červená (`dsh-prostredi` §4e, `overovani` §7.13).
+
+### 1) Tři moduly: úmysl → politika → provedení
+
+| Granule | Soubor | `provides` | Co je naměřené |
+|---|---|---|---|
+| `sim.policy` | `sim/policy.gd` | `load(json)`, `evaluate(state)`, `priority_of(rule)` | pravidla jsou DATA: podmínka i akce jsou `{"kind","args"}` s **pevným slovníkem** (7 podmínek, 8 akcí), priorita je číslo. `evaluate` vrací rozhodnutí seřazená podle **(priorita sestupně, id vzestupně)** — na pořadí v datech nezáleží (měřeno: prohozené pořadí = tyž výsledek). |
+| `sim.executor` | `sim/executor.gd` | `step(state) -> [Command]`, `status()` | rozhodnutí → `Command`; **na stav nesahá** (měřeno: `JSON.stringify(state)` před == po), vysílá **jen** příkaz, který projde `sim.commands.validate` (měřeno: `ok: true`; akce `vendor action=teleport` se NEpošle a důvod je `invalid command (range:action)`), a **zastaví se s důvodem**. |
+| `sim.decision_log` | `sim/decision_log.gd` | `decision(rule_id, why, state_ref)`, `skipped(rule_id, why)`, `since(tick)` | zapisuje **důvod** („item 3717: 0 < 1“, „stav nezna: inventory“, „lower priority (decided: …)“) a **změnu** publikuje jako událost `message` → vypíše ji `ui.journal` **bez její editace** (měřeno: ve `snapshot()["events"]` je `policy: go -> skill 45: 100 < 200`). Strop `MAX_ENTRIES = 256` + `dropped()`. |
+
+**Klíčové rozhodnutí, které drží hranici `D3`:** chybějící klíč stavu se **nikdy
+nečte jako nula**. `item_below` bez `inventory` není „0 < 1 → splněno“, ale
+`stav nezna: inventory` — a mutace, která chybějící stav doplní prázdným
+slovníkem (tj. vada „pravidlo se vyhodí z ničeho“), je **chycená** (naměřeno).
+
+### 2) Zapojení (ne mrtvý kód)
+
+`SimWorld` tickuje vykonavatele **jen když je politika načtená** (bez politiky
+= no-op) a vyrobené `Command` jdou **do stejné fronty jako hráč** s označením
+`src` (`player`/`policy`). `app/main.gd` načte `user://policy.json`, **když
+soubor existuje** (jinak nic — žádná hláška každý start). G4 (`check-wiring`):
+`volanych_z_produkce` 100 → **109**, `jen_z_testu` 38 → **37**; test-only
+zůstávají jen `sim.policy.priority_of` a `sim.decision_log.since` (obojí
+acceptance `wiring` nežádá).
+
+**`state_hash()` se NEMĚNIL:** politika, vykonavatel ani log **nejsou stavové
+zdroje** (měřeno: `state_source_names()` = `["entities", "scheduler"]`,
+`state_hash()` před nactením politiky == po nactení). Doklad, že se to
+nepohnulo: **G9 zelený se stejnými pinovanými hashy** (`tic_200 b203767b…`,
+`tic_1000 3f94a925…`), G7 `6946c1af…` před == po (`mobiles_after 3`),
+F1 `53f7860a… → d90b944f…` (events 210, agent_ticks 0, capped 1). **Replaye se
+nepřepínaly** a nový doklad hashe nebyl potřeba.
+
+### 3) Testy a mutační důkaz
+
+Čtyři **nové** case soubory (existující se neměnily, `docs/09 §9.5`):
+`policy.gd`, `executor.gd`, `decision_log.gd` a `policy_hook.gd` (zapojení
+měřené, ne mrtvý kód). Testy **1 551 → 1 650** kontrol / **0 selhání**,
+case souborů **61 → 65**.
+
+Mutace (`python tools\gates\mutace-tests.py --only policy,executor,decision_log,policy_hook`):
+**18 z 18 chyceno**, smlouva vstupu (neexistující cesta) **OK**, baseline
+**1 650 kontrol / 0 selhání**. Každou vadu chytila **ta** kontrola, kvůli které
+vzor existuje — např. „zastavení se ignoruje“ chytila kontrola *zastavený
+vykonavatel nevyhodí ani jiné pravidlo*, „politika se zaregistruje jako stavový
+zdroj“ kontrola *nacteni politiky samo NEMENI state_hash*, „vadná data se
+přijmou“ kontrola *politika bez platného pravidla se NENACTE*.
+
+### 4) Dvě pasti, které to stálo (obojí naměřené)
+
+1. **Dva mutační vzory z prvního běhu PROŠLY (16/18)** — a oba ukázaly slabý
+   TEST, ne slabý kód: (a) mutace měnila jen **text důvodu** („inventory = 0“),
+   ne chování, takže ji žádná kontrola chytit nemohla — správná mutace je
+   **chování** (chybějící stav se doplní `{}` a pravidlo se vyhodí z ničeho);
+   (b) kontrola „zastavený nic nepošle“ prošla i s vypnutým `_stopped`, protože
+   pravidlo `stop` se vyhodnotilo znovu a vrátilo prázdno z jiného důvodu.
+   Po opravě testu (měří se, že se nevyhodnotí **jiné** pravidlo) **10/10**.
+   **Pravidlo: mutace musí vracet vadu, kterou test umí vidět — a vada musí být
+   v chování, ne v textu.**
+2. **`JSON.parse_string` u vadného vstupu píše `ERROR:` do logu enginu** —
+   v testech to vypadá jako selhání. `sim/policy.gd` proto parsuje přes
+   `JSON.new().parse()` a chybu hlásí slovem v `errors()`.
+
+### 5) Co zůstává otevřené (pojmenované, ne zamlčené)
+
+1. **`inventory` a `backpack` v `policy_state()` NEJSOU** — předměty vlastní
+   `app/` (`items`, `container`), takže pravidlo „dojde krumpáč“ dnes řekne
+   `stav nezna: inventory`. Je na to šev **`SimWorld.set_state_provider()`**
+   (nikdo ho zatím nepoužívá); plní se, až bude mít `entity.container` dotaz na
+   počty, nebo se to doplní v `app/`.
+2. **Podmínky jsou pevný slovník** (7 druhů), bez vnořeného `and`/`or`
+   a výrazů — je to **aditivní** rozšíření (zadání §3), až na ně bude konkrétní
+   pravidlo, které daty zapsat nejde.
+3. **Pravidla se needitují ve hře**: hráč zapíše `user://policy.json` ručně;
+   žádný gump ani ukázkový soubor v repu není (viz „Co čeká na tebe“, D3).
+4. **Vykonavatel je „jeden krok“**: `move` = jeden krok, žádné plánování cesty;
+   `seq` je vlastní počítadlo vykonavatele (smlouva `sim.commands` ho jinak
+   nepoužívá).
+5. **Mrtvá větev, kterou jsem odstranil:** kontrola „neznámá akce“ ve
+   vykonavateli byla nedosažitelná (`sim.policy.load` neznámý druh akce odmítne
+   už při načtení). Zůstala jen cesta `_to_command` → `validate` (viditelný
+   důvod) a test s **cizí** politikou, která ji projde.
+6. **F4 (`check-no-waste.py`) pořád není** (čeká na `data.vendors`) a **plný
+   `mutace-tests.py` má dál 8 známých NECHYCENÝCH vzorů** (krok „Mutační důkaz
+   testů“ je v CI červený) — tahle session pustila jen `--only` pro své 4 moduly,
+   takže o stavu ostatních vzorů netvrdí nic nového.
+7. **`docs/08 §8.2` u F1 pořád říká „čeká na `MK`“** a `docs/04 §4.7`
+   nevyjmenovává `sources` (D1 níž) — nový stav to nezhoršil, jen prodlužuje.
+
+---
 
 ## ✅ CO JE NOVÉHO (2026-10-09, TŘETÍ SESSION TÉHOŽ DNE) — TELEFON JE ZMĚŘENÝ: GODOT NA NĚM BĚŽÍ, TESTY 0 SELHÁNÍ
 
@@ -1867,6 +1977,12 @@ zavřenými i otevřenými dveřmi, test kroku na schod nahoru/dolů, obojí s m
 (`--only walk` **12/12**), `run_tests.gd` **537/0**, `run-all.py` **0 vad**.
 
 ## Co čeká na tebe
+
+**⚠ 2026-10-09 (SESSION D, `ZADANI-24`): jedna věc k rozhodnutí (agent `docs/` ani `data/` needituje bez pokynu):**
+
+| # | Na co se čeká | Co to blokuje | Cena / cesta zpět |
+|---|---|---|---|
+| **D3** | **Politika nemá obsluhu v UI ani ukázkový soubor.** Pravidla se zadávají tak, že hráč zapíše `user://policy.json` **ručně** — a `user://` je mimo repo, takže v gitu není ani **příklad**, ze kterého by se dalo vyjít. Kód se ptá jen na existenci souboru (`app/main.gd`), takže dnes je politika „hotová, ale neviditelná“. | „idle sandbox“ z `D4` stojí na tom, že hráč **zadá, co má postava dělat**; bez obsluhy to umí jen ten, kdo zná tvar JSONu z hlavičky `sim/policy.gd` | Doporučení (dvě na sobě nezávislé věci): **(a)** `data/policy.example.json` + pár řádků v `docs/05`/`docs/04` (ukázka, jak se pravidla píšou) — je to datový soubor, ne zásah do kódu; **(b)** až bude `ui.vendor_gump`/`entity.container`, malý seznam pravidel v HUDu. Cesta zpět: soubor i gump smazat, kód se ptá jen na existenci `user://policy.json`. |
 
 **⚠ 2026-10-09 (druhá session téhož dne): dvě věci, které agent nesmí udělat sám
 (`docs/` je pro granule zakázané a `_analyza/` je mimo git):**
