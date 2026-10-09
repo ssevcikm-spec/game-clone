@@ -53,13 +53,6 @@ měří **regresi** („něco se rozbilo"), ne cíl.
 |---|---|---|---|
 | V1 | **Ovládání jako UO** | levá myš = výběr/cíl, dvojklik = použij, pravý klik = kontext, drag & drop předmětů, kurzor pro target, makra na klávesách, chůze po kliknutí (klik-to-move) i šipkami | §5.3 |
 | V2 | **Pohyb po krocích** | 8 směrů, diskrétní krok za 400 ms (běh 200 ms), spotřeba staminy, blokování terénem, výšky a schody, doors/teleporty jako v datech klienta | §5.1 |
-
-> **„Plynulý pohyb" ≠ volný pohyb.** Nový cíl (§1.1) žádá, aby pohyb **nebyl
-> trhavý** — to ale **neznamená zrušit kroky**: krok zůstává diskrétní
-> (400 ms / běh 200 ms) a **plynulý je přechod mezi dlaždicemi** (interpolace
-> obrazu mezi dvěma polohami). Přesně to dělá i originál v podání ClassicUO
-> a v klonu to řeší `REVIZE-POHYB-2026-10-07.md` §5 oprava B. Kdo by „plynulost"
-> četl jako volný pohyb, rozbije V2 i brány na kadenci.
 | V3 | **Interakce mezi objekty** | dvojklik otevře/použije, použití nástroje na cíl, předmět na předmět, předmět na tile, kontejnery, řetězení (ore → forge → ingot), hlášky místo tichého selhání | §5.2 |
 | V4 | **Manipulace** | zvednout/položit/přesunout, stackování, váha a nosnost, equip/unequip na vrstvy, reach (dosah), decay na zemi, zamčené kontejnery | §5.4 |
 | V5 | **Souboj** | war/peace, útočný cíl, swing timer dle DEX a zbraně, hit chance, damage, parry, luk a munice, healing obvazy, smrt a tělo | §5.5 |
@@ -70,6 +63,17 @@ měří **regresi** („něco se rozbilo"), ne cíl.
 | V10 | **Vývoj skillů** | 58 skillů v desetinách (0.0–100.0/120.0), růst používáním dle obtížnosti, skill cap 700, stat gain, stat cap | §5.10 |
 | V11 | **Obsah předmětů** | data-driven katalog: nástroje, zbraně, zbroje, oblečení, suroviny, lektvary, svitky, jídlo — každý s art ID z originálních dat, vahou, vrstvou, hodnotou | §6 |
 | V12 | **Svět a čas** | Britannia z originální mapy (faceta 0), statics, den/noc, světlo, spawn příšer, NPC ve městech | §5.11, §5.12 |
+
+> **„Plynulý pohyb" ≠ volný pohyb.** Nový cíl (§1.1) žádá, aby pohyb **nebyl
+> trhavý** — to ale **neznamená zrušit kroky**: krok zůstává diskrétní
+> (400 ms / běh 200 ms) a **plynulý je přechod mezi dlaždicemi** (interpolace
+> obrazu mezi dvěma polohami). Přesně to dělá i originál v podání ClassicUO
+> a v klonu to řeší `REVIZE-POHYB-2026-10-07.md` §5 oprava B. Kdo by „plynulost"
+> četl jako volný pohyb, rozbije V2 i brány na kadenci.
+>
+> **⚠ Poznámka musí zůstat POD tabulkou, ne uvnitř ní** — vložená mezi řádky
+> V2 a V3 tabulku rozbije (řádky za ní ztratí hlavičku a nevykreslí se).
+> Naměřeno 2026-10-09 nezávislým ověřením; opraveno.
 
 **Pravidlo odchylky (dřív „pravidlo věrnosti"):** tam, kde se hra od UO
 odchýlí, musí to být **rozhodnutí zapsané v `docs/`** s důvodem — ne tichý
@@ -178,9 +182,7 @@ vyrábí druhý zdroj pravdy a rozbíjí plán:
 | Okno | výchozí 1280×720, zoom 1× a 2× (celočíselný), okno i fullscreen |
 | Uložení | `user://saves/<slot>.sav` (JSON + gzip); POZOR: v sandboxu je
   `user://` mimo workspace → v testech přesměruj `APPDATA` (§10, past P9) |
-| Jazyk hry | **anglické názvy předmětů a hlášek** (jsou v datech UO), UI texty
-  anglicky; `locale/*.json` jako jediné místo pro překlad, česká varianta
-  volitelná. Důvod: překlad 60 000 názvů by byl druhý zdroj pravdy. |
+| Jazyk hry | **anglické názvy předmětů a hlášek** (jsou v datech UO), UI texty anglicky; `locale/*.json` jako jediné místo pro překlad, česká varianta volitelná. Důvod: překlad 60 000 názvů by byl druhý zdroj pravdy. |
 | Výkon | 60 FPS při 1280×720 v Britainu, ≤ 16 ms/frame; simulace ≤ 2 ms/tick |
 
 ## 1.7 Jak se celek vyhodnocuje (nezávisle na agentovi)

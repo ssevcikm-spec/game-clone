@@ -54,6 +54,17 @@ smlouvy klienta `docs/01-data-uo.md` — dvě z nich vznikly **vadou měřidla**
 teď **porovnává exit kód Godotu** (dřív ho jen tiskla) a její self-test dělá
 **2 mutace** (2/2).
 
+**Nová naměřená třída vad dokumentace (2026-10-09): poznámka vložená DOPROSTŘED
+markdown tabulky ji rozbije** — řádky za ní ztratí hlavičku a nevykreslí se.
+Stalo se to v téhle session (`docs/01` u V2) a **už dřív** (zalomená buňka
+v `docs/01` §1.6 a tabulka s hlavičkou bez řádků v `HANDOFF.md`) — všechny tři
+opravené. Sonda `.tmp/sonda-tabulky.py` (dočasná, v `.gitignore`) tuhle třídu
+hledá; **self-test 4/4** (najde vloženou poznámku i tabulku bez těla, mlčí na
+správném souboru a na matematickém zápisu `|dy|`). Po opravách: **0 vad**
+v `game-clone`, v klientu i v `uo-shadows/docs`.
+**Návrh k rozhodnutí:** udělat z ní bránu (`G14`) — dnes to není, protože brány
+jsou specifikované v `docs/08` a přidání brány je změna smlouvy, ne úklid.
+
 **Otevřená témata (neprovedená, §6 záznamu):** roadmapa pro `K1`–`K6` (6.1),
 podmínky v politice (6.2), „vidět do uvažování postavy" (6.3), „feel" jako
 měřitelná definice (6.4), **AI interakce / komplexní robot — námět k rozhodnutí**
@@ -1605,10 +1616,10 @@ reference to je (`LESSONS` 14. session).
 **Na dnešní cíl nečeká nic** — 10. session se rozhodla měřením (`TARGET_ROLES`
 z dat, oba id prostory) a cíl je hotový. **Ale čtyři rozhodnutí z
 `ZADANI-DALSI-VYVOJ-2.md` §5 (`Otázky k rozhodnutí`) pořád čekají** — každé
-z nich blokuje jinou trať, ne tu dnešní:
+z nich blokuje jinou trať, ne tu dnešní (a **11. session je vyřešila** — tabulka
+níž; prázdná tabulka „na co se čeká" odstraněna 2026-10-09, byla to jen hlavička
+bez řádků):
 
-| # | Na co se čeká | Co to blokuje | Cena / cesta zpět |
-|---|---|---|---|
 **✅ VYŘEŠENO 11. session (rozhodl uživatel):**
 
 | # | Rozhodnutí | Co z něj plyne |

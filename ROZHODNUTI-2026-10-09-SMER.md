@@ -20,7 +20,7 @@
 
 | Co | Hodnota | Jak změřeno 2026-10-09 |
 |---|---|---|
-| Trvání a velikost práce | 2026-10-02 → 2026-10-09; **127 commitů před touhle session** (HEAD `39ee290`), **129** po jejích commitech | `git rev-list --count HEAD`; data z `git log --format=%ad --date=short \| Sort-Object -Unique` |
+| Trvání a velikost práce | 2026-10-02 → 2026-10-09; **127 commitů před touhle session** (HEAD `39ee290`); tahle session k tomu přidala 4 commity (**131** k `6f3802a`) — počet je čítač, ne konstanta, proto je u něj sha | `git rev-list --count <sha>`; data z `git log --format=%ad --date=short \| Sort-Object -Unique` |
 | Herní kód | **10 617 řádků** (sim 4 198, app 3 169, render 2 399, ui 575, core 276) | `Measure-Object -Line` (neprázdné řádky) přes `sim/ app/ render/ ui/ core/`, přípony `.gd` a `.tscn` — **není to „jen `.gd`"**: `app/main.tscn` přidává 27 řádků (čistě `.gd` = 10 590) |
 | Testy | **12 170 řádků** (jen `.gd` = 11 468) | totéž nad `tests/`, přípony `.gd .json .py .md` |
 | Nástroje | **12 662 řádků** (extrakce UO 5 771, brány 5 068) | totéž nad `tools/`, přípony `.py` a `.gd` — **není to jen Python**: `tools/gates/sim_probe.gd` přidává 100 řádků (čistě Python = 12 562) |
@@ -309,6 +309,17 @@ nesahá. Rozhodnutí patří uživateli.
 Viz §3 — dnes v projektu **není** navržená. Až se rozhodne, co to znamená
 (data? skripty? pluginy? vlastní mapy?), je to samostatné zadání, protože mění
 smlouvy (`docs/04`).
+
+### 6.7 Brána na rozbité tabulky v dokumentaci (návrh z ověření)
+
+Ověření dnes našlo **třídu vad, kterou žádná brána neměří**: poznámka vložená
+doprostřed markdown tabulky ji rozbije (řádky za ní ztratí hlavičku a nevykreslí
+se). Naměřeno třikrát — jednou v téhle session, dvakrát už dřív. Sonda, která to
+hledá, existuje (`.tmp/sonda-tabulky.py`, self-test 4/4) a po opravách hlásí
+**0 vad** ve všech třech projektech.
+**Rozhodnutí k provedení:** má z ní být brána (`G14`)? Brány jsou specifikované
+v `docs/08` a jejich počet je součást smlouvy — přidání brány je změna
+smlouvy, ne úklid, takže patří uživateli.
 
 ---
 
