@@ -186,15 +186,42 @@ sessions: ~10 vad na session včetně měření), ale je to **odhad, ne měřen�
 
 ---
 
-## 9. Otázky pro uživatele (rozhodují o rozsahu)
+## 9. ROZHODNUTÍ UŽIVATELE (2026-10-09 — odpovědi na otázky §8 prvního kola)
 
-1. **Rozsah**: (a) dodělat fází 1 a pak se rozhodnout, (b) pustit rovnou
-   1 + 2 + 3, (c) jen fáze 1.
-2. **Okno a černý pás**: dnešní okno 1280×720 má **320 px vpravo + 120 px dole**
-   černý pás pro GUI (rozhodnutí z 18. session) → svět má 960×600, což je
-   **27 % okna pryč**. (a) zvětšit okno na 1600×900 a pás zmenšit,
-   (b) 1920×1080, (c) nechat jak je.
-3. **Měřítko „hotového vizuálu"**: (a) na první pohled stejné jako originál,
-   (b) i se světlem/počasím, (c) „líbí se mi to" (bez oracle).
-4. **Smím měnit spec test, když se rozhodnutí změní?** (dnes: jedna hodnota
-   v `tests/cases/balance.gd`; bez toho by „vypnout staminu" nešlo zapsat).
+| Otázka | Rozhodnutí |
+|---|---|
+| Rozsah | **Fáze 1 + kontrakt k pravidlům, která se v ní opravují.** Fáze 2 jako samostatný dokument až podle výsledku fáze 1. |
+| Okno | **Zvětšit na 1600×900** — a hlavně: rám světa má být **volitelný** (§10). Uživatel hru neprovozuje fullscreen z našeho okna, ale zvětšuje si ji; prostoru je dost. |
+| Zoom | **Výchozí zoom 1,0**, rozhled řešit oknem; zoom zůstává jen na klávesách pro ladění. |
+| Spec testy | **Agent smí měnit hodnotu ve spec testu**, když se změní rozhodnutí uživatele — vždy s odůvodněním a datem přímo v testu. |
+
+---
+
+## 10. Rám světa je volitelný (odpověď na otázku uživatele + pravidlo originálu)
+
+Uživatel se zeptal: *„předpokládám, že neumíš udělat okno světa volitelné?
+V UO u některých klientů lze ten rám roztáhnout libovolně… možná mají zobrazení
+světa třeba 1600×900, takže tolik vidí klient, ale hráč si z toho určuje výřez
+volbou velikosti rámu?"* — **Ano, přesně tak to originál dělá, a jde to i u nás.**
+
+| Co | Citace z reference |
+|---|---|
+| Svět se kreslí do **obdélníku `Camera.Bounds`**, ne do celého okna | `_src/classicuo/src/ClassicUO.Client/Game/Scenes/GameSceneDrawingSorting.cs:1196-1197` (`winGameWidth = Camera.Bounds.Width`) |
+| Ten obdélník je **uložený a volitelný**: pozice + velikost | `GameScene.cs:102-105` (`Camera.Bounds` z `Profile.GameWindowPosition/GameWindowSize`), ukládá se zpět `:281-287` |
+| Hráč ho mění **tažením za rám** | `Game/UI/Gumps/WorldViewportGump.cs:128-150` (drag mění `Camera.Bounds.Width/Height`) — a velikost se posílá i serveru (`:63`, `Send_GameWindowSize`) |
+| A je i **„fullsize"** (rám = celé okno) | `Game/UI/Gumps/OptionsGump.cs:1617-1730` (pole pro šířku/výšku/pozici, lock, fullsize) a `:4113-4133` (přepínač nastaví rám na velikost okna) |
+| **Kamera se centruje na rám, ne na okno** | `GameCursor.cs:655-656`, `GameSceneInputHandler.cs:48-49` — střed je `Bounds + Width/2` |
+
+**Co z toho plyne pro nás:** naše `gui_odsazeni` (posun kamery o polovinu pásu)
+je **správná myšlenka ze stejného pravidla** — chybí jí jen **volitelnost**.
+Dnešní stav: plátno je napevno 1280×720 (`project.godot`) a `scale_mode=integer`
+ho v cizím okně **nedovolí roztáhnout** (1920/1280 = 1,5 → celočíselný násobek 1
+→ hra zůstane v obdélníku 1280×720 uprostřed). To je i důvod, proč „okno nejde
+rozšířit".
+
+**Návrh (fáze 1, bod 5.2):** `display/window/stretch/mode = disabled` (svět 1:1
+bez převzorkování, jakmile okno není přesný násobek) + rám světa počítaný
+z **aktuální velikosti okna** mínus pás GUI + `fullsize` přepínač (pás vypnout).
+Přesně to dělá reference; měřený důvod, proč ne `canvas_items`: při okně
+1300×740 se převzorkuje **96,74 %** pixelů (19. session, `_analyza/p22-teren-zrno.txt`).
+
