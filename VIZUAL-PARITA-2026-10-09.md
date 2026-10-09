@@ -299,6 +299,36 @@ rohů šel mimo pole a **GDScript při chybě PŘERUŠÍ funkci**, takže se `_s
 nikdy neprovedlo a stavba se zacyklila (naměřeno: 200 000 kroků, 600 000
 objektů). Zjistilo se to jen díky počítadlům v `_faze_*` a pojistce.
 
+**Citace z reference (k bodu 5.5):** reference **staví render list každý frame**
+uvnitř kreslení (`GameScene.AddTileToRenderList(..., 150, chunk)`,
+`GameScene.cs:669`; týž soubor volá `AddTileToRenderList` i pro okolní dláždice),
+takže žádný „stutter z přestavby" nemá — platí ho průběžně. Náš seznam se staví
+naráz (85–250 ms) a odkládá se (`RECENTER_TILES`), což při přestavbě znamenalo
+jeden dlouhý frame; dělení po částech je náš způsob, jak se k chování reference
+přiblížit **v rámci našeho architektury** (stejný vzor už má dávka,
+`render.chunk_mesh.zacni/krok` z 18. session). **Není to tedy „pravidlo
+z reference", ale naměřená příčina + vzor, který už v projektu je** — a tak je to
+i zapsané.
+
+### ✅ FÁZE 1 JE KOMPLETNÍ (2026-10-09)
+
+Body **5.1 (zoom), 5.2 (rám světa), 5.3 (Z-pásma/strop), 5.4 (fade patra),
+5.5 (záseky)** jsou hotové, každý s citací z reference, měřením (číslo + snímek),
+testem s mutačním důkazem a zápisem v `HANDOFF.md`.
+
+| Bod | Čím je doložený | Testy |
+|---|---|---|
+| 5.1 | odchylka převodu **0,00 px** při zoomu 1,0/0,75/0,5/1,5/2,0; sonda `p26-zoom-vstup.gd` | `zoom_prevod.gd` (+2 mutace) |
+| 5.2 | okno 1280×720 → 1600×900: svět 960×600 → 1280×780, kresleno 78×44 → 97×55 dlaždic; 2 snímky | `window.gd` (17 kontrol, 2 mutace) |
+| 5.3 | strop 85 z 1369 pozic, rozdíl proti referenci **0**; snímek `p27-strop-1477-1612.png` | `near_z.gd` (10 kontrol, mutace) |
+| 5.4 | zachyceno **4725 objektů**, fade **11 kroků** po 20 ms; 3 snímky (před / průběh / po) | `fade_patra.gd` (12 kontrol, mutace) |
+| 5.5 | max frame **145,6 → 55,5 ms**, framů > 66 ms **1 → 0** | `stavba_seznamu.gd` (6 kontrol včetně parity, mutace) |
+
+**Co zůstává otevřené (pojmenované, ne zamlčené):** fade-**in** (5.4), základní
+frame čas ~35–40 ms (25–29 fps) — příčina NEMĚŘENA, tažení rámu světa myší
+(5.2), a vše, co patří do fáze 2 (kontrakt + paritní harness).
+
+
 **Citace z reference (k bodu 5.4):**
 
 | Co reference dělá | Citace a čísla |

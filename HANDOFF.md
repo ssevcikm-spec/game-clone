@@ -192,6 +192,29 @@ funkci** → `_st_y += 1` se nikdy neprovedlo → stavba se zacyklila (200 000 k
 každý literál `4` jako `Z_SCALE`** → fáze jsou odvozené konstanty
 (`FAZE_LAND = FAZE_GRID + 1`, …).
 
+### ✅ FÁZE 1 JE KOMPLETNÍ (5.1 → 5.5, vše hotové a doložené)
+
+| Bod | Důkaz (číslo) | Test + mutace |
+|---|---|---|
+| 5.1 zoom v převodu svět ↔ obrazovka | odchylka **0,00 px** při zoomu 1,0 / 0,75 / 0,5 / 1,5 / 2,0 | `zoom_prevod.gd` |
+| 5.2 rám světa podle okna (+ `F2` fullsize) | svět 960×600 → 1280×780, kresleno 78×44 → 97×55 dlaždic | `window.gd` (17 kontrol, 2 mutace) |
+| 5.3 Z-pásma a strop patra | strop na 85 z 1369 pozic, rozdíl proti referenci **0** | `near_z.gd` |
+| 5.4 patro dohasíná místo skoku | 4725 objektů, 11 kroků po 20 ms, 3 snímky | `fade_patra.gd` |
+| 5.5 záseky: stavba seznamu po částech | max frame **145,6 → 55,5 ms**, > 66 ms **1 → 0** | `stavba_seznamu.gd` |
+
+**Testy 1457 kontrol / 0 selhání; brány `run-all.py` 11 měřeno / 0 chyb.**
+
+**➡ CO ZŮSTÁVÁ OTEVŘENÉ (pojmenované, ne zamlčené):**
+1. **fade-in** (5.4): objekt, který se znovu objeví, kreslí nová dávka rovnou
+   s alfou 255; reference mu alfu zvyšuje (`GameSceneDrawingSorting.cs:425-435`).
+2. **Základní frame čas ~35 ms (1280×720) / ~40 ms (1600×900), tj. 25–29 fps** —
+   všechny framy jsou nad 33 ms. Příčina (GPU/kompozitor vs. GDScript)
+   **NEMĚŘENA**; sonda `p21-chuze.gd` naměřila tytéž hodnoty i před pracemi
+   na fázi 1 (median 31,9 ms), takže to není regrese těchto změn.
+3. **Tažení rámu světa myší** (5.2) — reference `WorldViewportGump.cs:128-150`;
+   dnes je rám jen dopočítaný a `F2` je přepínač fullsize, ne gump.
+4. **Fáze 2** (vizuální kontrakt + paritní harness, §6 dokumentu) a **fáze 3**.
+
 **➡ NÁVRH REVIZE VIZUÁLU JE V `VIZUAL-PARITA-2026-10-09.md`** — naměřené
 nálezy k deseti pozorováním, pravidla originálu s citacemi (Z-pásma
 `playerZ ± 14/16`, fade střech na alfu 0, hloubka `(x+y) + (127+z)*0.01`) a tři
