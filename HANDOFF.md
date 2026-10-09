@@ -76,11 +76,19 @@ zadrátovaný na **třech místech** (`MILNIKY_PORADI`, `MILNIKY`, `docs/07` §7
 stejný postup, jaký projekt už má pro „vlastní milník `A`" u zvuku.
 
 **Otevřená témata (neprovedená, §6 záznamu):** roadmapa pro `K1`–`K6` je
-**hotová** (§6.1), stejně jako náměty „podmínky v politice" (`sim.policy`) a
-„vidět do uvažování postavy" (`sim.decision_log`) — zůstávají jako granule;
-dál otevřené: „feel" jako měřitelná definice (6.4), **AI interakce / komplexní
-robot — námět k rozhodnutí** (6.5), modifikovatelnost (6.6), brána na rozbité
-tabulky (6.7).
+**hotová** (§6.1), stejně jako náměty „podmínky v politice" (`sim.policy`),
+„vidět do uvažování postavy" (`sim.decision_log`) a **„feel" jako měřitelná
+definice** (§6.4 → `docs/01` §1.8, poznatky `F1`–`F5`). Dál otevřené:
+**AI interakce / komplexní robot — námět k rozhodnutí** (6.5), modifikovatelnost
+(6.6), brána na rozbité tabulky (6.7) a **nové brány z pocitu (`F1`, `F4`)**
+— kandidáti; brány jsou smlouva v `docs/08`, ne úklid.
+
+**Odložené a vratné (rozhodnutí uživatele 2026-10-09, `D7`):** **zobrazení
+zdraví** (health bar). Uživatel chce dělat ústupky až po tom, co si to zahraje;
+v referenci je to **klientská volba** (`HealthBarGump`, `HealthLinesManager`,
+`Profile.CloseHealthBarType` — naměřeno), takže zapnutí je přepínač
+v konfiguraci klienta. Tvrdě platí jen: **zobrazení nesmí měnit pravidla**
+(simulace nesmí číst UI) a přepínač je na jednom místě.
 
 ---
 

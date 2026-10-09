@@ -201,6 +201,36 @@ Drží ho cloudová orchestra `forge-orchestra`, která je **momentálně červe
 `N9` (D3), aby oba projekty neříkaly opak. Rozhodnutí, jestli se v něm
 pokračuje, je **odložené** — není potřeba k produktu (`game-clone`).
 
+### D7 — „Feel" je definovaný a potvrzený (s výjimkou: zobrazení zdraví)
+
+**Rozhodnutí uživatele:** syntéza pocitu („se vším v podstatě souhlasím")
+**s jednou výhradou** — nesouhlasí s tím, aby **neviditelnost životů** byla
+pravidlem: chce být připraven dělat ústupky a tohle je ten případ; **rozhodne,
+až si to zahraje**, pokud je to vratné.
+
+**Co je tím rozhodnuté:** definice pocitu je zapsaná v `docs/01` §1.8 jako pět
+poznatků hráče (`F1`–`F5`) **s tím, jak se ověří** — tím je zavřené otevřené
+téma „feel jako měřitelná definice" (§6.4).
+
+**Co je odložené a vratné:** zobrazení zdraví. Naměřeno v referenci: health bar
+je **klientská volba, ne vlastnost simulace** —
+`_src/classicuo/src/ClassicUO.Client/Game/UI/Gumps/HealthBarGump.cs:21,302`
+(`BaseHealthBarGump`, `HealthBarGumpCustom`), `Game/Managers/HealthLinesManager.cs:11-23`
+(health lines nad mobily), `Game/Scenes/GameSceneInputHandler.cs:204-217`
+(otevře se i na cizí mobil), `Configuration/Profile.cs:174`
+(`CloseHealthBarType`), `OptionsGump.cs:4319-4341` (přepínač vlastních barů).
+Zapnutí/vypnutí je tedy přepínač v konfiguraci klienta a rozhodnutí může padnout
+později **bez zásahu do pravidel**.
+
+**Co platí tvrdě i tak (architektura, ne vkus):** zobrazení **nesmí měnit
+pravidla** (simulace nesmí číst UI ani se ptát, co je vidět; žádné pravidlo
+nesmí záviset na tom, jestli je bar zapnutý) a přepínač musí být **na jednom
+místě**. Až se rozhodne, patří k tomu **sonda** (kolik rozhodnutí hráč udělá
+s health barem a bez něj), ne dojem.
+
+**Cesta zpět:** není potřeba — nic se nezakazuje, `docs/01` §1.8 vede zobrazení
+zdraví jako **odložené**.
+
 ---
 
 ## 3. Proč to není „začít znovu" (a co by naopak drahé bylo)
@@ -247,6 +277,7 @@ cíl** a přesunout session do práce, kterou uživatel chce (D4, D5, D3).
 | 11 | V `docs/01` přejmenovány popisky, které by tvrdily opak („věrnostní bod" → „co bereme z reference", „pravidlo věrnosti" → „pravidlo odchylky", „věrnostní audit" → „audit") | `docs/01-cil-a-scope.md` §1.2, §1.7 |
 | 12 | Do plánu vložen milník **`MK` (krátká smyčka)** s 9 granulemi, obchod přesunut z M7, přidány vlny W13/W14 — roadmapa přegenerovaná | `tools/roadmap-gen.py`, `tools/plan-status.py`, `docs/07` §7.2/§7.3, `.forge/roadmap.json` |
 | 13 | Rozbité markdown tabulky opraveny (3×) a zapsána třída vady | `docs/01`, `HANDOFF.md`, §6.7 |
+| 14 | Definice „feel" zapsána jako `F1`–`F5` s tím, jak se ověří; **zobrazení zdraví** vedeno jako **odložené a vratné** | `docs/01` §1.8, §2 D7 |
 
 **Co zůstalo beze změny a je to tak správně:** `docs/02`–`docs/08`, `docs/10`,
 `docs/11`, brány, `project.godot`, `.forge/roadmap.json` — **plán se tímhle
@@ -303,13 +334,15 @@ když jsi nebyl") a `ui/debug_overlay` místo pro živý pohled.
 **Stav:** zapsáno jako granule `sim.decision_log` (§6.1) — zapisuje důvod jako
 události, zobrazuje `ui.journal` (ta se needituje, patří své granuli).
 
-### 6.4 „Feel" jako měřitelná definice
+### 6.4 „Feel" jako měřitelná definice — ✅ PROVEDENO 2026-10-09
 
-Dnes je „věrnost" měřená 12 body — „feel" měřený není. Než se podle něj začne
-stavět, musí se rozepsat na **poznatky hráče** s tím, jak se ověří (např.
-„poznám, kde jsem" → na snímku je souřadnice a orientace; „pohyb je plynulý" →
-žádný frame nad 8 ms při souvislé chůzi; „nemusím odklikat rutinu" → úkon
-provedený politikou). **Tohle je nejbližší práce s dokumenty** po téhle session.
+Zapsáno do `docs/01` **§1.8** jako pět poznatků hráče `F1`–`F5`, každý s tím,
+**jak se ověří** (sonda nad simulací, datová brána, zákazový sken, sonda
+ulož/načti) — a s výslovným pravidlem, že **pocit se neměří snímkem**.
+Přidána i hranice pro informace („čitelnost ano, jistota ne") **s výjimkou
+zobrazení zdraví, která je odložená a vratná** (D7).
+**Zbývá na uživateli:** jestli z `F1` (svět má vlastní čas) a `F4` (nic není
+odpad) mají být **brány** v `docs/08` — brány jsou smlouva, ne úklid.
 
 ### 6.5 AI interakce a „komplexní robot" (uživatelův námět — k rozhodnutí)
 

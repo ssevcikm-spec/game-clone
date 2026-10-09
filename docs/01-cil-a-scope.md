@@ -197,3 +197,70 @@ vyrábí druhý zdroj pravdy a rozbíjí plán:
 5. **Uložení/načtení** — hash stavu před uložením == hash po načtení.
 6. **Brány** (§8) — všechny musí projít **a** musí být prokazatelně schopné
    selhat (mutační test).
+
+## 1.8 „Feel" — co má hráč zažít (a jak se to ověří)
+
+> **Co je tenhle oddíl:** definice **pocitu**, který je od 2026-10-09 cílem hry
+> (§1.1). Vznikl jako syntéza uživatelova popisu a návrhu agenta; **uživatel ho
+> 2026-10-09 potvrdil** („se vším v podstatě souhlasím") **s jednou výhradou —
+> zobrazení zdraví** — což je níž vedené jako **odložené a vratné** rozhodnutí,
+> ne jako zákaz. **Není to stav projektu** (ten je v `HANDOFF.md`) a **není to
+> nová smlouva o chování** (to je §1.2). Je to **kritérium**, podle kterého se
+> pozná, že hra má pocit, který jsme chtěli.
+
+**Definice jednou větou:** *Svět, který běží, i když se nedívám; hráč do něj
+vstupuje bez levelů, takže riziko čte z kontextu a učí se z následků; jeho moc
+roste dovednostmi a přípravou, ne úrovněmi; a každý výstup světa je něčí vstup,
+takže nic není odpad.*
+
+| # | Poznatek hráče | Co to znamená pro kód a data | Jak se to ověří |
+|---|---|---|---|
+| F1 | **Svět jde dál, i když se nedívám** | svět má vlastní hodiny a vlastní knihu událostí; mimo obrazovku je **funkce času**, ne simulace agentů | sonda: headless, **nula příkazů**, N světových hodin → hash se změní, dva běhy dají totéž, počet tikajících entit zůstane v rozpočtu |
+| F2 | **Riziko čtu z kontextu a učím se z následků** | žádný obsah není zamčený úrovní; nebezpečnost se pozná z toho, co vidím (výbava, místo, chování), ne z čísla | zákazový sken: v datech a kódu není predikát `min_level`; sonda: každý region je dosažitelný od startu |
+| F3 | **Moc roste z přípravy, ne z úrovně** | strop je měkký: skilly, staty a **co si vezmu s sebou** (obvazy, lektvar, terén, útěk) | sonda: týž cíl jde splnit s minimem skillu a **s přípravou**; pravidla neobsahují člen „level" |
+| F4 | **Nic, co vyrobím, není odpad** | každý výstup dosažitelný ve hře má **konzumenta**: recept, poptávku světa, nebo propad | datová brána: pro každou kategorii dosažitelnou ve hře existuje konzument; mutace: předmět bez konzumenta → spadne |
+| F5 | **Co jsem udělal, zůstává** | svět si pamatuje změny, které způsobil hráč, a dají se po dnech přečíst | sonda: udělej X → ulož → načti → svět X pořád ukazuje; mutace: smazat knihu při načtení → spadne |
+
+**Pocit není snímek.** Kritéria odvozená z tohohle oddílu měří **vlastnosti
+světa** (čas, dosažitelnost, konzumenty, paměť), ne vzhled obrazovky. Vzhled
+zůstává na snímku a lidském oku (§1.7).
+
+**Lhostejnost světa musí být spočítaná, ne napsaná.** F1 a F4 se v singleplayeru
+perou: „svět, kterému jsem lhostejný" a „vždycky je komu prodat" dohromady
+znamenají svět autorovaný jako lhostejný a zkonstruovaný tak, aby hráče uživil —
+tedy nakonec postavený kolem něj. Řešení: ceny a poptávka jsou **funkcí stavu
+světa** (zásobenost, infestace), takže prodej 500 kůží cenu srazí a svět se
+neomluví.
+
+### Čitelnost ano, jistota ne — s výjimkou, která je odložená
+
+Z F2 plyne hranice pro **informace**, sestra hranice pro akce (§1.5 bod 8):
+**čitelnost smíme zlepšovat, jistotu nezavádíme.** „Jistota" je informace, která
+hráči **odebere rozhodnutí** (přesné číslo nebezpečnosti, ze kterého se „mám to
+zkusit?" stane mechanický přepočet).
+
+**⚠ Zobrazení zdraví je z toho vyňaté — odloženo a vratné** (rozhodnutí
+uživatele 2026-10-09: chce mít možnost dělat ústupky a tohle je ten případ;
+rozhodne se, **až si to zahraje**). Naměřeno v referenci: health bar je
+**klientská věc** — `BaseHealthBarGump` a `HealthBarGumpCustom`
+(`_src/classicuo/src/ClassicUO.Client/Game/UI/Gumps/HealthBarGump.cs:21,302`),
+health lines nad mobily (`Game/Managers/HealthLinesManager.cs:11-23`), otevře se
+i na **cizí** mobil (`Game/Scenes/GameSceneInputHandler.cs:204-217`) a je
+ovladatelný nastavením (`Configuration/Profile.cs:174` `CloseHealthBarType`,
+`OptionsGump.cs:4319-4341`). **Zobrazení zdraví tedy není proti feelu — je to
+volba klienta.**
+
+**Co platí tvrdě i tak (je to architektura, ne vkus):**
+
+1. **Zobrazení nesmí měnit pravidla.** Simulace nesmí číst UI ani se ptát, co je
+   vidět; žádné pravidlo nesmí záviset na tom, jestli je health bar zapnutý.
+2. **Přepínač je na jednom místě** (konfigurace klienta), aby se dal zapnout
+   a vypnout bez zásahu do simulace.
+3. **Až se rozhodne, musí to být měřené, ne dojmové** — patří k tomu sonda
+   (kolik rozhodnutí hráč udělá s health barem a bez něj), ne jen dojem.
+
+**Co z tohohle oddílu už je v plánu:** F1 a F5 nesou granule `sim.offline`,
+`sim.save` a `sim.decision_log` (milník `MK`, `docs/07` §7.2); F4 je kandidát na
+datovou bránu a F2/F3 jsou kritéria pro obsah a souboj (`M5`). **Kandidáti na
+nové brány (F1 a F4) jsou zatím NÁVRH** — brány jsou smlouva v `docs/08`, takže
+jejich přidání patří uživateli.
