@@ -90,6 +90,23 @@ v referenci je to **klientská volba** (`HealthBarGump`, `HealthLinesManager`,
 v konfiguraci klienta. Tvrdě platí jen: **zobrazení nesmí měnit pravidla**
 (simulace nesmí číst UI) a přepínač je na jednom místě.
 
+**Nový návrh k odsouhlasení (2026-10-09): `NAVRH-BRAN-FEEL-2026-10-09.md`.**
+Brány `F1` („svět má vlastní čas": 5 kontrol + 5 mutací) a `F4` („nic není
+odpad": 4 kontroly + 3 mutace) — **nic z toho není zapsané v `docs/08`**,
+dokud to uživatel neschválí. U `F1` uživatel potvrdil zásadu („svět má mít
+vlastní čas, to je v pořádku"), označení bran a zápis do smlouvy je na něm.
+
+**Multiplayer (nové zadání uživatele 2026-10-09):** chce umožnit **malý počet
+hráčů**. Architektura je připravená (autorita v `sim/`, klient posílá jen
+`Command`), chybí transport, snapshoty, zájem o okolí, predikce klienta.
+**Pravidlo, které je potřeba dodržet už teď:** hodiny světa bydlí **v simulaci**
+a „offline" = **bez připojeného klienta**, ne „bez hráče" — tím zůstanou
+singleplayer, session u hostitele i always-on server **týmž kódem**.
+**Hosting (naměřeno):** `oracle-frankfurt` = Oracle Cloud ARM (živý, ale **už
+dělá CI** orchestra), `cetnik` = Xiaomi Redmi Note 8 (Termux+PM2, LAN),
+`pc-domaci` = často offline (pro session u hostitele to nevadí).
+**Doporučení:** teď nehostovat; první MP jako session u hostitele.
+
 ---
 
 ## ✅ CO JE NOVÉHO (2026-10-09 — TŘI VADY ZE HRY, DEBUG OVERLAY, NÁVRH VIZUÁLNÍ REVIZE)

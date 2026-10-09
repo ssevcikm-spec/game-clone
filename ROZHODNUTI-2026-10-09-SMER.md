@@ -378,6 +378,33 @@ smlouvy, ne úklid, takže patří uživateli.
 
 ---
 
+### 6.8 Brány z pocitu (`F1`, `F4`) — návrh k odsouhlasení
+
+Návrh je hotový: **`NAVRH-BRAN-FEEL-2026-10-09.md`** — u každé brány co měří
+(pět kontrol u `F1`, čtyři u `F4`), **jaké mutace ji musí shodit**, kde běží,
+co potřebuje a co se změní v `docs/08`, když se schválí. **Nic z toho není
+provedené** — `docs/08` zůstává 13 bran. Uživatel potvrdil zásadu („svět má mít
+vlastní čas, to je v pořádku"), ale **označení a zápis do smlouvy je na něm**.
+
+### 6.9 Multiplayer a hosting — otevřené rozhodnutí
+
+Uživatel chce umožnit **malý počet hráčů**. Architektura je na to připravená
+(`sim/` je jediná autorita, klient posílá jen `Command`, tik je deterministický —
+naměřeno 2026-10-07 v `REVIZE-SMER` §1.4), chybí transport, snapshoty, zájem
+o okolí a predikce klienta.
+**Co je potřeba dodržet už teď (je to zdarma a je to v návrhu §5.1):** hodiny
+světa bydlí **v simulaci**, a „offline" znamená **„bez připojeného klienta"**,
+ne „bez hráče" — jinak by MP musel `sim.offline` přepisovat.
+**Hosting (naměřeno):** `oracle-frankfurt` = Oracle Cloud **ARM**, živý, ale
+**už slouží jako CI runner orchestra** (sdílet bych ho bez měření nechtěl);
+`cetnik` = **Xiaomi Redmi Note 8** (Termux + proot + PM2, dosažitelný SSH) —
+dobrý pro LAN, ne pro veřejný server; `pc-domaci` = domácí PC, často offline —
+což je pro **host-authoritative session** vlastnost, ne vada.
+**Doporučení:** nehostovat nic, dokud není co; první MP jako **session
+u hostitele** (cena nula), always-on svět až potom. Detaily: `NAVRH-BRAN-FEEL-2026-10-09.md` §5–§6.
+
+---
+
 ## 7. Cesta zpět (co je vratné a jak)
 
 | Rozhodnutí | Cesta zpět |

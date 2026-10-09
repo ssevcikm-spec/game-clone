@@ -263,4 +263,5 @@ volba klienta.**
 `sim.save` a `sim.decision_log` (milník `MK`, `docs/07` §7.2); F4 je kandidát na
 datovou bránu a F2/F3 jsou kritéria pro obsah a souboj (`M5`). **Kandidáti na
 nové brány (F1 a F4) jsou zatím NÁVRH** — brány jsou smlouva v `docs/08`, takže
-jejich přidání patří uživateli.
+jejich přidání patří uživateli. **Rozpracovaný návrh** (co brána měří, jaké
+mutace ji musí shodit, co se změní): `NAVRH-BRAN-FEEL-2026-10-09.md`.
