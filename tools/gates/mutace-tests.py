@@ -1127,6 +1127,21 @@ def fail_radky(vystup: str, prefix: str) -> list[str]:
             if line.strip().startswith("[test] FAIL") and prefix in line]
 
 
+def _bez_class_name(text: str) -> str:
+    """Mutant NESMI mit `class_name` - jinak se vubec nenacte.
+
+    NAMERENO 2026-10-09 (nalez pri praci na bráně F1): kopie souboru, ktery ma
+    `class_name` (`sim/sim_world.gd`, `sim/save.gd`, `sim/scheduler.gd`), skonci
+    v Godotu na `Parse Error: Class "SimWorld" hides a global script class`.
+    Test pak zahlasi "soubor chybi" - a harness to do dneska pocital jako
+    CHYCENO, i kdyz se mutovany kod nikdy nespustil (modul `world_loop`).
+    `class_name` se proto v KOPII odstrani; testy nacitaji cestou, ne jmenem
+    tridy, takze se merene chovani nemeni.
+    """
+    return "\n".join(radek for radek in text.splitlines()
+                     if not radek.startswith("class_name "))
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Mutacni dukaz testu")
     ap.add_argument("--only", default=None,
@@ -1175,7 +1190,7 @@ def main() -> int:
                       "mutace se neprovedla, nepocita se")
                 vysledek.append((klic, nazev, False, False, False, 0, "neprovedena"))
                 continue
-            mutant = zdroj.replace(stare, nove, 1)
+            mutant = _bez_class_name(zdroj.replace(stare, nove, 1))
             cesta.write_text(mutant, encoding="utf-8")
             na_disku = cesta.read_text(encoding="utf-8")
             # PROVEDENA = na disku je PRESNE zamysleny text a neco se zmenilo.
@@ -1191,10 +1206,23 @@ def main() -> int:
 
             rc, vystup, checks, failures = spust(f"{modul['prepinac']}={uri(cesta)}")
             probehla = checks > 0
-            chycena = rc != 0 and probehla and bool(fail_radky(vystup, modul["prefix"]))
             radky = fail_radky(vystup, modul["prefix"])
+            # ⚠ NAMERENO 2026-10-09: MUTANT, KTERY SE NENACTE, NENI CHYCENA VADA.
+            # Kopie souboru s `class_name` se v Godotu neda nacist
+            # (`Parse Error: Class "SimWorld" hides a global script class`),
+            # takze case zahlasi "soubor chybi" - a to ma v sobe PREFIX modulu,
+            # takze to harness do teto chvile pocital jako CHYCENO, i kdyz se
+            # mutovany kod vubec nespustil (`world_loop`). Dnes se to pozna:
+            # mutant je na DISKU, ale FAIL rika, ze soubor chybi / nejde nacist.
+            nenacetl = any(uri(cesta) in radek and (
+                "chybi" in radek or "nejde nacist" in radek or "nelze nacist" in radek
+                or "NENI HOTOVA" in radek) for radek in radky)
+            chycena = (rc != 0 and probehla and bool(radky) and not nenacetl)
             if not probehla:
                 poznamka = "SADA VUBEC NEPROBEHLA (0 kontrol)"
+            elif nenacetl:
+                poznamka = ("MUTANT SE NENACTL (parse error?) - to NENI chycena vada"
+                            + (": " + radky[0][:70] if radky else ""))
             elif radky:
                 poznamka = radky[0][:110]
             else:
