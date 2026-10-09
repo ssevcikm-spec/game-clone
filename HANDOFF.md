@@ -230,6 +230,47 @@ záseky; další zmenšení by znamenalo zlevnit stavbu dávky (`render.chunk_me
 ~270–315 ms na stavbu, děleno po 8 ms) nebo rozdělení na hráče (`split_ms 1,6`).
 **NEMĚŘENO:** zda by pomohl menší rozpočet `_STAVBA_MS`/`STAVBA_MS`.
 
+### ✅ DOPLNĚNO (2026-10-09 — VLNA VAD OD UŽIVATELE: TRHAVOST SVĚTA OPRAVENA)
+
+**Uživatel nahlásil 7 vad** (druhá zpráva téhož dne) — celý záznam je
+v **`VADY-VLNA-2026-10-09.md`**: co řekl, co se změřilo, co je opravené a co
+zůstává NEMĚŘENO. Tady je to podstatné:
+
+**V1 TRHAVOST SVĚTA — OPRAVENO.** Uživatel: „když se dívám jen na postavu, hýbe
+se dokonale plynule; svět se třepotá, jako kdyby doskakoval po pixelech."
+NAMĚŘENO (`_analyza/p31-jitter.gd`, 600 framů, 1920×1009, zoom 0,82 = jeho
+nastavení): **586 z 599 framů (97,8 %) se svět nepohnul vůbec** a pak skočil
+o **9 px** (11 px ve světě). Příčina: `player_pixel_offset()` počítal posun
+z **času simulace** (`sim.world_time()`, tik 50 ms), takže se svět 4× za krok
+teleportoval. Postava je vůči kameře pořád na stejném místě → *vypadá* plynule.
+
+| | PŘED | PO |
+|---|---|---|
+| framy bez pohybu světa | 586 / 599 (97,8 %) | **0 %** (během kroku) |
+| velikost skoku | 9 px | **1–3 px** |
+| pohyb za frame | 0, pak skok | **2,66 px průměr** |
+
+**Oprava:** posun se počítá z **nástěnných hodin** — `app/player_controller` si
+drží `_wall_start_ms` (nastaví se při prvním spatření kroku); vstup `now_ms`
+zůstává (testy měří funkci s explicitním časem = cesta simulace). **⚠ Past:** první pokus to uložil do
+`_step`, ale ten se každý frame nahrazuje kopií ze simulace → hodnota přežila
+jeden frame a měření se nezměnilo. Musí to být vlastní proměnná.
+**Test** `tests/cases/krok_nastenny_cas.gd` (4 kontroly) + **mutace** (zpět na
+čas simulace) → 1 selhání. **Testy 1462 → 1466 / 0 selhání; brány 11 / 0 chyb.**
+
+**Ostatní vady (stav):**
+* **V3 postava se zasekne o překážku** — ZMĚŘENO (v sondě udělala 1 krok za
+  7,8 s, pak stála); reference zkouší 8 směrů podle odchylky (`Movement.cs`) —
+  přesné řádky ještě NEPŘEČTENY, neopraveno.
+* **V4 fade má prodlevu** — ZMĚŘENO 811 ms (čeká se na novou dávku dělenou po
+  8 ms/frame ≈ 35 framů); návrh: dokud fade čeká, zvednout rozpočet na
+  30–40 ms/frame (~120 ms).
+* **V5 propadávání podlahou v patře** — NEMĚŘENO.
+* **V6/V2 textury (mříž, prkna) a lámání dlaždic** — NEMĚŘENO; ze screenshotů
+  je vidět pravoúhlý pruh jiné trávy (s2 = `x=1400 y=1468`), příčina neznámá.
+* **V7 voda v lese** — NEMĚŘENO (mapa ji tam má; je-li to vada mapy, nerozhodnuto).
+
+
 ### ✅ FÁZE 1 JE KOMPLETNÍ (5.1 → 5.5, vše hotové a doložené)
 
 | Bod | Důkaz (číslo) | Test + mutace |

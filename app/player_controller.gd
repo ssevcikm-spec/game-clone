@@ -152,7 +152,6 @@ const UI_KEYS := {
 # `x = delay / 80` a `steps = maxDelay / 80`, takze se postava posune
 # v peti skocich za krok (400 ms), ne plynule kazdy frame.
 const ANIM_FRAME_MS := 80
-
 var sim = null
 var input_map = null
 var movement = null
@@ -170,6 +169,12 @@ var _iso
 var _last_tile: Vector2i = Vector2i(-9999, -9999)
 var _action: int = ACTION_IDLE
 var _step: Dictionary = {}      # prave bezici krok z `sim.movement.pending_step`
+# Predchozi krok - jen pro to, aby se `wall_start_ms` neprepsal, kdyz simulace
+# posle tentez krok znovu (2026-10-09, vada "svet se trepota").
+var _predchozi_krok: Dictionary = {}
+# Nastenny cas zacatku aktualniho kroku (`-1` = krok neni v letu). Drzi se
+# MIMO `_step`, protoze ten se kazdy frame nahrazuje kopii ze simulace.
+var _wall_start_ms: int = -1
 # ⚠ SMER KRESLENI vs SMER SIMULACE (17. session, 2026-10-08) - VADA
 # "animace nezmeni orientaci, postava klouze do strany": `sim.movement` zapise
 # `mob.dir` az v `apply_step` na KONCI kroku (400 ms), takze kdyz hrac zmeni
@@ -429,6 +434,23 @@ func update_step(krok: Dictionary) -> void:
 	# `sim.movement.pending_step` - testy ho podavaji primo, aby se stav dal
 	# merit bez realne smycky.
 	_step = krok.duplicate()
+	# ⚠ 2026-10-09: NASTENNY cas zacatku kroku (viz `player_pixel_offset`).
+	# Krok chodi ze simulace opakovane (pending se cte kazdy frame), takze se
+	# nesmi prepsat porad - jinak by se posun zastavil na nule. Novy cas se
+	# zapise jen kdyz je to JINY krok (jiny `start_ms` nebo smer).
+	# ⚠⚠ POZOR: `_step` se kazdy frame NAHRAZUJE kopii ze simulace, takze se
+	# cas NESMI drzet v nem (prvni pokus to udelal a hodnota prezila jediny
+	# frame - namEReno sondou `p31-jitter.gd`: `wall_start` bylo porad -1).
+	if not _step.is_empty():
+		var stejny: bool = not _predchozi_krok.is_empty() \
+			and int(_predchozi_krok.get("start_ms", -1)) == int(_step.get("start_ms", -2)) \
+			and int(_predchozi_krok.get("dir", -1)) == int(_step.get("dir", -2))
+		if not stejny or _wall_start_ms < 0:
+			_wall_start_ms = Time.get_ticks_msec()
+		_predchozi_krok = _step.duplicate()
+	else:
+		_predchozi_krok = {}
+		_wall_start_ms = -1
 	if _step.is_empty():
 		_action = ACTION_IDLE
 		# ⚠⚠ 19. session (2026-10-08) - V15: OTOCENI NA MISTE SE MUSI NAKRESLIT.
@@ -486,12 +508,33 @@ func player_pixel_offset(now_ms: int = -1) -> Vector2:
 	# necommitla (`player.pos` je porad stara), takze obraz postavy je
 	# `to_screen(stara) + tento posun`; na konci kroku je posun presne jedna
 	# dlazdice a `apply_step` prepise `pos` - obraz se tim nezmeni (neni skok).
+	#
+	# ⚠⚠ 2026-10-09 - VADA UZIVATELE "SVET SE TREPOTA, POSTAVA JE PLYNULA":
+	# Posun se pocital z CASU SIMULACE (`_sim_time()` = `sim.world_time()`),
+	# ktery tece v ticcich po `Const.TICK_MS = 50` ms. NamEReno sondou
+	# `_analyza/p31-jitter.gd` (600 framu, 1920x1009, zoom 0,82): **97,8 % framu
+	# se svet nepohnul VUBEC** a pak skocil o 11 px (9 px na obrazovce) - svet se
+	# tedy nevalil, ale teleportoval se 4x za krok. Uzivatel to popsal presne:
+	# "neni to plynuly pohyb z bodu A do B, ale spis trepotani z jednoho bodu do
+	# druheho". Postava je pritom vuci kamere porad na stejnem miste, takze
+	# VYPADA plynule (meni se jen animace) - presne to uzivatel vidi.
+	#
+	# Kdyz je krok videny hrou (ne testem), pocita se posun z NASTENNYCH HODIN:
+	# `update_step` si k nemu ulozi `wall_start_ms`. Vstup `now_ms` zustava
+	# (testy meri funkci s explicitnim casem) - tehdy plati cas simulace.
 	if _step.is_empty() or player == null:
 		return Vector2.ZERO
 	if _iso == null:
 		_iso = Iso.new()
-	var cas: int = _sim_time() if now_ms < 0 else now_ms
-	var f: float = step_fraction(cas - int(_step["start_ms"]), int(_step["delay_ms"]))
+	var cas: int
+	var start: int
+	if now_ms < 0 and _wall_start_ms >= 0:
+		cas = Time.get_ticks_msec()
+		start = _wall_start_ms
+	else:
+		cas = _sim_time() if now_ms < 0 else now_ms
+		start = int(_step["start_ms"])
+	var f: float = step_fraction(cas - start, int(_step["delay_ms"]))
 	var dir: int = int(_step["dir"])
 	var kam := Vector2i(player.pos.x + Const.DIR_DX[dir], player.pos.y + Const.DIR_DY[dir])
 	var od: Vector2 = _iso.to_screen(player.pos.x, player.pos.y, int(player.pos.z))
