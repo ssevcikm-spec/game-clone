@@ -125,12 +125,12 @@ Pořadí je dané tím, co blokuje uživatelovo hlášení:
 | # | Práce | Měřené zadání (co musí vyjít) |
 |---|---|---|
 | ~~5.1~~ | ~~**Zoom: jeden převodní pár `svět ↔ obrazovka`**~~ **HOTOVO 2026-10-09** — viz §5.1 níže | `pick` == skutečný střed postavy pro zoom 0,5 / 0,75 / 1,0 / 1,5 / 2,0 (naměřeno **0,00 px**) |
-| 5.2 | **Rozhled oknem, ne zoomem < 1** (rozhodnutí uživatele, §9): rám světa **volitelný** podle velikosti okna (`stretch/mode=disabled`, okno 1600×900, pás GUI dopočítaný, `fullsize` přepínač) | při zoomu 1,0 je obraz jen posunutý (0,00 % převzorkování); okno 1920×1080 dá svět 1600×960 bez černých pruhů |
+| 5.2 | **Rozhled oknem, ne zoomem < 1** (rozhodnutí uživatele, §9): rám světa **volitelný** podle velikosti okna (`stretch/mode=disabled`, okno 1600×900, pás GUI dopočítaný, `fullsize` přepínač) | **NEMĚŘENO ZATÍM**: naměřeno je, co je dnes (§5.2 níže) — plátno zůstává 1280×720; po opravě musí `viewport` = velikost okna a svět 1600×960 |
 | 5.3 | **Z-pásma podle hráče** (`playerZ ± 14/16`, strop 150) v `render.chunk_renderer`/`render.sort` | snímek místa, kde je vidět zeď z podkroví: se stejným pravidlem se nezobrazí; číslo `maxZ` v overlayi |
 | 5.4 | **Střechy: fade na alfu 0** místo vyhození (dnešní stav je binární vidím/nevidím → „krok stranou a je to jinak") | dva snímky téhož místa s hráčem pod střechou a vedle |
 | 5.5 | **Záseky**: dokončit cestu „runtime atlas bez překreslení na GPU" (známá z R6) | 2 → 0 framů > 33 ms z 2300; `peak` v overlayi |
 
-### 5.1 HOTOVO (2026-10-09, commit viz `git log`)
+### 5.1 HOTOVO (2026-10-09, commit `f606511`)
 
 **Co bylo špatně:** převod obrazovka → svět se dělal jako `world = screen +
 camera_offset`, což platí **jen při zoomu 1,0**; `camera_offset` navíc neznal
@@ -159,10 +159,38 @@ se násobí zoomem.
 pinoval měření od středu okna (což byla ta vada). Měření od středu okna zůstává
 pokryté jako záložní cesta v `zoom_prevod.gd`.
 
-**Cena, kterou je fér říct:** 5.1 je zásah do tří souborů v `app/` (kamera,
-vstup, výstup na obrazovku) a musí projít existujícími testy vstupu
-(`tests/cases/input.gd`, `player_controller.gd`, `world_view.gd`) — odhadem
-1 session; 5.3/5.4 jsou změny v `render/` s paritní branou, také ~1 session.
+### 5.2 VÝCHOZÍ STAV (naměřeno 2026-10-09, `_analyza/p26-okno.gd`)
+
+| Co | Při `--resolution 1280x720` | Při `--resolution 1600x900` |
+|---|---|---|
+| okno systému | 1280×720 | **1600×900** |
+| viewport (plátno) | 1280×720 | **1280×720** ← nezvětší se |
+| `svet_rozmer()` při zoomu 0,75 | 1706,7×960 px | **tytéž** |
+| viditelné dlaždice | 78×44 | **tytéž** |
+| `gui_odsazeni` | (160, 60) | tytéž |
+| střed světa na obrazovce | (480, 300) | tytéž |
+
+**Co z toho plyne:** zvětšení okna dnes **nepřidá ani dlaždici** — `project.godot`
+drží plátno na 1280×720 a zbytek okna zůstane černý. Proto uživatel vidí hru
+„v obdélníku" a proto „ten zoom působí hloupě" (jediný způsob, jak dnes vidět
+víc světa, je zoom < 1, který ale rozmazává). Přesně to má bod 5.2 opravit.
+
+**Práce, kterou 5.2 potřebuje (odhad z kódu, ne z dojmu):**
+1. `project.godot`: `window/stretch/mode="disabled"` + výchozí 1600×900
+   (`canvas_items` + `scale_mode=integer` plátno zamyká) a `HRA.cmd`
+   (`--resolution 1280x720` je tam natvrdo),
+2. **reakce na změnu velikosti okna**: pás GUI, `world_view.gui_odsazeni`
+   a pozice oken HUDu se dnes počítají JEDNOU v `app/main._setup_ui()`,
+3. `fullsize` přepínač (pás = 0) — vzor `OptionsGump.cs:4113-4133`,
+4. brány: `check-render.py` (G10) fotí snímek — ověřit, že mu změna rozměru
+   nevadí, a doplnit test geometrie okna s mutací,
+5. důkaz: snímek při okně 1600×900 a při maximalizovaném okně + čísla
+   (viewport == okno, dlaždice, `gui_odsazeni`).
+
+**Cena, kterou je fér říct (pro 5.2–5.5):** 5.2 je zásah do `project.godot`,
+`app/main.gd` (geometrie se dnes počítá jednou) a `ui/hud.gd` (pozice oken) —
+odhadem 1 session; 5.3/5.4 jsou změny v `render/` s paritní branou, také
+~1 session. Nic z toho se nezačalo.
 
 ---
 
