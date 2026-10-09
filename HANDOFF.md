@@ -65,6 +65,22 @@ v `game-clone`, v klientu i v `uo-shadows/docs`.
 **Návrh k rozhodnutí:** udělat z ní bránu (`G14`) — dnes to není, protože brány
 jsou specifikované v `docs/08` a přidání brány je změna smlouvy, ne úklid.
 
+**MK — druhá granule hotová (2026-10-09): `sim.save`.** Mechanika persistence
+(IO, verze, migrace, **stavové zdroje**) je v `sim/save.gd`; `sim_world.gd` ji
+používá a umí `register_state_source(name, source)`. První zdroj je plánovač.
+**Změna specu (schválená uživatelem):** `state_hash()` teď zahrnuje stavové
+zdroje, takže se změnily hashe v `tests/replays/*.json` — **přepnuty
+s dokladem, ne naslepo**: sonda `_analyza/p30-replay-legacy-hash.gd` spočítá
+týž běh **starým** seznamem vstupů a její `hash_legacy` se oběma replayům
+**přesně rovná původním očekávaným hashům** (změnil se tvar vstupu, ne svět).
+Zapsáno i v `tests/replays/README.md` (nová sekce „Historie hashů").
+**Naměřeno:** testy **1 507 kontrol / 0 selhání** (bylo 1 487), `plan-status`:
+**MK 2/9**.
+**⚠ Co ještě není:** **entity (mobily, předměty) stavovým zdrojem nejsou** —
+`entity.mobile` a `sim.entity_registry` nemají `state()`/`restore()`; save proto
+nese `sources` (plánovač) a staré `mobiles`/`items` zůstávají prázdné, dokud
+nedostanou tvar. Je to další krok, ne tichý dluh.
+
 **MK — první granule hotová (2026-10-09): `sim.scheduler`.**
 ⚠ **Nalezeno PŘED implementací:** `core/clock.gd` **timery už má** (`after`,
 `cancel`, `advance`, otestované v `tests/cases/clock.gd`), ale **žádný produkční

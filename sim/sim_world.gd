@@ -29,8 +29,10 @@ const SimEvents = preload("res://core/events.gd")
 const SimHash = preload("res://core/hash.gd")
 const SimCommands = preload("res://sim/commands.gd")
 const SimScheduler = preload("res://sim/scheduler.gd")
+const SimSave = preload("res://sim/save.gd")
 
-const SAVE_VERSION: int = 1
+# Verze schematu save je v `sim/save.gd` (`SimSave.SAVE_VERSION`) - tady se
+# nedrzi druha, aby nemohly vzniknout dve pravdy o tom, co je v souboru.
 # Poradi z tabulky docs/04 §4.2; `spawn` je svetovy system, jde za nimi.
 const SYSTEM_ORDER: Array[String] = [
 	"movement", "interaction", "combat", "magic", "skill_gain", "harvest",
@@ -49,6 +51,8 @@ var _events
 var _hash
 var _commands
 var _scheduler
+var _save
+var _sources: Dictionary = {}
 var _queue: Array[Dictionary] = []
 var _serials_issued: int = 0
 
@@ -61,7 +65,9 @@ func _init(seed_value: int = 0, data: Dictionary = {}) -> void:
 	_events = SimEvents.new()
 	_hash = SimHash.new()
 	_commands = SimCommands.new()
+	_save = SimSave.new()
 	_scheduler = SimScheduler.new(_clock)
+	register_state_source("scheduler", _scheduler)
 	data_version = _hash.of_state([data])
 
 
@@ -129,12 +135,16 @@ func state_hash() -> String:
 		names,
 		[],
 		[],
+		# Stavove zdroje (od 2026-10-09; prvni je `sim.scheduler`): bez nich by
+		# hash netvrdil nic o BUDOUCNOSTI sveta - dva behy s jinou frontou
+		# udalosti by daly stejny hash a replay by tise prosel.
+		_save.collect(_sources),
 	])
 
 
 func save(path: String) -> bool:
 	var payload: Dictionary = {
-		"version": SAVE_VERSION,
+		"version": _save.version(),
 		"data_version": data_version,
 		"state_hash": state_hash(),
 		"seed": seed,
@@ -150,13 +160,13 @@ func save(path: String) -> bool:
 		"spawn_state": [],
 		"player_serial": player_serial,
 		"position_serial": 0,
+		# Stavove zdroje (docs/04 §4.7; prvni je `sim.scheduler`). Uklada se
+		# CELEK, ne cast - castecny save by rozbil vazby (research/08 bod 13).
+		"sources": _save.collect(_sources),
 	}
-	var file := FileAccess.open_compressed(path, FileAccess.WRITE, FileAccess.COMPRESSION_GZIP)
-	if file == null:
+	if not _save.write(path, payload):
 		push_event("message", {"text": "Save failed: cannot open " + path, "kind": "system"})
 		return false
-	file.store_string(JSON.stringify(payload))
-	file.close()
 	return true
 
 
@@ -164,18 +174,17 @@ func load(path: String) -> bool:
 	if not FileAccess.file_exists(path):
 		push_event("message", {"text": "Load failed: no save at " + path, "kind": "system"})
 		return false
-	var file := FileAccess.open_compressed(path, FileAccess.READ, FileAccess.COMPRESSION_GZIP)
-	if file == null:
+	var payload: Dictionary = _save.read(path)
+	if payload.is_empty():
 		push_event("message", {"text": "Load failed: cannot read " + path, "kind": "system"})
 		return false
-	var payload = JSON.parse_string(file.get_as_text())
-	file.close()
-	if not (payload is Dictionary):
-		push_event("message", {"text": "Load failed: save is not readable.", "kind": "system"})
-		return false
-	if int(payload.get("version", 0)) != SAVE_VERSION:
+	# Starsi save se MIGRUJE, novejsi se ODMITNE (radsi "nevim, co v tom je"
+	# nez tichy nesmysl). Verze i migrace patri do `sim/save.gd`.
+	var migrated: Dictionary = _save.migrate(payload, int(payload.get("version", 0)))
+	if migrated.is_empty():
 		push_event("message", {"text": "Load failed: unsupported save version.", "kind": "system"})
 		return false
+	payload = migrated
 	if str(payload.get("data_version", "")) != data_version:
 		push_event("message", {"text": "Load failed: data changed since the save.", "kind": "system"})
 		return false
@@ -195,6 +204,9 @@ func load(path: String) -> bool:
 	_serials.reset(_serials_issued + 1)
 	player_serial = int(payload.get("player_serial", 0))
 	_queue.clear()
+	# ⚠ Stavove zdroje se vraci PRED kontrolou hashe - hash je pocita, takze
+	# bez tohoto poradi by round-trip hlasil rozchod, ktery v datech neni.
+	_save.apply(_sources, payload.get("sources", {}))
 	# Kontrola integrity: co jsme ulozili, to musi po nacteni vyjit stejne.
 	var expected := str(payload.get("state_hash", ""))
 	if expected != "" and state_hash() != expected:
@@ -215,10 +227,25 @@ func clock():
 
 func scheduler():
 	# Ridke udalosti sveta (docs/05 §5.12: jeden world tick misto tisicu
-	# spawneru). ⚠ Stav planovace ZATIM neni v `state_hash()` ani v save -
-	# zahrnuti zmeni hash a pre-pinuje replaye, takze je to zapsana ZMENA SPECU
-	# (viz hlavicka `sim/scheduler.gd`), ne ticha oprava.
+	# spawneru). Stav planovace JE v `state_hash()` i v save od 2026-10-09
+	# (jako stavovy zdroj) - zmena specu odsouhlasena uzivatelem.
 	return _scheduler
+
+
+func register_state_source(name: String, source) -> void:
+	# Kdo ma stav, ktery patri do save a do hashe, zaregistruje se tady a musi
+	# umet `state()`/`restore(d)` (docs/04 §4.7). Uklada se CELEK, ne cast.
+	# Jmena se v save radi, takze poradi registrace nic neovlivnuje.
+	if source == null or not source.has_method("state") or not source.has_method("restore"):
+		push_warning("SimWorld.register_state_source: zdroj '%s' neumi state()/restore()" % name)
+		return
+	_sources[name] = source
+
+
+func state_source_names() -> Array:
+	var names: Array = _sources.keys()
+	names.sort()
+	return names
 
 
 func rng():

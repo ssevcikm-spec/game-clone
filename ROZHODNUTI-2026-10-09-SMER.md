@@ -320,6 +320,8 @@ cíl** a přesunout session do práce, kterou uživatel chce (D4, D5, D3).
 | 14 | Definice „feel" zapsána jako `F1`–`F5` s tím, jak se ověří; **zobrazení zdraví** vedeno jako **odložené a vratné** | `docs/01` §1.8, §2 D7 |
 | 15 | Brány z pocitu **`F1` a `F4` schváleny** a zapsány do smlouvy (do `MK` vrací `2` = neměřeno) | `docs/08` §8.2, `docs/01` §1.8, `NAVRH-BRAN-FEEL-2026-10-09.md` |
 | 16 | **Multiplayer:** rozhodnut tvar (session první, `always-on` odložený) + závazné pravidlo „hodiny světa v simulaci, offline = bez klienta" | §2 D9, `HANDOFF.md`, `NAVRH-BRAN-FEEL-2026-10-09.md` §5–§6 |
+| 17 | **`MK` zahájen:** hotové granule `sim.scheduler` a `sim.save` (mechanika persistence + stavové zdroje) | `sim/scheduler.gd`, `sim/save.gd`, `tests/cases/scheduler.gd`, `tests/cases/save.gd` |
+| 18 | **Jedna dokumentovaná změna specu** (schválena uživatelem): `state_hash()` zahrnuje stavové zdroje; očekávané hashe replayů přepnuty **s dokladem, že chování je stejné** | `sim/sim_world.gd`, `tests/replays/*.json`, `tests/replays/README.md`, `_analyza/p30-replay-legacy-hash.gd` |
 
 **Co zůstalo beze změny a je to tak správně:** `docs/02`–`docs/08`, `docs/10`,
 `docs/11`, brány, `project.godot`, `.forge/roadmap.json` — **plán se tímhle
@@ -344,6 +346,13 @@ smyčka nepotřebuje souboj ani magii, takže by na ně čekala zbytečně. Nese
 | `sim.executor` | vykonavatel: mění rozhodnutí na `Command`, nikdy nesahá na stav |
 | `sim.decision_log` | „vidět do uvažování postavy" — které pravidlo se vyhodnotilo a proč |
 | `data.vendors`, `sim.vendor`, `ui.vendor_gump` | **přesunuté z M7** — bez obchodu nejde „prodám výrobek prodejci" |
+
+**Stav granul (2026-10-09):** hotové **2 z 9** — `sim.scheduler` (typovaná
+vrstva řídkých událostí nad `core.clock`; ne druhý timer) a `sim.save`
+(mechanika persistence: IO, verze 2 s migrací 1→2, stavové zdroje; **fronta
+plánovače přežije save/load**). První stavový zdroj je plánovač. **Entity
+(mobily, předměty) zdrojem ještě nejsou** — `entity.mobile` a
+`sim.entity_registry` nemají `state()`/`restore()`, což je další krok.
 
 **Měřeno po změně** (`tools/plan-status.py`): granul **118** (bylo 112),
 `MK` 0/0/**9**, M7 spadlo na 4 granule, pokrytí vlnami **80 z 118** (přidány

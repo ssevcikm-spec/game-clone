@@ -1972,9 +1972,12 @@
         "core.hash"
       ],
       "provides": [
-        "save(path)",
-        "load(path)",
-        "migrate(payload, from_version)"
+        "version() -> int",
+        "write(path, payload) -> bool",
+        "read(path) -> Dictionary",
+        "migrate(payload, from_version) -> Dictionary",
+        "collect(sources) -> Dictionary",
+        "apply(sources, states) -> int"
       ],
       "consumes": [],
       "acceptance": [
@@ -1985,7 +1988,7 @@
       "size_lines": "<= 150",
       "model": "strong",
       "milestone": "MK",
-      "prompt": "NAMĚŘENO 2026-10-09 v `sim/sim_world.gd`: obálka save má 'mobiles': [] a 'items': [] (řádky 104-105 a 138-139), takže se svět neukládá. Naplň ji entitami, verzuj schéma a přidej migrace (research/08-multiplayer-poucky.md bod 5). Texty pro člověka česky, klíče anglicky. Test: hash stavu před uložením == po načtení (docs/08 G7) a load odmítne save z jiné verze dat."
+      "prompt": "NAMĚŘENO 2026-10-09 PŘED implementací: obálka save měla 'mobiles': [] a 'items': [] (dnes řádky 104-105 a 138-139) a IO bydlelo v `sim_world.gd`. Tenhle modul je MECHANIKA persistence (IO, verze, migrace, stavové zdroje) — co je stav, ví zdroj sám přes `state()`/`restore()`. Verze 2 = obálka + `sources`; migrace 1 -> 2 existuje a NOVĚJŠÍ verze se ODMÍTNE (radši 'nevím, co v tom je' než tichý nesmysl). Ukládá se CELEK, ne část — částečný save by rozbil vazby (research/08 bod 13). ⚠ Entity (mobily, předměty) zatím stavovým zdrojem NEJSOU: `entity.mobile` a `sim.entity_registry` nemají `state()`/`restore()` — to je další krok. ⚠ Zahrnutí stavu zdrojů do `state_hash()` je ZMĚNA SPECU odsouhlasená uživatelem 2026-10-09 a přepíná `tests/replays/*.json`. Test: fronta plánovače přežije save/load a hash před == po (docs/08 G7)."
     },
     {
       "id": "sim.offline",
