@@ -61,11 +61,11 @@ const MOUSE_RUN_PX: float = 190.0   # ClassicUO GameSceneInputHandler.cs:66
 #   stredem. Podezreni na `gui_odsazeni` se NEPOTVRDILO (v `camera_offset` se
 #   vykrati - stred.x vyslo spravne 480 = 1280/2 - 160).
 #   Spravny stred je to, co hrac na obrazovce VIDI:
-#   `world_view.player_ground_position() - camera_offset`. Nezavisi na `z`
-#   (kamera ho drzi na miste) a vykrati se v nem i posun beziciho kroku
+#   `(world_view.player_ground_position() - camera_offset) * zoom`. Nezavisi na
+#   `z` (kamera ho drzi na miste) a vykrati se v nem i posun beziciho kroku
 #   (`player_pixel_offset` je v obou clenech). Sklada ho klient -
-#   `app/player_controller._publish_center()` - protoze jen on zna `gui_odsazeni`
-#   a `world_view`. `Vector2.INF` = "klient ji nedodal" (testy, klient bez
+#   `app/player_controller._publish_center()` - protoze jen on zna `gui_odsazeni`,
+#   `world_view` a zoom. `Vector2.INF` = "klient ji nedodal" (testy, klient bez
 #   `world_view`) -> pocita se stara cesta z `camera_offset` (viz `poll`).
 const MOUSE_RATIO_NUM: int = 2
 const MOUSE_RATIO_DEN: int = 5
@@ -92,6 +92,20 @@ var gui_pas: Vector2 = Vector2.ZERO
 # ⚠ V14 (2026-10-08): pozice HRACE na obrazovce, na kterou se meri smer z mysi.
 # Plni ji `app/player_controller._publish_center()`. `Vector2.INF` = nedodano.
 var player_screen: Vector2 = Vector2.INF
+# ⚠⚠ ZOOM V PREVODU SVET <-> OBRAZOVKA (2026-10-09). Do tohoto dne se prevod
+# delal jako `world = screen + camera_offset`, coz plati JEN pri zoomu 1,0:
+# pri zoomu != 1 ma obrazovy pixel jinou velikost nez svetovy. NAMERENO
+# v overlayi pri zoomu 0,75: `pick=(426,280)` proti skutecnemu stredu postavy
+# (480,300) - klik, interakce i smer z mysi mirily tim vic vedle, cim dal byl
+# kurzor od stredu okna. Reference prevadi vstup ZPET touz matici, kterou
+# kresli (`_src/classicuo/src/ClassicUO.Renderer/Camera.cs:88-103`
+# `ScreenToWorld`, `:162-184` zoom jako `1f/Zoom` na cele matici sveta).
+# U nas je zoom na `Camera2D` (`app/world_view`), takze plati
+#   `screen = (world - camera.position) * zoom + viewport / 2`,
+#   `world  = screen / zoom + camera_offset`,
+# kde `camera_offset` je svetova pozice obrazoveho bodu (0,0) PRI TOMTO zoomu
+# (`app/player_controller._camera_offset`). Plni ji `app/player_controller`.
+var zoom: float = 1.0
 # ⚠ AUTO-RUN (V4, zadani 19): "soucasne stisknuti obou tlacitek mysi = postava
 # bezi za mysi". Stav drzi klient; meni ho `auto_run_step()` a je VIDET
 # (print pri kazde zmene).
@@ -178,13 +192,24 @@ func _precti_tlacitka() -> Dictionary:
 	return vstup
 
 
-func mouse_run(mouse_position: Vector2) -> bool:
-	# `run` pro drzene prave tlacitko: vzdalenost kurzoru od stredu obrazovky
-	# (ClassicUO `mouseRange >= 190`). Kdyz velikost okna neznáme, plati
-	# `always_run` - vymyslet si cislo by bylo horsi nez rict "nevim".
-	if view_size == Vector2.ZERO:
-		return always_run
-	return (mouse_position - view_size / 2.0).length() >= MOUSE_RUN_PX
+func mouse_run(mouse_position: Vector2, stred: Vector2 = Vector2.INF) -> bool:
+	# `run` pro drzene prave tlacitko: vzdalenost kurzoru od HRACE NA OBRAZOVCE
+	# (ClassicUO `mouseRange >= 190`, `GameSceneInputHandler.cs:54-66` - meri se
+	# od stredu `Camera.Bounds`, a v tom je hrac, protoze ho kamera drzi
+	# ve stredu; `:48-49`).
+	# ⚠ Do 2026-10-09 se merilo od `view_size / 2` = stredu OKNA. S cernym
+	# pasem GUI (320 px vpravo, 120 dole) je to od hrace **171 px** - skoro cela
+	# prahova vzdalenost 190 px, takze se `run` rozhodoval jinde, nez co hrac
+	# vidi. Kdo stred zna (`poll` ho bere z `center_for`), preda ho; bez nej
+	# plati stary stred okna (testy a klient bez `world_view`).
+	# Kdyz neni ani stred, ani velikost okna, vraci se `always_run` - vymyslet
+	# si cislo by bylo horsi nez rict "nevim".
+	var cil: Vector2 = stred
+	if not cil.is_finite():
+		if view_size == Vector2.ZERO:
+			return always_run
+		cil = view_size / 2.0
+	return (mouse_position - cil).length() >= MOUSE_RUN_PX
 
 
 func hold_command(action: String, now_ms: int, run: bool = false) -> Dictionary:
@@ -217,6 +242,15 @@ func direction_between(from: Vector2i, to: Vector2i) -> int:
 	return -1
 
 
+func _na_svet(screen: Vector2, camera_offset: Vector2) -> Vector2:
+	# JEDINE misto, kde se obrazovkova souradnice prevadi na svetovou
+	# (2026-10-09). Kdo prida dalsi prevod, at pouzije tuhle funkci - druha
+	# kopie by se s touhle musela rozejit a zoom je presne to, na co se
+	# zapomina (proto je tu i test: `tests/cases/zoom_prevod.gd`).
+	var z: float = zoom if zoom > 0.0 else 1.0
+	return screen / z + camera_offset
+
+
 func player_screen_position(player: Vector2i, camera_offset: Vector2, z: int = 0) -> Vector2:
 	# Kde je HRAC na obrazovce: kamera ho drzi ve stredu, takze stred obrazovky
 	# je jeho dlazdice. `click_at` pouziva opacny prevod (`world = screen + offset`).
@@ -225,9 +259,13 @@ func player_screen_position(player: Vector2i, camera_offset: Vector2, z: int = 0
 	# Zavisi na `z`, ktere musi byt vyska, na ktere postava stoji - `app/loop.gd`
 	# ale posila 0, takze na vysce (Britain z = 10) vyjde stred o 40 px niz.
 	# Presnou hodnotu dava klient (`player_screen`, viz hlavicka).
+	# ⚠ 2026-10-09: rozdil se nasobi ZOOMEM - `camera_offset` je svetova pozice
+	# obrazoveho bodu (0,0) pri tomto zoomu, takze rozdil vyjde ve SVETOVYCH
+	# pixelech a na obrazovkove se prevede `* zoom`.
 	var stred_sveta: Vector2 = _iso.to_screen(player.x, player.y, z) \
 		+ Vector2(Const.ISO_STEP, Const.TILE_H / 2)
-	return stred_sveta - camera_offset
+	var z_zoom: float = zoom if zoom > 0.0 else 1.0
+	return (stred_sveta - camera_offset) * z_zoom
 
 
 func center_for(player: Vector2i, camera_offset: Vector2, z: int = 0) -> Vector2:
@@ -274,7 +312,7 @@ func step_command(from: Vector2i, to: Vector2i) -> Dictionary:
 
 
 func click_at(player: Vector2i, screen: Vector2, camera_offset: Vector2, z: int = 0) -> Dictionary:
-	var world: Vector2 = screen + camera_offset
+	var world: Vector2 = _na_svet(screen, camera_offset)
 	var tile: Vector2i = _iso.to_tile(world.x, world.y, z)
 	return step_command(player, tile)
 
@@ -289,7 +327,7 @@ func interact_command(screen: Vector2, camera_offset: Vector2, z: int = 0) -> Di
 	# Cilem je zatim DLAZDICE: predmety a bytosti ve svete jeste nejsou (jsou
 	# jen v kontejneru), takze by je nebylo na co kliknout. Az pribudnou,
 	# pribude sem `kind: "item"`/`"mobile"` - smlouva §4.3 je zna.
-	var world: Vector2 = screen + camera_offset
+	var world: Vector2 = _na_svet(screen, camera_offset)
 	var tile: Vector2i = _iso.to_tile(world.x, world.y, z)
 	return {"t": "interact",
 		"target": {"kind": "tile", "x": tile.x, "y": tile.y, "z": z}}
@@ -398,14 +436,14 @@ func poll(player: Vector2i, camera_offset: Vector2, z: int = 0,
 			# `MoveCharacterByMouseInput`). Smer je z pozice kurzoru VULCI
 			# HRACI NA OBRAZOVCE (`direction_from_screen`, vada V3), stred
 			# dava `center_for` (presna pozice od klienta, vada V14), `run`
-			# z jeho vzdalenosti od stredu obrazovky.
+			# z jeho vzdalenosti od HRACE (do 2026-10-09 od stredu okna).
 			# Kurzor presne na hraci NENI krok - a prodleva se u nej
 			# NESPOTREBUJE (jinak by "nic" spálilo 400 ms, presne vada V1).
-			var smer: int = direction_from_screen(
-				center_for(player, camera_offset, z), mouse_position)
+			var stred_hrace: Vector2 = center_for(player, camera_offset, z)
+			var smer: int = direction_from_screen(stred_hrace, mouse_position)
 			if smer < 0:
 				continue
-			var bez: bool = mouse_run(mouse_position)
+			var bez: bool = mouse_run(mouse_position, stred_hrace)
 			if not _smi_krokovat(action, cas, bez):
 				continue
 			out.append({"t": "move", "dir": smer, "run": bez or always_run,

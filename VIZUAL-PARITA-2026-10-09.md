@@ -124,11 +124,40 @@ Pořadí je dané tím, co blokuje uživatelovo hlášení:
 
 | # | Práce | Měřené zadání (co musí vyjít) |
 |---|---|---|
-| 5.1 | **Zoom: jeden převodní pár `svět ↔ obrazovka`** (`screen_to_world`/`world_to_screen` s zoomem) a přes něj `_camera_offset`, `click_at`, `interact_command`, `center_for`/`player_screen`, `mouse_run` | `pick` v overlayi == skutečný střed postavy na obrazovce pro zoom 0,5 / 0,75 / 1,0 / 1,5 / 2,0; test na tři různé směry kliku |
-| 5.2 | **Rozhled oknem, ne zoomem < 1** (rozhodnutí uživatele, §7): zvětšit canvas (`project.godot`) a držet zoom 1,0 jako výchozí | při zoomu 1,0 je obraz jen posunutý (0,00 % převzorkování — měřeno 19. session); při 0,75 je 0,23 %, při 0,5 92,45 % |
+| ~~5.1~~ | ~~**Zoom: jeden převodní pár `svět ↔ obrazovka`**~~ **HOTOVO 2026-10-09** — viz §5.1 níže | `pick` == skutečný střed postavy pro zoom 0,5 / 0,75 / 1,0 / 1,5 / 2,0 (naměřeno **0,00 px**) |
+| 5.2 | **Rozhled oknem, ne zoomem < 1** (rozhodnutí uživatele, §9): rám světa **volitelný** podle velikosti okna (`stretch/mode=disabled`, okno 1600×900, pás GUI dopočítaný, `fullsize` přepínač) | při zoomu 1,0 je obraz jen posunutý (0,00 % převzorkování); okno 1920×1080 dá svět 1600×960 bez černých pruhů |
 | 5.3 | **Z-pásma podle hráče** (`playerZ ± 14/16`, strop 150) v `render.chunk_renderer`/`render.sort` | snímek místa, kde je vidět zeď z podkroví: se stejným pravidlem se nezobrazí; číslo `maxZ` v overlayi |
 | 5.4 | **Střechy: fade na alfu 0** místo vyhození (dnešní stav je binární vidím/nevidím → „krok stranou a je to jinak") | dva snímky téhož místa s hráčem pod střechou a vedle |
 | 5.5 | **Záseky**: dokončit cestu „runtime atlas bez překreslení na GPU" (známá z R6) | 2 → 0 framů > 33 ms z 2300; `peak` v overlayi |
+
+### 5.1 HOTOVO (2026-10-09, commit viz `git log`)
+
+**Co bylo špatně:** převod obrazovka → svět se dělal jako `world = screen +
+camera_offset`, což platí **jen při zoomu 1,0**; `camera_offset` navíc neznal
+zoom. Při zoomu ≠ 1 má obrazový pixel jinou velikost než světový, takže klik,
+obecná interakce, směr z myši i prah běhu mířily vedle — a chyba rostla se
+vzdáleností od středu okna (přesně to uživatel popsal).
+
+**Co je teď:** jedna dvojice `world_to_screen`/`screen_to_world` v
+`app/world_view.gd` (kamera + zoom + viewport na jednom místě), jedno místo
+převodu v `app/input_map._na_svet` (používá je klik i interakce), `mouse_run`
+měří od **hráče** (prah 190 px z reference), záložní `player_screen_position`
+se násobí zoomem.
+
+| Důkaz | Číslo |
+|---|---|
+| Živá sonda `_analyza/p26-zoom-vstup.gd` (oracle = Godot `Camera2D.get_canvas_transform()`, tedy matice, kterou engine opravdu kreslí) | odchylka klient vs. engine **0,00 px** při zoomu 1,0 / 0,75 / 0,5 / 1,5 / 2,0; klik na obrazové místo východní dlaždice dal **vždy dir 0 (východ)** |
+| Kolik byla vada | tyž klik starou matematikou: zoom 0,75 → dlaždice (1490, 1631) = **směr 5 (jihozápad)**, zoom 0,5 → taky JZ, zoom 1,5/2,0 → **směr 1 (severovýchod)** |
+| Overlay (snímek `_analyza/p25-overlay-walk.png`) | `pick=(426,280)` → **`pick=(480,300)`** = přesný střed viditelného světa |
+| Test `tests/cases/zoom_prevod.gd` (nový, 19 kontrol) | round-trip 80 dlaždic × 5 zoomů: **0 chyb**; interakce na touž dlaždici; prah 189/190 px od hráče; záložní střed |
+| Mutační důkaz | vrácení vady do `_na_svet` (bez dělení zoomem) → **52 z 80** dlaždic vedle při zoomu 0,75, **64 z 80** při 0,5, 32 z 80 při 1,5 a 2,0; při zoomu 1,0 se neprojeví (proto vada přežila 19. session) |
+| Testy / brány | **1385 → 1404 kontrol / 0 selhání**; `tools/gates/run-all.py` **11 měřeno / 0 chyb** |
+
+**⚠ Změna ve spec testu (druhá v této práci, na schválení uživatele 2026-10-09):**
+`tests/cases/input.gd` v bloku 8 dodává `player_screen` (pozici hráče), protože
+`poll` od 2026-10-09 měří prah běhu **od hráče**, ne od středu okna — starý test
+pinoval měření od středu okna (což byla ta vada). Měření od středu okna zůstává
+pokryté jako záložní cesta v `zoom_prevod.gd`.
 
 **Cena, kterou je fér říct:** 5.1 je zásah do tří souborů v `app/` (kamera,
 vstup, výstup na obrazovku) a musí projít existujícími testy vstupu

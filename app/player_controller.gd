@@ -312,6 +312,10 @@ func _process(_delta: float) -> void:
 	# sam nezna (je to RefCounted). Kdyz se okno zmeni, hodnota se obnovi.
 	if input_map != null:
 		input_map.view_size = get_viewport().get_visible_rect().size
+		# ⚠ 2026-10-09: ZOOM je vstup prevodu svet <-> obrazovka (`app.input`).
+		# Bez nej by klik i interakce mirily pri zoomu != 1 vedle (namEReno
+		# pri zoomu 0,75: `pick=(426,280)` proti skutecnemu stredu (480,300)).
+		input_map.zoom = _zoom()
 		# ⚠ 20. session: CERNY PAS GUI je mimo svet - klient vi, kde konci
 		# viditelna plocha sveta (`gui_odsazeni` je POLOVINA pasu, proto 2x).
 		# Bez toho by obecna interakce (E/T) sahala i na dlazdici POD zurnalem.
@@ -364,10 +368,12 @@ func _process(_delta: float) -> void:
 	# session skladal z `z = 0` (`app/loop.gd:39`) - na vysce (Britain z = 10)
 	# vysel stred o 40 px niz, nez kde hrac stoji (namEReno sondou
 	# `_analyza/p22-mys-sonda.gd`: 4 473 z 11 163 pozic kurzoru vratilo jiny
-	# smer). `player_ground_position() - camera_offset` je to, co hrac VIDI:
-	# `gui_odsazeni` i posun beziciho kroku jsou v obou clenech, takze se
-	# vykrati (`world_view.set_player_offset` i `look_at_tile` dostavaji tyz
-	# posun) a hodnota se v case nemeni.
+	# smer). Stred je to, co hrac VIDI: `(player_ground_position() -
+	# camera_offset) * zoom`, kde `gui_odsazeni` i posun beziciho kroku jsou
+	# v obou clenech, takze se vykrati (`world_view.set_player_offset`
+	# i `look_at_tile` dostavaji tyz posun) a hodnota se v case nemeni.
+	# ⚠ 2026-10-09: nasobeni ZOOMEM je nova cast (V14 platila jen pri zoomu
+	# 1,0); bez nej vysel stred pri zoomu 0,75 o 54 px vedle.
 	_publish_center()
 
 
@@ -378,7 +384,7 @@ func _publish_center() -> void:
 		return
 	if not view.has_method("player_ground_position"):
 		return
-	input_map.player_screen = view.player_ground_position() - _camera_offset()
+	input_map.player_screen = (view.player_ground_position() - _camera_offset()) * _zoom()
 
 
 func action() -> int:
@@ -505,12 +511,26 @@ func _follow(offset: Vector2 = Vector2.ZERO) -> void:
 
 
 func _camera_offset() -> Vector2:
-	# Levy horni roh sveta na obrazovce - `app/input_map.click_at` pocita
-	# `world = screen + camera_offset`.
+	# SVETOVA pozice OBRAZOVEHO BODU (0,0) pri DANEM ZOOMU (2026-10-09).
+	# ⚠ Do tohoto dne tu bylo `camera.position - size / 2` (bez zoomu) a prevod
+	# se delal jako `world = screen + camera_offset` - to plati JEN pri zoomu
+	# 1,0. Pri zoomu != 1 ma obrazovy pixel jinou velikost nez svetovy, takze
+	# se `screen` musi delit zoomem (`app/input_map._na_svet`) a offset pocitat
+	# s `1 / zoom`. NamEReno v overlayi pri zoomu 0,75: `pick=(426,280)` proti
+	# skutecnemu stredu postavy (480,300).
 	if camera == null:
 		return Vector2.ZERO
 	# Testy tvori uzel bez sceny (N8) - viewport pak neni a velikost okna
 	# neznáme; bere se nula, ne vymysleny stred.
 	var vp := get_viewport()
 	var size: Vector2 = vp.get_visible_rect().size if vp != null else Vector2.ZERO
-	return camera.position - size / 2.0
+	return camera.position - size / (2.0 * _zoom())
+
+
+func _zoom() -> float:
+	# Zoom klienta pro prepocet obrazovkovych souradnic. Kdyz view zoom nezna
+	# (stub v testu, klient bez sceny), vraci 1.0 = PRESNE stare chovani;
+	# vymyslena hodnota by rozbila prevod, ktery se neda overit.
+	if view != null and view.has_method("zoom_hodnota"):
+		return maxf(0.01, float(view.zoom_hodnota()))
+	return 1.0

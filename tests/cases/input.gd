@@ -158,9 +158,21 @@ func run(t) -> void:
 		"app.input: prave tlacitko - bez velikosti okna rozhoduje `always_run` (%s / %s)"
 		% [str(prazdna.mouse_run(stred)), str(vzdy.mouse_run(stred))])
 	Input.action_press("test_drzeni_mys")
+	# ⚠ 2026-10-09: `poll` meri `run` od pozice HRACE NA OBRAZOVCE, ne od stredu
+	# okna - reference meri od stredu `Camera.Bounds`
+	# (`GameSceneInputHandler.cs:48-66`), a v tom je hrac, protoze ho kamera
+	# drzi ve stredu. S cernym pasem GUI (320 vpravo, 120 dole) je to rozdil
+	# 171 px, tedy skoro cely prah 190 px. Test proto pozici hrace DODA
+	# (presne jako `app/player_controller._publish_center()`) a hranici meri
+	# od NI. Mereni od stredu okna (zalozni cesta, klient nic neposlal) je
+	# v `tests/cases/zoom_prevod.gd`.
+	drzeny.player_screen = stred
 	var daleko: Array = drzeny.poll(Vector2i(10, 10), Vector2.ZERO, 0, stred + Vector2(400, 0), 0)
 	var blizko: Array = drzeny.poll(Vector2i(10, 10), Vector2.ZERO, 0, stred + Vector2(50, 0), walk_ms)
 	Input.action_release("test_drzeni_mys")
+	# 9c nize meri ZALOZNI cestu (kdyz klient pozici hrace neposlal) - proto se
+	# "nevim" vraci zpet.
+	drzeny.player_screen = Vector2.INF
 	t._check(daleko.size() == 1 and daleko[0].get("t") == "move" and daleko[0].get("run") == true,
 		"app.input: DRZENE PRAVE TLACITKO - daleko od hrace = BEH (namEReno %s)" % str(daleko))
 	t._check(blizko.size() == 1 and blizko[0].get("run") == false,

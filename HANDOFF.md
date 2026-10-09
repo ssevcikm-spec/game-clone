@@ -28,6 +28,35 @@ smysl pustit tě s maximálním výkonem na revizi… dokončit celý vizuál?".
 `tools/gates/run-all.py` **11 měřeno / 0 chyb**; commit `d858c8c`,
 `origin/main = d858c8c` (push ověřen).
 
+### ✅ DOPLNĚNO (FÁZE 1, BOD 5.1 — ZOOM V PŘEVODU SVĚT ↔ OBRAZOVKA)
+
+**Co bylo špatně:** `world = screen + camera_offset` platí jen při zoomu 1,0
+(`camera_offset` navíc zoom neznal) → klik, interakce, směr z myši i prah běhu
+mířily při zoomu ≠ 1 vedle, tím víc, čím dál byl kurzor od středu okna.
+
+**Co je hotové:** `app/world_view` má `viewport_size()`/`world_to_screen()`/
+`screen_to_world()`/`zoom_hodnota()`, `app/input_map` má `zoom` a jediné místo
+převodu `_na_svet()` (používá je klik i interakce), `mouse_run` měří od HRÁČE
+(`GameSceneInputHandler.cs:48-66`), `_camera_offset()` i záložní
+`player_screen_position()` počítají s zoomem.
+
+| Důkaz | Číslo |
+|---|---|
+| `_analyza/p26-zoom-vstup.gd` (oracle = Godot `Camera2D.get_canvas_transform()`) | odchylka klient vs. engine **0,00 px** při zoomu 1,0/0,75/0,5/1,5/2,0; klik na východní dlaždici = **dir 0** vždy |
+| Kolik byla vada | tyž klik starou matematikou: zoom 0,75 → (1490,1631) = **směr 5 (JZ)**, 0,5 → JZ, 1,5/2,0 → **směr 1 (SV)** |
+| Overlay | `pick=(426,280)` → **`pick=(480,300)`** (`_analyza/p25-overlay-walk.png`) |
+| Test + mutace | nový `tests/cases/zoom_prevod.gd` (19 kontrol, round-trip 80 dlaždic × 5 zoomů = 0 chyb); vrácení vady do `_na_svet` → **52/80** chyb při zoomu 0,75 |
+| Testy / brány | **1385 → 1404 kontrol / 0 selhání**; brány **11 měřeno / 0 chyb** |
+
+**⚠ Druhá změna spec testu (schváleno uživatelem 2026-10-09):** `tests/cases/input.gd`
+blok 8 dodává `player_screen` — prah běhu se od 2026-10-09 měří od hráče, ne od
+středu okna; starý test pinoval střed okna. Záložní cesta (střed okna) zůstává
+měřená v `zoom_prevod.gd`.
+
+**➡ Další bod fáze 1 je 5.2** (rám světa volitelný: `stretch/mode=disabled`,
+okno 1600×900, pás GUI dopočítaný, `fullsize`), pak 5.3/5.4 (Z-pásma, střechy)
+a 5.5 (záseky). Zadání a citace z reference: `VIZUAL-PARITA-2026-10-09.md` §5 a §10.
+
 **➡ NÁVRH REVIZE VIZUÁLU JE V `VIZUAL-PARITA-2026-10-09.md`** — naměřené
 nálezy k deseti pozorováním, pravidla originálu s citacemi (Z-pásma
 `playerZ ± 14/16`, fade střech na alfu 0, hloubka `(x+y) + (127+z)*0.01`) a tři

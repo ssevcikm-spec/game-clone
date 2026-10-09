@@ -303,11 +303,9 @@ func set_player_offset(offset: Vector2) -> void:
 
 
 # --- ZOOM (19. session, V9) ----------------------------------------------
-func svet_rozmer() -> Vector2:
-	# VIDITELNA PLOCHA SVETA v px. Kamera ma `zoom`, takze svet se do viewportu
-	# vejde `1 / zoom` krat vetsi. Tohle cislo je VSTUP pro `_obrazovka()`
-	# (orezavani) i `_list_okraj()` (okno seznamu) - kdyz se na to zapomene,
-	# obrazovka prestane byt pokryta a u okraju vzniknou DIRY (namERena past).
+func viewport_size() -> Vector2:
+	# ROZMER VIEWPORTU v px. Jedno misto pro `svet_rozmer()` i pro prevod
+	# svet <-> obrazovka (`world_to_screen`/`screen_to_world`).
 	#
 	# Kdyz viewport rozmer NEMA (headless beh bez okna), vezme se DEKLAROVANA
 	# velikost okna z `project.godot`: okno seznamu i pokryti se pak pocitaji
@@ -319,7 +317,43 @@ func svet_rozmer() -> Vector2:
 		rozmer = Vector2(
 			float(ProjectSettings.get_setting("display/window/size/viewport_width", 1280)),
 			float(ProjectSettings.get_setting("display/window/size/viewport_height", 720)))
-	return rozmer / zoom
+	return rozmer
+
+
+func world_to_screen(w: Vector2) -> Vector2:
+	# PROJEKCE SVET -> OBRAZOVKA pro kameru s zoomem (2026-10-09).
+	# ODVOZENI (Godot `Camera2D`): `screen = (world - camera.position) * zoom
+	# + viewport / 2`. Kdo prevadi souradnice rucne, MUSI pouzit tuhle dvojici:
+	# `app/input_map` to do 2026-10-09 nedelal (pocital `world = screen +
+	# camera_offset`) a pri zoomu != 1 miril vedle - namEReno v overlayi pri
+	# zoomu 0,75: `pick=(426,280)` proti skutecnemu stredu postavy (480,300).
+	# Reference ma prevod na jednom miste take (`_src/classicuo/src/
+	# ClassicUO.Renderer/Camera.cs:88-103` `ScreenToWorld`).
+	if _camera == null:
+		return w
+	return (w - _camera.position) * zoom + viewport_size() / 2.0
+
+
+func screen_to_world(s: Vector2) -> Vector2:
+	# Opacny smer k `world_to_screen`. Pouziva ho vstup (klik, interakce).
+	if _camera == null:
+		return s
+	return (s - viewport_size() / 2.0) / zoom + _camera.position
+
+
+func zoom_hodnota() -> float:
+	# Zoom pro klienta, ktery ho potrebuje a nesmi sahat na promennou:
+	# `has_method` tak funguje i v testech, kde view neni `app.world_view`.
+	# Vzdy > 0 (deleni nulou by bylo tiche a obraz by zmizel).
+	return maxf(0.01, zoom)
+
+
+func svet_rozmer() -> Vector2:
+	# VIDITELNA PLOCHA SVETA v px. Kamera ma `zoom`, takze svet se do viewportu
+	# vejde `1 / zoom` krat vetsi. Tohle cislo je VSTUP pro `_obrazovka()`
+	# (orezavani) i `_list_okraj()` (okno seznamu) - kdyz se na to zapomene,
+	# obrazovka prestane byt pokryta a u okraju vzniknou DIRY (namERena past).
+	return viewport_size() / zoom
 
 
 func viditelne_dlazdice() -> Vector2i:
