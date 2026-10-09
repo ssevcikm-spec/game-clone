@@ -57,9 +57,10 @@ proot** (upstream 5.5.0, 2026-10-06), aby server šel spouštět i bez rootu.
 (kroky 1–3), kontext [`PREDANI-SESSION-2026-10-09.md`](PREDANI-SESSION-2026-10-09.md).
 **Stav před session:** `MK 2/0/7`, 63 měřeně hotových granul, brány 11 OK / 0 chyb,
 testy 1 507 kontrol / 0 selhání, HEAD `5959f3b`.
-**Stav po session:** commit **`fd3bea2`**, `origin/main == HEAD` (push ověřen,
-`ahead 0`), `MK 3/9`, **64** měřeně hotových, brány **12 OK / 0 chyb**,
-testy **1 551 / 0**.
+**Stav po session:** commity **`fd3bea2`** (hlavní práce), **`cc3aaa7`** (číslo
+v tomhle bloku) a **`3757a4d`** (oprava mutačního harnessu, viz §6) — vše
+pushnuté (`origin/main == HEAD`, `ahead 0`); `MK 3/9`, **64** měřeně hotových,
+brány **12 OK / 0 chyb**, testy **1 551 / 0**.
 
 > ⚠ **Prostředí (naměřeno na začátku session):** session běžela v `workspace-write`
 > a brány hlásily **„chyb 2, čeká 1"** — G3/G7/G11 nemohly zapsat `user://` ani
@@ -171,7 +172,7 @@ vlastní doklad. G9 po přepnutí: `hash == očekávaný` u obou replayů, `exit
 | Dokumentové brány | `check-docs-refs`, `check-zadani`, `roadmap-gen --check` → všechny `exit 0` |
 | G7 | `hash_before == hash_after = 6946c1af…`, `mobiles_after 3`, self-test **8 případů / 0 chyb** |
 | F1 self-test / mutace | 13 případů / 0 chyb · **5 z 5 mutací chyceno** + smlouva vstupu OK |
-| Mutační harness testů | **16 z 16** (`offline`, `mobile`, `registry`), baseline 1551/0 |
+| Mutační harness testů | **16 z 16** (`offline` 5, `mobile` 4, `registry` 7), baseline 1551/0; po opravě harnessu (§6) i **`world_loop` 1/1 — skutečným kódem** |
 
 ### 6) Nálezy a pasti, které stojí za zapsání
 
@@ -191,6 +192,24 @@ vlastní doklad. G9 po přepnutí: `hash == očekávaný` u obou replayů, `exit
 * **`plan-status.py` měří „v gitu" = sledované gitem** — necommitnutý soubor je
   pro něj „soubor je, test není", i když test existuje. „Hotovo" se tedy smí
   vykazovat až po commitu.
+* **⚠ SLA PŘEDCHOZÍ HARNESS, NALEZENÁ A OPRAVENÁ (`3757a4d`): `mutace-tests.py`
+  počítal za CHYCENOU i mutaci, která se VŮBEC NENAČETLA.** Mutant souboru
+  s `class_name` (např. `sim/sim_world.gd` → modul `world_loop`) skončí v Godotu
+  na `Parse Error: Class "SimWorld" hides a global script class`; case pak
+  zahlásí „soubor chybí“ — a protože je v té hlášce **prefix modulu**, harness to
+  vykázal jako **CHYCENA vada**, i když se mutovaný kód nikdy nespustil.
+  Naměřeno před opravou: `world_loop` „CHYCENA“ s hláškou
+  `FAIL sim.world_loop NENI HOTOVA: …/mutante-world_loop.gd chybí`.
+  **Oprava:** mutant se zapisuje **bez `class_name`** (testy načítají cestou)
+  a harness navíc rozliší „mutant se nenačetl“ jako **NECHYCENO**.
+  Po opravě: `world_loop` **1/1 chyceno skutečným kódem** (1 551 kontrol,
+  1 selhání), `offline` 5/5, `mobile` 4/4, `registry` 7/7, `plan-status --check`
+  `exit 0`.
+* **⚠ Dva různé počty kontrol téhož dne:** druhá session (telefon, `e8d980c`)
+  naměřila **1 466 kontrol / 0 selhání** při **61 case souborech**, tady je
+  **1 551 / 0** při týchž 61. **Rozdíl 85 kontrol není vysvětlený** — nabízí se
+  podmíněné kontroly nad `assets/uo/` (telefon assety nemá), ale **není to
+  ověřené**; kdo to potká, ať měří **tímtéž postupem na témže stromě**.
 
 ### 7) Co zůstává otevřené (pojmenované, ne zamlčené)
 
