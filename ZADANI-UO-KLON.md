@@ -10,6 +10,13 @@
 > Classic**, které jsou na této stanici.
 >
 > **Není to MMO.** Žádný server, žádná síť, žádný druhý hráč.
+>
+> **⚠ 2026-10-09 — CÍL SE ZMĚNIL (rozhodnutí uživatele).** Věrná kopie **není**
+> cíl; cílem je **„feel" bez omezení staré hry**, hra **modifikovatelná
+> a rozšiřitelná**, **svět jde dál i beze hráče** a **automatizace smí provést,
+> co hráč rozhodl** (nesmí rozhodnout za něj). Zadání níž platí **dál tam, kde
+> neodporuje** `ROZHODNUTI-2026-10-09-SMER.md` a `docs/01`; **nejbližší cíl je
+> krátká smyčka** (`docs/01` §1.3), ne celá osmička vět.
 
 ---
 

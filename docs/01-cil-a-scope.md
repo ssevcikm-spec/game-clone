@@ -49,7 +49,7 @@ kadence na milisekundu) **jako cíl**. Vyžaduje se, aby chování šlo **dohled
 k referenci** a aby ho **hráč poznal**. Brány měřící paritu obrazu zůstávají —
 měří **regresi** („něco se rozbilo"), ne cíl.
 
-| # | Věrnostní bod | Co to konkrétně znamená | Kde je spec |
+| # | Co bereme z reference (dřív „věrnostní bod") | Co to konkrétně znamená | Kde je spec |
 |---|---|---|---|
 | V1 | **Ovládání jako UO** | levá myš = výběr/cíl, dvojklik = použij, pravý klik = kontext, drag & drop předmětů, kurzor pro target, makra na klávesách, chůze po kliknutí (klik-to-move) i šipkami | §5.3 |
 | V2 | **Pohyb po krocích** | 8 směrů, diskrétní krok za 400 ms (běh 200 ms), spotřeba staminy, blokování terénem, výšky a schody, doors/teleporty jako v datech klienta | §5.1 |
@@ -64,10 +64,10 @@ měří **regresi** („něco se rozbilo"), ne cíl.
 | V11 | **Obsah předmětů** | data-driven katalog: nástroje, zbraně, zbroje, oblečení, suroviny, lektvary, svitky, jídlo — každý s art ID z originálních dat, vahou, vrstvou, hodnotou | §6 |
 | V12 | **Svět a čas** | Britannia z originální mapy (faceta 0), statics, den/noc, světlo, spawn příšer, NPC ve městech | §5.11, §5.12 |
 
-**Pravidlo věrnosti:** tam, kde se klon od UO odchýlí, musí to být
-**rozhodnutí zapsané v `docs/`** s důvodem — ne tichý rozdíl v kódu. „Nevím,
-jak to UO dělalo" je přípustný stav, ale musí být vidět: `UNVERIFIED` +
-co je potřeba změřit.
+**Pravidlo odchylky (dřív „pravidlo věrnosti"):** tam, kde se hra od UO
+odchýlí, musí to být **rozhodnutí zapsané v `docs/`** s důvodem — ne tichý
+rozdíl v kódu. „Nevím, jak to UO dělalo" je přípustný stav, ale musí být
+vidět: `UNVERIFIED` + co je potřeba změřit.
 
 ## 1.3 Hlavní herní smyčka, která musí fungovat celá
 
@@ -180,8 +180,8 @@ vyrábí druhý zdroj pravdy a rozbíjí plán:
 
 1. **Hratelnostní test podle §1.3** — člověk projde osm vět smyčky a dá
    známku 1–5. Tohle je jediné kritérium, které rozhoduje o „hotovo".
-2. **Věrnostní audit V1–V12** — u každého bodu se najde místo v datech
-   a v kódu, které ho implementuje, a ověří se spuštěním.
+2. **Audit V1–V12** (co bereme z reference) — u každého bodu se najde místo
+   v datech a v kódu, které ho implementuje, a ověří se spuštěním.
 3. **Snímek hry** — `read_image` (nebo `vision` v CI) se podívá na frame:
    je tam vidět dlaždicová krajina, postava, zbraň, jméno, HUD.
 4. **Determinismus** — dva běhy téhož skriptu příkazů dají stejný hash stavu.

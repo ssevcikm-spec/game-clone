@@ -21,7 +21,7 @@ UO Classic, které jsou na této stanici.
 ```
 ZADANI-UO-KLON.md            hlavní zadání (10 oddílů, dá se předat samostatně)
 docs/
-  01-cil-a-scope.md          cíl, měřitelná věrnost (V1–V12), non-goals, hlavní smyčka
+  01-cil-a-scope.md          cíl, co bereme z reference (V1–V12), non-goals, hlavní smyčka + nejbližší KRÁTKÁ smyčka
   02-technicka-rozhodnuti.md engine, architektura běhu, izometrie, konvence, výkon
   03-assety-a-data.md        extrakce z instalace UO: soubory, formáty, nástroj, brány
   04-architektura-a-smlouvy.md vrstvy, 100 komponent, Command/Event, TVARY DAT, kritéria

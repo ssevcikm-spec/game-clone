@@ -230,6 +230,9 @@ cíl** a přesunout session do práce, kterou uživatel chce (D4, D5, D3).
 | 6 | Staré zadání `ZADANI-DALSI-VYVOJ.md` označeno jako překonané v tom bodě (nemaže se) | `ZADANI-DALSI-VYVOJ.md` hlavička |
 | 7 | `N9` v `uo-shadows` přeformulováno stejnou hranicí | `E:\Workspaces\uo-shadows\docs\GDD.md` §11 |
 | 8 | Nový projekt klienta založen (kostra, smlouvy, zadání prvního milníku) | `E:\Workspaces\godot-uo-client\` |
+| 9 | Hlavní zadání označeno jako v cíli překonané (nemaže se, jen doplňuje) | `ZADANI-UO-KLON.md` hlavička |
+| 10 | Rozcestník balíčku popisuje nový cíl místo „měřitelné věrnosti" | `README.md` řádek o `docs/01` |
+| 11 | V `docs/01` přejmenovány popisky, které by tvrdily opak („věrnostní bod" → „co bereme z reference", „pravidlo věrnosti" → „pravidlo odchylky", „věrnostní audit" → „audit") | `docs/01-cil-a-scope.md` §1.2, §1.7 |
 
 **Co zůstalo beze změny a je to tak správně:** `docs/02`–`docs/08`, `docs/10`,
 `docs/11`, brány, `project.godot`, `.forge/roadmap.json` — **plán se tímhle
