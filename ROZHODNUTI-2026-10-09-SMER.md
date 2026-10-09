@@ -231,6 +231,46 @@ s health barem a bez něj), ne dojem.
 **Cesta zpět:** není potřeba — nic se nezakazuje, `docs/01` §1.8 vede zobrazení
 zdraví jako **odložené**.
 
+### D8 — Brány z pocitu `F1` a `F4` jsou schválené
+
+**Rozhodnutí uživatele:** „Schvaluji jako **F1** a **F4**." Obě brány jsou
+zapsané v `docs/08` §8.2 (tabulka bran) i s poznámkou, že **do milníku `MK`
+vrací `2` (NEMĚŘENO)** — `sim.offline` a obchod ještě neexistují a `2` se
+nesmí tvářit jako zelená. Kontroly a mutace, které brány musí mít, jsou
+v `NAVRH-BRAN-FEEL-2026-10-09.md` §2–§3.
+
+**Co to znamená pro práci:** brány se implementují **spolu s `MK`** (jsou na něm
+závislé) a do `run-all.py` se zapíšou, až soubory bran existovat budou.
+
+**Cesta zpět:** smazat dva řádky v `docs/08` a dvě zmínky v `docs/01` §1.8.
+
+### D9 — Multiplayer: obojí, `always-on` odložený; hodiny světa patří do simulace
+
+**Rozhodnutí uživatele:** „Volitelně bych rád povolil **obojí** s tím, že
+**always-on bude odložené**, až na to přijde relevance."
+
+**Co je tím rozhodnuté:**
+
+1. **Session u hostitele** je první multiplayer — cena nula, žádná údržba,
+   svět běží, dokud běží hostitel.
+2. **Always-on svět** zůstává v plánu jako **odložený**, ne zamítnutý.
+3. **Závazné pravidlo pro `sim.offline` (platí od teď):** hodiny světa bydlí
+   **v simulaci** a „offline" znamená **„bez připojeného klienta"**, ne „bez
+   hráče". Tím zůstanou singleplayer, session u hostitele i always-on server
+   **týmž kódem**; kdyby to bylo naopak, MP by musel `sim.offline` přepisovat.
+4. **Kolik hráčů:** zatím neurčeno („zatím nevím") — architektura to unese,
+   číslo se doladí podle provozu.
+
+**Hosting (analýza, ne rozhodnutí):** `oracle-frankfurt` je Oracle Cloud **ARM**
+a **může být i herní server**, ale platí se za čtyři věci, které kapacitou
+koupit nelze: **latence z vytížení** (uzel dělá těžké CI úlohy), **bezpečnostní
+dosah** (veřejný port na stroji, kde běží self-hosted runner s tokeny),
+**sdílený osud** (OOM/restart shodí svět) a **provoz** (zálohy, restarty,
+monitoring). Naměřená oprava předpokladu: **conductor na Oracle neběží** — je to
+Cloudflare Worker; Oracle uzel je **výpočetní uzel** orchestra. Detaily a návrh
+řešení: `NAVRH-BRAN-FEEL-2026-10-09.md` §6.1b.
+**Co k tomu chybí:** (a) reálná kapacita uzlu a (b) tik při běžícím buildu.
+
 ---
 
 ## 3. Proč to není „začít znovu" (a co by naopak drahé bylo)
@@ -278,6 +318,8 @@ cíl** a přesunout session do práce, kterou uživatel chce (D4, D5, D3).
 | 12 | Do plánu vložen milník **`MK` (krátká smyčka)** s 9 granulemi, obchod přesunut z M7, přidány vlny W13/W14 — roadmapa přegenerovaná | `tools/roadmap-gen.py`, `tools/plan-status.py`, `docs/07` §7.2/§7.3, `.forge/roadmap.json` |
 | 13 | Rozbité markdown tabulky opraveny (3×) a zapsána třída vady | `docs/01`, `HANDOFF.md`, §6.7 |
 | 14 | Definice „feel" zapsána jako `F1`–`F5` s tím, jak se ověří; **zobrazení zdraví** vedeno jako **odložené a vratné** | `docs/01` §1.8, §2 D7 |
+| 15 | Brány z pocitu **`F1` a `F4` schváleny** a zapsány do smlouvy (do `MK` vrací `2` = neměřeno) | `docs/08` §8.2, `docs/01` §1.8, `NAVRH-BRAN-FEEL-2026-10-09.md` |
+| 16 | **Multiplayer:** rozhodnut tvar (session první, `always-on` odložený) + závazné pravidlo „hodiny světa v simulaci, offline = bez klienta" | §2 D9, `HANDOFF.md`, `NAVRH-BRAN-FEEL-2026-10-09.md` §5–§6 |
 
 **Co zůstalo beze změny a je to tak správně:** `docs/02`–`docs/08`, `docs/10`,
 `docs/11`, brány, `project.godot`, `.forge/roadmap.json` — **plán se tímhle
@@ -378,30 +420,20 @@ smlouvy, ne úklid, takže patří uživateli.
 
 ---
 
-### 6.8 Brány z pocitu (`F1`, `F4`) — návrh k odsouhlasení
+### 6.8 Brány z pocitu (`F1`, `F4`) — ✅ ROZHODNUTO (D8)
 
-Návrh je hotový: **`NAVRH-BRAN-FEEL-2026-10-09.md`** — u každé brány co měří
-(pět kontrol u `F1`, čtyři u `F4`), **jaké mutace ji musí shodit**, kde běží,
-co potřebuje a co se změní v `docs/08`, když se schválí. **Nic z toho není
-provedené** — `docs/08` zůstává 13 bran. Uživatel potvrdil zásadu („svět má mít
-vlastní čas, to je v pořádku"), ale **označení a zápis do smlouvy je na něm**.
+Uživatel schválil brány **pod označením `F1` a `F4`**; jsou zapsané v `docs/08`
+§8.2 a **čekají na implementaci spolu s `MK`** (do té doby vrací `2` = neměřeno).
+Návrh s kontrolami a mutacemi: `NAVRH-BRAN-FEEL-2026-10-09.md`.
 
-### 6.9 Multiplayer a hosting — otevřené rozhodnutí
+### 6.9 Multiplayer a hosting — ✅ ROZHODNUTO (D9); hosting zůstává analýzou
 
-Uživatel chce umožnit **malý počet hráčů**. Architektura je na to připravená
-(`sim/` je jediná autorita, klient posílá jen `Command`, tik je deterministický —
-naměřeno 2026-10-07 v `REVIZE-SMER` §1.4), chybí transport, snapshoty, zájem
-o okolí a predikce klienta.
-**Co je potřeba dodržet už teď (je to zdarma a je to v návrhu §5.1):** hodiny
-světa bydlí **v simulaci**, a „offline" znamená **„bez připojeného klienta"**,
-ne „bez hráče" — jinak by MP musel `sim.offline` přepisovat.
-**Hosting (naměřeno):** `oracle-frankfurt` = Oracle Cloud **ARM**, živý, ale
-**už slouží jako CI runner orchestra** (sdílet bych ho bez měření nechtěl);
-`cetnik` = **Xiaomi Redmi Note 8** (Termux + proot + PM2, dosažitelný SSH) —
-dobrý pro LAN, ne pro veřejný server; `pc-domaci` = domácí PC, často offline —
-což je pro **host-authoritative session** vlastnost, ne vada.
-**Doporučení:** nehostovat nic, dokud není co; první MP jako **session
-u hostitele** (cena nula), always-on svět až potom. Detaily: `NAVRH-BRAN-FEEL-2026-10-09.md` §5–§6.
+Tvar je rozhodnutý: **session u hostitele první, `always-on` odložený**, a platí
+pravidlo „**hodiny světa v simulaci, offline = bez připojeného klienta**".
+Počet hráčů zatím neurčen. **Hosting je analýza, ne rozhodnutí** — Oracle ARM
+uzel to umí, ale platí se za latenci z vytížení, bezpečnostní dosah, sdílený osud
+a provoz; chybí k tomu dvě měření (kapacita uzlu, tik při buildu).
+Detaily: `NAVRH-BRAN-FEEL-2026-10-09.md` §5–§6.1b.
 
 ---
 

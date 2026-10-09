@@ -90,22 +90,24 @@ v referenci je to **klientská volba** (`HealthBarGump`, `HealthLinesManager`,
 v konfiguraci klienta. Tvrdě platí jen: **zobrazení nesmí měnit pravidla**
 (simulace nesmí číst UI) a přepínač je na jednom místě.
 
-**Nový návrh k odsouhlasení (2026-10-09): `NAVRH-BRAN-FEEL-2026-10-09.md`.**
-Brány `F1` („svět má vlastní čas": 5 kontrol + 5 mutací) a `F4` („nic není
-odpad": 4 kontroly + 3 mutace) — **nic z toho není zapsané v `docs/08`**,
-dokud to uživatel neschválí. U `F1` uživatel potvrdil zásadu („svět má mít
-vlastní čas, to je v pořádku"), označení bran a zápis do smlouvy je na něm.
+**Brány z pocitu — ✅ SCHVÁLENO 2026-10-09:** `F1` („svět má vlastní čas") a `F4`
+(„nic není odpad") jsou **zapsané v `docs/08` §8.2** (uživatel: „Schvaluji jako
+F1 a F4"). **Implementují se spolu s `MK`** a do té doby vrací `2` (NEMĚŘENO) —
+což se nesmí tvářit jako zelená. Kontroly, mutace a co která brána měří:
+`NAVRH-BRAN-FEEL-2026-10-09.md`.
 
-**Multiplayer (nové zadání uživatele 2026-10-09):** chce umožnit **malý počet
-hráčů**. Architektura je připravená (autorita v `sim/`, klient posílá jen
-`Command`), chybí transport, snapshoty, zájem o okolí, predikce klienta.
-**Pravidlo, které je potřeba dodržet už teď:** hodiny světa bydlí **v simulaci**
-a „offline" = **bez připojeného klienta**, ne „bez hráče" — tím zůstanou
-singleplayer, session u hostitele i always-on server **týmž kódem**.
-**Hosting (naměřeno):** `oracle-frankfurt` = Oracle Cloud ARM (živý, ale **už
-dělá CI** orchestra), `cetnik` = Xiaomi Redmi Note 8 (Termux+PM2, LAN),
-`pc-domaci` = často offline (pro session u hostitele to nevadí).
-**Doporučení:** teď nehostovat; první MP jako session u hostitele.
+**Multiplayer — ✅ ROZHODNUTO 2026-10-09 (`D9`):** uživatel chce **obojí**,
+s tím, že **`always-on` je odložený**, „až na to přijde relevance". První MP je
+tedy **session u hostitele** (cena nula, žádná údržba, žádný veřejný port).
+**Závazné pravidlo pro `sim.offline` (platí od teď):** hodiny světa bydlí
+**v simulaci** a „offline" = **bez připojeného klienta**, ne „bez hráče" —
+tím zůstanou SP, session i always-on **týmž kódem**. Počet hráčů zatím neurčen.
+**Hosting je analýza, ne rozhodnutí** (`NAVRH-BRAN-FEEL-2026-10-09.md` §6.1b):
+`oracle-frankfurt` = Oracle Cloud **ARM** a může být i herní server, ale platí se
+za **latenci z vytížení** (uzel dělá těžké CI úlohy), **bezpečnostní dosah**
+(veřejný port vedle self-hosted runneru s tokeny), **sdílený osud** a **provoz**.
+Naměřená oprava: **conductor na Oracle neběží** (je to Cloudflare Worker) —
+Oracle je výpočetní uzel. Chybí dvě měření: kapacita uzlu a tik při buildu.
 
 ---
 

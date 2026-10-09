@@ -261,7 +261,7 @@ volba klienta.**
 
 **Co z tohohle oddílu už je v plánu:** F1 a F5 nesou granule `sim.offline`,
 `sim.save` a `sim.decision_log` (milník `MK`, `docs/07` §7.2); F4 je kandidát na
-datovou bránu a F2/F3 jsou kritéria pro obsah a souboj (`M5`). **Kandidáti na
-nové brány (F1 a F4) jsou zatím NÁVRH** — brány jsou smlouva v `docs/08`, takže
-jejich přidání patří uživateli. **Rozpracovaný návrh** (co brána měří, jaké
-mutace ji musí shodit, co se změní): `NAVRH-BRAN-FEEL-2026-10-09.md`.
+datovou bránu a F2/F3 jsou kritéria pro obsah a souboj (`M5`). **Brány `F1`
+a `F4` jsou od 2026-10-09 SCHVÁLENÉ** (uživatel) a zapsané v `docs/08` §8.2 —
+do milníku `MK` vrací `2` (NEMĚŘENO), protože `sim.offline` a obchod ještě
+neexistují. Návrh včetně kontrol a mutací: `NAVRH-BRAN-FEEL-2026-10-09.md`.

@@ -1,12 +1,14 @@
 # Návrh bran z pocitu (`F1`, `F4`) + co s tím dělá multiplayer a hosting
 
-> **Co je tenhle soubor:** **NÁVRH K ODSOUHLASENÍ** — ne stav, ne zadání.
-> Vznikl 2026-10-09 na pokyn uživatele („Rozpracuj to") poté, co potvrdil
-> definici pocitu v `docs/01` §1.8. **Datum spotřeby: až uživatel schválí** —
-> do té doby se podle něj nic nemění (`docs/08` zůstává 13 bran, roadmapa
-> zůstává, jak je).
-> **Co je v něm měřené:** zdroje a uzly v §6 (naměřeno 2026-10-09 na této
-> stanici). **Co je odhad:** ceny práce u bran (`[O]`) a hosting (§6.4).
+> **Co je tenhle soubor:** **NÁVRH — SCHVÁLENO 2026-10-09.** Uživatel schválil
+> brány `F1` a `F4` **pod označením `F1` a `F4`** (ne `G14`/`G15`); jsou
+> **zapsané v `docs/08` §8.2** a **čekají na implementaci** — do milníku `MK`
+> vrací `2` (NEMĚŘENO), protože `sim.offline` a obchod ještě neexistují.
+> **Datum spotřeby: 2026-10-09** — z §2 a §3 se provedlo **zapsání do smlouvy**;
+> samotné brány jsou před námi (spolu s granulemi `MK`). **§5 (multiplayer)
+> a §6 (hosting) jsou analýza a doporučení, ne provedená práce.**
+> **Co je v něm měřené:** uzly a zdroje v §6 (naměřeno 2026-10-09 na této
+> stanici). **Co je odhad:** ceny práce u bran (`[O]`).
 > **Současný stav projektu** je v `HANDOFF.md`; **cíl a pocit** v `docs/01`.
 
 ---
@@ -171,6 +173,34 @@ hostuje něco, co ještě nemá tvar. Naměřené zdroje:
    ale **oddělený od CI**: vlastní `systemd` jednotka, CPU kvóta (nebo druhý
    stroj/instance), a **měření**, že tik drží rozpočet i při běžícím buildu.
    Kdyby to nevyšlo: domácí PC (když běží) nebo telefon pro LAN.
+
+### 6.1b „Co to ovlivní?" — co se platí za sdílení uzlu s CI
+
+Uživatel se 2026-10-09 ptal, co vlastně sdílení uzlu ovlivní, a vyslovil
+podezření, že Oracle uzel má zdrojů dost. **Podezření je pravděpodobně správné
+u kapacity, ale nesdílení není o kapacitě** — platí se za čtyři jiné věci:
+
+| Co | Proč to je problém | Jak se to dá řešit |
+|---|---|---|
+| **1. Latence z vytížení CPU** | uzel je **CI worker** (kinds `test,build`) — tedy přesně těžké úlohy (Godot import/export, testy). Náš rozpočet je **tik ≤ 2 ms v 50 ms slotu**; když ho build vyhladoví, hráči vidí poskakování | `systemd` jednotka s `CPUQuota`, `Nice`, nebo omezit souběh runneru na 1; **a změřit** tik při běžícím buildu |
+| **2. Bezpečnostní dosah** | self-hosted runner **spouští kód z repa a drží tokeny**; veřejně poslouchající herní port je **nová útočná plocha na témže stroji** — kdo ji prolomí, je vedle CI tajemství | vlastní uživatel bez přístupu k pracovnímu stromu runneru, firewall, hardening; **nejlépe druhý stroj/instance** (free tier ARM obvykle dovolí dva) |
+| **3. Sdílený osud** | OOM nebo restart kvůli CI shodí svět uprostřed hraní; a naopak | oddělené jednotky + limity; zálohy světa (save) mimo stroj |
+| **4. Provoz** | updates, restarty, zálohy, monitoring — **někdo to musí dělat**, i když je to zdarma penězi | až ve chvíli, kdy je always-on opravdu potřeba (§6.1 bod 3) |
+
+**Co to naopak neovlivní:** peníze (free tier malý server unese), síť (veřejná IP
+je), paměť (server posílá jen stav, art zůstává na klientech) a výkon herní
+smyčky samotné — ta je lehká (naměřeno v UO: v aktivním okně kolem 37 NPC).
+
+**Oprava jednoho předpokladu (naměřeno):** na Oracle uzlu **neběží conductor** —
+conductor je Cloudflare Worker (`conductor/wrangler.toml`, `*.workers.dev`).
+Oracle uzel je **výpočetní uzel orchestra** (self-hosted runner pro `test`
+a `build`). To je pro rozhodnutí důležité: neběží tam „řídicí smyčka", ale
+**těžké úlohy**.
+
+**Co k tomu chybí, aby to bylo rozhodnutí a ne dohad:** (a) reálná kapacita uzlu
+(`nproc`, RAM, load average, disk) a (b) **tik při běžícím buildu**. První jde
+změřit hned (na stanici je `~/.ssh/oracle_node.key`, ale chybí záznam
+o hostiteli — viz otázka níž); druhé až s implementovaným `sim.offline`.
 
 ### 6.2 Právní poznámka, která se týká právě hostingu
 

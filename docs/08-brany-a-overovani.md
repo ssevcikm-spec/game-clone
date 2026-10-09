@@ -34,10 +34,20 @@
 | G11 | `smoke` | **běh**: hra se spustí headless na 300 framů bez `SCRIPT ERROR` | každý PR | jakákoli runtime chyba (Godot 3 API, `null`, chybějící uzel) |
 | G12 | `bench_sim.gd` | **výkon**: tick ≤ 2 ms při 200 mobilech / 3000 předmětech | nightly | překročení limitu |
 | G13 | `vision` (poradní) | **obsah vidí**: je na snímku město? je vidět postava se zbraní? | každý PR se snímkem | **neblokuje** — jen komentuje (falešný poplach je dražší) |
+| **F1** | `check-world-clock.py` — **čeká na `MK`** | **svět má vlastní čas**: bez jediného příkazu od hráče se stav světa změní, dvakrát totéž dá totéž, netiká při tom celý svět, doběh je idempotentní a nezávisí na dávkování | každý PR (až bude `sim.offline`) | svět se bez hráče nehýbe, dva běhy se rozejdou, tikne celý svět, nebo doběh závisí na dávkách |
+| **F4** | `check-no-waste.py` — **čeká na `MK`** | **nic není odpad**: každý výstup dosažitelný ve hře má konzumenta (recept / poptávku světa / propad) a odkaz na konzumenta vede na existující záznam | každý PR (až bude `data.vendors` a poptávka) | výstup bez konzumenta, **prázdný uzávěr** (nula měřených věcí), nebo konzument na neexistující id |
+
+**Dvě brány z pocitu (`F1`, `F4`) jsou od 2026-10-09 součástí smlouvy**
+(rozhodnutí uživatele; návrh včetně kontrol a mutací:
+`NAVRH-BRAN-FEEL-2026-10-09.md`). Vycházejí z poznatků `F1` a `F4` v `docs/01`
+§1.8. **Do milníku `MK` vrací `2` (NEMĚŘENO)** — `sim.offline` a obchod ještě
+neexistují, a `2` se **nikdy** netváří jako zelená (§8.9). Do `run-all.py` se
+zapíšou, až budou soubory bran existovat; do té doby jsou v tabulce proto, aby
+se na ně nezapomnělo.
 
 **Pořadí v CI je závazné:** G1 → G3 → G5 → G2 → G4 → G6 → G7 → G8 → G9 →
-G11 → G10 → G13. Schéma je první, protože je nejlevnější a rozpor v zadání
-zneplatňuje všechno ostatní.
+G11 → G10 → G13 (a po implementaci **F1 → F4** za G9). Schéma je první, protože
+je nejlevnější a rozpor v zadání zneplatňuje všechno ostatní.
 
 ## 8.3 Tři brány, které mají největší cenu
 
