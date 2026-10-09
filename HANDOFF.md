@@ -132,6 +132,29 @@ v úrovni stropu a výš **faduje na alfu 0** (`ProcessAlpha`,
 **➡ Další bod fáze 1 je 5.4** (fade střech/patra na alfu 0 místo vyhození),
 pak 5.5 (záseky: runtime atlas bez překreslování na GPU).
 
+### ✅ DOPLNĚNO (FÁZE 1, BOD 5.4 — PATRO DOHASÍNÁ MÍSTO SKOKU)
+
+**Co je hotové:** objekty, které po přestavbě seznamu zmizely (strop patra nebo
+střecha nad hráčem), se **zachytí a dohasínají** po **25 jednotkách alfy za tik
+20 ms** (doslovný přepis `CalculateAlpha`, `GameSceneDrawingSorting.cs:398-440`
++ `Constants.ALPHA_TIME = 20`) — místo aby zmizely skokem. Kreslí se **mimo
+dávku** (reference fading objekty taky routuje mimo mesh, `ChunkMesh.cs:878-882`),
+protože dávka je zapečená a alfa by v ní zamrzla.
+
+| Důkaz | Číslo |
+|---|---|
+| `_analyza/p28-fade-sonda.gd` (posun (1490,1611) → (1491,1612), strop 127 → 40) | zachyceno **4725 objektů** (celé patro budovy), fade dohasíná **11 kroků**; frame časy během fade **20–25 ms** = žádný zásek |
+| Snímky | `_analyza/p28-fade-2f.png` (patro ještě plné) → **`p28-fade-5f.png` (patro průhledné, uvnitř je vidět místnosti)** → `p28-fade-po.png` |
+| Test + mutace | nový `tests/cases/fade_patra.gd` (12 kontrol); mutace „skok místo fade“ → **2 selhání** |
+| ⚠ DVĚ FALEŠNÉ CESTY (obojí naměřeno a zapsáno) | (a) fade přes starou dávku NEBYL vidět — objekty zůstaly zapečené (snímek `6f` ukazoval plné patro); (b) kreslit během fade původní cestou stojí při 1600×900 **~320 ms/frame** (19 485 objektů) → nepřijatelné. Řešení: fade **čeká na novou dávku** (`spust_fade()`), do té doby kreslí stará |
+| Cena | mezi posunem a začátkem fade se čeká na stavbu nové dávky — naměřeno **811 ms** při 1600×900 (reference tuhle prodlevu nemá, staví každý frame) |
+| ⚠ CO SE NEDĚLÁ | **fade-in**: objekt, který se znovu objeví, kreslí nová dávka rovnou s alfou 255; reference mu alfu zvyšuje (`:425-435`) |
+| Testy / brány | **1433 → 1450 kontrol / 0 selhání**; brány **11 měřeno / 0 chyb** |
+
+**➡ Další bod fáze 1 je 5.5** — záseky: `2 framy z ~2300 na ~130 ms` (stav po
+R6) a známá zbývající cesta = **překreslení runtime atlasu na GPU**
+(`chunk_mesh`, viz commit `76d603a`); overlay (`F3`) ukazuje `peak` frame čas.
+
 **➡ NÁVRH REVIZE VIZUÁLU JE V `VIZUAL-PARITA-2026-10-09.md`** — naměřené
 nálezy k deseti pozorováním, pravidla originálu s citacemi (Z-pásma
 `playerZ ± 14/16`, fade střech na alfu 0, hloubka `(x+y) + (127+z)*0.01`) a tři

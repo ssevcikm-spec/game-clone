@@ -127,7 +127,7 @@ Pořadí je dané tím, co blokuje uživatelovo hlášení:
 | ~~5.1~~ | ~~**Zoom: jeden převodní pár `svět ↔ obrazovka`**~~ **HOTOVO 2026-10-09** — viz §5.1 níže | `pick` == skutečný střed postavy pro zoom 0,5 / 0,75 / 1,0 / 1,5 / 2,0 (naměřeno **0,00 px**) |
 | ~~5.2~~ | ~~**Rozhled oknem, ne zoomem < 1**~~ **HOTOVO 2026-10-09** — viz §5.2 níže | `viewport == okno`, svět = okno − pás; fullsize = celé okno |
 | ~~5.3~~ | ~~**Z-pásma podle hráče** (`playerZ ± 14/16`, strop 150)~~ **HOTOVO 2026-10-09** — viz §5.3 níže | rozdíl proti referenci **0** na 1369 místech; strop 150 měřeně 0 objektů |
-| 5.4 | **Střechy/patro: fade na alfu 0** místo vyhození (dnešní stav je binární vidím/nevidím → „krok stranou a je to jinak") | dva snímky téhož místa s hráčem pod střechou a vedle; změřený čas fade |
+| ~~5.4~~ | ~~**Střechy/patro: fade na alfu 0** místo vyhození~~ **HOTOVO 2026-10-09** — viz §5.4 níže | snímek v průběhu fade (`_analyza/p28-fade-5f.png`); frame časy během fade 20–25 ms |
 | 5.5 | **Záseky**: dokončit cestu „runtime atlas bez překreslení na GPU" (známá z R6) | 2 → 0 framů > 33 ms z 2300; `peak` v overlayi |
 
 ### 5.1 HOTOVO (2026-10-09, commit `f606511`)
@@ -230,15 +230,37 @@ střecha — a to se krokem mění. Naměřeno: **904 z 1369** pozic má nad hr�
 je **tvrdý skok** (žádné prolínání) — a to je přesně bod 5.4: reference objekty
 v úrovni stropu a výš **faduje na alfu 0** (`ProcessAlpha`, `:339-368`), nezahazuje.
 
-### 5.4 PŘIPRAVENO (pravidlo z reference, naměřeno 2026-10-09 — práce nezačala)
+### 5.4 HOTOVO (2026-10-09, `render/chunk_renderer.gd` + `app/world_view.gd`)
+
+**Co je hotové:** objekty, které po přestavbě seznamu zmizely (strop patra /
+střecha nad hráčem), se **zachytí a dohasínají** po 25 jednotkách alfy na tik
+20 ms (`ALFA_KROK`/`ALFA_TIK_MS`, doslovný přepis `CalculateAlpha`,
+`GameSceneDrawingSorting.cs:398-440` + `Constants.ALPHA_TIME = 20`), místo aby
+zmizely skokem. Kreslí se **mimo dávku** (jako reference routuje fading objekty
+mimo mesh, `ChunkMesh.cs:878-882`) — dávka je zapečená a alfa by v ní zamrzla.
+
+| Důkaz | Číslo |
+|---|---|
+| Živá sonda `_analyza/p28-fade-sonda.gd` (posun (1490,1611) → (1491,1612), strop 127 → 40) | zachyceno **4725 objektů** (celé patro budovy), fade dohasíná **11 kroků**; frame časy během fade **20–25 ms** (žádný zásek) |
+| Snímek pro oko | `_analyza/p28-fade-2f.png` (patro ještě plné) → **`_analyza/p28-fade-5f.png` (patro průhledné, uvnitř je vidět místnosti)** → `p28-fade-po.png` |
+| Test + mutace | nový `tests/cases/fade_patra.gd` (12 kontrol: 255 → 230 → 205, tik 20 ms, po 11 ticcích vypadne, `fade_zapnuty=false`, objekt mimo nový pohled se nechytá, znovu viditelný z fade vypadne); mutace „skok místo fade" (`ALFA_KROK = 255`) → **2 selhání** |
+| ⚠ NAMĚŘENÁ CESTA (dvě falešné starty, obojí zapsané) | (a) fade kreslený přes **starou dávku** nebyl vidět (objekt zůstal zapečený) — snímek `6f` ukazoval plné patro; (b) kreslit během fade **původní cestou** stojí při 1600×900 **~320 ms/frame** (19 485 objektů) → nepřijatelné. Řešení: fade **čeká na novou dávku** (`spust_fade()` až když je hotová) |
+| Cena, kterou to má | mezi posunem a začátkem fade se čeká na stavbu nové dávky — naměřeno **811 ms** při 1600×900 (do té doby kreslí stará dávka, kde objekty ještě jsou). Reference tuhle prodlevu nemá (staví se každý frame) |
+| Testy / brány | **1433 → 1450 kontrol / 0 selhání**; brány **11 měřeno / 0 chyb** |
+
+**⚠ CO SE NEDĚLÁ (pojmenovaná odchylka):** **fade-in**. Objekt, který se znovu
+objeví, nakreslí nová dávka **rovnou s alfou 255**; reference mu alfu
+`CalculateAlpha` zase **zvyšuje** (`:425-435`). Je to vidět jako skok při
+odchodu z budovy — zapsáno, ne zamlčeno.
+**Citace z reference (k bodu 5.4):**
 
 | Co reference dělá | Citace a čísla |
 |---|---|
 | Objekt v úrovni `_maxZ` a výš se **nevyhodí, ale faduje** na alfu 0 | `ProcessAlpha`, `GameSceneDrawingSorting.cs:339-356` (`obj.Z >= _maxZ` → `CalculateAlpha(ref obj.AlphaHue, 0)`); totéž pro `_noDrawRoofs && IsRoof` (`:357-368`) |
 | Krok fade | `CalculateAlpha` (`:398-440`): alfa se mění po **25 jednotkách** na tik (255 → 0 je tedy ~11 tiků) |
 | Délka tiku | `Constants.ALPHA_TIME = 20` ms (`Constants.cs:42`) → celý fade **~220 ms** |
-| Fade se dá vypnout | `Profile.UseObjectsFading == false` → alfa se nastaví rovnou (`:400-408`) |
-| Rozpracované (co musí kód umět) | seznam objektů dnes skryté objekty **vyhazuje** (`chunk_renderer._build`: `z_statiku >= _max_z` → `continue`), kdežto fade potřebuje, aby objekt v seznamu **zůstal** a kreslil se s měnící se alfou; u dávky (`render.chunk_mesh`) to znamená buď druhý průchod, nebo alfau ve shaderu. To je jádro bodu 5.4 |
+| Fade se dá vypnout | `Profile.UseObjectsFading == false` → alfa se nastaví rovnou (`:400-408`) = náš `fade_zapnuty` |
+| Fading objekty jdou **mimo mesh** | `ChunkMesh.cs:878-882` (`meshFadingOut` → do render queue) — u nás se dohasínající objekty kreslí zvlášť, protože dávka je zapečená |
 
 
 

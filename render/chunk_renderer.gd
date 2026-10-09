@@ -124,6 +124,28 @@ const STROP_NIC: int = 127
 const NEAR_Z_TOLERANCE: int = 6      # `Map.cs:192` (`Math.Abs(z - obj.Z) > 6`)
 const NEAR_Z_LIMIT: int = 20000      # pojistka (reference ma mrizku 64x64)
 const NEAR_Z_NENI: int = -32768      # "na te dlazdici strecha neni"
+# --- FADE PATRA (2026-10-09, faze 1 bod 5.4) ------------------------------
+# Reference objekty v urovni stropu a vys NEVYHAZUJE, ale snizuje jim ALFU:
+# `ProcessAlpha` (`_src/classicuo/.../GameSceneDrawingSorting.cs:339-368`:
+# `obj.Z >= _maxZ` nebo `_noDrawRoofs && IsRoof` -> `CalculateAlpha(ref alpha, 0)`)
+# a `CalculateAlpha` (`:398-440`) meni alfu po **25 jednotkach** na tik; tik je
+# `Constants.ALPHA_TIME = 20` ms (`Constants.cs:42`), takze cely fade
+# 255 -> 0 je 11 tiku = **~220 ms**. `Profile.UseObjectsFading == false` fade
+# vypne a alfa se nastavi rovnou (`:400-408`) - u nas `fade_zapnuty`.
+#
+# ⚠ PROC SE CHYTAJI "ZMIZELE" OBJEKTY A NE DRZI ALFA U VSECH: nas seznam se
+# prestavuje po 85-250 ms (namEReno, `_analyza/p20-kadence.gd`), kdezto
+# reference ma render list kazdy frame. Alfa zavislá na case by se tedy v
+# seznamu "zapekla". Faduji se proto jen objekty, ktere pri prestavbe ZMIZELY
+# (a kresli se mimo davku - stejne jako reference routuje fading objekty mimo
+# mesh: `ChunkMesh.cs:878-882`).
+const ALFA_KROK: int = 25
+const ALFA_TIK_MS: int = 20
+const ALFA_MAX: int = 255
+# "Tik jeste nezacal": prvni volani `fade_objekty` tik NASTARTUJE a alfu
+# nemeni, takze objekt je prvni frame jeste plne pruhledny (255) - presne to
+# dela reference, kde alfa objektu zacina na 255 a snizuje se az dalsim tikem.
+const ALFA_ZACATEK: int = -2147483647
 
 var _map = null
 var _textures = null
@@ -156,6 +178,13 @@ var strop_vypoctu: int = 0
 # bez ni by se hra zasekavala a `near_z` by byl drazsi nez uzitek.
 var _strop_klic: String = ""
 var _strop_vysledek: Dictionary = {}
+# FADE (bod 5.4): objekty, ktere pri posledni prestavbe zmizely a jeste
+# dohasinaji. `{obj, a, t}`; `_fade_klic` brani zdvojení.
+var fade_zapnuty: bool = true
+var fade_zachyceno: int = 0          # celkem zachyceno (pro sondu)
+var fade_aktivnich: int = 0          # kolik jich prave dohasina
+var _fade: Array = []
+var _fade_klic: Dictionary = {}
 
 
 
@@ -388,9 +417,113 @@ func visible(center: Vector2i, tiles_x: int, tiles_y: int) -> Array:
 	# ⚠ P20 (17. session): cena prestavby seznamu je 85-250 ms (podle velikosti
 	# okna) a je to duvod, proc se prestavba ODDALUJE (`RECENTER_TILES` ve
 	# `app/world_view`). Mereni: `_analyza/p20-kadence.gd`.
+	var stary: Array = _list
 	_list = _build(want)
 	_built = true
+	_zachyt_fade(stary, want)
 	return _list
+
+
+func klic_objektu(obj: Dictionary) -> String:
+	# Identita objektu pro fade (a pro rozdil seznamu): druh, dlazdice, vyska,
+	# art. Statik ma stejny klic v kazdem seznamu, dokud stoji.
+	return "%s:%d,%d,%d,%d" % [str(obj.get("kind", "?")), int(obj["x"]),
+		int(obj["y"]), int(obj["z"]), int(obj["art_id"])]
+
+
+func _zachyt_fade(stary: Array, oblast: Rect2i) -> void:
+	# Co bylo kreslene a po prestavbe zmizelo, se FADUJE (reference snizuje
+	# alfu, nevyhazuje - viz hlavicka `ALFA_KROK`). Fade vypnuty = nechytá se nic
+	# (reference `Profile.UseObjectsFading == false`).
+	if not fade_zapnuty or stary.is_empty():
+		return
+	var nove: Dictionary = {}
+	for obj in _list:
+		nove[klic_objektu(obj)] = true
+	# 1) Co je znovu videt, z fade VYPADNE (jinak by se kreslilo dvakrat:
+	#    v davce i s alfou). Reference objektu alfu zase ZVYSI - my ho vratime
+	#    rovnout alfou (pojmenovana odchylka, viz HANDOFF).
+	var zbyva: Array = []
+	for zaznam in _fade:
+		if nove.has(klic_objektu(zaznam["obj"])):
+			_fade_klic.erase(klic_objektu(zaznam["obj"]))
+			continue
+		zbyva.append(zaznam)
+	_fade = zbyva
+	# 2) Nove zmizele objekty se chyti - ale JEN ty, ktere zustaly v pohledu:
+	#    objekt mimo novy pohled nezmizel "pod stropem", jen odjel z obrazovky
+	#    (jinak by se pri kazdem posunu fadovaly tisice objektu).
+	for obj in stary:
+		var klic: String = klic_objektu(obj)
+		if nove.has(klic) or _fade_klic.has(klic):
+			continue
+		if not oblast.has_point(Vector2i(int(obj["x"]), int(obj["y"]))):
+			continue
+		_fade_klic[klic] = true
+		# `ceka` = fade jeste NEBEZI: objekt je porad v STARE davce, ktera se
+		# kresli, dokud se nová davka nedostavi. Spusti ho `spust_fade()`.
+		_fade.append({"obj": obj, "a": ALFA_MAX, "t": ALFA_ZACATEK, "ceka": true})
+		fade_zachyceno += 1
+	# Nove zachycene objekty CEKAJI (jsou jeste ve stare davce) - aktivni jsou
+	# jen ty, ktere uz dohasinaji z drivejska.
+	fade_aktivnich = _fade.size() - fade_ceka()
+
+
+func fade_ceka() -> int:
+	# Kolik objektu ceka na spusteni fade (jsou jeste ve stare davce).
+	var n: int = 0
+	for zaznam in _fade:
+		if bool(zaznam["ceka"]):
+			n += 1
+	return n
+
+
+func spust_fade() -> int:
+	# SPUSTI fade objektu, ktere cekaly na novou davku (viz `_zachyt_fade`).
+	# Vraci, kolik jich zacalo dohasinat. Volej az ve chvili, kdy je nova davka
+	# hotova - do te doby jsou objekty jeste nakreslene tou starou.
+	var spusteno: int = 0
+	for zaznam in _fade:
+		if not bool(zaznam["ceka"]):
+			continue
+		zaznam["ceka"] = false
+		spusteno += 1
+	fade_aktivnich = _fade.size() - fade_ceka()
+	return spusteno
+
+
+func fade_objekty(now_ms: int) -> Array:
+	# Objekty, ktere prave dohasinaji: vrati `[{obj, alfa}]` a posune stav
+	# (25 jednotek na `ALFA_TIK_MS`). Kdo dosahl nuly, vypadne.
+	# Objekty, ktere jeste CEKAJI (jsou ve stare davce), se nekresli - jinak by
+	# se kreslily dvakrat.
+	# Vstup casu je ARGUMENT (jako `render.anim.play(..., now_ms)`), aby se
+	# fade dal merit deterministicky.
+	var out: Array = []
+	var zbyva: Array = []
+	for zaznam in _fade:
+		if bool(zaznam["ceka"]):
+			zbyva.append(zaznam)
+			continue
+		var a: int = int(zaznam["a"])
+		var t: int = int(zaznam["t"])
+		if t == ALFA_ZACATEK:
+			zaznam["t"] = now_ms        # prvni volani tik nastartuje, alfu nemeni
+		elif now_ms - t >= ALFA_TIK_MS:
+			a = maxi(0, a - ALFA_KROK)
+			zaznam["a"] = a
+			zaznam["t"] = now_ms
+		if a <= 0:
+			_fade_klic.erase(klic_objektu(zaznam["obj"]))
+			continue
+		out.append({"obj": zaznam["obj"], "alfa": a})
+		zbyva.append(zaznam)
+	_fade = zbyva
+	return out
+
+
+func fade_pocet() -> int:
+	return _fade.size()
 
 
 func _build(area: Rect2i) -> Array:

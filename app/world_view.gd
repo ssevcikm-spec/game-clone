@@ -606,11 +606,20 @@ func _draw() -> void:
 	# atlas se naplnil), kresli se puvodni cestou - obraz musi byt spravny vzdy.
 	# POZOR: `_priprav_mesh()` vraci `_mesh.is_built()` - dokud dávka postavena
 	# NENI, kresli se puvodni cestou (jinak by se kreslil prazdny mesh = cerno).
+	# ⚠⚠ FADE PATRA (2026-10-09, bod 5.4): fade se SPOUSTI az ve chvili, kdy je
+	# hotova NOVA davka (`st == 0`). Do te doby kresli stara davka, ktera zmizele
+	# objekty jeste MA - kdyby se fade pustil hned, kreslil by se dvakrat
+	# (jednou z davky, jednou s alfou) a zmizeni by nebylo videt.
+	# NAMERENO: druha cesta (kreslit behem fade puvodni cestou, aby stara davka
+	# neprekazela) stoji pri okne 1600x900 **~320 ms/frame** (19 485 objektu) -
+	# na hru se zaseky to je neprijatelne.
 	if mesh_enabled and _mesh != null:
 		var st: int = _priprav_mesh()
 		if st == 0:
+			_chunk.spust_fade()
 			_kresli_mesh(false)
 			_davek += 1
+			_draw_fade()
 			return
 		# ⚠ 18. session: dokud se davka stavi (`krok`) nebo se stranka na GPU
 		# prekresluje (`hold`), kresli se PREDCHOZI davka - ta na starou stranku
@@ -618,9 +627,49 @@ func _draw() -> void:
 		if st == 1:
 			_kresli_mesh(true)
 			_predchozich += 1
+			_draw_fade()
 			return
 	_puvodnich += 1
+	# Puvodni cesta kresli seznam OKAMZITE (zadna stara davka) - fade se proto
+	# spousti hned, jinak by objekty zmizely skokem.
+	if _chunk != null:
+		_chunk.spust_fade()
 	_draw_puvodni()
+	_draw_fade()
+
+
+func _draw_fade() -> void:
+	# FADE PATRA (2026-10-09, faze 1 bod 5.4): objekty, ktere po prestavbe
+	# seznamu ZMIZELY (strop patra / strecha nad hracem), se kresli s KLESAJICI
+	# alfou - misto aby zmizely skokem. Reference snizuje alfu na objektech
+	# samotnych (`GameSceneDrawingSorting.cs:339-368`, krok 25/255 po 20 ms
+	# = ~220 ms); u nas se chytaji pri prestavbe seznamu, protoze ta je odlozena
+	# (`render/chunk_renderer.gd`, hlavicka `ALFA_KROK`).
+	#
+	# Kresli se NAKONEC (za davkou): objekty nad stropem maji v `render.sort`
+	# vyssi klic, takze "posledni" je jejich spravne poradi (strecha nad hracem
+	# ma hrace prekryvat).
+	#
+	# Cas je NASTENNI (`Time.Ticks` v referenci), ne sim: fade je vizualni
+	# efekt, ktery nema menit stav simulace (a `check-determinism` to hlida).
+	if _chunk == null or not _chunk.fade_zapnuty:
+		return
+	var cas: int = Time.get_ticks_msec()
+	# ⚠ OREZANI MIMO OBRAZOVKU je tu POVINNE (namEReno 2026-10-09): pri posunu
+	# pod strechu se zachyti 4 725 objektu (cele patro budovy) a bez orezani se
+	# kazdy frame kreslily vsechny - frame vyskocil na ~250 ms (proti ~30 ms).
+	# Stejny orez dela i puvodni cesta (`_draw_puvodni`, `CULL_MARGIN`).
+	var okno: Rect2 = _obrazovka(CULL_MARGIN)
+	for zaznam in _chunk.fade_objekty(cas):
+		var obj: Dictionary = zaznam["obj"]
+		var pozice: Vector2 = _chunk.screen_position(obj)
+		if not okno.has_point(pozice):
+			continue
+		var art: Texture2D = _textures.texture(int(obj["art_id"]))
+		if art == null:
+			continue
+		var alfa: float = float(int(zaznam["alfa"])) / 255.0
+		draw_texture(art, pozice, Color(1.0, 1.0, 1.0, alfa))
 
 func _draw_puvodni() -> void:
 	drawn = 0
