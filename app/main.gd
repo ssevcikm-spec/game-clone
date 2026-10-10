@@ -137,6 +137,7 @@ var skill_list = null            # `ui.skill_list` (2026-10-10, D10)
 var vendor_gump = null           # `ui.vendor_gump` (2026-10-10, D10)
 var vendor = null                # `sim.vendor` (2026-10-10, D10)
 var prodejce = 0                 # serial vendora NPC ve svete (0 = nikdo)
+var balvany: Array = []          # pozice rudnych balvanu (pro sondu smycky)
 var _skill_s: float = 0.0        # casovac obnovy seznamu skillu (2x/s)
 var _skill_klic: Array = []      # posledni hodnoty (neplnit UI kazdy frame)
 var debug_overlay = null         # `ui.debug_overlay` (2026-10-09)
@@ -565,15 +566,26 @@ func _setup_player(view) -> void:
 	batoh.layer = 0
 	batoh.parent = serial
 	items[int(player.backpack)] = batoh
-	# Nastroje (20. session): do batohu jde KAZDY nastroj z `data/items.json`.
-	# Bez nich by obecna interakce nemela co vybrat a vracela by `no_pair`.
-	var nastroju: int = _give_tools()
+	# START (2026-10-10, D10 "demo"): nastroje z DAT + startovni zlato. Do teto
+	# chvile hrac dostaval VSECHNY nastroje a zadne zlato - obchod se tim dal
+	# jen prohlizet, ne pouzit. Nastroje zustavaji (demo ma byt hratelne hned,
+	# ne o nakupovani kladiva), zlato je nove - aby slo neco KOUPIT i prodat.
+	var start: Dictionary = _starting_kit()
+	var nastroju: int = int(start["nastroju"])
 	# STANICE VE SVETE (20. session): kovadlina a vyhen. NAMERENO sondou
 	# `_analyza/p24-vyroba.gd`: v okoli Britainu (160 dlazdic) NENI zadna
 	# stanice jako statik mapy, takze bez tohohle by se ruda nedala vytavit -
 	# `sim.craft` sice stanici jako PREDMET umi (`_station_near`), ale nikdo
 	# ji do sveta nedaval. Dava se VEDLE hrace, aby na ni hrac dosahl (2 dlazdice).
 	var stanic: int = _postav_stanice()
+	# BALVANY (RUDNÉ ŽÍLY) VEDLE HRÁČE (2026-10-10, D10 „demo“): nejbližší ruda
+	# na této mapě je **132 dlaždic** od Britainu (`_analyza/p35c-sonda-hory.gd`),
+	# ale kovadlina, výheň i prodejce stojí u Britainu. Než vznikne cesta nebo
+	# `world.regions` (doly), stojí tady pár balvanů jako PŘEDMĚTY na zemi -
+	# `sim.harvest` je umí těžit (`_item_tile`, art 0x453B–0x454F).
+	# ⚠ Je to VĚDOMÝ SEŠITEK pro demo, ne náhrada mapy: `_analyza/p36-smycka.gd`
+	# měří, že se z nich dá vytěžit ruda. Cesta zpět: smazat tohle volání.
+	var balvanu: int = _postav_balvany()
 	# PRODEJCE (2026-10-10, D10): do sveta se postavi JEDEN kovar (podle jmena
 	# `blacksmith`) - bez vendora ve svete se obchod neda vubec spustit.
 	# ⚠ PORADI JE POVINNE: `sim.vendor` se zaklada TADY, pred postavenim
@@ -677,20 +689,31 @@ func _setup_player(view) -> void:
 	print("[main] hrac: serial ", serial, " na ", player.pos, " (", map.land_at(player.pos.x, player.pos.y),
 		" land), hue ", player.hue, " (0 = bez barvy), barvy: ", view.hue_stats(),
 		", nastroju v batohu ", nastroju, ", pocatecnich skillu ", skillu,
-		", prodejcu ", prodanych,
+		", prodejcu ", prodanych, ", balvanu ", balvanu, ", zlata ", int(start["zlata"]),
 		", systemu v sim: ", sim.systems.keys())
 
-func _give_tools() -> int:
-	# VSECHNY NASTROJE DO BATOHU (pokyn uzivatele 2026-10-08). Vraci pocet
-	# vydanych predmetu; kdyz data chybi, HLASI to - ticha nula by znamenala
-	# "obecna interakce nic nedela" a vypadalo by to jako vada interakce.
+
+func _starting_kit() -> Dictionary:
+	# CO HRAC DOSTANE NA START (2026-10-10, D10 „demo“). Nahrazuje puvodni
+	# `_give_tools()`, ktery daval VSECHNY nastroje a ZADNE zlato.
+	#
+	# Nastaveni je VEDOME a je to rozhodnuti, ne mereni:
+	#   * NASTROJE zustavaji vsechny - demo ma byt hratelne hned, ne o tom, ze
+	#     hrac pul hodiny shani kladivo. Bere se z DAT (`data/items.json`),
+	#     kategorie `tool`, jeden od kazdeho typu.
+	#   * ZLATO navic: **60** = tri nejlevnejsi veci u kovare (krumpac 21 g).
+	#     Bez nej se obchod dal jen prohlizet, ne pouzit - a prodej bez nakupu
+	#     nema co prodat. Castka je zamerne mala: vydelavat se ma prodejem.
+	#   * Art zlata je z `data/vendors.json` (`config.gold_art`), ne z hlavy -
+	#     namEReno 2026-10-10: zlato ma vic artu podle velikosti hromady.
+	var zlata: int = 60
 	if not FileAccess.file_exists(ITEMS_DATA):
 		push_warning("app.main: chybi " + ITEMS_DATA + " - hrac nedostane zadny nastroj")
-		return 0
+		return {"nastroju": 0, "zlata": 0}
 	var parsed = JSON.parse_string(FileAccess.get_file_as_string(ITEMS_DATA))
 	if not (parsed is Array):
 		push_warning("app.main: " + ITEMS_DATA + " neni seznam - hrac nedostane zadny nastroj")
-		return 0
+		return {"nastroju": 0, "zlata": 0}
 	var pocet: int = 0
 	var jmena: Array[String] = []
 	var videne_typy: Dictionary = {}     # type -> true (jeden nastroj od kazdeho typu)
@@ -706,7 +729,7 @@ func _give_tools() -> int:
 			continue
 		# ⚠ 20. session: JEDEN NASTROJ OD KAZDEHO TYPU, ne od kazdeho artu.
 		# Typ je identita (`data/items.json` -> `type`) a jeden typ ma casto vic
-		# grafik: krumpac 2 arty, sekera 3, kladivo 2. Do teto session se bral
+		# grafik: krumpac 2 arty, sekera 3, kladivo 2. Do te session se bral
 		# kazdy zaznam, takze hrac dostal 28 predmetu misto 16 (dva krumpace,
 		# tri sekery...) - nasla to sonda `_analyza/p23-interakce.gd`.
 		var typ: String = str(rec.get("type", ""))
@@ -724,8 +747,23 @@ func _give_tools() -> int:
 		items[int(predmet.serial)] = predmet
 		jmena.append(str(rec.get("name", role)))
 		pocet += 1
-	print("[main] nastroje v batohu: ", pocet, " (", ", ".join(PackedStringArray(jmena)), ")")
-	return pocet
+	# ZLATO: art z dat vendora (viz komentar vyse).
+	var gold_art: int = 0x4EED
+	if vendor != null and vendor.has_method("gold_art"):
+		gold_art = int(vendor.gold_art())
+	elif vendor != null:
+		var gd: Dictionary = vendor.stats()
+		if int(gd.get("gold_art", 0)) > 0:
+			gold_art = int(gd["gold_art"])
+	var mince = ItemScript.new(sim.next_serial(), gold_art, zlata)
+	if container.add(int(player.backpack), mince):
+		items[int(mince.serial)] = mince
+	else:
+		push_warning("app.main: startovni zlato se do batohu neveslo - hrac nema cim platit")
+		zlata = 0
+	print("[main] start: nastroju ", pocet, " (", ", ".join(PackedStringArray(jmena)),
+		"), zlata ", zlata, " (art ", gold_art, ")")
+	return {"nastroju": pocet, "zlata": zlata}
 
 
 static func start_skills(balance_skills: Dictionary, skills_data) -> Dictionary:
@@ -1029,6 +1067,29 @@ func _prodejce_pozadavek() -> void:
 		int(pozadavek.get("vendor", -1)), " polozek ",
 		(pozadavek.get("lines", []) as Array).size())
 	sim.enqueue(pozadavek)
+
+
+func _postav_balvany() -> int:
+	# RUDNÉ BALVANY VEDLE HRÁČE (2026-10-10, D10 „demo“). Důvod a hranice jsou
+	# v komentáři u volání v `_setup_world`; tady jen stavba.
+	# Art je z `sim.harvest.MINE_STATIC` (0x453B–0x454F) - kdyby se seznam
+	# rozešel, `sim.harvest` by balvany netěžil a sonda by to ukázala.
+	var pozice: Array = [Vector2i(1, 0), Vector2i(2, 0), Vector2i(1, 1), Vector2i(0, 2)]
+	var art: int = 0x453B
+	var postaveno: int = 0
+	balvany = []
+	for p in pozice:
+		var balvan = ItemScript.new(sim.next_serial(), art, 1)
+		balvan.parent = 0                      # 0 = na zemi (docs/04 §4.5)
+		balvan.pos = Vector3i(int(player.pos.x) + int(p.x), int(player.pos.y) + int(p.y),
+			int(player.pos.z))
+		items[int(balvan.serial)] = balvan
+		balvany.append(Vector2i(balvan.pos.x, balvan.pos.y))
+		postaveno += 1
+		if postaveno == 1:
+			_hlaseni_do_zurnalu("There are rocks to the east. (use them to mine)")
+	print("[main] balvany: ", postaveno, " kusu (art ", art, ") u hrace na ", player.pos)
+	return postaveno
 
 
 func _hlaseni_do_zurnalu(text: String) -> void:

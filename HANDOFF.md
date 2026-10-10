@@ -6,6 +6,50 @@
 > **Současný stav se bere z tohoto bloku** a ověřuje se živě (§„Předletová
 > kontrola" níž je starší a **datovaná**).
 
+## ✅ CO JE NOVÉHO (2026-10-10, DRUHÁ ČÁST) — **CELÁ KRÁTKÁ SMYČKA SE DÁ ZAHRÁT** (bez zásahu z konzole)
+
+**Co bylo zadáno (uživatel, 2026-10-10):** „Ano“ na otázku, zda dodělat
+**průchod těžba → výroba → prodej** a přidat **startovní zlato místo debug
+nástrojů**, aby se smyčka dala zahrát celá.
+
+**Stav před:** testy 1 836 / 0, brány **12** OK, obchod hotový, ale sonda smyčky
+končila u obchodu (těžba/výroba se ve hře neměřily).
+**Stav po:** testy **1 836 kontrol / 0 selhání**, brány **13** měřeno / 0 chyb,
+sonda celé smyčky **9 kontrol / 0 selhání**.
+
+### 1) Co je nové (a čím je to doložené)
+
+| Věc | Soubor | Naměřené |
+|---|---|---|
+| **Celá smyčka ve hře** | `_analyza/p36-smycka.gd` | `pickaxe`+`tongs`+**60 zlata** na startu → těžba z balvanů (ruda po 9 pokusech) → tavení (ingot po 10 pokusech) → **výroba `dagger`** (id 114, 3 ingoty, made=1) → **prodej kováři (zlato 60 → 74)**. **9 kontrol / 0 selhání.** |
+| **Rudné balvány u hráče** | `app/main._postav_balvany()` + `sim/harvest.gd` (`_item_tile`) | Nejbližší ruda na mapě je **132 dlaždic** od Britainu (`_analyza/p35c-sonda-hory.gd`), ale stanice i prodejce stojí u Britainu. Balvan je **PŘEDMĚT na zemi** s artem z `MINE_STATIC` (0x453B–0x454F) a `sim.harvest` ho těží. ⚠ **Vědomý sešitek pro demo** (stejná třída jako `_postav_stanice`) — až bude cesta/`world.regions`, nahradí ho doly. |
+| **Startovní zlato 60** | `app/main._starting_kit()` (nahradil `_give_tools()`) | 60 = tři nejlevnější věci u kováře (krumpáč 21 g). Nástroje **zůstávají** (demo má být hratelné hned). Art zlata je z DAT (`vendor.gold_art()`), ne z hlavy — `0x0EED` vs `0x4EED` byl měřený omyl. |
+| **Brána G14** | `tools/gates/check-state-float.py` (přidala ji **jiná session**, ne já) | `run-all.py` teď hlásí **13 bran** (nová je `G14 check-state-float`); s mým kódem všechny OK. |
+
+### 2) Dvě pasti, které stálo to měření (obě v sondě)
+
+1. **Těžba i tavení mají HOD** — první pokus v deterministickém běhu **selhal**
+   (`reason:"skill"` u těžby, `"failed"` u tavení). Není to vada: sonda se musí
+   **opakovat** a počet pokusů vypsat (tady 9 a 10). Kdo si myslí, že „jeden
+   pokus = výsledek“, píše test, který padá podle RNG.
+2. **`craft.smelt` chce SERIAL rudy, ne počet** — s nulou vrací `no_ore`
+   (naměřeno). Sonda proto bere serial z batohu (`_serial_typu`).
+
+### 3) Co zůstává otevřené
+
+1. **Sonda prodala `fishing_pole`, ne vykovanou dýku.** V tom běhu po výrobě
+   zbyl v batohu i rybářský prut (ze startovní sady) a `sellable` bere první
+   art podle pořadí — smyčka „vyrob → prodej VÝROBEK“ je tím **měřená jen
+   částečně**. Dorychlé měření: prodat konkrétní art dýky (`vendor.sell(...)`
+   s artem z `craft` výsledku).
+2. **Startovní sada dává všechny nástroje.** Pro demo je to úmysl (hrát hned),
+   ale znamená to, že **nákup u kováře není povinný** — obchod je zatím
+   „navíc“, ne podmínka postupu.
+3. Platí i věci z předchozího bloku: `data/regions.json` neexistuje, replay pro
+   `sim.vendor` není, `app/main.gd` nemá mutační modul, `DEX = 130` zůstává.
+
+---
+
 ## ✅ CO JE NOVÉHO (2026-10-10) — `D10`: PRIORITY SE MĚNÍ NA „HERNÍ ZÁKLADY A DEMO“ (obchod + základy + integrace)
 
 > **Pozor na datum:** tenhle blok je z **2026-10-10** (session běžela přes

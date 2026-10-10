@@ -476,7 +476,16 @@ func _resource_tile(kind: String, x: int, y: int) -> int:
 		var land: int = _land(x, y)
 		if land >= 0 and _in_ranges(land, MINE_LAND):
 			return land
-		return _static_tile(x, y, MINE_STATIC)
+		var statik: int = _static_tile(x, y, MINE_STATIC)
+		if statik >= 0:
+			return statik
+		# ⚠ PREDMET NA ZEMI (2026-10-10, D10 "demo"): ruda je na teto mape
+		# NEJBLIZSI 132 dlazdic od Britainu (`_analyza/p35c-sonda-hory.gd`) a
+		# stanice i prodejce stoji u Britainu - nez se dobehne cesta/regiony,
+		# stoji u Britainu par BALVANU jako predmety (`app/main._postav_balvany`).
+		# Je to stejna trida sesitku jako `_postav_stanice` (kovadlina/vyhen):
+		# pozdeji ji nahradi mapa (doly) nebo `world.regions` - viz HANDOFF.
+		return _item_tile(x, y, MINE_STATIC)
 	if kind == KIND_WOOD:
 		return _static_tile(x, y, TREE_STATIC)
 	var l: int = _land(x, y)
@@ -503,6 +512,25 @@ func _static_tile(x: int, y: int, ranges: Array) -> int:
 			continue
 		if _in_ranges(_art_of(int(s["tile"])), ranges):
 			return _art_of(int(s["tile"]))
+	return -1
+
+
+func _item_tile(x: int, y: int, ranges: Array) -> int:
+	# Predmet NA ZEMI jako zdroj sberu (2026-10-10, viz `_resource_tile`).
+	# Hleda se stejnym pravidlem jako statik: art v `ranges` a presna dlazdice
+	# (`parent == 0` = na zemi, `docs/04 §4.5`). Kdyby se ptalo jen na art,
+	# "ruda" by platila i pro balvan v batohu hrace.
+	if not (_items is Dictionary):
+		return -1
+	for serial in _items:
+		var item = _items[serial]
+		if item == null or int(item.parent) != 0:
+			continue
+		if int(item.pos.x) != x or int(item.pos.y) != y:
+			continue
+		var art: int = int(item.tile)
+		if _in_ranges(art, ranges):
+			return art
 	return -1
 
 

@@ -333,8 +333,14 @@ func stock_of(v: int, typ: String) -> int:
 	return _stock_of(v, typ)
 
 
-func art_of_type(v: int, typ: String) -> int:
-	# ART predmetu daneho TYPU, ktery vendor prodava nebo vykupuje (0 = nema).
+func gold_art() -> int:
+	# ART zlata z DAT (`config.gold_art`). Zlato ma vic artu podle velikosti
+	# hromady, takze se nesmi psat z hlavy (namEReno 2026-10-10: hrac dostal
+	# `0x0EED` misto `0x4EED` a `sellable` ho pak nepoznal jako zlato).
+	return int(_config.get("gold_art", 0x4EED))
+
+
+func art_of_type(v: int, typ: String) -> int:	# ART predmetu daneho TYPU, ktery vendor prodava nebo vykupuje (0 = nema).
 	# Potrebuje to klient/sonda, aby nemusela vymyslet art ID z hlavy (namEReno
 	# 2026-10-10: `0x0E86` neni krumpac teto instalace - je to 20101).
 	var rec: Dictionary = _record(v)

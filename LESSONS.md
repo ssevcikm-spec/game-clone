@@ -24,6 +24,43 @@ Typy: `chyba` (moje vada) · `past-nástroje` (prostředí/nástroj, ne logika) 
 
 ---
 
+# 2026-10-10 (druhá část) — CELÁ KRÁTKÁ SMYČKA VE HŘE: RNG V SONDĚ A SERIAL MÍSTO POČTU
+
+### 2026-10-10 — „Jeden pokus = výsledek“ je v herní smyčce chyba měření (chyba)
+**Co se stalo:** sonda celé smyčky (`_analyza/p36-smycka.gd`) nejdřív hlásila
+„těžba selhala“ (`reason:"skill"`) a „tavení selhalo“ (`reason:"failed"`).
+Nebyla to vada hry: **těžba i tavení mají skill hod** a v deterministickém běhu
+vyšel první pokus neúspěšně. Oprava: akce se opakuje (s posunem času, protože
+systém má `swing_ms` 1600) a **počet pokusů se vypíše** — ruda přišla po 9,
+ingot po 10 pokusech.
+**Doklad:** `_analyza/p36-smycka.gd` (9 kontrol / 0 selhání), HANDOFF 2026-10-10/2.
+**Ponaučení:** u akcí s hodem se test nesmí ptát „povedlo se to?“ po jednom
+pokusu — ptá se „**za kolik pokusů** to přišlo“ a to číslo zapíše. Jinak test
+padá podle RNG a vypadá to jako vada mechaniky.
+
+### 2026-10-10 — `smelt` chce SERIAL předmětu, ne jeho počet (chyba)
+**Co se stalo:** tavení vracelo `no_ore`, i když hráč rudu v batohu měl —
+do `craft.smelt(m, ore, forge)` jsem poslal `0` místo **serialu** rudy.
+**Doklad:** `_analyza/p36-smycka.gd` (před: `no_ore`, po: ingot 0 → 1).
+**Ponaučení:** u API, kde je parametr „věc“, se vždycky ptej, jestli to je
+**serial, index, nebo počet** — projekt používá serialy (`entity.item`) a
+v tomhle případě to není vidět z názvu argumentu.
+
+### 2026-10-10 — Nejbližší ruda je 132 dlaždic od Britainu (past-zadání)
+**Co se stalo:** smyčka „vytěž → vykov → prodej“ se nedala zahrát, protože
+kovadlina, výheň i prodejce stojí u Britainu, ale **nejbližší důl je 132
+dlaždic daleko** (`_analyza/p35c-sonda-hory.gd`, hledáno podle `MINE_LAND`;
+plošný sken přes `resource_kind` byl příliš pomalý, protože u statiků čte celý
+blok). Řešení pro demo: rudné balvány jako **předměty na zemi** vedle hráče.
+**Doklad:** `p35c-sonda-hory.gd` (`132, 1363, 1498`), `app/main._postav_balvany`,
+`p36-smycka.gd` (těžba 0 → 1 ruda).
+**Ponaučení:** než nastavíš demo smyčku, **změř vzdálenost surovin od místa,
+kde hráč začíná** — jinak je smyčka „hratelná“ jen na papíře. A když něco
+doplňuješ sešitem, **napiš to jako sešitek** (i s cestou zpět), ne jako
+vlastnost světa.
+
+---
+
 # 2026-10-10 — HERNÍ ZÁKLADY PRO DEMO: INTEGRACE NAŠLA PĚT VAD, KTERÉ TESTY NEVIDĚLY
 
 ### 2026-10-10 — Modul s testy není zapojený modul (chyba)
