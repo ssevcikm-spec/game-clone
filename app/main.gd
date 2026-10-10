@@ -31,6 +31,9 @@ const TiledataScript = preload("res://sim/world/tiledata.gd")
 const ContainerScript = preload("res://sim/entity/container.gd")
 const ItemScript = preload("res://sim/entity/item.gd")
 const HarvestScript = preload("res://sim/systems/harvest.gd")
+# 2026-10-10 (`sim.regen`): doplnovani hp/stam/mana. Registruje se do
+# `sim.systems` - `SimWorld` ho tickuje podle `SYSTEM_ORDER`.
+const RegenScript = preload("res://sim/systems/regen.gd")
 const CraftScript = preload("res://sim/systems/craft.gd")
 const JournalScript = preload("res://ui/journal.gd")
 # DEBUG OVERLAY (granule `ui.debug_overlay`, 2026-10-09): informace o lokaci
@@ -55,6 +58,18 @@ const CraftGumpScript = preload("res://ui/craft_gump.gd")
 # VIDET (`HANDOFF` "Co ceka na tebe" D3). Okno je JEN CTENI - pravidla needituje
 # ani neuklada (rozhodnuti uzivatele 2026-10-09: "D3 prijmu jen jako HUD").
 const PolicyPanelScript = preload("res://ui/policy_panel.gd")
+# 2026-10-10 (`ui.skill_list`, D10 - "herni zaklady"): okno se seznamem skillu.
+# Bez nej neni videt, ze tezba a vyroba neco rostou - a to je pro demo klicove.
+const SkillListScript = preload("res://ui/skill_list.gd")
+# 2026-10-10 (`ui.vendor_gump`, D10): obchodni okno. Otevre ho udalost
+# `gump_open{gump:"vendor"}` (stejne jako okno vyroby) - a `sim.vendor` ji
+# posle, kdyz hrac pouzije vendora (`Command{t:"use"}` -> `interaction`).
+const VendorGumpScript = preload("res://ui/vendor_gump.gd")
+# `sim/systems/vendor.gd` (D10): ceny a sklad z `data/vendors.json`.
+const VendorScript = preload("res://sim/systems/vendor.gd")
+# `sim/entity/skills.gd` kvuli `SKILL_COUNT` (58) - pocet radku seznamu se
+# NEPISE natvrdo, aby se nerozesel se simulaci.
+const SkillsScript = preload("res://sim/entity/skills.gd")
 # 20. session (2026-10-08): obecna interakce. `sim.interaction` se registruje
 # TADY (integraci misto) - do teto session nebyl v behu hry vubec, takze kazdy
 # prikaz `use`/`use_on`/`interact` skoncil hlaskou "Not available yet".
@@ -91,6 +106,9 @@ const ITEM_OFFSET: int = 0x4000         # tiledata id -> art id (docs/03 §3.4)
 # Jak casto se prekresluje DEBUG OVERLAY (s). Kazdy frame by zbytecne prehanel
 # text i `get_minimum_size()`; 0,2 s je pro hledani vady v obrazku dost.
 const DEBUG_OVERLAY_S: float = 0.2
+# Jak casto se obnovuje SEZNAM SKILLU (D10, 2026-10-10). Hodnoty skillu rostou
+# pomalu (desetiny), takze 2x/s staci - kazdy frame by zbytecne prebavoval uzly.
+const SKILL_LIST_S: float = 0.5
 # Cislo animace pro CLOVEKA (`app/player_controller` / `sim.movement`) -> nazev
 # do overlaye. Cisla jsou ABSTRAKTNI ID; skupina v anim.mul je jina (beh = 2,
 # viz `render/anim_player.ACTION_GROUP`).
@@ -115,6 +133,12 @@ var journal = null
 var backpack = null              # `ui.backpack` (20. session)
 var craft_gump = null            # `ui.craft_gump` (20. session)
 var policy_panel = null          # `ui.policy_panel` (2026-10-09, D3 jako HUD)
+var skill_list = null            # `ui.skill_list` (2026-10-10, D10)
+var vendor_gump = null           # `ui.vendor_gump` (2026-10-10, D10)
+var vendor = null                # `sim.vendor` (2026-10-10, D10)
+var prodejce = 0                 # serial vendora NPC ve svete (0 = nikdo)
+var _skill_s: float = 0.0        # casovac obnovy seznamu skillu (2x/s)
+var _skill_klic: Array = []      # posledni hodnoty (neplnit UI kazdy frame)
 var debug_overlay = null         # `ui.debug_overlay` (2026-10-09)
 var _batoh_klic: Array = []      # posledni obsah batohu (neplnit UI kazdy frame)
 var tiledata = null
@@ -198,6 +222,14 @@ func _process(_delta: float) -> void:
 	if _politika_s >= DEBUG_OVERLAY_S:
 		_politika_s = 0.0
 		_osvezi_politiku(true)
+	# SEZNAM SKILLU (D10, 2026-10-10): obnovuje se 2x/s a jen kdyz se hodnoty
+	# zmenily (`_skill_klic` je otisk posledniho stavu). Bez toho by se uzly
+	# prebavovaly 60x za sekundu kvuli cislu, ktere roste po desetinach.
+	if skill_list != null:
+		_skill_s += _delta
+		if _skill_s >= SKILL_LIST_S:
+			_skill_s = 0.0
+			_osvezi_skilly()
 	if debug_overlay != null:
 		_debug_s += _delta
 		if _debug_s >= DEBUG_OVERLAY_S:
@@ -213,6 +245,7 @@ func _process(_delta: float) -> void:
 		return
 	_batoh()
 	_recept()
+	_prodejce_pozadavek()
 	var values: Dictionary = {
 		"name": player.name,
 		"hp": player.hp, "hp_max": player.max_hp, "max_hp": player.max_hp,
@@ -354,6 +387,37 @@ func _setup_ui() -> void:
 	policy_panel.visible = false
 	if not hud.register_window("policy_panel", policy_panel, Vector2(340.0, 520.0)):
 		push_warning("app.main: okno pravidel se nepodarilo zaregistrovat v HUD")
+	# OKNO SKILLU (2026-10-10, D10 "herní základy"): ZAVRENE, dokud hrac
+	# nezmackne `K` (jako `B` u batohu a `P` u pravidel). Obsah plni
+	# `_osvezi_skilly()` z `player.skills` + `data/skills.json` (jmena) - UI samo
+	# o skillech nic nevi a nic nemeni.
+	skill_list = SkillListScript.new()
+	skill_list.name = "SkillList"
+	hud.add_child(skill_list)
+	skill_list.visible = false
+	# ⚠ VELIKOST JE POVINNA (stejna past jako u `ui.journal`): Control s vychozi
+	# velikosti (0,0) text NEKRESLI, i kdyz data ma. `ui.skill_list` si ji sam
+	# nedrzi (je to tenky klient), takze ji dostava odtud.
+	skill_list.custom_minimum_size = Vector2(280.0, 320.0)
+	skill_list.size = Vector2(280.0, 320.0)
+	if not hud.register_window("skill_list", skill_list, Vector2(8.0, 560.0)):
+		push_warning("app.main: okno skillu se nepodarilo zaregistrovat v HUD")
+	# OBCHODNI OKNO (2026-10-10, D10): ZAVRENE; otevira se UDALOSTI
+	# `gump_open{gump:"vendor"}` - hrac ho neotevira klavesou, ale pouzitim
+	# vendora (`Command{t:"use"}`), stejne jako okno vyroby.
+	vendor_gump = VendorGumpScript.new()
+	vendor_gump.name = "VendorGump"
+	hud.add_child(vendor_gump)
+	vendor_gump.visible = false
+	if not hud.register_window("vendor_gump", vendor_gump, Vector2(340.0, 60.0)):
+		push_warning("app.main: obchodni okno se nepodarilo zaregistrovat v HUD")
+	# ⚠ DO `loop.gump_okna` SE PRIDAVA AZ TADY, po vytvoreni okna: kdyz se
+	# pridavalo driv (u okna vyroby), byl v seznamu `null` a udalost
+	# `gump_open{gump:"vendor"}` nemel kdo prevzit - okno se neotevrelo
+	# (namEReno 2026-10-10 sondou `p34-smycka.gd`: `gump_okna` melo
+	# `["CraftGump", "null"]`).
+	if loop != null:
+		loop.gump_okna.append(vendor_gump)
 	# DEBUG OVERLAY: neni to okno (nema titul ani se neposouva) - je to vrstva
 	# textu v levem hornim rohu, VIDITELNA od startu, aby ji zachytil screenshot.
 	# `F3` ji prepina (`app/player_controller`). Hodnoty plni `_debug_values()`.
@@ -510,8 +574,18 @@ func _setup_player(view) -> void:
 	# `sim.craft` sice stanici jako PREDMET umi (`_station_near`), ale nikdo
 	# ji do sveta nedaval. Dava se VEDLE hrace, aby na ni hrac dosahl (2 dlazdice).
 	var stanic: int = _postav_stanice()
+	# PRODEJCE (2026-10-10, D10): do sveta se postavi JEDEN kovar (podle jmena
+	# `blacksmith`) - bez vendora ve svete se obchod neda vubec spustit.
+	# ⚠ PORADI JE POVINNE: `sim.vendor` se zaklada TADY, pred postavenim
+	# prodejce. NamEReno 2026-10-10: kdyz se zakladal pozdeji, `_postav_vendora`
+	# videl `vendor == null`, prodejce se nepostavil a sonda `p34-smycka.gd`
+	# hlasila "ve svete stoji prodejce (serial 0)". Modul nema `tick` (restock
+	# je LINIVY - doplni se pri pristupu, jako v referenci), takze ho `SimWorld`
+	# jen preskoci; v `systems` ale byt MUSI, protoze `sim.interaction` ho
+	# odtud bere pro `Command{t:"use"}`.
 	# Barva kuze (granule `render.hue`, sada `HUE_SKIN` z `hues.json`). Bez ni je
 	# telo 400 sedive: art z `anim.mul` je jen rampa jasu, barvu dava hue.
+	# V UO znamena `hue == 0` "zadna barva", proto se sada dava jen kdyz je 0.
 	# V UO znamena `hue == 0` "zadna barva", proto se sada dava jen kdyz je 0.
 	if player.hue == 0:
 		player.hue = HueScript.HUE_SKIN
@@ -548,6 +622,12 @@ func _setup_player(view) -> void:
 	# `not_available` (viditelne), dokud je nekdo nezalozi.
 	interaction = InteractionScript.new(sim, sim.events(), null, container, registry, items)
 	sim.systems["interaction"] = interaction
+	# TLACITKO "use" V SEZNAMU SKILLU (D10): UI jen OHLASTI, co hrac zmackl
+	# (`ui/` nesmi menit stav simulace); tady se z toho stane `Command`.
+	# `Command{t:"skill"}` dnes v `sim/commands.gd` NENI, takze se posle jen
+	# tehdy, kdyz ho smlouva zna - jinak se rekne proc (zadne tiche nic).
+	if skill_list != null and not skill_list.use_pressed.is_connected(_on_skill_use):
+		skill_list.use_pressed.connect(_on_skill_use)
 	# POCATECNI SKILLY (20. session): bez nich je sber nehratelny (viz
 	# `data/balance.json` -> `player_start_skills`). Az po `interaction`, aby se
 	# jmena skillu prekladala JEDNIM zdrojem (`data/skills.json`).
@@ -560,6 +640,28 @@ func _setup_player(view) -> void:
 	time.bind(sim.clock())
 	sim.systems["time"] = time
 
+	# REGENERACE (2026-10-10, `sim.regen`): doplnuje hp/stam/mana kazdy tik.
+	# Poradi je v `SimWorld.SYSTEM_ORDER` (hned za `poison`) - tady se jen
+	# registruje instance. `sim.hunger` zatim NEEXISTUJE, proto `null`; modul to
+	# hlasi pres `hunger_gate_on()` a hlad jen zdvojnasobi interval hp (nic
+	# nevymysli). ⚠ `stamina_drain_model` je dnes `"never"` (`data/balance.json`),
+	# takze se stamina vubec nespotrebovava a regenerace je zatim videt jen
+	# v hp/mane - az se drain prepne na `run_only`, teprve se projevi i u staminy
+	# (a to je zmena `sim.movement`, ne tohohle modulu).
+	sim.systems["regen"] = RegenScript.new(registry, sim.clock(), null)
+
+	# OBCHOD (2026-10-10, D10): sklad a ceny z `data/vendors.json`. ⚠ ZAKLADA SE
+	# TU, az PO `registry = sim.registry` - kdyz vznikl driv, dostal `registry`
+	# jeste `null` a `vendor.buy()` pak hlasilo `no_mobile` (namEReno 2026-10-10
+	# sondou `p34-smycka.gd`). Modul nema `tick` (restock je LINIVY - doplni se
+	# pri pristupu k vendorovi jako v referenci), takze ho `SimWorld` jen
+	# preskoci; v `systems` ale byt MUSI, protoze `sim.interaction` ho odtud
+	# bere pro `Command{t:"use"}`.
+	vendor = VendorScript.new(container, items, tiledata, registry, sim,
+		sim.clock(), sim.events())
+	sim.systems["vendor"] = vendor
+	var prodanych: int = _postav_vendora(registry)
+
 	view.set_registry(registry)
 	view.set_player(player)
 	controller = get_node_or_null("PlayerController")
@@ -569,13 +671,14 @@ func _setup_player(view) -> void:
 	controller.setup(player, sim, loop.input_map, movement, view, loop)
 	controller.backpack = backpack      # klavesa `B` prepina okno batohu
 	controller.policy_panel = policy_panel   # klavesa `P` ukaze okno pravidel
+	controller.skill_list = skill_list   # klavesa `K` ukaze seznam skillu (D10)
 	controller.debug_overlay = debug_overlay   # klavesa `F3` prepina overlay
 	controller.okno = self              # klavesa `F2` prepina fullsize (bod 5.2)
 	print("[main] hrac: serial ", serial, " na ", player.pos, " (", map.land_at(player.pos.x, player.pos.y),
 		" land), hue ", player.hue, " (0 = bez barvy), barvy: ", view.hue_stats(),
 		", nastroju v batohu ", nastroju, ", pocatecnich skillu ", skillu,
+		", prodejcu ", prodanych,
 		", systemu v sim: ", sim.systems.keys())
-
 
 func _give_tools() -> int:
 	# VSECHNY NASTROJE DO BATOHU (pokyn uzivatele 2026-10-08). Vraci pocet
@@ -756,6 +859,60 @@ func _osvezi_politiku(prebavit: bool = false) -> void:
 		policy_panel.flush()
 
 
+func _osvezi_skilly() -> void:
+	# Obsah okna se skilly (D10, 2026-10-10). UI je TENKY KLIENT: tady se
+	# precte `player.skills` a jmena z `data/skills.json` a preda se hotovy
+	# seznam radku. Kdyz se nic nezmenilo, UI se neprebavuje.
+	var radky: Array = _radky_skillu()
+	var klic: Array = []
+	for radek in radky:
+		klic.append([int(radek.get("id", -1)), int(radek.get("value", 0)),
+			int(radek.get("lock", 0))])
+	if klic == _skill_klic:
+		return
+	_skill_klic = klic
+	skill_list.update(radky)
+
+
+func _radky_skillu() -> Array:
+	# Radky pro `ui.skill_list`: `{id, name, value (desetiny), lock}`. Jmena
+	# jsou v `data/skills.json` (58 skillu, `id` je index); chybejici jmeno se
+	# NEVYMYSLI - pouzije se "#<id>", aby bylo videt, ze data chybi.
+	var radky: Array = []
+	if player == null or player.skills == null:
+		return radky
+	var jmena: Dictionary = {}
+	var parsed = JSON.parse_string(FileAccess.get_file_as_string(SKILLS_DATA))
+	if parsed is Array:
+		for rec in parsed:
+			if rec is Dictionary and rec.has("id"):
+				jmena[int(rec["id"])] = str(rec.get("name", ""))
+	else:
+		push_warning("app.main: " + SKILLS_DATA + " neni seznam - skilly budou bez jmen")
+	for i in range(SkillsScript.SKILL_COUNT):
+		radky.append({
+			"id": i,
+			"name": str(jmena.get(i, "#" + str(i))),
+			"value": int(player.skills.value(i)),
+			"lock": int(player.skills.lock(i)),
+		})
+	return radky
+
+
+func _on_skill_use(skill: int) -> void:
+	# Stisk "use" v seznamu skillu. Simulace dnes `Command{t:"skill"}` NEZNA
+	# (`sim/commands.gd` -> `REQUIRED` ho nema), takze se NIC neposle - a je to
+	# VIDET slovem, ne tichem ("nula a prazdno nejsou uspech", `docs/09` §9.6).
+	# Az command vznikne (patri do sveho zadani, ne sem), zmeni se jen tenhle
+	# blok: `sim.enqueue({t:"skill", skill})`.
+	if skill < 0 or skill >= SkillsScript.SKILL_COUNT:
+		print("[main] skill use: ", skill, " - mimo rozsah 0..",
+			SkillsScript.SKILL_COUNT - 1, ", neposilam")
+		return
+	print("[main] skill use: ", skill,
+		" - Command{t:\"skill\"} neni ve smlouve (sim/commands.gd), neposilam")
+
+
 func _batoh() -> void:
 	# Obsah batohu pro okno (20. session). UI je TENKY KLIENT: tady se precte
 	# kontejner a preda se hotovy seznam radku; kdyz se obsah nezmenil, UI se
@@ -816,6 +973,62 @@ func _postav_stanice() -> int:
 		_hlaseni_do_zurnalu("A " + role + " stands to the " + str(stanice["smer"]) + ".")
 		print("[main] stanice: ", role, " (art ", art, ") na ", predmet.pos)
 	return postaveno
+
+
+func _postav_vendora(reg) -> int:
+	# ⚠ REGISTR JDE ARGUMENTEM, ne z `self.registry`: v teto chvili je clenská
+	# promenna jeste `null` (`_setup_world` ji teprve nastavi) a `reg.register()`
+	# by spadl na "Nonexistent function 'register' in base 'Nil'" - namEReno
+	# 2026-10-10 sondou `p34-smycka.gd` (prodejce se pak nepostavil a sonda
+	# hlasila "serial 0"). Clenska promenna se plni pozdeji, proto argument.
+	# KOVAR DO SVETA (2026-10-10, D10). Vybere se podle JMENA (`blacksmith`),
+	# ne podle poradi v datech - poradi je vlastnost generatoru, ne smlouva.
+	# Stojí VEDLE hrace (dosah `sim.vendor.VENDOR_RANGE` = 2 dlazdice), aby se
+	# dal hned pouzit: `use` na nej -> `gump_open{gump:"vendor"}` -> obchodni okno.
+	#
+	# `mob.ai` = {"state": "vendor"} je to, co `sim.interaction.describe()`
+	# pouziva pro rozpoznani vendora (docs/05 §5.3); bez toho by to byl "mobile"
+	# a `use` by nabidl boj/rozhovor, ne obchod.
+	if vendor == null:
+		push_warning("app.main: `sim.vendor` neni - prodejce se nepostavi")
+		return 0
+	var v: int = vendor.vendor_index("blacksmith")
+	if v < 0:
+		push_warning("app.main: v `data/vendors.json` neni vendor 'blacksmith'")
+		return 0
+	if player == null or reg == null:
+		return 0
+	var pos := Vector3i(int(player.pos.x) + 1, int(player.pos.y), int(player.pos.z))
+	var kovar = MobileScript.new(sim.next_serial(), PLAYER_BODY, pos)
+	kovar.name = "Blacksmith"
+	kovar.ai = {"state": "vendor"}
+	reg.register(kovar)
+	prodejce = int(kovar.serial)
+	# Dosah se MUSI nastavit: bez pozice `sim.vendor` odpovi `no_vendor_pos`.
+	if not vendor.nastav_pozici(v, pos):
+		push_warning("app.main: pozici vendora se nepodarilo nastavit")
+	if not vendor.zaregistruj_serial(prodejce, v):
+		push_warning("app.main: serial vendora se nepodarilo zaregistrovat")
+	# Otevreny obchod pri startu? NE - hrac si ho otevre sam (`use` na vendora).
+	_hlaseni_do_zurnalu("A blacksmith is here. (use him to trade)")
+	print("[main] prodejce: serial ", prodejce, " (", str(vendor.vendor_ids()[v]),
+		") na ", pos, " | k dohledani pres `use`")
+	return 1
+
+
+func _prodejce_pozadavek() -> void:
+	# Potvrzeny nakup/prodej z obchodniho okna (D10). UI je TENKY KLIENT: posle
+	# hotovy `Command`, tady se jen vyzvedne a preda simulaci (stejna cesta jako
+	# u klaves a okna vyroby).
+	if vendor_gump == null or sim == null:
+		return
+	var pozadavek: Dictionary = vendor_gump.odeber_pozadavek()
+	if pozadavek.is_empty():
+		return
+	print("[main] obchod: ", pozadavek.get("action", "?"), " u vendora ",
+		int(pozadavek.get("vendor", -1)), " polozek ",
+		(pozadavek.get("lines", []) as Array).size())
+	sim.enqueue(pozadavek)
 
 
 func _hlaseni_do_zurnalu(text: String) -> void:

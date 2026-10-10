@@ -6,6 +6,103 @@
 > **Současný stav se bere z tohoto bloku** a ověřuje se živě (§„Předletová
 > kontrola" níž je starší a **datovaná**).
 
+## ✅ CO JE NOVÉHO (2026-10-10) — `D10`: PRIORITY SE MĚNÍ NA „HERNÍ ZÁKLADY A DEMO“ (obchod + základy + integrace)
+
+> **Pozor na datum:** tenhle blok je z **2026-10-10** (session běžela přes
+> půlnoc), bloky níž jsou z **2026-10-09**.
+
+**Co bylo zadáno (uživatel, 2026-10-09 večer):** „Změň prioritizaci.
+**Automatizace má smysl až když existuje nějaká herní náplň.** Teď je cílem
+**získat co nejvíce za co nejméně času** — rozchodit herní základy, aby se dalo
+pouštět demo.“ Na dotaz, co má být v demu, zvolil **celou krátkou smyčku včetně
+obchodu** a pořadí **„nejdřív všechny otevřené vady, pak náplň“**.
+Rozhodnutí je zapsané v [`ROZHODNUTI-2026-10-09-VECER-DEMO.md`](ROZHODNUTI-2026-10-09-VECER-DEMO.md) (`D10`).
+
+**Stav před session:** testy **1 674 / 0**, brány **12 OK / 0 chyb**, `MK 6/0/3`.
+**Stav po session:** testy **1 836 kontrol / 0 selhání** (72 case souborů),
+brány **12 OK / 0 chyb**, mutace nových modulů **52 z 52 chyceno**
+(regen 6, equipment 7, regions 6, skill_list 8, vendor 16, vendor_gump 9).
+
+### 1) Co je hotové (a čím je to doložené)
+
+| Granule | Soubor | Naměřené |
+|---|---|---|
+| `data.vendors` | `data/vendors.json` (115 kB) + `gen_vendors()` v `tools/gates/gen-content.py` | **38 vendorů, 464 řádků skladu, 491 poptávek**; generátor deterministický (dva běhy = stejný sha256), `--check` OK a **nepotřebuje `assets/uo/`** |
+| `sim.vendor` | `sim/systems/vendor.gd` | `stock/buy_price/sell_price/buy/sell/restock` + `gump_data`, `nastav_pozici`, `zaregistruj_serial`, `art_of_type`. Ceny jsou **DATA per shop** (`research/06`), `buy_price = ceil(1,90 × sell_price)`; dosah 2 dlaždice; zlato se kontroluje v batohu |
+| `ui.vendor_gump` | `ui/vendor_gump.gd` | Tenký klient: oba seznamy vstupem, množství, cena, potvrzení; posílá `{t:"vendor", action, vendor, lines}` |
+| `sim.regen` | `sim/systems/regen.gd` | `tick()`: hp +1/10 s, stam +1/5 s, mana dle INT/Meditation (INT 20 → 4 s), jen živí; chybějící `sim.hunger` hlásí (`hunger_gate_on()`) |
+| `ui.skill_list` | `ui/skill_list.gd` | 58 řádků vstupem, formát v desetinách, zámky, tlačítko „use“ (jen ohlašuje) |
+| `entity.equipment` | `sim/entity/equipment.gd` | vrstvy, `occupied`, štít × dvouruční = `two_handed` |
+| `world.regions` | `sim/world/regions.gd` | bez `data/regions.json` vrací **NEMĚŘENO** (nic si nevymýšlí) |
+
+### 2) Integrace (kdo ji dělal a co našla) — **to je dnešní nejcennější část**
+
+Moduly dodali **dva teammates paralelně** (`ekonom`: obchod, `zaklady`: základy),
+integraci do produkce dělal **lead** (aby si je nerozbili). Integrace odhalila
+**pět vad, které žádný test nechytil** — všechny v `app/main.gd`/napojení:
+
+1. **Vendor se zakládal dřív, než existoval registr** → `reg.register()` na
+   `null` spadlo, prodejce se nepostavil. (`p34-smycka.gd`: „serial 0“.)
+2. **Pořadí `_postav_vendora` před `registry = sim.registry`** → totéž.
+3. **`vendor_gump` se do `loop.gump_okna` přidával PŘED svým vytvořením** →
+   v seznamu byl `null`, takže `gump_open` neměl kdo převzít a **okno se
+   neotevřelo** (naměřeno: `gump_okna` = `["CraftGump", "null"]`).
+4. **`interaction.use` na vendora vracelo jen `stock()`** (seznam) a `_call`
+   umí jen slovník → `gump_open` se **nikdy neposlal**. Opraveno: posílá se
+   `gump_data()` jako událost (stejná vada, jakou měla výroba ve 20. session).
+5. **Serial vs index vendora**: `use` posílá serial mobily, `sim.vendor`
+   pracuje s indexem v datech → bez překladu (`zaregistruj_serial` /
+   `vendor_of_serial`) se ptalo na neexistující vendory.
+
+**Průběžný test smyčky** (`_analyza/p34-smycka.gd`, **13 kontrol / 0 selhání**)
+projde celou cestu ve hře: `use` na prodejce → `gump_open` → okno má **60
+položek k prodeji a 16 k výkupu** → nákup bez zlata se odmítne (`reason:"gold"`,
+nic se nezmění) → se zlatem projde (zlato 63 → 42, cena 21, krumpáč v batohu)
+→ prodej 2 ingotů přidá 8 zlata a ingoty zmizí.
+
+### 3) Tři pasti, které stálo to měření (všechny v sondě, ne v kódu)
+
+1. **`gump_open` se doručuje až v rámci** (`app/loop._deliver_events`), ne
+   v `sim.tick` — kontrola hned po ticku hlásila „okno není otevřené“.
+2. **`player_serial` je `SimWorld.player_serial`** — ručně sestavený serial dal
+   `{ok:false, reason:"no_mobile"}`.
+3. **ART ID se nesmí vymyslet:** krumpáč je v této instalaci **20101**
+   (ne `0x0E86`) a ingot **23535**. Sonda je teď bere z dat
+   (`vendor.art_of_type`).
+
+### 4) Co zůstává otevřené (pojmenované)
+
+1. **`data/regions.json` neexistuje** → přijímací kritérium `world.regions`
+   („Britain je město a guard zóna“) je **NEMĚŘENO**; test měří obě větve nad
+   fixture a po vzniku dat se zapne sám.
+2. **Proteza `player_start_stats.DEX = 130` zůstává.** Doporučení teammatea:
+   `DEX 15` (šablona Blacksmith 60/15/15 v `research/profese.json`).
+   ⚠ **Regenerace protezu sama nenahradí, dokud je `stamina_drain_model:
+   "never"`** (stamina se dnes nespotřebovává vůbec) — a kdyby se drain vrátil
+   na `run_only`, spotřeba je **300 bodů/min** proti regenu **12 bodů/min**;
+   trvalá oprava je ve **spotřebě podle váhy** (`sim.movement`), ne v DEX.
+3. **Replay pro `sim.vendor`** (acceptance `tests+replay`) **NEMĚŘENO** —
+   vyžaduje nový `tests/replays/*.json` s hashem (bootstrap, mimo scope).
+4. **Schéma `vendors.json` není pinnuté** v `docs/04 §4.5` a
+   `check-content.py` ho nemá v `REQUIRED_FIELDS` (G5 ho zatím jen note-uje).
+5. **Arbitráž mezi vendory z autorských tabulek** (16 dvojic, nejhorší
+   `thigh_boots` 14 → 28). Je to vlastnost referenčních dat, ne našich pravidel;
+   strop chrání jen fallback.
+6. **C7 z `docs/06 §6.6`** („25 vendorů s ≥5 zboží i poptávky“) — dnes **23/38**
+   kvůli **1162 nevyřešeným jménům předmětů** v této instalaci; test to hlásí
+   s číslem, netlačí na zelenou.
+7. **`app/main.gd` nemá mutační modul** → integrační cesty (1–5 výše) kryje
+   **jen sonda** `p34-smycka.gd`, ne brána.
+8. **⚠ NEDOZJIŠTĚNÝ NÁLEZ z mutačního běhu:** vzor `vendor/strop proti arbitráži
+   se ignoruje` **nedoběhl** — `PROBEHLALA NE (0 kontrol, 0 selhani, exit 124)`,
+   tedy **timeout 900 s** (naměřeno 2026-10-10, `MUTACE_DIR=.cache/mutace-lead`).
+   Není to „chycená“ ani „slepá“ mutace: **nevím, co se stalo**, a proto to
+   netvrdím. Buď v mutovaném kódu vznikne pomalá cesta, nebo je to vlastnost
+   měření (52 vzorů v jednom běhu). Dořešit: pustit ten jeden vzor samostatně
+   s kratším limitem a zjistit, kde se zasekl.
+
+---
+
 ## ✅ CO JE NOVÉHO (2026-10-09, ČTVRTÁ SESSION TÉHOŽ DNE) — `D3` JE JAKO HUD: PRAVIDLA JE KONEČNĚ VIDĚT (okno pravidel)
 
 **Co bylo zadáno (uživatel, 2026-10-09):** „Pokračuj. D3 — přijmu jen jako HUD,

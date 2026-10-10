@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import os
 import re
 import sys
 from pathlib import Path
@@ -43,7 +44,12 @@ from gate_common import godot_bin, godot_run  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 TESTS = "res://tests/run_tests.gd"
-MUTANT_DIR = ROOT / ".cache" / "gates" / "mutace"
+# ⚠ SOUBEZNY BEH (namEReno 2026-10-10, teammate `zaklady`): dva behy harnessu
+# si mutanty v tomhle adresari navzajem premazavaji a vzniknou FALESNE "slepe"
+# vysledky (mutant se v pulce cteni zmeni). Kdo potrebuje merit soubezne,
+# nastavi `MUTACE_DIR` na vlastni adresar:
+#   $env:MUTACE_DIR='E:\Workspaces\game-clone\.cache\mutace-moje'
+MUTANT_DIR = Path(os.environ.get("MUTACE_DIR") or (ROOT / ".cache" / "gates" / "mutace"))
 SOUHRN = re.compile(r"(\d+)\s+kontrol,\s*(\d+)\s+selh")
 
 # klic -> soubor, ktery se mutuje, prefix FAIL radku a prepinac testu
@@ -1258,6 +1264,215 @@ MODULY = {
             # "PRAVIDLA (0) | (stav nevykonavatele neni znamy)" a "(zadna pravidla)").
         ],
     },
+    # --- 2026-10-10: vlna 1 zakladu pro demo (D10, `ROZHODNUTI-...-VECER-DEMO.md`) --
+    # Vzory pripravil teammate `zaklady` a OVERIL rucnim behem (27 z 27 chyceno,
+    # doklad `.tmp/zaklady/mutace-vysledek.txt`); tady jsou zapsane do sdileneho
+    # harnessu. Provedeni a verdikt u kazdeho vzoru hlasi az HARNESS - slaby vzor
+    # se pozna tak, ze PROSEL (a pak se opravuje TEST, ne vzor).
+    #
+    # `sim.regen`: intervaly jsou MERENE hodnoty (docs/05 §5.14, research/01
+    # §1.4), takze kazda zmena cisla musi shodit case `regen`.
+    "regen": {
+        "soubor": ROOT / "sim" / "systems" / "regen.gd",
+        "prefix": "sim.regen",
+        "prepinac": "--regen-script",
+        "mutace": [
+            ("stamina se doplnuje 2x pomaleji (10 s misto 5 s)",
+             "const STAM_MS := 5000", "const STAM_MS := 10000"),
+            ("hp se doplnuje 2x rychleji (5 s misto 10 s)",
+             "const HITS_MS := 10000", "const HITS_MS := 5000"),
+            ("koeficient meditace i pod 100,0 (0,0275 misto 0,025)",
+             "const COEF_LOW := 0.025", "const COEF_LOW := 0.0275"),
+            ("hlad uz nezdrzuje hp (multiplier 1)",
+             "const HUNGRY_HP_MULT := 2", "const HUNGRY_HP_MULT := 1"),
+            ("mrtvy mobil regeneruje",
+             "\t\tif mob == null or not mob.alive():\n\t\t\tcontinue",
+             "\t\tif mob == null:\n\t\t\tcontinue"),
+            ("hlad se aplikuje vzdy (i pri level 6)",
+             "\treturn int(_hunger.level(int(mob.serial))) <= 0", "\treturn true"),
+        ],
+    },
+    # `entity.equipment`: pravidla vrstev z reference a invariant "prave jeden
+    # rodic"; posledni vzor je nalez pro `entity.container` (`remove()` predmet
+    # spotrebuje), ktery si modul oboustranne obnovuje.
+    "equipment": {
+        "soubor": ROOT / "sim" / "entity" / "equipment.gd",
+        "prefix": "sim.entity.equipment",
+        "prepinac": "--equipment-script",
+        "mutace": [
+            ("stit pri dvourucne zbrani se povoli",
+             "\tif layer == LAYER_TWO_HANDED and _je_stit(item):", "\tif false:"),
+            ("obsazena vrstva se prehledne",
+             "\tif obsazeno != 0:", "\tif false:"),
+            ("jednorucni + dvourucni zbran se povoli",
+             "\tif _konflikt_dvourucni(mob, item, layer):", "\tif false:"),
+            ("vrstva mimo uzivatelsky rozsah se prijme",
+             "\tif layer < LAYER_FIRST or layer > LAYER_LAST_USER:",
+             "\tif layer < LAYER_FIRST:"),
+            ("vaha nasazeneho predmetu ignoruje mnozstvi",
+             "\t\t\tsoucet += int(_tiledata.weight(int(item.tile))) * int(item.amount)",
+             "\t\t\tsoucet += int(_tiledata.weight(int(item.tile)))"),
+            ("bonus se pocita i z predmetu v batohu",
+             "\tfor serial in _serials(mob):\n\t\tvar item = _item(serial)\n"
+             "\t\tif item != null and item.props is Dictionary:",
+             "\tfor serial in _items.keys():\n\t\tvar item = _item(serial)\n"
+             "\t\tif item != null and item.props is Dictionary:"),
+            ("vyjmuty predmet ztrati mnozstvi (amount 0)",
+             "\t\tif _container.remove(p, int(item.serial), pocet) > 0:\n"
+             "\t\t\titem.amount = pocet",
+             "\t\tif _container.remove(p, int(item.serial), pocet) > 0:\n\t\t\tpass"),
+        ],
+    },
+    # `world.regions`: dnes NEMERENA data - mutace musi shodit jak "neumi rict
+    # neznam", tak merene chovani nad fixtures.
+    "regions": {
+        "soubor": ROOT / "sim" / "world" / "regions.gd",
+        "prefix": "world.regions",
+        "prepinac": "--regions-script",
+        "mutace": [
+            ("nemerena data se tvari jako zmerena",
+             "\t_known = not _regions.is_empty()", "\t_known = true"),
+            ("mimo region se vraci prvni region (meze se nekontroluji)",
+             "\t\tif x >= r[0] and y >= r[1] and x < r[0] + r[2] and y < r[1] + r[3]:",
+             "\t\tif x >= r[0] and y >= r[1]:"),
+            ("okno regionu je uzavrene (hranice patri obema)",
+             "x < r[0] + r[2] and y < r[1] + r[3]",
+             "x <= r[0] + r[2] and y <= r[1] + r[3]"),
+            ("plocha mimo `area` se ignoruje",
+             "\tvar src: Dictionary = area if area is Dictionary else rec",
+             "\tvar src: Dictionary = area if area is Dictionary else {}"),
+            ("pri prekryvu vyhrava POSLEDNI zaznam",
+             "\t\t\t_regions.append(rec)", "\t\t\t_regions.push_front(rec)"),
+            ("zaznam bez `name` se prijme (skipped se nemeri)",
+             "\t\tif rec is Dictionary and str(rec.get(\"name\", \"\")) != \"\":",
+             "\t\tif rec is Dictionary:"),
+        ],
+    },
+    # `ui.skill_list`: tenky klient - mutace nesmi projit ani na formatovani,
+    # ani na zamky, ani na "prazdno je videt", ani na "UI nemeni stav".
+    "skill_list": {
+        "soubor": ROOT / "ui" / "skill_list.gd",
+        "prefix": "ui.skill_list",
+        "prepinac": "--skill-list-script",
+        "mutace": [
+            ("hodnota se zaokrouhli na cele (desetiny se ztrati)",
+             "\treturn \"%s%d.%d\" % [znamenko, v / 10, v % 10]",
+             "\treturn \"%s%d.0\" % [znamenko, v / 10]"),
+            ("zamek `down` se tvari jako `lock`",
+             "\tif zamek == LOCK_DOWN:\n\t\treturn \"down\"",
+             "\tif zamek == LOCK_DOWN:\n\t\treturn \"lock\""),
+            ("neznamy zamek se tvari jako `lock`",
+             "\treturn \"?\"", "\treturn \"lock\""),
+            ("prazdny vstup se nevykresli (ticho)",
+             "\tif _radky.is_empty():\n\t\t_pridej_label(\"Prazdno\", BEZ_SKILLU)\n", ""),
+            ("preskocene (vadne) radky se nepocitaji",
+             "\t\t\t_skipped += 1", "\t\t\tpass"),
+            ("tlacitko use posle vzdy skill -1",
+             "\tvar skill: int = int(radek.get(\"id\", radek.get(\"skill\", -1)))",
+             "\tvar skill: int = -1"),
+            ("UI pri stisku meni obsah okna (nemeni se jen ohlasi)",
+             "\tuse_pressed.emit(skill)",
+             "\tuse_pressed.emit(skill)\n\t_box.get_child(0).get_child(1).text = \"99.9\""),
+            ("update vykresli jen prvni radek",
+             "\tfor radek in rows:", "\tfor radek in rows.slice(0, 1):"),
+        ],
+    },
+    # --- 2026-10-10: obchod (vlakna `ekonom`, D10) ---------------------
+    # Vzory pripravil teammate `ekonom` a OVERIL rucnim behem (25 z 25
+    # chyceno); tady jsou prenesene PRIMO z jeho zdroje, ne prepsane rucne.
+    "vendor": {
+        "soubor": ROOT / "sim" / "systems" / "vendor.gd",
+        "prefix": "sim.vendor",
+        "prepinac": "--vendor-script",
+        "mutace": [
+            ('cena se neodečte (nakup nic nestoji)',
+             '\t_odeber_zlato(mob, celkem)',
+             '\tpass'),
+            ('prodej da DVAKRAT vic zlata, nez ma byt',
+             '\t\tcelkem += kus * mnozstvi\n\t\tprodej.append(',
+             '\t\tcelkem += kus * mnozstvi * 2\n\t\tprodej.append('),
+            ('prodej odebere predmet, ale ZLATO NEPRIDA',
+             '\tvar vlozeno: bool = _container.add(int(mob.backpack), zlato)',
+             '\tvar vlozeno: bool = false'),
+            ('prodej predmet VUBEC neodebere',
+             '\t\tvzato += _odeber_art(mob, int(p["art"]), int(p["amount"]))',
+             '\t\tpass'),
+            ('restock nikdy nedoplni sklad',
+             '\t_dopln(id, rec)',
+             '\tpass'),
+            ('sklad se pri nakupu neodečte',
+             '\t\t_uber_stock(v, str(n["type"]), int(n["amount"]))',
+             '\t\tpass'),
+            ('kontrola skladu se preskoci (proda se i co neni)',
+             '\t\tif _stock_of(v, typ) < mnozstvi:',
+             '\t\tif false:'),
+            ('kontrola zlata se preskoci (nakup i bez penez)',
+             '\tif _gold(mob) < celkem:',
+             '\tif false:'),
+            ('buy_price nema koeficient 1,90 (prodava za nakupni cenu)',
+             '\treturn (zaklad * percent + 99) / 100',
+             '\treturn zaklad'),
+            ('zlato se da prodat (sell_price zlata neni 0)',
+             '\tif typ == GOLD_TYPE:\n\t\treturn 0',
+             '\tif false:\n\t\treturn 0'),
+            ('cena predmene, ktery vendor jen prodava, se bere z `value` (ne z tabulky)',
+             '\tif not e.is_empty() and int(e.get("price", 0)) > 0:\n\t\treturn maxi(1, (int(e["price"]) * 100) / percent)',
+             '\tif false:\n\t\treturn maxi(1, (int(e["price"]) * 100) / percent)'),
+            ('strop proti arbitrazi se ignoruje (koupit u kovare, prodat u krejciho)',
+             '\tif strop > 0 and cena > strop:\n\t\tcena = strop',
+             '\tif false:\n\t\tcena = strop'),
+            ('state() zapomene sklad (save/load ztrati obchod)',
+             '\treturn {"stock": sklad, "restock": _restock.duplicate()}',
+             '\treturn {"stock": {}, "restock": _restock.duplicate()}'),
+            # ⚠ POZOR: `_dosah` guard je v souboru 2x (nakup i prodej).
+            # `replace(..., 1)` mutuje jen PRVNI vyskyt, proto je tenhle vzor
+            # rozsireny kontextem NAKUPU (`var nakup`) a vzor nize kontextem
+            # PRODEJE (`var prodej`) - jinak by kazdy meril jen pulku cesty.
+            ('dosah se nekontroluje (obchodovat jde z cele mapy)',
+             '\tif not _dosah(mob, v):\n\t\treturn _fail("too_far" if _pozice.has(_vid(v)) else "no_vendor_pos")\n\t_restock_if_due(v)\n\tvar nakup: Array = []',
+             '\tif false:\n\t\treturn _fail("no_vendor_pos")\n\t_restock_if_due(v)\n\tvar nakup: Array = []'),
+            ("neznama pozice vendora se hlasi jako 'too_far' (nejde rozlisit proc)",
+             '\t\treturn _fail("too_far" if _pozice.has(_vid(v)) else "no_vendor_pos")\n\t_restock_if_due(v)\n\tvar prodej: Array = []',
+             '\t\treturn _fail("too_far")\n\t_restock_if_due(v)\n\tvar prodej: Array = []'),
+            ('dosah je z cele mapy (100 dlazdic misto 2)',
+             'const VENDOR_RANGE := 2',
+             'const VENDOR_RANGE := 100'),
+        ],
+    },
+    "vendor_gump": {
+        "soubor": ROOT / "ui" / "vendor_gump.gd",
+        "prefix": "ui.vendor_gump",
+        "prepinac": "--vendor-gump-script",
+        "mutace": [
+            ('potvrzeni posle i PRAZDNY vyber',
+             '\tif not (s in ["buy", "sell"]) or vybranych(s) <= 0:\n\t\treturn false',
+             '\tif false:\n\t\treturn false'),
+            ('mnozstvi se neoreze na to, co je k dispozici',
+             '\tvar orezene: int = clampi(amount, 0, int(radek.get("amount", 0)))',
+             '\tvar orezene: int = amount'),
+            ('soucet ignoruje cenu (celkem je jen pocet kusu)',
+             '\t\tsoucet += mnozstvi(smer, art) * int(radek.get("price", 0))',
+             '\t\tsoucet += mnozstvi(smer, art)'),
+            ("okno prijme i cizi gump (`gump_open{gump:'craft'}`)",
+             '\tif str(obal.get("gump", "")) != "vendor":\n\t\treturn false',
+             '\tif false:\n\t\treturn false'),
+            ('radek bez `item` se prijme (v gumpu je nabidka, ktera neexistuje)',
+             '\t\tif art <= 0:\n\t\t\tcontinue',
+             '\t\tif false:\n\t\t\tcontinue'),
+            ("potvrzeni vzdy posle `action:'buy'` (prodej se nikdy neposle)",
+             '\t_pozadavek = {"t": "vendor", "action": s, "vendor": _vendor, "lines": lines}',
+             '\t_pozadavek = {"t": "vendor", "action": "buy", "vendor": _vendor, "lines": lines}'),
+            ('novy seznam necha STARY vyber (potvrdi se, co hrac nevidel)',
+             '\t_vyber = {"buy": {}, "sell": {}}',
+             '\tpass'),
+            ('stare uzly se pri prebaveni NEUVOLNI (`free()` chybi)',
+             '\t\t\tchild.free()',
+             '\t\t\tpass'),
+            ("prazdny seznam prodeje rekne '(nothing to buy)'",
+             '\t\tprazdny.text = "(nothing to buy)" if _smer == "buy" else "(nothing to sell)"',
+             '\t\tprazdny.text = "(nothing to buy)"'),
+        ],
+    },
 }
 
 
@@ -1314,7 +1529,8 @@ def main() -> int:
     klice = list(MODULY) if not args.only else [k.strip() for k in args.only.split(",")]
 
     puvodni = {k: MODULY[k]["soubor"].read_text(encoding="utf-8") for k in MODULY}
-    hash_pred = {k: sha(v) for k, v in puvodni.items()}
+    hash_pred = {k: sha(v) for k, v in puvodni.items()
+}
 
     # 0) baseline: bez mutace musi sada projit a NECO zmerit
     rc, vystup, checks, failures = spust(None)

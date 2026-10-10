@@ -24,6 +24,50 @@ Typy: `chyba` (moje vada) · `past-nástroje` (prostředí/nástroj, ne logika) 
 
 ---
 
+# 2026-10-10 — HERNÍ ZÁKLADY PRO DEMO: INTEGRACE NAŠLA PĚT VAD, KTERÉ TESTY NEVIDĚLY
+
+### 2026-10-10 — Modul s testy není zapojený modul (chyba)
+**Co se stalo:** dva teammates dodali paralelně obchod (`sim.vendor`,
+`ui.vendor_gump`) a základy (`sim.regen`, `ui.skill_list`, `entity.equipment`,
+`world.regions`) — **všechno zelené** (`1832 kontrol, 0 selhání`, brány 12/0).
+Integrace do produkce pak našla **pět vad, které ani jeden test nechytil**:
+(1) `sim.vendor` se zakládal **před** `registry = sim.registry`, takže dostal
+`null` a `vendor.buy()` pak hlásilo `no_mobile` (a prodejce se vůbec nepostavil);
+(2) `_postav_vendora()` běželo ještě před tím přiřazením; (3) `vendor_gump` se
+přidával do `loop.gump_okna` **dřív, než vznikl** → v seznamu byl `null` a
+`gump_open` neměl kdo převzít (okno se neotevřelo); (4) `interaction.use` na
+vendora vracelo `stock()` (seznam) a `_call` umí jen slovník → událost
+`gump_open` se **nikdy neposlala**; (5) `use` posílá **serial** mobily, ale
+`sim.vendor` pracuje s **indexem** vendora v datech.
+**Doklad:** `_analyza/p34-smycka.gd` (13 kontrol / 0 selhání po opravách;
+před nimi „serial 0“, `gump_okna = ["CraftGump", "null"]`, `no_mobile`).
+**Ponaučení:** „soubor je + brána zavolala jeho funkci“ nestačí, když ta funkce
+je volaná **jen z testu** v pořadí, které si test zvolil. U nového modulu se
+**musí spustit produkční cesta** (celá hra) a měřit, co z ní vyleze. A pořadí
+inicializace je součást smlouvy: `null` z předčasného přiřazení se v GDScriptu
+neprojeví jako chyba kompilace, ale jako **tichý `null`** o pár řádků dál.
+
+### 2026-10-10 — Sonda si vymyslela ART ID a „našla“ vadu v datech (chyba)
+**Co se stalo:** průběžný test smyčky hlásil `reason:"not_sold"` a „v datech
+vendora chybí krumpáč“, i když data byla správná. Příčina: v sondě jsem měl
+art krumpáče `0x0E86` z hlavy, ale v této instalaci je to **20101** (a ingot
+**23535**). Oprava: sonda bere art z dat (`vendor.art_of_type`) a do modulu
+přibyla kontrola, že vrácený art odpovídá datům.
+**Doklad:** `p34-smycka.gd` (před: `not_sold`, po: `ok=true`, krumpáčů 1 → 2)
++ `tests/cases/vendor.gd` sekce „ART z DAT (ne z hlavy)“.
+**Ponaučení:** **konstanty v sondě jsou tvrzení o datech** — když je napíšeš
+z hlavy, měříš svoji paměť. Ber je z dat a přidej kontrolu, že sedí.
+
+### 2026-10-10 — Dvě strany téhož: `gump_open` doručuje až rámec (past-nástroje)
+**Co se stalo:** po `Command{t:"use"}` sonda hned po `sim.tick()` kontrolovala
+okno a hlásila „není otevřené“. Událost `gump_open` ale doručuje
+`app/loop._deliver_events` **až v rámci** — `sim.tick` ji jen vyrobí.
+**Doklad:** `p34-smycka.gd` (musela se rozdělit na tři fáze ve třech rámcích).
+**Ponaučení:** u událostí, které jdou `sim` → `ui`, se nikdy neptej ve stejném
+rámci, ve kterém vznikly. Rozděl měření po rámcích (`stav` v `_process`).
+
+---
+
 # 2026-10-09 (D3 jako HUD) — OKNO PRAVIDEL V HUDU: SNÍMEK NAŠEL NEVYKRESLENOU HLAVIČKU
 
 ### 2026-10-09 — „Změnilo se něco?“ na prvním vykreslení mlčí (chyba)

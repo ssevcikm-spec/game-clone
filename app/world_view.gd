@@ -106,8 +106,12 @@ const HOLE_COLOR := Color(1.0, 0.0, 1.0, 0.85)
 #   * NEZAVISLA PRICINA (mimo tento modul): kdyz okno NEMA zakladni velikost
 #     1280x720, `canvas_items` stretch skaluje canvas zlomkem (okno 1300x740 ->
 #     1,0156x) a prevzorkuje se CELY obraz i pri zoomu 1,0: zbytek **96,74 %**.
-#     To je vlastnost `project.godot` (`boot.project`), ne tohoto modulu; reseni
-#     je `display/window/stretch/scale_mode=integer` nebo hrat v 1280x720.
+#     ⚠ TA PRICINA UZ NEEXISTUJE (overeno 2026-10-09 vecer): `project.godot` ma
+#     dnes `window/stretch/mode="disabled"` (zmena z 2026-10-09, faze 1 bod 5.2),
+#     takze se platno rovna oknu a NIC se neprevzorkovava. Cisla vyse pochazeji
+#     z doby, kdy tam bylo `canvas_items` - zustavaji jako MERENI TE DEBY, ne
+#     jako dnesni stav (`AGENTS.md`: historicka cisla se neprepisuji, jen
+#     oznacuji). Zbyva jen zoom != 1 (viz body vyse).
 #     Cisla a postup: `_analyza/p22-teren-zrno.txt`.
 const ZOOM_MIN: float = 0.5
 const ZOOM_MAX: float = 2.0

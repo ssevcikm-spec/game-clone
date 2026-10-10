@@ -1,0 +1,6865 @@
+{
+ "config": {
+  "_popis": [
+   "Ceny jsou TADY (data), ne v kódu: `stock[].price` = tabulkova cena",
+   "shopu (kolik dostane hrac za kus), `buys[].price` = tabulkova cena,",
+   "`buy_price = ceil(buy_percent/100 * sell_price)` (`GenericSell.cs:126-129`).",
+   "Predmet, ktery v tabulce neni, se oceni fallbackem `value_percent` z `value`",
+   "v `data/items.json` - NAMERENE nespolehlive (longsword 6 vs dagger 20),",
+   "proto je to fallback, ne zaklad. `restock_ms` = 60 min (research/06 §2.3)."
+  ],
+  "buy_percent": 190,
+  "era": "t2a",
+  "gold_art": 20205,
+  "gump_max_rows": 250,
+  "restock_ms": 3600000,
+  "source": "research/06 §2.2.1 + §2.4.1",
+  "value_percent": 100
+ },
+ "vendors": [
+  {
+   "buys": [
+    {
+     "name": "mandrake root",
+     "price": 2,
+     "tile": 6365,
+     "type": "mandrake_root"
+    },
+    {
+     "name": "Garlic",
+     "price": 2,
+     "tile": 3972,
+     "type": "garlic"
+    },
+    {
+     "name": "Ginseng",
+     "price": 2,
+     "tile": 3973,
+     "type": "ginseng"
+    },
+    {
+     "name": "Nightshade",
+     "price": 2,
+     "tile": 3976,
+     "type": "nightshade"
+    },
+    {
+     "name": "Sulfurous Ash",
+     "price": 2,
+     "tile": 3980,
+     "type": "sulfurous_ash"
+    },
+    {
+     "name": "bottle",
+     "price": 3,
+     "tile": 3621,
+     "type": "bottle"
+    }
+   ],
+   "class": "Alchemist",
+   "era": "t2a",
+   "guild": "—",
+   "id": "alchemist",
+   "restock_ms": 3600000,
+   "shops": [
+    "SBAlchemist"
+   ],
+   "source": "research/06 §2.2.1 + §2.4.1",
+   "stock": [
+    {
+     "max": 20,
+     "name": "Garlic",
+     "price": 3,
+     "tile": 3972,
+     "type": "garlic"
+    },
+    {
+     "max": 20,
+     "name": "Ginseng",
+     "price": 3,
+     "tile": 3973,
+     "type": "ginseng"
+    },
+    {
+     "max": 20,
+     "name": "mandrake root",
+     "price": 3,
+     "tile": 6365,
+     "type": "mandrake_root"
+    },
+    {
+     "max": 20,
+     "name": "Nightshade",
+     "price": 3,
+     "tile": 3976,
+     "type": "nightshade"
+    },
+    {
+     "max": 20,
+     "name": "Sulfurous Ash",
+     "price": 3,
+     "tile": 3980,
+     "type": "sulfurous_ash"
+    },
+    {
+     "max": 100,
+     "name": "bottle",
+     "price": 5,
+     "tile": 3621,
+     "type": "bottle"
+    },
+    {
+     "max": 100,
+     "name": "heating stand",
+     "price": 2,
+     "tile": 6217,
+     "type": "heating_stand"
+    }
+   ],
+   "title": "the alchemist"
+  },
+  {
+   "buys": [
+    {
+     "name": "Leather Gloves",
+     "price": 30,
+     "tile": 5062,
+     "type": "leather_gloves"
+    },
+    {
+     "name": "leather gorget",
+     "price": 37,
+     "tile": 5063,
+     "type": "leather_gorget"
+    },
+    {
+     "name": "leather cap",
+     "price": 5,
+     "tile": 7609,
+     "type": "leather_cap"
+    },
+    {
+     "name": "leather shorts",
+     "price": 14,
+     "tile": 7168,
+     "type": "leather_shorts"
+    },
+    {
+     "name": "leather skirt",
+     "price": 11,
+     "tile": 7176,
+     "type": "leather_skirt"
+    },
+    {
+     "name": "studded gloves",
+     "price": 39,
+     "tile": 5077,
+     "type": "studded_gloves"
+    },
+    {
+     "name": "studded gorget",
+     "price": 36,
+     "tile": 5078,
+     "type": "studded_gorget"
+    },
+    {
+     "name": "buckler",
+     "price": 25,
+     "tile": 7027,
+     "type": "buckler"
+    },
+    {
+     "name": "bronze shield",
+     "price": 33,
+     "tile": 7026,
+     "type": "bronze_shield"
+    },
+    {
+     "name": "metal shield",
+     "price": 60,
+     "tile": 7035,
+     "type": "metal_shield"
+    },
+    {
+     "name": "heater shield",
+     "price": 115,
+     "tile": 7030,
+     "type": "heater_shield"
+    },
+    {
+     "name": "plate gorget",
+     "price": 52,
+     "tile": 9803,
+     "type": "plate_gorget"
+    },
+    {
+     "name": "bascinet",
+     "price": 9,
+     "tile": 5134,
+     "type": "bascinet"
+    },
+    {
+     "name": "close helm",
+     "price": 9,
+     "tile": 5129,
+     "type": "close_helm"
+    },
+    {
+     "name": "helmet",
+     "price": 9,
+     "tile": 5130,
+     "type": "helmet"
+    },
+    {
+     "name": "norse helm",
+     "price": 9,
+     "tile": 5132,
+     "type": "norse_helm"
+    },
+    {
+     "name": "plate helm",
+     "price": 10,
+     "tile": 5138,
+     "type": "plate_helm"
+    },
+    {
+     "name": "ringmail gloves",
+     "price": 26,
+     "tile": 5099,
+     "type": "ringmail_gloves"
+    }
+   ],
+   "class": "Armorer",
+   "era": "t2a",
+   "guild": "—",
+   "id": "armorer",
+   "restock_ms": 3600000,
+   "shops": [
+    "SBLeatherArmor",
+    "SBStuddedArmor",
+    "SBMetalShields",
+    "SBPlateArmor",
+    "SBHelmetArmor",
+    "SBChainmailArmor",
+    "SBRingmailArmor"
+   ],
+   "source": "research/06 §2.2.1 + §2.4.1",
+   "stock": [
+    {
+     "max": 20,
+     "name": "Leather Gloves",
+     "price": 60,
+     "tile": 5062,
+     "type": "leather_gloves"
+    },
+    {
+     "max": 20,
+     "name": "leather gorget",
+     "price": 74,
+     "tile": 5063,
+     "type": "leather_gorget"
+    },
+    {
+     "max": 20,
+     "name": "leather cap",
+     "price": 10,
+     "tile": 7609,
+     "type": "leather_cap"
+    },
+    {
+     "max": 20,
+     "name": "leather shorts",
+     "price": 86,
+     "tile": 7168,
+     "type": "leather_shorts"
+    },
+    {
+     "max": 20,
+     "name": "leather skirt",
+     "price": 87,
+     "tile": 7176,
+     "type": "leather_skirt"
+    },
+    {
+     "max": 20,
+     "name": "studded gloves",
+     "price": 79,
+     "tile": 5077,
+     "type": "studded_gloves"
+    },
+    {
+     "max": 20,
+     "name": "studded gorget",
+     "price": 73,
+     "tile": 5078,
+     "type": "studded_gorget"
+    },
+    {
+     "max": 20,
+     "name": "bronze shield",
+     "price": 66,
+     "tile": 7026,
+     "type": "bronze_shield"
+    },
+    {
+     "max": 20,
+     "name": "buckler",
+     "price": 50,
+     "tile": 7027,
+     "type": "buckler"
+    },
+    {
+     "max": 20,
+     "name": "heater shield",
+     "price": 231,
+     "tile": 7030,
+     "type": "heater_shield"
+    },
+    {
+     "max": 20,
+     "name": "metal shield",
+     "price": 121,
+     "tile": 7035,
+     "type": "metal_shield"
+    },
+    {
+     "max": 20,
+     "name": "plate gorget",
+     "price": 104,
+     "tile": 9803,
+     "type": "plate_gorget"
+    },
+    {
+     "max": 20,
+     "name": "plate helm",
+     "price": 21,
+     "tile": 5138,
+     "type": "plate_helm"
+    },
+    {
+     "max": 20,
+     "name": "close helm",
+     "price": 18,
+     "tile": 5129,
+     "type": "close_helm"
+    },
+    {
+     "max": 20,
+     "name": "helmet",
+     "price": 31,
+     "tile": 5130,
+     "type": "helmet"
+    },
+    {
+     "max": 20,
+     "name": "norse helm",
+     "price": 18,
+     "tile": 5132,
+     "type": "norse_helm"
+    },
+    {
+     "max": 20,
+     "name": "bascinet",
+     "price": 18,
+     "tile": 5134,
+     "type": "bascinet"
+    },
+    {
+     "max": 20,
+     "name": "ringmail gloves",
+     "price": 93,
+     "tile": 5099,
+     "type": "ringmail_gloves"
+    }
+   ],
+   "title": "the armourer"
+  },
+  {
+   "buys": [
+    {
+     "name": "French bread",
+     "price": 1,
+     "tile": 2444,
+     "type": "french_bread"
+    },
+    {
+     "name": "cake",
+     "price": 5,
+     "tile": 2537,
+     "type": "cake"
+    },
+    {
+     "name": "muffins",
+     "price": 2,
+     "tile": 2539,
+     "type": "muffin"
+    },
+    {
+     "name": "dough",
+     "price": 4,
+     "tile": 4157,
+     "type": "dough"
+    },
+    {
+     "name": "pitcher",
+     "price": 5,
+     "tile": 2518,
+     "type": "pitcher"
+    },
+    {
+     "name": "eggs",
+     "price": 1,
+     "tile": 2485,
+     "type": "eggs"
+    }
+   ],
+   "class": "Baker",
+   "era": "t2a",
+   "guild": "—",
+   "id": "baker",
+   "restock_ms": 3600000,
+   "shops": [
+    "SBBaker"
+   ],
+   "source": "research/06 §2.2.1 + §2.4.1",
+   "stock": [
+    {
+     "max": 20,
+     "name": "cake",
+     "price": 13,
+     "tile": 2537,
+     "type": "cake"
+    },
+    {
+     "max": 20,
+     "name": "muffins",
+     "price": 3,
+     "tile": 2539,
+     "type": "muffin"
+    },
+    {
+     "max": 20,
+     "name": "French bread",
+     "price": 5,
+     "tile": 2444,
+     "type": "french_bread"
+    }
+   ],
+   "title": "the baker"
+  },
+  {
+   "buys": [
+    {
+     "name": "pitcher",
+     "price": 5,
+     "tile": 2518,
+     "type": "pitcher"
+    },
+    {
+     "name": "banana",
+     "price": 1,
+     "tile": 5917,
+     "type": "banana"
+    },
+    {
+     "name": "candle",
+     "price": 3,
+     "tile": 2575,
+     "type": "candle"
+    }
+   ],
+   "class": "Barkeeper",
+   "era": "t2a",
+   "guild": "—",
+   "id": "barkeeper",
+   "restock_ms": 3600000,
+   "shops": [
+    "SBBarkeeper"
+   ],
+   "source": "research/06 §2.2.1 + §2.4.1",
+   "stock": [
+    {
+     "max": 20,
+     "name": "wasabi",
+     "price": 2,
+     "tile": 9448,
+     "type": "wasabi"
+    },
+    {
+     "max": 20,
+     "name": "bento box",
+     "price": 6,
+     "tile": 10292,
+     "type": "bento_box"
+    }
+   ],
+   "title": "the barkeeper"
+  },
+  {
+   "buys": [
+    {
+     "name": "Beeswax",
+     "price": 1,
+     "tile": 5154,
+     "type": "beeswax"
+    }
+   ],
+   "class": "Beekeeper",
+   "era": "t2a",
+   "guild": "—",
+   "id": "beekeeper",
+   "restock_ms": 3600000,
+   "shops": [
+    "SBBeekeeper"
+   ],
+   "source": "research/06 §2.2.1 + §2.4.1",
+   "stock": [
+    {
+     "max": 20,
+     "name": "Beeswax",
+     "price": 2,
+     "tile": 5154,
+     "type": "beeswax"
+    }
+   ],
+   "title": "the beekeeper"
+  },
+  {
+   "buys": [
+    {
+     "name": "tongs",
+     "price": 7,
+     "tile": 4027,
+     "type": "tongs"
+    },
+    {
+     "name": "iron ingot",
+     "price": 4,
+     "tile": 7151,
+     "type": "iron_ingot"
+    },
+    {
+     "name": "buckler",
+     "price": 25,
+     "tile": 7027,
+     "type": "buckler"
+    },
+    {
+     "name": "bronze shield",
+     "price": 33,
+     "tile": 7026,
+     "type": "bronze_shield"
+    },
+    {
+     "name": "metal shield",
+     "price": 60,
+     "tile": 7035,
+     "type": "metal_shield"
+    },
+    {
+     "name": "heater shield",
+     "price": 115,
+     "tile": 7030,
+     "type": "heater_shield"
+    },
+    {
+     "name": "wooden shield",
+     "price": 15,
+     "tile": 7034,
+     "type": "wooden_shield"
+    },
+    {
+     "name": "plate gorget",
+     "price": 52,
+     "tile": 9803,
+     "type": "plate_gorget"
+    },
+    {
+     "name": "leather shorts",
+     "price": 14,
+     "tile": 7168,
+     "type": "leather_shorts"
+    },
+    {
+     "name": "leather skirt",
+     "price": 11,
+     "tile": 7176,
+     "type": "leather_skirt"
+    },
+    {
+     "name": "bascinet",
+     "price": 9,
+     "tile": 5134,
+     "type": "bascinet"
+    },
+    {
+     "name": "close helm",
+     "price": 9,
+     "tile": 5129,
+     "type": "close_helm"
+    },
+    {
+     "name": "helmet",
+     "price": 9,
+     "tile": 5130,
+     "type": "helmet"
+    },
+    {
+     "name": "norse helm",
+     "price": 9,
+     "tile": 5132,
+     "type": "norse_helm"
+    },
+    {
+     "name": "plate helm",
+     "price": 10,
+     "tile": 5138,
+     "type": "plate_helm"
+    },
+    {
+     "name": "ringmail gloves",
+     "price": 26,
+     "tile": 5099,
+     "type": "ringmail_gloves"
+    },
+    {
+     "name": "battle axe",
+     "price": 13,
+     "tile": 3911,
+     "type": "battle_axe"
+    },
+    {
+     "name": "double axe",
+     "price": 26,
+     "tile": 3915,
+     "type": "double_axe"
+    },
+    {
+     "name": "large battle axe",
+     "price": 16,
+     "tile": 5114,
+     "type": "large_battle_axe"
+    },
+    {
+     "name": "pickaxe",
+     "price": 11,
+     "tile": 3717,
+     "type": "pickaxe"
+    },
+    {
+     "name": "two handed axe",
+     "price": 16,
+     "tile": 5186,
+     "type": "two_handed_axe"
+    },
+    {
+     "name": "war axe",
+     "price": 14,
+     "tile": 5039,
+     "type": "war_axe"
+    },
+    {
+     "name": "axe",
+     "price": 20,
+     "tile": 3913,
+     "type": "axe"
+    },
+    {
+     "name": "bardiche",
+     "price": 30,
+     "tile": 3917,
+     "type": "bardiche"
+    },
+    {
+     "name": "halberd",
+     "price": 21,
+     "tile": 5182,
+     "type": "halberd"
+    },
+    {
+     "name": "butcher knife",
+     "price": 7,
+     "tile": 5110,
+     "type": "butcher_knife"
+    },
+    {
+     "name": "cleaver",
+     "price": 7,
+     "tile": 3778,
+     "type": "cleaver"
+    },
+    {
+     "name": "dagger",
+     "price": 10,
+     "tile": 3921,
+     "type": "dagger"
+    },
+    {
+     "name": "skinning knife",
+     "price": 7,
+     "tile": 3780,
+     "type": "skinning_knife"
+    },
+    {
+     "name": "club",
+     "price": 8,
+     "tile": 5043,
+     "type": "club"
+    },
+    {
+     "name": "hammer pick",
+     "price": 13,
+     "tile": 5180,
+     "type": "hammer_pick"
+    },
+    {
+     "name": "mace",
+     "price": 14,
+     "tile": 3932,
+     "type": "mace"
+    },
+    {
+     "name": "maul",
+     "price": 10,
+     "tile": 5178,
+     "type": "maul"
+    },
+    {
+     "name": "war hammer",
+     "price": 12,
+     "tile": 5176,
+     "type": "war_hammer"
+    },
+    {
+     "name": "war mace",
+     "price": 15,
+     "tile": 5126,
+     "type": "war_mace"
+    },
+    {
+     "name": "heavy crossbow",
+     "price": 27,
+     "tile": 5116,
+     "type": "heavy_crossbow"
+    },
+    {
+     "name": "bow",
+     "price": 17,
+     "tile": 5041,
+     "type": "bow"
+    },
+    {
+     "name": "crossbow",
+     "price": 23,
+     "tile": 3919,
+     "type": "crossbow"
+    },
+    {
+     "name": "composite bow",
+     "price": 25,
+     "tile": 9922,
+     "type": "composite_bow"
+    },
+    {
+     "name": "repeating crossbow",
+     "price": 28,
+     "tile": 9923,
+     "type": "repeating_crossbow"
+    },
+    {
+     "name": "scepter",
+     "price": 20,
+     "tile": 9916,
+     "type": "scepter"
+    },
+    {
+     "name": "bladed staff",
+     "price": 20,
+     "tile": 9917,
+     "type": "bladed_staff"
+    },
+    {
+     "name": "scythe",
+     "price": 19,
+     "tile": 9914,
+     "type": "scythe"
+    },
+    {
+     "name": "bone harvester",
+     "price": 17,
+     "tile": 9915,
+     "type": "bone_harvester"
+    },
+    {
+     "name": "pike",
+     "price": 19,
+     "tile": 9918,
+     "type": "pike"
+    },
+    {
+     "name": "double bladed staff",
+     "price": 17,
+     "tile": 9919,
+     "type": "double_bladed_staff"
+    },
+    {
+     "name": "lance",
+     "price": 17,
+     "tile": 9920,
+     "type": "lance"
+    },
+    {
+     "name": "crescent blade",
+     "price": 18,
+     "tile": 9921,
+     "type": "crescent_blade"
+    },
+    {
+     "name": "spear",
+     "price": 15,
+     "tile": 9594,
+     "type": "spear"
+    },
+    {
+     "name": "pitchfork",
+     "price": 9,
+     "tile": 3719,
+     "type": "pitchfork"
+    },
+    {
+     "name": "short spear",
+     "price": 11,
+     "tile": 5122,
+     "type": "short_spear"
+    },
+    {
+     "name": "black staff",
+     "price": 11,
+     "tile": 3568,
+     "type": "black_staff"
+    },
+    {
+     "name": "gnarled staff",
+     "price": 8,
+     "tile": 5112,
+     "type": "gnarled_staff"
+    },
+    {
+     "name": "quarter staff",
+     "price": 9,
+     "tile": 3721,
+     "type": "quarter_staff"
+    },
+    {
+     "name": "smith's hammer",
+     "price": 10,
+     "tile": 5091,
+     "type": "smith_s_hammer"
+    },
+    {
+     "name": "broadsword",
+     "price": 17,
+     "tile": 3934,
+     "type": "broadsword"
+    },
+    {
+     "name": "cutlass",
+     "price": 12,
+     "tile": 5184,
+     "type": "cutlass"
+    },
+    {
+     "name": "katana",
+     "price": 16,
+     "tile": 5118,
+     "type": "katana"
+    },
+    {
+     "name": "kryss",
+     "price": 16,
+     "tile": 5120,
+     "type": "kryss"
+    },
+    {
+     "name": "longsword",
+     "price": 27,
+     "tile": 3936,
+     "type": "longsword"
+    },
+    {
+     "name": "scimitar",
+     "price": 18,
+     "tile": 5045,
+     "type": "scimitar"
+    },
+    {
+     "name": "viking sword",
+     "price": 27,
+     "tile": 5049,
+     "type": "viking_sword"
+    },
+    {
+     "name": "arrow",
+     "price": 1,
+     "tile": 3903,
+     "type": "arrow"
+    },
+    {
+     "name": "shaft",
+     "price": 1,
+     "tile": 7124,
+     "type": "shaft"
+    },
+    {
+     "name": "feather",
+     "price": 1,
+     "tile": 7121,
+     "type": "feather"
+    }
+   ],
+   "class": "Blacksmith",
+   "era": "t2a",
+   "guild": "BlacksmithsGuild",
+   "id": "blacksmith",
+   "restock_ms": 3600000,
+   "shops": [
+    "SBBlacksmith",
+    "SBSmithTools",
+    "SBMetalShields",
+    "SBWoodenShields",
+    "SBPlateArmor",
+    "SBHelmetArmor",
+    "SBChainmailArmor",
+    "SBRingmailArmor",
+    "SBAxeWeapon",
+    "SBPoleArmWeapon",
+    "SBRangedWeapon",
+    "SBKnifeWeapon",
+    "SBMaceWeapon",
+    "SBSpearForkWeapon",
+    "SBSwordWeapon"
+   ],
+   "source": "research/06 §2.2.1 + §2.4.1",
+   "stock": [
+    {
+     "max": 16,
+     "name": "iron ingot",
+     "price": 5,
+     "tile": 7151,
+     "type": "iron_ingot"
+    },
+    {
+     "max": 14,
+     "name": "tongs",
+     "price": 13,
+     "tile": 4027,
+     "type": "tongs"
+    },
+    {
+     "max": 20,
+     "name": "bronze shield",
+     "price": 66,
+     "tile": 7026,
+     "type": "bronze_shield"
+    },
+    {
+     "max": 20,
+     "name": "buckler",
+     "price": 50,
+     "tile": 7027,
+     "type": "buckler"
+    },
+    {
+     "max": 20,
+     "name": "heater shield",
+     "price": 231,
+     "tile": 7030,
+     "type": "heater_shield"
+    },
+    {
+     "max": 20,
+     "name": "metal shield",
+     "price": 121,
+     "tile": 7035,
+     "type": "metal_shield"
+    },
+    {
+     "max": 20,
+     "name": "wooden shield",
+     "price": 30,
+     "tile": 7034,
+     "type": "wooden_shield"
+    },
+    {
+     "max": 20,
+     "name": "plate gorget",
+     "price": 104,
+     "tile": 9803,
+     "type": "plate_gorget"
+    },
+    {
+     "max": 20,
+     "name": "plate helm",
+     "price": 21,
+     "tile": 5138,
+     "type": "plate_helm"
+    },
+    {
+     "max": 20,
+     "name": "close helm",
+     "price": 18,
+     "tile": 5129,
+     "type": "close_helm"
+    },
+    {
+     "max": 20,
+     "name": "helmet",
+     "price": 31,
+     "tile": 5130,
+     "type": "helmet"
+    },
+    {
+     "max": 20,
+     "name": "norse helm",
+     "price": 18,
+     "tile": 5132,
+     "type": "norse_helm"
+    },
+    {
+     "max": 20,
+     "name": "bascinet",
+     "price": 18,
+     "tile": 5134,
+     "type": "bascinet"
+    },
+    {
+     "max": 20,
+     "name": "ringmail gloves",
+     "price": 93,
+     "tile": 5099,
+     "type": "ringmail_gloves"
+    },
+    {
+     "max": 20,
+     "name": "bardiche",
+     "price": 60,
+     "tile": 3917,
+     "type": "bardiche"
+    },
+    {
+     "max": 20,
+     "name": "battle axe",
+     "price": 26,
+     "tile": 3911,
+     "type": "battle_axe"
+    },
+    {
+     "max": 20,
+     "name": "two handed axe",
+     "price": 32,
+     "tile": 5186,
+     "type": "two_handed_axe"
+    },
+    {
+     "max": 20,
+     "name": "bow",
+     "price": 35,
+     "tile": 5041,
+     "type": "bow"
+    },
+    {
+     "max": 20,
+     "name": "butcher knife",
+     "price": 14,
+     "tile": 5110,
+     "type": "butcher_knife"
+    },
+    {
+     "max": 20,
+     "name": "crossbow",
+     "price": 46,
+     "tile": 3919,
+     "type": "crossbow"
+    },
+    {
+     "max": 20,
+     "name": "heavy crossbow",
+     "price": 55,
+     "tile": 5116,
+     "type": "heavy_crossbow"
+    },
+    {
+     "max": 20,
+     "name": "cutlass",
+     "price": 24,
+     "tile": 5184,
+     "type": "cutlass"
+    },
+    {
+     "max": 20,
+     "name": "dagger",
+     "price": 21,
+     "tile": 3921,
+     "type": "dagger"
+    },
+    {
+     "max": 20,
+     "name": "halberd",
+     "price": 42,
+     "tile": 5182,
+     "type": "halberd"
+    },
+    {
+     "max": 20,
+     "name": "hammer pick",
+     "price": 26,
+     "tile": 5180,
+     "type": "hammer_pick"
+    },
+    {
+     "max": 20,
+     "name": "katana",
+     "price": 33,
+     "tile": 5118,
+     "type": "katana"
+    },
+    {
+     "max": 20,
+     "name": "kryss",
+     "price": 32,
+     "tile": 5120,
+     "type": "kryss"
+    },
+    {
+     "max": 20,
+     "name": "broadsword",
+     "price": 35,
+     "tile": 3934,
+     "type": "broadsword"
+    },
+    {
+     "max": 20,
+     "name": "longsword",
+     "price": 55,
+     "tile": 3936,
+     "type": "longsword"
+    },
+    {
+     "max": 20,
+     "name": "viking sword",
+     "price": 55,
+     "tile": 5049,
+     "type": "viking_sword"
+    },
+    {
+     "max": 20,
+     "name": "cleaver",
+     "price": 15,
+     "tile": 3778,
+     "type": "cleaver"
+    },
+    {
+     "max": 20,
+     "name": "axe",
+     "price": 40,
+     "tile": 3913,
+     "type": "axe"
+    },
+    {
+     "max": 20,
+     "name": "double axe",
+     "price": 52,
+     "tile": 3915,
+     "type": "double_axe"
+    },
+    {
+     "max": 20,
+     "name": "pickaxe",
+     "price": 22,
+     "tile": 3717,
+     "type": "pickaxe"
+    },
+    {
+     "max": 20,
+     "name": "pitchfork",
+     "price": 19,
+     "tile": 3719,
+     "type": "pitchfork"
+    },
+    {
+     "max": 20,
+     "name": "scimitar",
+     "price": 36,
+     "tile": 5045,
+     "type": "scimitar"
+    },
+    {
+     "max": 20,
+     "name": "skinning knife",
+     "price": 14,
+     "tile": 3780,
+     "type": "skinning_knife"
+    },
+    {
+     "max": 20,
+     "name": "large battle axe",
+     "price": 33,
+     "tile": 5114,
+     "type": "large_battle_axe"
+    },
+    {
+     "max": 20,
+     "name": "war axe",
+     "price": 29,
+     "tile": 5039,
+     "type": "war_axe"
+    },
+    {
+     "max": 20,
+     "name": "bone harvester",
+     "price": 35,
+     "tile": 9915,
+     "type": "bone_harvester"
+    },
+    {
+     "max": 20,
+     "name": "crescent blade",
+     "price": 37,
+     "tile": 9921,
+     "type": "crescent_blade"
+    },
+    {
+     "max": 20,
+     "name": "double bladed staff",
+     "price": 35,
+     "tile": 9919,
+     "type": "double_bladed_staff"
+    },
+    {
+     "max": 20,
+     "name": "lance",
+     "price": 34,
+     "tile": 9920,
+     "type": "lance"
+    },
+    {
+     "max": 20,
+     "name": "pike",
+     "price": 39,
+     "tile": 9918,
+     "type": "pike"
+    },
+    {
+     "max": 20,
+     "name": "scythe",
+     "price": 39,
+     "tile": 9914,
+     "type": "scythe"
+    },
+    {
+     "max": 20,
+     "name": "composite bow",
+     "price": 50,
+     "tile": 9922,
+     "type": "composite_bow"
+    },
+    {
+     "max": 20,
+     "name": "repeating crossbow",
+     "price": 57,
+     "tile": 9923,
+     "type": "repeating_crossbow"
+    },
+    {
+     "max": 20,
+     "name": "black staff",
+     "price": 22,
+     "tile": 3568,
+     "type": "black_staff"
+    },
+    {
+     "max": 20,
+     "name": "club",
+     "price": 16,
+     "tile": 5043,
+     "type": "club"
+    },
+    {
+     "max": 20,
+     "name": "gnarled staff",
+     "price": 16,
+     "tile": 5112,
+     "type": "gnarled_staff"
+    },
+    {
+     "max": 20,
+     "name": "mace",
+     "price": 28,
+     "tile": 3932,
+     "type": "mace"
+    },
+    {
+     "max": 20,
+     "name": "maul",
+     "price": 21,
+     "tile": 5178,
+     "type": "maul"
+    },
+    {
+     "max": 20,
+     "name": "quarter staff",
+     "price": 19,
+     "tile": 3721,
+     "type": "quarter_staff"
+    },
+    {
+     "max": 20,
+     "name": "smith's hammer",
+     "price": 21,
+     "tile": 5091,
+     "type": "smith_s_hammer"
+    },
+    {
+     "max": 20,
+     "name": "short spear",
+     "price": 23,
+     "tile": 5122,
+     "type": "short_spear"
+    },
+    {
+     "max": 20,
+     "name": "spear",
+     "price": 31,
+     "tile": 9594,
+     "type": "spear"
+    },
+    {
+     "max": 20,
+     "name": "war hammer",
+     "price": 25,
+     "tile": 5176,
+     "type": "war_hammer"
+    },
+    {
+     "max": 20,
+     "name": "war mace",
+     "price": 31,
+     "tile": 5126,
+     "type": "war_mace"
+    },
+    {
+     "max": 20,
+     "name": "scepter",
+     "price": 39,
+     "tile": 9916,
+     "type": "scepter"
+    },
+    {
+     "max": 20,
+     "name": "bladed staff",
+     "price": 40,
+     "tile": 9917,
+     "type": "bladed_staff"
+    }
+   ],
+   "title": "the blacksmith"
+  },
+  {
+   "buys": [
+    {
+     "name": "arrow",
+     "price": 1,
+     "tile": 3903,
+     "type": "arrow"
+    },
+    {
+     "name": "shaft",
+     "price": 1,
+     "tile": 7124,
+     "type": "shaft"
+    },
+    {
+     "name": "feather",
+     "price": 1,
+     "tile": 7121,
+     "type": "feather"
+    },
+    {
+     "name": "heavy crossbow",
+     "price": 27,
+     "tile": 5116,
+     "type": "heavy_crossbow"
+    },
+    {
+     "name": "bow",
+     "price": 17,
+     "tile": 5041,
+     "type": "bow"
+    },
+    {
+     "name": "crossbow",
+     "price": 25,
+     "tile": 3919,
+     "type": "crossbow"
+    },
+    {
+     "name": "composite bow",
+     "price": 23,
+     "tile": 9922,
+     "type": "composite_bow"
+    },
+    {
+     "name": "repeating crossbow",
+     "price": 22,
+     "tile": 9923,
+     "type": "repeating_crossbow"
+    }
+   ],
+   "class": "Bowyer",
+   "era": "t2a",
+   "guild": "—",
+   "id": "bowyer",
+   "restock_ms": 3600000,
+   "shops": [
+    "SBBowyer",
+    "SBRangedWeapon"
+   ],
+   "source": "research/06 §2.2.1 + §2.4.1",
+   "stock": [
+    {
+     "max": 20,
+     "name": "crossbow",
+     "price": 55,
+     "tile": 3919,
+     "type": "crossbow"
+    },
+    {
+     "max": 20,
+     "name": "heavy crossbow",
+     "price": 55,
+     "tile": 5116,
+     "type": "heavy_crossbow"
+    },
+    {
+     "max": 20,
+     "name": "repeating crossbow",
+     "price": 46,
+     "tile": 9923,
+     "type": "repeating_crossbow"
+    },
+    {
+     "max": 20,
+     "name": "composite bow",
+     "price": 45,
+     "tile": 9922,
+     "type": "composite_bow"
+    },
+    {
+     "max": 20,
+     "name": "bow",
+     "price": 40,
+     "tile": 5041,
+     "type": "bow"
+    }
+   ],
+   "title": "the bowyer"
+  },
+  {
+   "buys": [
+    {
+     "name": "butcher knife",
+     "price": 7,
+     "tile": 5110,
+     "type": "butcher_knife"
+    },
+    {
+     "name": "cleaver",
+     "price": 7,
+     "tile": 3778,
+     "type": "cleaver"
+    },
+    {
+     "name": "skinning knife",
+     "price": 7,
+     "tile": 3780,
+     "type": "skinning_knife"
+    }
+   ],
+   "class": "Butcher",
+   "era": "t2a",
+   "guild": "—",
+   "id": "butcher",
+   "restock_ms": 3600000,
+   "shops": [
+    "SBButcher"
+   ],
+   "source": "research/06 §2.2.1 + §2.4.1",
+   "stock": [
+    {
+     "max": 20,
+     "name": "butcher knife",
+     "price": 13,
+     "tile": 5110,
+     "type": "butcher_knife"
+    },
+    {
+     "max": 20,
+     "name": "cleaver",
+     "price": 13,
+     "tile": 3778,
+     "type": "cleaver"
+    },
+    {
+     "max": 20,
+     "name": "skinning knife",
+     "price": 13,
+     "tile": 3780,
+     "type": "skinning_knife"
+    }
+   ],
+   "title": "the butcher"
+  },
+  {
+   "buys": [
+    {
+     "name": "wooden box",
+     "price": 7,
+     "tile": 2474,
+     "type": "wooden_box"
+    },
+    {
+     "name": "stool",
+     "price": 6,
+     "tile": 2602,
+     "type": "stool"
+    },
+    {
+     "name": "foot stool",
+     "price": 6,
+     "tile": 2910,
+     "type": "foot_stool"
+    },
+    {
+     "name": "wooden chair",
+     "price": 8,
+     "tile": 2862,
+     "type": "wooden_chair"
+    },
+    {
+     "name": "saw",
+     "price": 9,
+     "tile": 4148,
+     "type": "saw"
+    },
+    {
+     "name": "scorp",
+     "price": 6,
+     "tile": 4327,
+     "type": "scorp"
+    },
+    {
+     "name": "smoothing plane",
+     "price": 6,
+     "tile": 4146,
+     "type": "smoothing_plane"
+    },
+    {
+     "name": "draw knife",
+     "price": 6,
+     "tile": 4324,
+     "type": "draw_knife"
+    },
+    {
+     "name": "froe",
+     "price": 6,
+     "tile": 4325,
+     "type": "froe"
+    },
+    {
+     "name": "hammer",
+     "price": 14,
+     "tile": 4138,
+     "type": "hammer"
+    },
+    {
+     "name": "inshave",
+     "price": 6,
+     "tile": 4326,
+     "type": "inshave"
+    },
+    {
+     "name": "jointing plane",
+     "price": 6,
+     "tile": 4144,
+     "type": "jointing_plane"
+    },
+    {
+     "name": "moulding planes",
+     "price": 6,
+     "tile": 4140,
+     "type": "moulding_planes"
+    },
+    {
+     "name": "dovetail saw",
+     "price": 7,
+     "tile": 4136,
+     "type": "dovetail_saw"
+    },
+    {
+     "name": "board",
+     "price": 2,
+     "tile": 7790,
+     "type": "board"
+    },
+    {
+     "name": "club",
+     "price": 13,
+     "tile": 5043,
+     "type": "club"
+    },
+    {
+     "name": "lute",
+     "price": 10,
+     "tile": 3763,
+     "type": "lute"
+    },
+    {
+     "name": "lap harp",
+     "price": 10,
+     "tile": 3762,
+     "type": "lap_harp"
+    },
+    {
+     "name": "tambourine",
+     "price": 10,
+     "tile": 3741,
+     "type": "tambourine"
+    },
+    {
+     "name": "log",
+     "price": 1,
+     "tile": 7133,
+     "type": "log"
+    },
+    {
+     "name": "black staff",
+     "price": 11,
+     "tile": 3568,
+     "type": "black_staff"
+    },
+    {
+     "name": "gnarled staff",
+     "price": 8,
+     "tile": 5112,
+     "type": "gnarled_staff"
+    },
+    {
+     "name": "quarter staff",
+     "price": 9,
+     "tile": 3721,
+     "type": "quarter_staff"
+    },
+    {
+     "name": "wooden shield",
+     "price": 15,
+     "tile": 7034,
+     "type": "wooden_shield"
+    }
+   ],
+   "class": "Carpenter",
+   "era": "t2a",
+   "guild": "TinkersGuild",
+   "id": "carpenter",
+   "restock_ms": 3600000,
+   "shops": [
+    "SBCarpenter",
+    "SBStavesWeapon",
+    "SBWoodenShields"
+   ],
+   "source": "research/06 §2.2.1 + §2.4.1",
+   "stock": [
+    {
+     "max": 20,
+     "name": "nails",
+     "price": 3,
+     "tile": 4142,
+     "type": "nails"
+    },
+    {
+     "max": 20,
+     "name": "board",
+     "price": 3,
+     "tile": 7790,
+     "type": "board"
+    },
+    {
+     "max": 20,
+     "name": "draw knife",
+     "price": 10,
+     "tile": 4324,
+     "type": "draw_knife"
+    },
+    {
+     "max": 20,
+     "name": "froe",
+     "price": 10,
+     "tile": 4325,
+     "type": "froe"
+    },
+    {
+     "max": 20,
+     "name": "scorp",
+     "price": 10,
+     "tile": 4327,
+     "type": "scorp"
+    },
+    {
+     "max": 20,
+     "name": "inshave",
+     "price": 10,
+     "tile": 4326,
+     "type": "inshave"
+    },
+    {
+     "max": 20,
+     "name": "dovetail saw",
+     "price": 12,
+     "tile": 4136,
+     "type": "dovetail_saw"
+    },
+    {
+     "max": 20,
+     "name": "saw",
+     "price": 15,
+     "tile": 4148,
+     "type": "saw"
+    },
+    {
+     "max": 20,
+     "name": "hammer",
+     "price": 17,
+     "tile": 4138,
+     "type": "hammer"
+    },
+    {
+     "max": 20,
+     "name": "moulding planes",
+     "price": 11,
+     "tile": 4140,
+     "type": "moulding_planes"
+    },
+    {
+     "max": 20,
+     "name": "smoothing plane",
+     "price": 10,
+     "tile": 4146,
+     "type": "smoothing_plane"
+    },
+    {
+     "max": 20,
+     "name": "jointing plane",
+     "price": 11,
+     "tile": 4144,
+     "type": "jointing_plane"
+    },
+    {
+     "max": 20,
+     "name": "tambourine",
+     "price": 21,
+     "tile": 3741,
+     "type": "tambourine"
+    },
+    {
+     "max": 20,
+     "name": "lap harp",
+     "price": 21,
+     "tile": 3762,
+     "type": "lap_harp"
+    },
+    {
+     "max": 20,
+     "name": "lute",
+     "price": 21,
+     "tile": 3763,
+     "type": "lute"
+    },
+    {
+     "max": 20,
+     "name": "black staff",
+     "price": 22,
+     "tile": 3568,
+     "type": "black_staff"
+    },
+    {
+     "max": 20,
+     "name": "gnarled staff",
+     "price": 16,
+     "tile": 5112,
+     "type": "gnarled_staff"
+    },
+    {
+     "max": 20,
+     "name": "quarter staff",
+     "price": 19,
+     "tile": 3721,
+     "type": "quarter_staff"
+    },
+    {
+     "max": 20,
+     "name": "wooden shield",
+     "price": 30,
+     "tile": 7034,
+     "type": "wooden_shield"
+    }
+   ],
+   "title": "the carpenter"
+  },
+  {
+   "buys": [
+    {
+     "name": "shoes",
+     "price": 4,
+     "tile": 5903,
+     "type": "shoes"
+    },
+    {
+     "name": "boots",
+     "price": 5,
+     "tile": 5899,
+     "type": "boots"
+    },
+    {
+     "name": "thigh boots",
+     "price": 7,
+     "tile": 5905,
+     "type": "thigh_boots"
+    },
+    {
+     "name": "sandals",
+     "price": 2,
+     "tile": 5901,
+     "type": "sandals"
+    }
+   ],
+   "class": "Cobbler",
+   "era": "t2a",
+   "guild": "—",
+   "id": "cobbler",
+   "restock_ms": 3600000,
+   "shops": [
+    "SBCobbler"
+   ],
+   "source": "research/06 §2.2.1 + §2.4.1",
+   "stock": [
+    {
+     "max": 20,
+     "name": "thigh boots",
+     "price": 15,
+     "tile": 5905,
+     "type": "thigh_boots"
+    },
+    {
+     "max": 20,
+     "name": "shoes",
+     "price": 8,
+     "tile": 5903,
+     "type": "shoes"
+    },
+    {
+     "max": 20,
+     "name": "boots",
+     "price": 10,
+     "tile": 5899,
+     "type": "boots"
+    },
+    {
+     "max": 20,
+     "name": "sandals",
+     "price": 5,
+     "tile": 5901,
+     "type": "sandals"
+    }
+   ],
+   "title": "the cobbler"
+  },
+  {
+   "buys": [
+    {
+     "name": "cake",
+     "price": 5,
+     "tile": 2537,
+     "type": "cake"
+    },
+    {
+     "name": "flour sifter",
+     "price": 1,
+     "tile": 4158,
+     "type": "flour_sifter"
+    },
+    {
+     "name": "rolling pin",
+     "price": 1,
+     "tile": 4163,
+     "type": "rolling_pin"
+    },
+    {
+     "name": "muffins",
+     "price": 1,
+     "tile": 2539,
+     "type": "muffin"
+    }
+   ],
+   "class": "Cook",
+   "era": "t2a",
+   "guild": "—",
+   "id": "cook",
+   "restock_ms": 3600000,
+   "shops": [
+    "SBCook"
+   ],
+   "source": "research/06 §2.2.1 + §2.4.1",
+   "stock": [
+    {
+     "max": 20,
+     "name": "cake",
+     "price": 13,
+     "tile": 2537,
+     "type": "cake"
+    },
+    {
+     "max": 20,
+     "name": "muffins",
+     "price": 3,
+     "tile": 2539,
+     "type": "muffin"
+    },
+    {
+     "max": 20,
+     "name": "rolling pin",
+     "price": 2,
+     "tile": 4163,
+     "type": "rolling_pin"
+    },
+    {
+     "max": 20,
+     "name": "flour sifter",
+     "price": 2,
+     "tile": 4158,
+     "type": "flour_sifter"
+    }
+   ],
+   "title": "the cook"
+  },
+  {
+   "buys": [
+    {
+     "name": "pitcher",
+     "price": 5,
+     "tile": 2518,
+     "type": "pitcher"
+    },
+    {
+     "name": "eggs",
+     "price": 1,
+     "tile": 2485,
+     "type": "eggs"
+    },
+    {
+     "name": "Pumpkin",
+     "price": 5,
+     "tile": 43456,
+     "type": "pumpkin"
+    },
+    {
+     "name": "onion",
+     "price": 1,
+     "tile": 43133,
+     "type": "onion"
+    },
+    {
+     "name": "squash",
+     "price": 1,
+     "tile": 3186,
+     "type": "squash"
+    },
+    {
+     "name": "lemons",
+     "price": 1,
+     "tile": 5929,
+     "type": "lemon"
+    },
+    {
+     "name": "limes",
+     "price": 1,
+     "tile": 5931,
+     "type": "lime"
+    },
+    {
+     "name": "sheaf of hay",
+     "price": 1,
+     "tile": 3894,
+     "type": "sheaf_of_hay"
+    }
+   ],
+   "class": "Farmer",
+   "era": "t2a",
+   "guild": "—",
+   "id": "farmer",
+   "restock_ms": 3600000,
+   "shops": [
+    "SBFarmer"
+   ],
+   "source": "research/06 §2.2.1 + §2.4.1",
+   "stock": [
+    {
+     "max": 20,
+     "name": "squash",
+     "price": 3,
+     "tile": 3186,
+     "type": "squash"
+    },
+    {
+     "max": 20,
+     "name": "onion",
+     "price": 3,
+     "tile": 43133,
+     "type": "onion"
+    },
+    {
+     "max": 20,
+     "name": "Pumpkin",
+     "price": 11,
+     "tile": 43456,
+     "type": "pumpkin"
+    },
+    {
+     "max": 20,
+     "name": "turnip",
+     "price": 6,
+     "tile": 3385,
+     "type": "turnip"
+    },
+    {
+     "max": 20,
+     "name": "eggs",
+     "price": 3,
+     "tile": 2485,
+     "type": "eggs"
+    },
+    {
+     "max": 20,
+     "name": "lemons",
+     "price": 3,
+     "tile": 5929,
+     "type": "lemon"
+    },
+    {
+     "max": 20,
+     "name": "limes",
+     "price": 3,
+     "tile": 5931,
+     "type": "lime"
+    },
+    {
+     "max": 20,
+     "name": "sheaf of hay",
+     "price": 2,
+     "tile": 3894,
+     "type": "sheaf_of_hay"
+    }
+   ],
+   "title": "the farmer"
+  },
+  {
+   "buys": [
+    {
+     "name": "fish",
+     "price": 1,
+     "tile": 2508,
+     "type": "fish"
+    },
+    {
+     "name": "small fish",
+     "price": 1,
+     "tile": 3542,
+     "type": "small_fish"
+    },
+    {
+     "name": "fishing pole",
+     "price": 7,
+     "tile": 3519,
+     "type": "fishing_pole"
+    }
+   ],
+   "class": "Fisherman",
+   "era": "t2a",
+   "guild": "FishermensGuild",
+   "id": "fisherman",
+   "restock_ms": 3600000,
+   "shops": [
+    "SBFisherman"
+   ],
+   "source": "research/06 §2.2.1 + §2.4.1",
+   "stock": [
+    {
+     "max": 20,
+     "name": "small fish",
+     "price": 3,
+     "tile": 3542,
+     "type": "small_fish"
+    },
+    {
+     "max": 80,
+     "name": "fish",
+     "price": 6,
+     "tile": 2508,
+     "type": "fish"
+    },
+    {
+     "max": 20,
+     "name": "fishing pole",
+     "price": 15,
+     "tile": 3519,
+     "type": "fishing_pole"
+    }
+   ],
+   "title": "the fisher"
+  },
+  {
+   "buys": [
+    {
+     "name": "mandrake root",
+     "price": 2,
+     "tile": 6365,
+     "type": "mandrake_root"
+    },
+    {
+     "name": "Garlic",
+     "price": 2,
+     "tile": 3972,
+     "type": "garlic"
+    },
+    {
+     "name": "Ginseng",
+     "price": 2,
+     "tile": 3973,
+     "type": "ginseng"
+    },
+    {
+     "name": "Nightshade",
+     "price": 2,
+     "tile": 3976,
+     "type": "nightshade"
+    },
+    {
+     "name": "Sulfurous Ash",
+     "price": 2,
+     "tile": 3980,
+     "type": "sulfurous_ash"
+    },
+    {
+     "name": "bottle",
+     "price": 3,
+     "tile": 3621,
+     "type": "bottle"
+    }
+   ],
+   "class": "Glassblower",
+   "era": "t2a",
+   "guild": "MagesGuild",
+   "id": "glassblower",
+   "restock_ms": 3600000,
+   "shops": [
+    "SBGlassblower",
+    "SBAlchemist"
+   ],
+   "source": "research/06 §2.2.1 + §2.4.1",
+   "stock": [
+    {
+     "max": 20,
+     "name": "Garlic",
+     "price": 3,
+     "tile": 3972,
+     "type": "garlic"
+    },
+    {
+     "max": 20,
+     "name": "Ginseng",
+     "price": 3,
+     "tile": 3973,
+     "type": "ginseng"
+    },
+    {
+     "max": 20,
+     "name": "mandrake root",
+     "price": 3,
+     "tile": 6365,
+     "type": "mandrake_root"
+    },
+    {
+     "max": 20,
+     "name": "Nightshade",
+     "price": 3,
+     "tile": 3976,
+     "type": "nightshade"
+    },
+    {
+     "max": 20,
+     "name": "Sulfurous Ash",
+     "price": 3,
+     "tile": 3980,
+     "type": "sulfurous_ash"
+    },
+    {
+     "max": 100,
+     "name": "bottle",
+     "price": 5,
+     "tile": 3621,
+     "type": "bottle"
+    },
+    {
+     "max": 100,
+     "name": "heating stand",
+     "price": 2,
+     "tile": 6217,
+     "type": "heating_stand"
+    }
+   ],
+   "title": "the alchemist"
+  },
+  {
+   "buys": [
+    {
+     "name": "board",
+     "price": 1,
+     "tile": 7790,
+     "type": "board"
+    },
+    {
+     "name": "iron ingot",
+     "price": 3,
+     "tile": 7151,
+     "type": "iron_ingot"
+    },
+    {
+     "name": "necklace",
+     "price": 13,
+     "tile": 4229,
+     "type": "necklace"
+    },
+    {
+     "name": "silver necklace",
+     "price": 10,
+     "tile": 7946,
+     "type": "silver_necklace"
+    },
+    {
+     "name": "beads",
+     "price": 13,
+     "tile": 4235,
+     "type": "beads"
+    }
+   ],
+   "class": "GolemCrafter",
+   "era": "t2a",
+   "guild": "—",
+   "id": "golemcrafter",
+   "restock_ms": 3600000,
+   "shops": [
+    "SBVagabond"
+   ],
+   "source": "research/06 §2.2.1 + §2.4.1",
+   "stock": [
+    {
+     "max": 20,
+     "name": "necklace",
+     "price": 26,
+     "tile": 4229,
+     "type": "necklace"
+    },
+    {
+     "max": 20,
+     "name": "beads",
+     "price": 27,
+     "tile": 4235,
+     "type": "beads"
+    },
+    {
+     "max": 20,
+     "name": "board",
+     "price": 3,
+     "tile": 7790,
+     "type": "board"
+    },
+    {
+     "max": 20,
+     "name": "iron ingot",
+     "price": 6,
+     "tile": 7151,
+     "type": "iron_ingot"
+    }
+   ],
+   "title": "the golem crafter"
+  },
+  {
+   "buys": [
+    {
+     "name": "arrow",
+     "price": 1,
+     "tile": 3903,
+     "type": "arrow"
+    },
+    {
+     "name": "backpack",
+     "price": 7,
+     "tile": 2482,
+     "type": "backpack"
+    },
+    {
+     "name": "pouch",
+     "price": 3,
+     "tile": 3705,
+     "type": "pouch"
+    },
+    {
+     "name": "bag",
+     "price": 3,
+     "tile": 3702,
+     "type": "bag"
+    },
+    {
+     "name": "candle",
+     "price": 3,
+     "tile": 2575,
+     "type": "candle"
+    },
+    {
+     "name": "torch",
+     "price": 4,
+     "tile": 2578,
+     "type": "torch"
+    },
+    {
+     "name": "lantern",
+     "price": 1,
+     "tile": 2581,
+     "type": "lantern"
+    },
+    {
+     "name": "lockpicks",
+     "price": 6,
+     "tile": 5373,
+     "type": "lockpick"
+    },
+    {
+     "name": "floppy hat",
+     "price": 3,
+     "tile": 5907,
+     "type": "floppy_hat"
+    },
+    {
+     "name": "cap",
+     "price": 5,
+     "tile": 5909,
+     "type": "cap"
+    },
+    {
+     "name": "tall straw hat",
+     "price": 4,
+     "tile": 5910,
+     "type": "tall_straw_hat"
+    },
+    {
+     "name": "straw hat",
+     "price": 3,
+     "tile": 5911,
+     "type": "straw_hat"
+    },
+    {
+     "name": "leather cap",
+     "price": 5,
+     "tile": 7609,
+     "type": "leather_cap"
+    },
+    {
+     "name": "feathered hat",
+     "price": 5,
+     "tile": 5914,
+     "type": "feathered_hat"
+    },
+    {
+     "name": "tricorne hat",
+     "price": 4,
+     "tile": 5915,
+     "type": "tricorne_hat"
+    },
+    {
+     "name": "bandana",
+     "price": 3,
+     "tile": 5439,
+     "type": "bandana"
+    },
+    {
+     "name": "bottle",
+     "price": 3,
+     "tile": 3621,
+     "type": "bottle"
+    },
+    {
+     "name": "wooden box",
+     "price": 7,
+     "tile": 2474,
+     "type": "wooden_box"
+    },
+    {
+     "name": "kindling",
+     "price": 1,
+     "tile": 3553,
+     "type": "kindling"
+    },
+    {
+     "name": "Beeswax",
+     "price": 1,
+     "tile": 5154,
+     "type": "beeswax"
+    },
+    {
+     "name": "necklace",
+     "price": 13,
+     "tile": 4229,
+     "type": "necklace"
+    },
+    {
+     "name": "silver necklace",
+     "price": 10,
+     "tile": 7946,
+     "type": "silver_necklace"
+    },
+    {
+     "name": "beads",
+     "price": 13,
+     "tile": 4235,
+     "type": "beads"
+    }
+   ],
+   "class": "GypsyMaiden",
+   "era": "t2a",
+   "guild": "—",
+   "id": "gypsymaiden",
+   "restock_ms": 3600000,
+   "shops": [
+    "SBProvisioner"
+   ],
+   "source": "research/06 §2.2.1 + §2.4.1",
+   "stock": [
+    {
+     "max": 20,
+     "name": "arrow",
+     "price": 2,
+     "tile": 3903,
+     "type": "arrow"
+    },
+    {
+     "max": 20,
+     "name": "backpack",
+     "price": 15,
+     "tile": 2482,
+     "type": "backpack"
+    },
+    {
+     "max": 20,
+     "name": "pouch",
+     "price": 6,
+     "tile": 3705,
+     "type": "pouch"
+    },
+    {
+     "max": 20,
+     "name": "bag",
+     "price": 6,
+     "tile": 3702,
+     "type": "bag"
+    },
+    {
+     "max": 20,
+     "name": "candle",
+     "price": 6,
+     "tile": 2575,
+     "type": "candle"
+    },
+    {
+     "max": 20,
+     "name": "torch",
+     "price": 8,
+     "tile": 2578,
+     "type": "torch"
+    },
+    {
+     "max": 20,
+     "name": "lantern",
+     "price": 2,
+     "tile": 2581,
+     "type": "lantern"
+    },
+    {
+     "max": 20,
+     "name": "oil flask",
+     "price": 10,
+     "tile": 7193,
+     "type": "oil_flask"
+    },
+    {
+     "max": 20,
+     "name": "lockpicks",
+     "price": 12,
+     "tile": 5373,
+     "type": "lockpick"
+    },
+    {
+     "max": 20,
+     "name": "floppy hat",
+     "price": 7,
+     "tile": 5907,
+     "type": "floppy_hat"
+    },
+    {
+     "max": 20,
+     "name": "cap",
+     "price": 10,
+     "tile": 5909,
+     "type": "cap"
+    },
+    {
+     "max": 20,
+     "name": "tall straw hat",
+     "price": 8,
+     "tile": 5910,
+     "type": "tall_straw_hat"
+    },
+    {
+     "max": 20,
+     "name": "straw hat",
+     "price": 7,
+     "tile": 5911,
+     "type": "straw_hat"
+    },
+    {
+     "max": 20,
+     "name": "leather cap",
+     "price": 10,
+     "tile": 7609,
+     "type": "leather_cap"
+    },
+    {
+     "max": 20,
+     "name": "feathered hat",
+     "price": 10,
+     "tile": 5914,
+     "type": "feathered_hat"
+    },
+    {
+     "max": 20,
+     "name": "tricorne hat",
+     "price": 8,
+     "tile": 5915,
+     "type": "tricorne_hat"
+    },
+    {
+     "max": 20,
+     "name": "bandana",
+     "price": 6,
+     "tile": 5439,
+     "type": "bandana"
+    },
+    {
+     "max": 20,
+     "name": "Beeswax",
+     "price": 1,
+     "tile": 5154,
+     "type": "beeswax"
+    },
+    {
+     "max": 20,
+     "name": "Garlic",
+     "price": 3,
+     "tile": 3972,
+     "type": "garlic"
+    },
+    {
+     "max": 20,
+     "name": "Ginseng",
+     "price": 3,
+     "tile": 3973,
+     "type": "ginseng"
+    },
+    {
+     "max": 20,
+     "name": "bottle",
+     "price": 5,
+     "tile": 3621,
+     "type": "bottle"
+    },
+    {
+     "max": 20,
+     "name": "wooden box",
+     "price": 14,
+     "tile": 2474,
+     "type": "wooden_box"
+    },
+    {
+     "max": 20,
+     "name": "bedroll",
+     "price": 5,
+     "tile": 2645,
+     "type": "bedroll"
+    },
+    {
+     "max": 20,
+     "name": "kindling",
+     "price": 2,
+     "tile": 3553,
+     "type": "kindling"
+    }
+   ],
+   "title": "the gypsy maiden"
+  },
+  {
+   "buys": [
+    {
+     "name": "Garlic",
+     "price": 2,
+     "tile": 3972,
+     "type": "garlic"
+    },
+    {
+     "name": "Ginseng",
+     "price": 2,
+     "tile": 3973,
+     "type": "ginseng"
+    }
+   ],
+   "class": "Healer",
+   "era": "t2a",
+   "guild": "—",
+   "id": "healer",
+   "restock_ms": 3600000,
+   "shops": [
+    "SBHealer"
+   ],
+   "source": "research/06 §2.2.1 + §2.4.1",
+   "stock": [
+    {
+     "max": 20,
+     "name": "Ginseng",
+     "price": 3,
+     "tile": 3973,
+     "type": "ginseng"
+    },
+    {
+     "max": 20,
+     "name": "Garlic",
+     "price": 3,
+     "tile": 3972,
+     "type": "garlic"
+    }
+   ],
+   "title": "— (`BaseHealer`)"
+  },
+  {
+   "buys": [
+    {
+     "name": "mandrake root",
+     "price": 2,
+     "tile": 6365,
+     "type": "mandrake_root"
+    },
+    {
+     "name": "Garlic",
+     "price": 2,
+     "tile": 3972,
+     "type": "garlic"
+    },
+    {
+     "name": "Ginseng",
+     "price": 2,
+     "tile": 3973,
+     "type": "ginseng"
+    },
+    {
+     "name": "Nightshade",
+     "price": 2,
+     "tile": 3976,
+     "type": "nightshade"
+    },
+    {
+     "name": "bottle",
+     "price": 3,
+     "tile": 3621,
+     "type": "bottle"
+    }
+   ],
+   "class": "Herbalist",
+   "era": "t2a",
+   "guild": "MagesGuild",
+   "id": "herbalist",
+   "restock_ms": 3600000,
+   "shops": [
+    "SBHerbalist"
+   ],
+   "source": "research/06 §2.2.1 + §2.4.1",
+   "stock": [
+    {
+     "max": 20,
+     "name": "Ginseng",
+     "price": 3,
+     "tile": 3973,
+     "type": "ginseng"
+    },
+    {
+     "max": 20,
+     "name": "Garlic",
+     "price": 3,
+     "tile": 3972,
+     "type": "garlic"
+    },
+    {
+     "max": 20,
+     "name": "mandrake root",
+     "price": 3,
+     "tile": 6365,
+     "type": "mandrake_root"
+    },
+    {
+     "max": 20,
+     "name": "Nightshade",
+     "price": 3,
+     "tile": 3976,
+     "type": "nightshade"
+    },
+    {
+     "max": 20,
+     "name": "bottle",
+     "price": 5,
+     "tile": 3621,
+     "type": "bottle"
+    }
+   ],
+   "title": "the herbalist"
+  },
+  {
+   "buys": [
+    {
+     "name": "mandrake root",
+     "price": 2,
+     "tile": 6365,
+     "type": "mandrake_root"
+    },
+    {
+     "name": "Garlic",
+     "price": 2,
+     "tile": 3972,
+     "type": "garlic"
+    },
+    {
+     "name": "Ginseng",
+     "price": 2,
+     "tile": 3973,
+     "type": "ginseng"
+    },
+    {
+     "name": "Nightshade",
+     "price": 2,
+     "tile": 3976,
+     "type": "nightshade"
+    },
+    {
+     "name": "Sulfurous Ash",
+     "price": 2,
+     "tile": 3980,
+     "type": "sulfurous_ash"
+    },
+    {
+     "name": "recall rune",
+     "price": 8,
+     "tile": 7956,
+     "type": "recall_rune"
+    },
+    {
+     "name": "spellbook",
+     "price": 9,
+     "tile": 3643,
+     "type": "spellbook"
+    }
+   ],
+   "class": "HolyMage",
+   "era": "t2a",
+   "guild": "—",
+   "id": "holymage",
+   "restock_ms": 3600000,
+   "shops": [
+    "SBHolyMage"
+   ],
+   "source": "research/06 §2.2.1 + §2.4.1",
+   "stock": [
+    {
+     "max": 10,
+     "name": "spellbook",
+     "price": 18,
+     "tile": 3643,
+     "type": "spellbook"
+    },
+    {
+     "max": 10,
+     "name": "recall rune",
+     "price": 15,
+     "tile": 7956,
+     "type": "recall_rune"
+    },
+    {
+     "max": 20,
+     "name": "Garlic",
+     "price": 3,
+     "tile": 3972,
+     "type": "garlic"
+    },
+    {
+     "max": 20,
+     "name": "Ginseng",
+     "price": 3,
+     "tile": 3973,
+     "type": "ginseng"
+    },
+    {
+     "max": 20,
+     "name": "mandrake root",
+     "price": 3,
+     "tile": 6365,
+     "type": "mandrake_root"
+    },
+    {
+     "max": 20,
+     "name": "Nightshade",
+     "price": 3,
+     "tile": 3976,
+     "type": "nightshade"
+    },
+    {
+     "max": 20,
+     "name": "Sulfurous Ash",
+     "price": 3,
+     "tile": 3980,
+     "type": "sulfurous_ash"
+    }
+   ],
+   "title": "the Holy Mage"
+  },
+  {
+   "buys": [
+    {
+     "name": "pitcher",
+     "price": 5,
+     "tile": 2518,
+     "type": "pitcher"
+    },
+    {
+     "name": "banana",
+     "price": 1,
+     "tile": 5917,
+     "type": "banana"
+    },
+    {
+     "name": "torch",
+     "price": 3,
+     "tile": 2578,
+     "type": "torch"
+    },
+    {
+     "name": "candle",
+     "price": 3,
+     "tile": 2575,
+     "type": "candle"
+    },
+    {
+     "name": "Beeswax",
+     "price": 1,
+     "tile": 5154,
+     "type": "beeswax"
+    }
+   ],
+   "class": "InnKeeper",
+   "era": "t2a",
+   "guild": "—",
+   "id": "innkeeper",
+   "restock_ms": 3600000,
+   "shops": [
+    "SBInnKeeper"
+   ],
+   "source": "research/06 §2.2.1 + §2.4.1",
+   "stock": [
+    {
+     "max": 20,
+     "name": "banana",
+     "price": 2,
+     "tile": 5917,
+     "type": "banana"
+    },
+    {
+     "max": 20,
+     "name": "torch",
+     "price": 7,
+     "tile": 2578,
+     "type": "torch"
+    },
+    {
+     "max": 20,
+     "name": "candle",
+     "price": 6,
+     "tile": 2575,
+     "type": "candle"
+    },
+    {
+     "max": 20,
+     "name": "Beeswax",
+     "price": 1,
+     "tile": 5154,
+     "type": "beeswax"
+    },
+    {
+     "max": 20,
+     "name": "backpack",
+     "price": 15,
+     "tile": 2482,
+     "type": "backpack"
+    }
+   ],
+   "title": "the innkeeper"
+  },
+  {
+   "buys": [
+    {
+     "name": "battle axe",
+     "price": 13,
+     "tile": 3911,
+     "type": "battle_axe"
+    },
+    {
+     "name": "double axe",
+     "price": 26,
+     "tile": 3915,
+     "type": "double_axe"
+    },
+    {
+     "name": "large battle axe",
+     "price": 16,
+     "tile": 5114,
+     "type": "large_battle_axe"
+    },
+    {
+     "name": "pickaxe",
+     "price": 11,
+     "tile": 3717,
+     "type": "pickaxe"
+    },
+    {
+     "name": "two handed axe",
+     "price": 16,
+     "tile": 5186,
+     "type": "two_handed_axe"
+    },
+    {
+     "name": "war axe",
+     "price": 14,
+     "tile": 5039,
+     "type": "war_axe"
+    },
+    {
+     "name": "axe",
+     "price": 20,
+     "tile": 3913,
+     "type": "axe"
+    },
+    {
+     "name": "butcher knife",
+     "price": 7,
+     "tile": 5110,
+     "type": "butcher_knife"
+    },
+    {
+     "name": "cleaver",
+     "price": 7,
+     "tile": 3778,
+     "type": "cleaver"
+    },
+    {
+     "name": "dagger",
+     "price": 10,
+     "tile": 3921,
+     "type": "dagger"
+    },
+    {
+     "name": "skinning knife",
+     "price": 7,
+     "tile": 3780,
+     "type": "skinning_knife"
+    },
+    {
+     "name": "club",
+     "price": 8,
+     "tile": 5043,
+     "type": "club"
+    },
+    {
+     "name": "hammer pick",
+     "price": 13,
+     "tile": 5180,
+     "type": "hammer_pick"
+    },
+    {
+     "name": "mace",
+     "price": 14,
+     "tile": 3932,
+     "type": "mace"
+    },
+    {
+     "name": "maul",
+     "price": 10,
+     "tile": 5178,
+     "type": "maul"
+    },
+    {
+     "name": "war hammer",
+     "price": 12,
+     "tile": 5176,
+     "type": "war_hammer"
+    },
+    {
+     "name": "war mace",
+     "price": 15,
+     "tile": 5126,
+     "type": "war_mace"
+    },
+    {
+     "name": "tongs",
+     "price": 7,
+     "tile": 4027,
+     "type": "tongs"
+    },
+    {
+     "name": "iron ingot",
+     "price": 4,
+     "tile": 7151,
+     "type": "iron_ingot"
+    },
+    {
+     "name": "bardiche",
+     "price": 30,
+     "tile": 3917,
+     "type": "bardiche"
+    },
+    {
+     "name": "halberd",
+     "price": 21,
+     "tile": 5182,
+     "type": "halberd"
+    },
+    {
+     "name": "spear",
+     "price": 15,
+     "tile": 9594,
+     "type": "spear"
+    },
+    {
+     "name": "pitchfork",
+     "price": 9,
+     "tile": 3719,
+     "type": "pitchfork"
+    },
+    {
+     "name": "short spear",
+     "price": 11,
+     "tile": 5122,
+     "type": "short_spear"
+    },
+    {
+     "name": "broadsword",
+     "price": 17,
+     "tile": 3934,
+     "type": "broadsword"
+    },
+    {
+     "name": "cutlass",
+     "price": 12,
+     "tile": 5184,
+     "type": "cutlass"
+    },
+    {
+     "name": "katana",
+     "price": 16,
+     "tile": 5118,
+     "type": "katana"
+    },
+    {
+     "name": "kryss",
+     "price": 16,
+     "tile": 5120,
+     "type": "kryss"
+    },
+    {
+     "name": "longsword",
+     "price": 27,
+     "tile": 3936,
+     "type": "longsword"
+    },
+    {
+     "name": "scimitar",
+     "price": 18,
+     "tile": 5045,
+     "type": "scimitar"
+    },
+    {
+     "name": "viking sword",
+     "price": 27,
+     "tile": 5049,
+     "type": "viking_sword"
+    },
+    {
+     "name": "scythe",
+     "price": 19,
+     "tile": 9914,
+     "type": "scythe"
+    },
+    {
+     "name": "bone harvester",
+     "price": 17,
+     "tile": 9915,
+     "type": "bone_harvester"
+    },
+    {
+     "name": "scepter",
+     "price": 18,
+     "tile": 9916,
+     "type": "scepter"
+    },
+    {
+     "name": "bladed staff",
+     "price": 16,
+     "tile": 9917,
+     "type": "bladed_staff"
+    },
+    {
+     "name": "pike",
+     "price": 19,
+     "tile": 9918,
+     "type": "pike"
+    },
+    {
+     "name": "double bladed staff",
+     "price": 17,
+     "tile": 9919,
+     "type": "double_bladed_staff"
+    },
+    {
+     "name": "lance",
+     "price": 17,
+     "tile": 9920,
+     "type": "lance"
+    },
+    {
+     "name": "crescent blade",
+     "price": 18,
+     "tile": 9921,
+     "type": "crescent_blade"
+    },
+    {
+     "name": "buckler",
+     "price": 25,
+     "tile": 7027,
+     "type": "buckler"
+    },
+    {
+     "name": "bronze shield",
+     "price": 33,
+     "tile": 7026,
+     "type": "bronze_shield"
+    },
+    {
+     "name": "metal shield",
+     "price": 60,
+     "tile": 7035,
+     "type": "metal_shield"
+    },
+    {
+     "name": "heater shield",
+     "price": 115,
+     "tile": 7030,
+     "type": "heater_shield"
+    },
+    {
+     "name": "bascinet",
+     "price": 9,
+     "tile": 5134,
+     "type": "bascinet"
+    },
+    {
+     "name": "close helm",
+     "price": 9,
+     "tile": 5129,
+     "type": "close_helm"
+    },
+    {
+     "name": "helmet",
+     "price": 9,
+     "tile": 5130,
+     "type": "helmet"
+    },
+    {
+     "name": "norse helm",
+     "price": 9,
+     "tile": 5132,
+     "type": "norse_helm"
+    },
+    {
+     "name": "plate helm",
+     "price": 10,
+     "tile": 5138,
+     "type": "plate_helm"
+    },
+    {
+     "name": "plate gorget",
+     "price": 52,
+     "tile": 9803,
+     "type": "plate_gorget"
+    },
+    {
+     "name": "ringmail gloves",
+     "price": 26,
+     "tile": 5099,
+     "type": "ringmail_gloves"
+    },
+    {
+     "name": "studded gloves",
+     "price": 39,
+     "tile": 5077,
+     "type": "studded_gloves"
+    },
+    {
+     "name": "studded gorget",
+     "price": 36,
+     "tile": 5078,
+     "type": "studded_gorget"
+    },
+    {
+     "name": "Leather Gloves",
+     "price": 30,
+     "tile": 5062,
+     "type": "leather_gloves"
+    },
+    {
+     "name": "leather gorget",
+     "price": 37,
+     "tile": 5063,
+     "type": "leather_gorget"
+    },
+    {
+     "name": "leather cap",
+     "price": 5,
+     "tile": 7609,
+     "type": "leather_cap"
+    },
+    {
+     "name": "leather shorts",
+     "price": 14,
+     "tile": 7168,
+     "type": "leather_shorts"
+    },
+    {
+     "name": "leather skirt",
+     "price": 11,
+     "tile": 7176,
+     "type": "leather_skirt"
+    }
+   ],
+   "class": "IronWorker",
+   "era": "t2a",
+   "guild": "—",
+   "id": "ironworker",
+   "restock_ms": 3600000,
+   "shops": [
+    "SBAxeWeapon",
+    "SBKnifeWeapon",
+    "SBMaceWeapon",
+    "SBSmithTools",
+    "SBPoleArmWeapon",
+    "SBSpearForkWeapon",
+    "SBSwordWeapon",
+    "SBMetalShields",
+    "SBHelmetArmor",
+    "SBPlateArmor",
+    "SBChainmailArmor",
+    "SBRingmailArmor",
+    "SBStuddedArmor",
+    "SBLeatherArmor"
+   ],
+   "source": "research/06 §2.2.1 + §2.4.1",
+   "stock": [
+    {
+     "max": 20,
+     "name": "battle axe",
+     "price": 26,
+     "tile": 3911,
+     "type": "battle_axe"
+    },
+    {
+     "max": 20,
+     "name": "two handed axe",
+     "price": 32,
+     "tile": 5186,
+     "type": "two_handed_axe"
+    },
+    {
+     "max": 20,
+     "name": "axe",
+     "price": 40,
+     "tile": 3913,
+     "type": "axe"
+    },
+    {
+     "max": 20,
+     "name": "double axe",
+     "price": 52,
+     "tile": 3915,
+     "type": "double_axe"
+    },
+    {
+     "max": 20,
+     "name": "pickaxe",
+     "price": 22,
+     "tile": 3717,
+     "type": "pickaxe"
+    },
+    {
+     "max": 20,
+     "name": "large battle axe",
+     "price": 33,
+     "tile": 5114,
+     "type": "large_battle_axe"
+    },
+    {
+     "max": 20,
+     "name": "war axe",
+     "price": 29,
+     "tile": 5039,
+     "type": "war_axe"
+    },
+    {
+     "max": 20,
+     "name": "butcher knife",
+     "price": 14,
+     "tile": 5110,
+     "type": "butcher_knife"
+    },
+    {
+     "max": 20,
+     "name": "dagger",
+     "price": 21,
+     "tile": 3921,
+     "type": "dagger"
+    },
+    {
+     "max": 20,
+     "name": "cleaver",
+     "price": 15,
+     "tile": 3778,
+     "type": "cleaver"
+    },
+    {
+     "max": 20,
+     "name": "skinning knife",
+     "price": 14,
+     "tile": 3780,
+     "type": "skinning_knife"
+    },
+    {
+     "max": 20,
+     "name": "hammer pick",
+     "price": 26,
+     "tile": 5180,
+     "type": "hammer_pick"
+    },
+    {
+     "max": 20,
+     "name": "club",
+     "price": 16,
+     "tile": 5043,
+     "type": "club"
+    },
+    {
+     "max": 20,
+     "name": "mace",
+     "price": 28,
+     "tile": 3932,
+     "type": "mace"
+    },
+    {
+     "max": 20,
+     "name": "maul",
+     "price": 21,
+     "tile": 5178,
+     "type": "maul"
+    },
+    {
+     "max": 20,
+     "name": "war hammer",
+     "price": 25,
+     "tile": 5176,
+     "type": "war_hammer"
+    },
+    {
+     "max": 20,
+     "name": "war mace",
+     "price": 31,
+     "tile": 5126,
+     "type": "war_mace"
+    },
+    {
+     "max": 16,
+     "name": "iron ingot",
+     "price": 5,
+     "tile": 7151,
+     "type": "iron_ingot"
+    },
+    {
+     "max": 14,
+     "name": "tongs",
+     "price": 13,
+     "tile": 4027,
+     "type": "tongs"
+    },
+    {
+     "max": 20,
+     "name": "bardiche",
+     "price": 60,
+     "tile": 3917,
+     "type": "bardiche"
+    },
+    {
+     "max": 20,
+     "name": "halberd",
+     "price": 42,
+     "tile": 5182,
+     "type": "halberd"
+    },
+    {
+     "max": 20,
+     "name": "pitchfork",
+     "price": 19,
+     "tile": 3719,
+     "type": "pitchfork"
+    },
+    {
+     "max": 20,
+     "name": "short spear",
+     "price": 23,
+     "tile": 5122,
+     "type": "short_spear"
+    },
+    {
+     "max": 20,
+     "name": "spear",
+     "price": 31,
+     "tile": 9594,
+     "type": "spear"
+    },
+    {
+     "max": 20,
+     "name": "cutlass",
+     "price": 24,
+     "tile": 5184,
+     "type": "cutlass"
+    },
+    {
+     "max": 20,
+     "name": "katana",
+     "price": 33,
+     "tile": 5118,
+     "type": "katana"
+    },
+    {
+     "max": 20,
+     "name": "kryss",
+     "price": 32,
+     "tile": 5120,
+     "type": "kryss"
+    },
+    {
+     "max": 20,
+     "name": "broadsword",
+     "price": 35,
+     "tile": 3934,
+     "type": "broadsword"
+    },
+    {
+     "max": 20,
+     "name": "longsword",
+     "price": 55,
+     "tile": 3936,
+     "type": "longsword"
+    },
+    {
+     "max": 20,
+     "name": "viking sword",
+     "price": 55,
+     "tile": 5049,
+     "type": "viking_sword"
+    },
+    {
+     "max": 20,
+     "name": "scimitar",
+     "price": 36,
+     "tile": 5045,
+     "type": "scimitar"
+    },
+    {
+     "max": 20,
+     "name": "bone harvester",
+     "price": 35,
+     "tile": 9915,
+     "type": "bone_harvester"
+    },
+    {
+     "max": 20,
+     "name": "crescent blade",
+     "price": 37,
+     "tile": 9921,
+     "type": "crescent_blade"
+    },
+    {
+     "max": 20,
+     "name": "double bladed staff",
+     "price": 35,
+     "tile": 9919,
+     "type": "double_bladed_staff"
+    },
+    {
+     "max": 20,
+     "name": "lance",
+     "price": 34,
+     "tile": 9920,
+     "type": "lance"
+    },
+    {
+     "max": 20,
+     "name": "pike",
+     "price": 39,
+     "tile": 9918,
+     "type": "pike"
+    },
+    {
+     "max": 20,
+     "name": "scythe",
+     "price": 39,
+     "tile": 9914,
+     "type": "scythe"
+    },
+    {
+     "max": 20,
+     "name": "bronze shield",
+     "price": 66,
+     "tile": 7026,
+     "type": "bronze_shield"
+    },
+    {
+     "max": 20,
+     "name": "buckler",
+     "price": 50,
+     "tile": 7027,
+     "type": "buckler"
+    },
+    {
+     "max": 20,
+     "name": "heater shield",
+     "price": 231,
+     "tile": 7030,
+     "type": "heater_shield"
+    },
+    {
+     "max": 20,
+     "name": "metal shield",
+     "price": 121,
+     "tile": 7035,
+     "type": "metal_shield"
+    },
+    {
+     "max": 20,
+     "name": "plate helm",
+     "price": 21,
+     "tile": 5138,
+     "type": "plate_helm"
+    },
+    {
+     "max": 20,
+     "name": "close helm",
+     "price": 18,
+     "tile": 5129,
+     "type": "close_helm"
+    },
+    {
+     "max": 20,
+     "name": "helmet",
+     "price": 31,
+     "tile": 5130,
+     "type": "helmet"
+    },
+    {
+     "max": 20,
+     "name": "norse helm",
+     "price": 18,
+     "tile": 5132,
+     "type": "norse_helm"
+    },
+    {
+     "max": 20,
+     "name": "bascinet",
+     "price": 18,
+     "tile": 5134,
+     "type": "bascinet"
+    },
+    {
+     "max": 20,
+     "name": "plate gorget",
+     "price": 104,
+     "tile": 9803,
+     "type": "plate_gorget"
+    },
+    {
+     "max": 20,
+     "name": "ringmail gloves",
+     "price": 93,
+     "tile": 5099,
+     "type": "ringmail_gloves"
+    },
+    {
+     "max": 20,
+     "name": "studded gloves",
+     "price": 79,
+     "tile": 5077,
+     "type": "studded_gloves"
+    },
+    {
+     "max": 20,
+     "name": "studded gorget",
+     "price": 73,
+     "tile": 5078,
+     "type": "studded_gorget"
+    },
+    {
+     "max": 20,
+     "name": "Leather Gloves",
+     "price": 60,
+     "tile": 5062,
+     "type": "leather_gloves"
+    },
+    {
+     "max": 20,
+     "name": "leather gorget",
+     "price": 74,
+     "tile": 5063,
+     "type": "leather_gorget"
+    },
+    {
+     "max": 20,
+     "name": "leather cap",
+     "price": 10,
+     "tile": 7609,
+     "type": "leather_cap"
+    },
+    {
+     "max": 20,
+     "name": "leather shorts",
+     "price": 86,
+     "tile": 7168,
+     "type": "leather_shorts"
+    },
+    {
+     "max": 20,
+     "name": "leather skirt",
+     "price": 87,
+     "tile": 7176,
+     "type": "leather_skirt"
+    }
+   ],
+   "title": "the iron worker"
+  },
+  {
+   "buys": [
+    {
+     "name": "necklace",
+     "price": 13,
+     "tile": 4229,
+     "type": "necklace"
+    },
+    {
+     "name": "silver necklace",
+     "price": 10,
+     "tile": 7946,
+     "type": "silver_necklace"
+    },
+    {
+     "name": "beads",
+     "price": 13,
+     "tile": 4235,
+     "type": "beads"
+    }
+   ],
+   "class": "Jeweler",
+   "era": "t2a",
+   "guild": "—",
+   "id": "jeweler",
+   "restock_ms": 3600000,
+   "shops": [
+    "SBJewel"
+   ],
+   "source": "research/06 §2.2.1 + §2.4.1",
+   "stock": [
+    {
+     "max": 20,
+     "name": "necklace",
+     "price": 26,
+     "tile": 4229,
+     "type": "necklace"
+    },
+    {
+     "max": 20,
+     "name": "beads",
+     "price": 27,
+     "tile": 4235,
+     "type": "beads"
+    }
+   ],
+   "title": "the jeweler"
+  },
+  {
+   "buys": [
+    {
+     "name": "Leather Gloves",
+     "price": 30,
+     "tile": 5062,
+     "type": "leather_gloves"
+    },
+    {
+     "name": "leather gorget",
+     "price": 37,
+     "tile": 5063,
+     "type": "leather_gorget"
+    },
+    {
+     "name": "leather cap",
+     "price": 5,
+     "tile": 7609,
+     "type": "leather_cap"
+    },
+    {
+     "name": "leather shorts",
+     "price": 14,
+     "tile": 7168,
+     "type": "leather_shorts"
+    },
+    {
+     "name": "leather skirt",
+     "price": 11,
+     "tile": 7176,
+     "type": "leather_skirt"
+    },
+    {
+     "name": "studded gloves",
+     "price": 39,
+     "tile": 5077,
+     "type": "studded_gloves"
+    },
+    {
+     "name": "studded gorget",
+     "price": 36,
+     "tile": 5078,
+     "type": "studded_gorget"
+    },
+    {
+     "name": "thigh boots",
+     "price": 28,
+     "tile": 5905,
+     "type": "thigh_boots"
+    }
+   ],
+   "class": "LeatherWorker",
+   "era": "t2a",
+   "guild": "—",
+   "id": "leatherworker",
+   "restock_ms": 3600000,
+   "shops": [
+    "SBLeatherArmor",
+    "SBStuddedArmor",
+    "SBLeatherWorker"
+   ],
+   "source": "research/06 §2.2.1 + §2.4.1",
+   "stock": [
+    {
+     "max": 20,
+     "name": "Leather Gloves",
+     "price": 60,
+     "tile": 5062,
+     "type": "leather_gloves"
+    },
+    {
+     "max": 20,
+     "name": "leather gorget",
+     "price": 74,
+     "tile": 5063,
+     "type": "leather_gorget"
+    },
+    {
+     "max": 20,
+     "name": "leather cap",
+     "price": 10,
+     "tile": 7609,
+     "type": "leather_cap"
+    },
+    {
+     "max": 20,
+     "name": "leather shorts",
+     "price": 86,
+     "tile": 7168,
+     "type": "leather_shorts"
+    },
+    {
+     "max": 20,
+     "name": "leather skirt",
+     "price": 87,
+     "tile": 7176,
+     "type": "leather_skirt"
+    },
+    {
+     "max": 20,
+     "name": "studded gloves",
+     "price": 79,
+     "tile": 5077,
+     "type": "studded_gloves"
+    },
+    {
+     "max": 20,
+     "name": "studded gorget",
+     "price": 73,
+     "tile": 5078,
+     "type": "studded_gorget"
+    },
+    {
+     "max": 10,
+     "name": "thigh boots",
+     "price": 56,
+     "tile": 5905,
+     "type": "thigh_boots"
+    }
+   ],
+   "title": "the leather worker"
+  },
+  {
+   "buys": [
+    {
+     "name": "mandrake root",
+     "price": 2,
+     "tile": 6365,
+     "type": "mandrake_root"
+    },
+    {
+     "name": "Garlic",
+     "price": 2,
+     "tile": 3972,
+     "type": "garlic"
+    },
+    {
+     "name": "Ginseng",
+     "price": 2,
+     "tile": 3973,
+     "type": "ginseng"
+    },
+    {
+     "name": "Nightshade",
+     "price": 2,
+     "tile": 3976,
+     "type": "nightshade"
+    },
+    {
+     "name": "Sulfurous Ash",
+     "price": 2,
+     "tile": 3980,
+     "type": "sulfurous_ash"
+    },
+    {
+     "name": "Daemon Blood",
+     "price": 3,
+     "tile": 3965,
+     "type": "daemon_blood"
+    },
+    {
+     "name": "Pig Iron",
+     "price": 2,
+     "tile": 3978,
+     "type": "pig_iron"
+    },
+    {
+     "name": "Nox Crystal",
+     "price": 3,
+     "tile": 3982,
+     "type": "nox_crystal"
+    },
+    {
+     "name": "Grave Dust",
+     "price": 1,
+     "tile": 3983,
+     "type": "grave_dust"
+    },
+    {
+     "name": "recall rune",
+     "price": 13,
+     "tile": 7956,
+     "type": "recall_rune"
+    },
+    {
+     "name": "spellbook",
+     "price": 25,
+     "tile": 3643,
+     "type": "spellbook"
+    }
+   ],
+   "class": "Mage",
+   "era": "t2a",
+   "guild": "MagesGuild",
+   "id": "mage",
+   "restock_ms": 3600000,
+   "shops": [
+    "SBMage"
+   ],
+   "source": "research/06 §2.2.1 + §2.4.1",
+   "stock": [
+    {
+     "max": 10,
+     "name": "spellbook",
+     "price": 18,
+     "tile": 3643,
+     "type": "spellbook"
+    },
+    {
+     "max": 10,
+     "name": "recall rune",
+     "price": 15,
+     "tile": 7956,
+     "type": "recall_rune"
+    },
+    {
+     "max": 20,
+     "name": "Garlic",
+     "price": 3,
+     "tile": 3972,
+     "type": "garlic"
+    },
+    {
+     "max": 20,
+     "name": "Ginseng",
+     "price": 3,
+     "tile": 3973,
+     "type": "ginseng"
+    },
+    {
+     "max": 20,
+     "name": "mandrake root",
+     "price": 3,
+     "tile": 6365,
+     "type": "mandrake_root"
+    },
+    {
+     "max": 20,
+     "name": "Nightshade",
+     "price": 3,
+     "tile": 3976,
+     "type": "nightshade"
+    },
+    {
+     "max": 20,
+     "name": "Sulfurous Ash",
+     "price": 3,
+     "tile": 3980,
+     "type": "sulfurous_ash"
+    },
+    {
+     "max": 999,
+     "name": "Daemon Blood",
+     "price": 6,
+     "tile": 3965,
+     "type": "daemon_blood"
+    },
+    {
+     "max": 999,
+     "name": "Pig Iron",
+     "price": 5,
+     "tile": 3978,
+     "type": "pig_iron"
+    },
+    {
+     "max": 999,
+     "name": "Nox Crystal",
+     "price": 6,
+     "tile": 3982,
+     "type": "nox_crystal"
+    },
+    {
+     "max": 999,
+     "name": "Grave Dust",
+     "price": 3,
+     "tile": 3983,
+     "type": "grave_dust"
+    }
+   ],
+   "title": "the mage"
+  },
+  {
+   "buys": [
+    {
+     "name": "sheaf of hay",
+     "price": 1,
+     "tile": 3894,
+     "type": "sheaf_of_hay"
+    }
+   ],
+   "class": "Miller",
+   "era": "t2a",
+   "guild": "—",
+   "id": "miller",
+   "restock_ms": 3600000,
+   "shops": [
+    "SBMiller"
+   ],
+   "source": "research/06 §2.2.1 + §2.4.1",
+   "stock": [
+    {
+     "max": 20,
+     "name": "sheaf of hay",
+     "price": 2,
+     "tile": 3894,
+     "type": "sheaf_of_hay"
+    }
+   ],
+   "title": "the miller"
+  },
+  {
+   "buys": [
+    {
+     "name": "pickaxe",
+     "price": 12,
+     "tile": 3717,
+     "type": "pickaxe"
+    },
+    {
+     "name": "shovel",
+     "price": 6,
+     "tile": 3897,
+     "type": "shovel"
+    },
+    {
+     "name": "lantern",
+     "price": 1,
+     "tile": 2581,
+     "type": "lantern"
+    },
+    {
+     "name": "oil flask",
+     "price": 4,
+     "tile": 7193,
+     "type": "oil_flask"
+    },
+    {
+     "name": "torch",
+     "price": 3,
+     "tile": 2578,
+     "type": "torch"
+    },
+    {
+     "name": "bag",
+     "price": 3,
+     "tile": 3702,
+     "type": "bag"
+    },
+    {
+     "name": "candle",
+     "price": 3,
+     "tile": 2575,
+     "type": "candle"
+    }
+   ],
+   "class": "Miner",
+   "era": "t2a",
+   "guild": "—",
+   "id": "miner",
+   "restock_ms": 3600000,
+   "shops": [
+    "SBMiner"
+   ],
+   "source": "research/06 §2.2.1 + §2.4.1",
+   "stock": [
+    {
+     "max": 20,
+     "name": "bag",
+     "price": 6,
+     "tile": 3702,
+     "type": "bag"
+    },
+    {
+     "max": 10,
+     "name": "candle",
+     "price": 6,
+     "tile": 2575,
+     "type": "candle"
+    },
+    {
+     "max": 10,
+     "name": "torch",
+     "price": 8,
+     "tile": 2578,
+     "type": "torch"
+    },
+    {
+     "max": 10,
+     "name": "lantern",
+     "price": 2,
+     "tile": 2581,
+     "type": "lantern"
+    },
+    {
+     "max": 10,
+     "name": "oil flask",
+     "price": 8,
+     "tile": 7193,
+     "type": "oil_flask"
+    },
+    {
+     "max": 10,
+     "name": "pickaxe",
+     "price": 25,
+     "tile": 3717,
+     "type": "pickaxe"
+    },
+    {
+     "max": 10,
+     "name": "shovel",
+     "price": 12,
+     "tile": 3897,
+     "type": "shovel"
+    }
+   ],
+   "title": "the miner"
+  },
+  {
+   "buys": [
+    {
+     "name": "arrow",
+     "price": 1,
+     "tile": 3903,
+     "type": "arrow"
+    },
+    {
+     "name": "backpack",
+     "price": 7,
+     "tile": 2482,
+     "type": "backpack"
+    },
+    {
+     "name": "pouch",
+     "price": 3,
+     "tile": 3705,
+     "type": "pouch"
+    },
+    {
+     "name": "bag",
+     "price": 3,
+     "tile": 3702,
+     "type": "bag"
+    },
+    {
+     "name": "candle",
+     "price": 3,
+     "tile": 2575,
+     "type": "candle"
+    },
+    {
+     "name": "torch",
+     "price": 4,
+     "tile": 2578,
+     "type": "torch"
+    },
+    {
+     "name": "lantern",
+     "price": 1,
+     "tile": 2581,
+     "type": "lantern"
+    },
+    {
+     "name": "lockpicks",
+     "price": 6,
+     "tile": 5373,
+     "type": "lockpick"
+    },
+    {
+     "name": "floppy hat",
+     "price": 3,
+     "tile": 5907,
+     "type": "floppy_hat"
+    },
+    {
+     "name": "cap",
+     "price": 5,
+     "tile": 5909,
+     "type": "cap"
+    },
+    {
+     "name": "tall straw hat",
+     "price": 4,
+     "tile": 5910,
+     "type": "tall_straw_hat"
+    },
+    {
+     "name": "straw hat",
+     "price": 3,
+     "tile": 5911,
+     "type": "straw_hat"
+    },
+    {
+     "name": "leather cap",
+     "price": 5,
+     "tile": 7609,
+     "type": "leather_cap"
+    },
+    {
+     "name": "feathered hat",
+     "price": 5,
+     "tile": 5914,
+     "type": "feathered_hat"
+    },
+    {
+     "name": "tricorne hat",
+     "price": 4,
+     "tile": 5915,
+     "type": "tricorne_hat"
+    },
+    {
+     "name": "bandana",
+     "price": 3,
+     "tile": 5439,
+     "type": "bandana"
+    },
+    {
+     "name": "bottle",
+     "price": 3,
+     "tile": 3621,
+     "type": "bottle"
+    },
+    {
+     "name": "wooden box",
+     "price": 7,
+     "tile": 2474,
+     "type": "wooden_box"
+    },
+    {
+     "name": "kindling",
+     "price": 1,
+     "tile": 3553,
+     "type": "kindling"
+    },
+    {
+     "name": "Beeswax",
+     "price": 1,
+     "tile": 5154,
+     "type": "beeswax"
+    },
+    {
+     "name": "necklace",
+     "price": 13,
+     "tile": 4229,
+     "type": "necklace"
+    },
+    {
+     "name": "silver necklace",
+     "price": 10,
+     "tile": 7946,
+     "type": "silver_necklace"
+    },
+    {
+     "name": "beads",
+     "price": 13,
+     "tile": 4235,
+     "type": "beads"
+    }
+   ],
+   "class": "Provisioner",
+   "era": "t2a",
+   "guild": "—",
+   "id": "provisioner",
+   "restock_ms": 3600000,
+   "shops": [
+    "SBProvisioner"
+   ],
+   "source": "research/06 §2.2.1 + §2.4.1",
+   "stock": [
+    {
+     "max": 20,
+     "name": "arrow",
+     "price": 2,
+     "tile": 3903,
+     "type": "arrow"
+    },
+    {
+     "max": 20,
+     "name": "backpack",
+     "price": 15,
+     "tile": 2482,
+     "type": "backpack"
+    },
+    {
+     "max": 20,
+     "name": "pouch",
+     "price": 6,
+     "tile": 3705,
+     "type": "pouch"
+    },
+    {
+     "max": 20,
+     "name": "bag",
+     "price": 6,
+     "tile": 3702,
+     "type": "bag"
+    },
+    {
+     "max": 20,
+     "name": "candle",
+     "price": 6,
+     "tile": 2575,
+     "type": "candle"
+    },
+    {
+     "max": 20,
+     "name": "torch",
+     "price": 8,
+     "tile": 2578,
+     "type": "torch"
+    },
+    {
+     "max": 20,
+     "name": "lantern",
+     "price": 2,
+     "tile": 2581,
+     "type": "lantern"
+    },
+    {
+     "max": 20,
+     "name": "oil flask",
+     "price": 10,
+     "tile": 7193,
+     "type": "oil_flask"
+    },
+    {
+     "max": 20,
+     "name": "lockpicks",
+     "price": 12,
+     "tile": 5373,
+     "type": "lockpick"
+    },
+    {
+     "max": 20,
+     "name": "floppy hat",
+     "price": 7,
+     "tile": 5907,
+     "type": "floppy_hat"
+    },
+    {
+     "max": 20,
+     "name": "cap",
+     "price": 10,
+     "tile": 5909,
+     "type": "cap"
+    },
+    {
+     "max": 20,
+     "name": "tall straw hat",
+     "price": 8,
+     "tile": 5910,
+     "type": "tall_straw_hat"
+    },
+    {
+     "max": 20,
+     "name": "straw hat",
+     "price": 7,
+     "tile": 5911,
+     "type": "straw_hat"
+    },
+    {
+     "max": 20,
+     "name": "leather cap",
+     "price": 10,
+     "tile": 7609,
+     "type": "leather_cap"
+    },
+    {
+     "max": 20,
+     "name": "feathered hat",
+     "price": 10,
+     "tile": 5914,
+     "type": "feathered_hat"
+    },
+    {
+     "max": 20,
+     "name": "tricorne hat",
+     "price": 8,
+     "tile": 5915,
+     "type": "tricorne_hat"
+    },
+    {
+     "max": 20,
+     "name": "bandana",
+     "price": 6,
+     "tile": 5439,
+     "type": "bandana"
+    },
+    {
+     "max": 20,
+     "name": "Beeswax",
+     "price": 1,
+     "tile": 5154,
+     "type": "beeswax"
+    },
+    {
+     "max": 20,
+     "name": "Garlic",
+     "price": 3,
+     "tile": 3972,
+     "type": "garlic"
+    },
+    {
+     "max": 20,
+     "name": "Ginseng",
+     "price": 3,
+     "tile": 3973,
+     "type": "ginseng"
+    },
+    {
+     "max": 20,
+     "name": "bottle",
+     "price": 5,
+     "tile": 3621,
+     "type": "bottle"
+    },
+    {
+     "max": 20,
+     "name": "wooden box",
+     "price": 14,
+     "tile": 2474,
+     "type": "wooden_box"
+    },
+    {
+     "max": 20,
+     "name": "bedroll",
+     "price": 5,
+     "tile": 2645,
+     "type": "bedroll"
+    },
+    {
+     "max": 20,
+     "name": "kindling",
+     "price": 2,
+     "tile": 3553,
+     "type": "kindling"
+    }
+   ],
+   "title": "the provisioner"
+  },
+  {
+   "buys": [
+    {
+     "name": "spyglass",
+     "price": 1,
+     "tile": 5365,
+     "type": "spyglass"
+    }
+   ],
+   "class": "Shipwright",
+   "era": "t2a",
+   "guild": "—",
+   "id": "shipwright",
+   "restock_ms": 3600000,
+   "shops": [
+    "SBShipwright"
+   ],
+   "source": "research/06 §2.2.1 + §2.4.1",
+   "stock": [
+    {
+     "max": 20,
+     "name": "spyglass",
+     "price": 3,
+     "tile": 5365,
+     "type": "spyglass"
+    }
+   ],
+   "title": "the shipwright"
+  },
+  {
+   "buys": [
+    {
+     "name": "mallet and chisel",
+     "price": 1,
+     "tile": 4787,
+     "type": "mallet_and_chisel"
+    },
+    {
+     "name": "wooden box",
+     "price": 7,
+     "tile": 2474,
+     "type": "wooden_box"
+    },
+    {
+     "name": "stool",
+     "price": 6,
+     "tile": 2602,
+     "type": "stool"
+    },
+    {
+     "name": "foot stool",
+     "price": 6,
+     "tile": 2910,
+     "type": "foot_stool"
+    },
+    {
+     "name": "wooden chair",
+     "price": 8,
+     "tile": 2862,
+     "type": "wooden_chair"
+    },
+    {
+     "name": "saw",
+     "price": 9,
+     "tile": 4148,
+     "type": "saw"
+    },
+    {
+     "name": "scorp",
+     "price": 6,
+     "tile": 4327,
+     "type": "scorp"
+    },
+    {
+     "name": "smoothing plane",
+     "price": 6,
+     "tile": 4146,
+     "type": "smoothing_plane"
+    },
+    {
+     "name": "draw knife",
+     "price": 6,
+     "tile": 4324,
+     "type": "draw_knife"
+    },
+    {
+     "name": "froe",
+     "price": 6,
+     "tile": 4325,
+     "type": "froe"
+    },
+    {
+     "name": "hammer",
+     "price": 14,
+     "tile": 4138,
+     "type": "hammer"
+    },
+    {
+     "name": "inshave",
+     "price": 6,
+     "tile": 4326,
+     "type": "inshave"
+    },
+    {
+     "name": "jointing plane",
+     "price": 6,
+     "tile": 4144,
+     "type": "jointing_plane"
+    },
+    {
+     "name": "moulding planes",
+     "price": 6,
+     "tile": 4140,
+     "type": "moulding_planes"
+    },
+    {
+     "name": "dovetail saw",
+     "price": 7,
+     "tile": 4136,
+     "type": "dovetail_saw"
+    },
+    {
+     "name": "board",
+     "price": 2,
+     "tile": 7790,
+     "type": "board"
+    },
+    {
+     "name": "wooden shield",
+     "price": 31,
+     "tile": 7034,
+     "type": "wooden_shield"
+    },
+    {
+     "name": "black staff",
+     "price": 24,
+     "tile": 3568,
+     "type": "black_staff"
+    },
+    {
+     "name": "gnarled staff",
+     "price": 12,
+     "tile": 5112,
+     "type": "gnarled_staff"
+    },
+    {
+     "name": "quarter staff",
+     "price": 15,
+     "tile": 3721,
+     "type": "quarter_staff"
+    },
+    {
+     "name": "club",
+     "price": 13,
+     "tile": 5043,
+     "type": "club"
+    },
+    {
+     "name": "log",
+     "price": 1,
+     "tile": 7133,
+     "type": "log"
+    },
+    {
+     "name": "lute",
+     "price": 10,
+     "tile": 3763,
+     "type": "lute"
+    },
+    {
+     "name": "lap harp",
+     "price": 10,
+     "tile": 3762,
+     "type": "lap_harp"
+    },
+    {
+     "name": "tambourine",
+     "price": 10,
+     "tile": 3741,
+     "type": "tambourine"
+    }
+   ],
+   "class": "StoneCrafter",
+   "era": "t2a",
+   "guild": "TinkersGuild",
+   "id": "stonecrafter",
+   "restock_ms": 3600000,
+   "shops": [
+    "SBStoneCrafter",
+    "SBStavesWeapon",
+    "SBCarpenter",
+    "SBWoodenShields"
+   ],
+   "source": "research/06 §2.2.1 + §2.4.1",
+   "stock": [
+    {
+     "max": 20,
+     "name": "nails",
+     "price": 3,
+     "tile": 4142,
+     "type": "nails"
+    },
+    {
+     "max": 20,
+     "name": "board",
+     "price": 3,
+     "tile": 7790,
+     "type": "board"
+    },
+    {
+     "max": 20,
+     "name": "draw knife",
+     "price": 10,
+     "tile": 4324,
+     "type": "draw_knife"
+    },
+    {
+     "max": 20,
+     "name": "froe",
+     "price": 10,
+     "tile": 4325,
+     "type": "froe"
+    },
+    {
+     "max": 20,
+     "name": "scorp",
+     "price": 10,
+     "tile": 4327,
+     "type": "scorp"
+    },
+    {
+     "max": 20,
+     "name": "inshave",
+     "price": 10,
+     "tile": 4326,
+     "type": "inshave"
+    },
+    {
+     "max": 20,
+     "name": "dovetail saw",
+     "price": 12,
+     "tile": 4136,
+     "type": "dovetail_saw"
+    },
+    {
+     "max": 20,
+     "name": "saw",
+     "price": 15,
+     "tile": 4148,
+     "type": "saw"
+    },
+    {
+     "max": 20,
+     "name": "hammer",
+     "price": 17,
+     "tile": 4138,
+     "type": "hammer"
+    },
+    {
+     "max": 20,
+     "name": "moulding planes",
+     "price": 11,
+     "tile": 4140,
+     "type": "moulding_planes"
+    },
+    {
+     "max": 20,
+     "name": "smoothing plane",
+     "price": 10,
+     "tile": 4146,
+     "type": "smoothing_plane"
+    },
+    {
+     "max": 20,
+     "name": "jointing plane",
+     "price": 11,
+     "tile": 4144,
+     "type": "jointing_plane"
+    },
+    {
+     "max": 50,
+     "name": "mallet and chisel",
+     "price": 3,
+     "tile": 4787,
+     "type": "mallet_and_chisel"
+    },
+    {
+     "max": 20,
+     "name": "black staff",
+     "price": 22,
+     "tile": 3568,
+     "type": "black_staff"
+    },
+    {
+     "max": 20,
+     "name": "gnarled staff",
+     "price": 16,
+     "tile": 5112,
+     "type": "gnarled_staff"
+    },
+    {
+     "max": 20,
+     "name": "quarter staff",
+     "price": 19,
+     "tile": 3721,
+     "type": "quarter_staff"
+    },
+    {
+     "max": 20,
+     "name": "tambourine",
+     "price": 21,
+     "tile": 3741,
+     "type": "tambourine"
+    },
+    {
+     "max": 20,
+     "name": "lap harp",
+     "price": 21,
+     "tile": 3762,
+     "type": "lap_harp"
+    },
+    {
+     "max": 20,
+     "name": "lute",
+     "price": 21,
+     "tile": 3763,
+     "type": "lute"
+    },
+    {
+     "max": 20,
+     "name": "wooden shield",
+     "price": 30,
+     "tile": 7034,
+     "type": "wooden_shield"
+    }
+   ],
+   "title": "the stone crafter"
+  },
+  {
+   "buys": [
+    {
+     "name": "scissors",
+     "price": 6,
+     "tile": 3998,
+     "type": "scissors"
+    },
+    {
+     "name": "sewing kit",
+     "price": 1,
+     "tile": 3997,
+     "type": "sewing_kit"
+    },
+    {
+     "name": "dyes",
+     "price": 4,
+     "tile": 4009,
+     "type": "dyes"
+    },
+    {
+     "name": "cloth",
+     "price": 1,
+     "tile": 5989,
+     "type": "cloth"
+    },
+    {
+     "name": "fancy shirt",
+     "price": 10,
+     "tile": 7933,
+     "type": "fancy_shirt"
+    },
+    {
+     "name": "shirt",
+     "price": 6,
+     "tile": 5399,
+     "type": "shirt"
+    },
+    {
+     "name": "short pants",
+     "price": 3,
+     "tile": 5422,
+     "type": "short_pants"
+    },
+    {
+     "name": "long pants",
+     "price": 5,
+     "tile": 5433,
+     "type": "long_pants"
+    },
+    {
+     "name": "cloak",
+     "price": 4,
+     "tile": 5397,
+     "type": "cloak"
+    },
+    {
+     "name": "fancy dress",
+     "price": 12,
+     "tile": 7935,
+     "type": "fancy_dress"
+    },
+    {
+     "name": "robe",
+     "price": 9,
+     "tile": 7939,
+     "type": "robe"
+    },
+    {
+     "name": "plain dress",
+     "price": 7,
+     "tile": 7937,
+     "type": "plain_dress"
+    },
+    {
+     "name": "skirt",
+     "price": 5,
+     "tile": 5398,
+     "type": "skirt"
+    },
+    {
+     "name": "kilt",
+     "price": 5,
+     "tile": 5431,
+     "type": "kilt"
+    },
+    {
+     "name": "doublet",
+     "price": 7,
+     "tile": 8059,
+     "type": "doublet"
+    },
+    {
+     "name": "tunic",
+     "price": 9,
+     "tile": 8097,
+     "type": "tunic"
+    },
+    {
+     "name": "jester suit",
+     "price": 13,
+     "tile": 8095,
+     "type": "jester_suit"
+    },
+    {
+     "name": "full apron",
+     "price": 5,
+     "tile": 5437,
+     "type": "full_apron"
+    },
+    {
+     "name": "half apron",
+     "price": 5,
+     "tile": 5435,
+     "type": "half_apron"
+    },
+    {
+     "name": "jester hat",
+     "price": 6,
+     "tile": 5916,
+     "type": "jester_hat"
+    },
+    {
+     "name": "floppy hat",
+     "price": 3,
+     "tile": 5907,
+     "type": "floppy_hat"
+    },
+    {
+     "name": "cap",
+     "price": 5,
+     "tile": 5909,
+     "type": "cap"
+    },
+    {
+     "name": "bandana",
+     "price": 3,
+     "tile": 5439,
+     "type": "bandana"
+    },
+    {
+     "name": "tall straw hat",
+     "price": 4,
+     "tile": 5910,
+     "type": "tall_straw_hat"
+    },
+    {
+     "name": "straw hat",
+     "price": 4,
+     "tile": 5911,
+     "type": "straw_hat"
+    },
+    {
+     "name": "bonnet",
+     "price": 4,
+     "tile": 5913,
+     "type": "bonnet"
+    },
+    {
+     "name": "feathered hat",
+     "price": 5,
+     "tile": 5914,
+     "type": "feathered_hat"
+    },
+    {
+     "name": "tricorne hat",
+     "price": 4,
+     "tile": 5915,
+     "type": "tricorne_hat"
+    },
+    {
+     "name": "flax",
+     "price": 51,
+     "tile": 6809,
+     "type": "flax"
+    }
+   ],
+   "class": "Tailor",
+   "era": "t2a",
+   "guild": "TailorsGuild",
+   "id": "tailor",
+   "restock_ms": 3600000,
+   "shops": [
+    "SBTailor"
+   ],
+   "source": "research/06 §2.2.1 + §2.4.1",
+   "stock": [
+    {
+     "max": 20,
+     "name": "sewing kit",
+     "price": 3,
+     "tile": 3997,
+     "type": "sewing_kit"
+    },
+    {
+     "max": 20,
+     "name": "scissors",
+     "price": 11,
+     "tile": 3998,
+     "type": "scissors"
+    },
+    {
+     "max": 20,
+     "name": "dyes",
+     "price": 8,
+     "tile": 4009,
+     "type": "dyes"
+    },
+    {
+     "max": 20,
+     "name": "shirt",
+     "price": 12,
+     "tile": 5399,
+     "type": "shirt"
+    },
+    {
+     "max": 20,
+     "name": "short pants",
+     "price": 7,
+     "tile": 5422,
+     "type": "short_pants"
+    },
+    {
+     "max": 20,
+     "name": "fancy shirt",
+     "price": 21,
+     "tile": 7933,
+     "type": "fancy_shirt"
+    },
+    {
+     "max": 20,
+     "name": "long pants",
+     "price": 10,
+     "tile": 5433,
+     "type": "long_pants"
+    },
+    {
+     "max": 20,
+     "name": "fancy dress",
+     "price": 26,
+     "tile": 7935,
+     "type": "fancy_dress"
+    },
+    {
+     "max": 20,
+     "name": "plain dress",
+     "price": 13,
+     "tile": 7937,
+     "type": "plain_dress"
+    },
+    {
+     "max": 20,
+     "name": "kilt",
+     "price": 11,
+     "tile": 5431,
+     "type": "kilt"
+    },
+    {
+     "max": 20,
+     "name": "half apron",
+     "price": 10,
+     "tile": 5435,
+     "type": "half_apron"
+    },
+    {
+     "max": 20,
+     "name": "robe",
+     "price": 18,
+     "tile": 7939,
+     "type": "robe"
+    },
+    {
+     "max": 20,
+     "name": "cloak",
+     "price": 8,
+     "tile": 5397,
+     "type": "cloak"
+    },
+    {
+     "max": 20,
+     "name": "doublet",
+     "price": 13,
+     "tile": 8059,
+     "type": "doublet"
+    },
+    {
+     "max": 20,
+     "name": "tunic",
+     "price": 18,
+     "tile": 8097,
+     "type": "tunic"
+    },
+    {
+     "max": 20,
+     "name": "jester suit",
+     "price": 26,
+     "tile": 8095,
+     "type": "jester_suit"
+    },
+    {
+     "max": 20,
+     "name": "jester hat",
+     "price": 12,
+     "tile": 5916,
+     "type": "jester_hat"
+    },
+    {
+     "max": 20,
+     "name": "floppy hat",
+     "price": 7,
+     "tile": 5907,
+     "type": "floppy_hat"
+    },
+    {
+     "max": 20,
+     "name": "cap",
+     "price": 10,
+     "tile": 5909,
+     "type": "cap"
+    },
+    {
+     "max": 20,
+     "name": "tall straw hat",
+     "price": 8,
+     "tile": 5910,
+     "type": "tall_straw_hat"
+    },
+    {
+     "max": 20,
+     "name": "straw hat",
+     "price": 7,
+     "tile": 5911,
+     "type": "straw_hat"
+    },
+    {
+     "max": 20,
+     "name": "leather cap",
+     "price": 10,
+     "tile": 7609,
+     "type": "leather_cap"
+    },
+    {
+     "max": 20,
+     "name": "feathered hat",
+     "price": 10,
+     "tile": 5914,
+     "type": "feathered_hat"
+    },
+    {
+     "max": 20,
+     "name": "tricorne hat",
+     "price": 8,
+     "tile": 5915,
+     "type": "tricorne_hat"
+    },
+    {
+     "max": 20,
+     "name": "bandana",
+     "price": 6,
+     "tile": 5439,
+     "type": "bandana"
+    },
+    {
+     "max": 20,
+     "name": "cloth",
+     "price": 2,
+     "tile": 5989,
+     "type": "cloth"
+    },
+    {
+     "max": 20,
+     "name": "flax",
+     "price": 102,
+     "tile": 6809,
+     "type": "flax"
+    }
+   ],
+   "title": "the tailor"
+  },
+  {
+   "buys": [
+    {
+     "name": "bag",
+     "price": 3,
+     "tile": 3702,
+     "type": "bag"
+    },
+    {
+     "name": "pouch",
+     "price": 3,
+     "tile": 3705,
+     "type": "pouch"
+    },
+    {
+     "name": "backpack",
+     "price": 7,
+     "tile": 2482,
+     "type": "backpack"
+    },
+    {
+     "name": "skinning knife",
+     "price": 7,
+     "tile": 3780,
+     "type": "skinning_knife"
+    },
+    {
+     "name": "Leather Gloves",
+     "price": 15,
+     "tile": 5062,
+     "type": "leather_gloves"
+    },
+    {
+     "name": "leather gorget",
+     "price": 15,
+     "tile": 5063,
+     "type": "leather_gorget"
+    },
+    {
+     "name": "leather cap",
+     "price": 5,
+     "tile": 7609,
+     "type": "leather_cap"
+    },
+    {
+     "name": "studded gloves",
+     "price": 39,
+     "tile": 5077,
+     "type": "studded_gloves"
+    },
+    {
+     "name": "studded gorget",
+     "price": 22,
+     "tile": 5078,
+     "type": "studded_gorget"
+    },
+    {
+     "name": "leather shorts",
+     "price": 14,
+     "tile": 7168,
+     "type": "leather_shorts"
+    },
+    {
+     "name": "leather skirt",
+     "price": 12,
+     "tile": 7176,
+     "type": "leather_skirt"
+    }
+   ],
+   "class": "Tanner",
+   "era": "t2a",
+   "guild": "—",
+   "id": "tanner",
+   "restock_ms": 3600000,
+   "shops": [
+    "SBTanner"
+   ],
+   "source": "research/06 §2.2.1 + §2.4.1",
+   "stock": [
+    {
+     "max": 20,
+     "name": "leather gorget",
+     "price": 31,
+     "tile": 5063,
+     "type": "leather_gorget"
+    },
+    {
+     "max": 20,
+     "name": "leather cap",
+     "price": 10,
+     "tile": 7609,
+     "type": "leather_cap"
+    },
+    {
+     "max": 20,
+     "name": "Leather Gloves",
+     "price": 31,
+     "tile": 5062,
+     "type": "leather_gloves"
+    },
+    {
+     "max": 20,
+     "name": "studded gorget",
+     "price": 50,
+     "tile": 5078,
+     "type": "studded_gorget"
+    },
+    {
+     "max": 20,
+     "name": "studded gloves",
+     "price": 45,
+     "tile": 5077,
+     "type": "studded_gloves"
+    },
+    {
+     "max": 20,
+     "name": "leather shorts",
+     "price": 28,
+     "tile": 7168,
+     "type": "leather_shorts"
+    },
+    {
+     "max": 20,
+     "name": "leather skirt",
+     "price": 25,
+     "tile": 7176,
+     "type": "leather_skirt"
+    },
+    {
+     "max": 20,
+     "name": "bag",
+     "price": 6,
+     "tile": 3702,
+     "type": "bag"
+    },
+    {
+     "max": 20,
+     "name": "pouch",
+     "price": 6,
+     "tile": 3705,
+     "type": "pouch"
+    },
+    {
+     "max": 20,
+     "name": "backpack",
+     "price": 15,
+     "tile": 2482,
+     "type": "backpack"
+    },
+    {
+     "max": 20,
+     "name": "skinning knife",
+     "price": 15,
+     "tile": 3780,
+     "type": "skinning_knife"
+    }
+   ],
+   "title": "the tanner"
+  },
+  {
+   "buys": [
+    {
+     "name": "pitcher",
+     "price": 5,
+     "tile": 2518,
+     "type": "pitcher"
+    },
+    {
+     "name": "banana",
+     "price": 1,
+     "tile": 5917,
+     "type": "banana"
+    },
+    {
+     "name": "candle",
+     "price": 3,
+     "tile": 2575,
+     "type": "candle"
+    }
+   ],
+   "class": "TavernKeeper",
+   "era": "t2a",
+   "guild": "—",
+   "id": "tavernkeeper",
+   "restock_ms": 3600000,
+   "shops": [
+    "SBTavernKeeper"
+   ],
+   "source": "research/06 §2.2.1 + §2.4.1",
+   "stock": [
+    {
+     "max": 20,
+     "name": "wasabi",
+     "price": 2,
+     "tile": 9448,
+     "type": "wasabi"
+    },
+    {
+     "max": 20,
+     "name": "bento box",
+     "price": 6,
+     "tile": 10292,
+     "type": "bento_box"
+    }
+   ],
+   "title": "the tavern keeper"
+  },
+  {
+   "buys": [
+    {
+     "name": "backpack",
+     "price": 7,
+     "tile": 2482,
+     "type": "backpack"
+    },
+    {
+     "name": "pouch",
+     "price": 3,
+     "tile": 3705,
+     "type": "pouch"
+    },
+    {
+     "name": "torch",
+     "price": 3,
+     "tile": 2578,
+     "type": "torch"
+    },
+    {
+     "name": "lantern",
+     "price": 1,
+     "tile": 2581,
+     "type": "lantern"
+    },
+    {
+     "name": "oil flask",
+     "price": 4,
+     "tile": 7193,
+     "type": "oil_flask"
+    },
+    {
+     "name": "lockpicks",
+     "price": 6,
+     "tile": 5373,
+     "type": "lockpick"
+    },
+    {
+     "name": "wooden box",
+     "price": 7,
+     "tile": 2474,
+     "type": "wooden_box"
+    }
+   ],
+   "class": "Thief",
+   "era": "t2a",
+   "guild": "—",
+   "id": "thief",
+   "restock_ms": 3600000,
+   "shops": [
+    "SBThief"
+   ],
+   "source": "research/06 §2.2.1 + §2.4.1",
+   "stock": [
+    {
+     "max": 20,
+     "name": "backpack",
+     "price": 15,
+     "tile": 2482,
+     "type": "backpack"
+    },
+    {
+     "max": 20,
+     "name": "pouch",
+     "price": 6,
+     "tile": 3705,
+     "type": "pouch"
+    },
+    {
+     "max": 20,
+     "name": "torch",
+     "price": 8,
+     "tile": 2578,
+     "type": "torch"
+    },
+    {
+     "max": 20,
+     "name": "lantern",
+     "price": 2,
+     "tile": 2581,
+     "type": "lantern"
+    },
+    {
+     "max": 20,
+     "name": "oil flask",
+     "price": 8,
+     "tile": 7193,
+     "type": "oil_flask"
+    },
+    {
+     "max": 20,
+     "name": "lockpicks",
+     "price": 12,
+     "tile": 5373,
+     "type": "lockpick"
+    },
+    {
+     "max": 20,
+     "name": "wooden box",
+     "price": 14,
+     "tile": 2474,
+     "type": "wooden_box"
+    }
+   ],
+   "title": "the thief"
+  },
+  {
+   "buys": [
+    {
+     "name": "tambourine",
+     "price": 10,
+     "tile": 3741,
+     "type": "tambourine"
+    },
+    {
+     "name": "lap harp",
+     "price": 10,
+     "tile": 3762,
+     "type": "lap_harp"
+    },
+    {
+     "name": "lute",
+     "price": 10,
+     "tile": 3763,
+     "type": "lute"
+    },
+    {
+     "name": "shovel",
+     "price": 6,
+     "tile": 3897,
+     "type": "shovel"
+    },
+    {
+     "name": "sewing kit",
+     "price": 1,
+     "tile": 3997,
+     "type": "sewing_kit"
+    },
+    {
+     "name": "scissors",
+     "price": 6,
+     "tile": 3998,
+     "type": "scissors"
+    },
+    {
+     "name": "tongs",
+     "price": 7,
+     "tile": 4027,
+     "type": "tongs"
+    },
+    {
+     "name": "dovetail saw",
+     "price": 6,
+     "tile": 4136,
+     "type": "dovetail_saw"
+    },
+    {
+     "name": "moulding planes",
+     "price": 6,
+     "tile": 4140,
+     "type": "moulding_planes"
+    },
+    {
+     "name": "nails",
+     "price": 1,
+     "tile": 4142,
+     "type": "nails"
+    },
+    {
+     "name": "jointing plane",
+     "price": 6,
+     "tile": 4144,
+     "type": "jointing_plane"
+    },
+    {
+     "name": "smoothing plane",
+     "price": 6,
+     "tile": 4146,
+     "type": "smoothing_plane"
+    },
+    {
+     "name": "saw",
+     "price": 7,
+     "tile": 4148,
+     "type": "saw"
+    },
+    {
+     "name": "clock",
+     "price": 11,
+     "tile": 4171,
+     "type": "clock"
+    },
+    {
+     "name": "clock parts",
+     "price": 1,
+     "tile": 4175,
+     "type": "clock_parts"
+    },
+    {
+     "name": "gears",
+     "price": 1,
+     "tile": 4179,
+     "type": "gears"
+    },
+    {
+     "name": "sextant",
+     "price": 6,
+     "tile": 4183,
+     "type": "sextant"
+    },
+    {
+     "name": "sextant parts",
+     "price": 2,
+     "tile": 4185,
+     "type": "sextant_parts"
+    },
+    {
+     "name": "springs",
+     "price": 1,
+     "tile": 4189,
+     "type": "springs"
+    },
+    {
+     "name": "draw knife",
+     "price": 5,
+     "tile": 4324,
+     "type": "draw_knife"
+    },
+    {
+     "name": "froe",
+     "price": 5,
+     "tile": 4325,
+     "type": "froe"
+    },
+    {
+     "name": "inshave",
+     "price": 5,
+     "tile": 4326,
+     "type": "inshave"
+    },
+    {
+     "name": "scorp",
+     "price": 5,
+     "tile": 4327,
+     "type": "scorp"
+    },
+    {
+     "name": "lockpicks",
+     "price": 6,
+     "tile": 5373,
+     "type": "lockpick"
+    },
+    {
+     "name": "tinker's tools",
+     "price": 3,
+     "tile": 7868,
+     "type": "tinker_s_tools"
+    },
+    {
+     "name": "board",
+     "price": 1,
+     "tile": 7790,
+     "type": "board"
+    },
+    {
+     "name": "log",
+     "price": 1,
+     "tile": 7133,
+     "type": "log"
+    },
+    {
+     "name": "pickaxe",
+     "price": 16,
+     "tile": 3717,
+     "type": "pickaxe"
+    },
+    {
+     "name": "hammer",
+     "price": 3,
+     "tile": 4138,
+     "type": "hammer"
+    },
+    {
+     "name": "smith's hammer",
+     "price": 11,
+     "tile": 5091,
+     "type": "smith_s_hammer"
+    },
+    {
+     "name": "butcher knife",
+     "price": 6,
+     "tile": 5110,
+     "type": "butcher_knife"
+    }
+   ],
+   "class": "Tinker",
+   "era": "t2a",
+   "guild": "—",
+   "id": "tinker",
+   "restock_ms": 3600000,
+   "shops": [
+    "SBTinker"
+   ],
+   "source": "research/06 §2.2.1 + §2.4.1",
+   "stock": [
+    {
+     "max": 20,
+     "name": "clock",
+     "price": 22,
+     "tile": 4171,
+     "type": "clock"
+    },
+    {
+     "max": 20,
+     "name": "nails",
+     "price": 3,
+     "tile": 4142,
+     "type": "nails"
+    },
+    {
+     "max": 20,
+     "name": "clock parts",
+     "price": 3,
+     "tile": 4175,
+     "type": "clock_parts"
+    },
+    {
+     "max": 20,
+     "name": "gears",
+     "price": 2,
+     "tile": 4179,
+     "type": "gears"
+    },
+    {
+     "max": 20,
+     "name": "sextant",
+     "price": 13,
+     "tile": 4183,
+     "type": "sextant"
+    },
+    {
+     "max": 20,
+     "name": "sextant parts",
+     "price": 5,
+     "tile": 4185,
+     "type": "sextant_parts"
+    },
+    {
+     "max": 20,
+     "name": "springs",
+     "price": 3,
+     "tile": 4189,
+     "type": "springs"
+    },
+    {
+     "max": 20,
+     "name": "key ring",
+     "price": 8,
+     "tile": 4113,
+     "type": "key_ring"
+    },
+    {
+     "max": 20,
+     "name": "lockpicks",
+     "price": 12,
+     "tile": 5373,
+     "type": "lockpick"
+    },
+    {
+     "max": 20,
+     "name": "board",
+     "price": 3,
+     "tile": 7790,
+     "type": "board"
+    },
+    {
+     "max": 16,
+     "name": "iron ingot",
+     "price": 5,
+     "tile": 7151,
+     "type": "iron_ingot"
+    },
+    {
+     "max": 20,
+     "name": "sewing kit",
+     "price": 3,
+     "tile": 3997,
+     "type": "sewing_kit"
+    },
+    {
+     "max": 20,
+     "name": "draw knife",
+     "price": 10,
+     "tile": 4324,
+     "type": "draw_knife"
+    },
+    {
+     "max": 20,
+     "name": "froe",
+     "price": 10,
+     "tile": 4325,
+     "type": "froe"
+    },
+    {
+     "max": 20,
+     "name": "scorp",
+     "price": 10,
+     "tile": 4327,
+     "type": "scorp"
+    },
+    {
+     "max": 20,
+     "name": "inshave",
+     "price": 10,
+     "tile": 4326,
+     "type": "inshave"
+    },
+    {
+     "max": 20,
+     "name": "butcher knife",
+     "price": 13,
+     "tile": 5110,
+     "type": "butcher_knife"
+    },
+    {
+     "max": 20,
+     "name": "scissors",
+     "price": 11,
+     "tile": 3998,
+     "type": "scissors"
+    },
+    {
+     "max": 14,
+     "name": "tongs",
+     "price": 13,
+     "tile": 4027,
+     "type": "tongs"
+    },
+    {
+     "max": 20,
+     "name": "dovetail saw",
+     "price": 12,
+     "tile": 4136,
+     "type": "dovetail_saw"
+    },
+    {
+     "max": 20,
+     "name": "saw",
+     "price": 15,
+     "tile": 4148,
+     "type": "saw"
+    },
+    {
+     "max": 20,
+     "name": "hammer",
+     "price": 17,
+     "tile": 4138,
+     "type": "hammer"
+    },
+    {
+     "max": 20,
+     "name": "smith's hammer",
+     "price": 23,
+     "tile": 5091,
+     "type": "smith_s_hammer"
+    },
+    {
+     "max": 20,
+     "name": "shovel",
+     "price": 12,
+     "tile": 3897,
+     "type": "shovel"
+    },
+    {
+     "max": 20,
+     "name": "moulding planes",
+     "price": 11,
+     "tile": 4140,
+     "type": "moulding_planes"
+    },
+    {
+     "max": 20,
+     "name": "jointing plane",
+     "price": 10,
+     "tile": 4144,
+     "type": "jointing_plane"
+    },
+    {
+     "max": 20,
+     "name": "smoothing plane",
+     "price": 11,
+     "tile": 4146,
+     "type": "smoothing_plane"
+    },
+    {
+     "max": 20,
+     "name": "pickaxe",
+     "price": 25,
+     "tile": 3717,
+     "type": "pickaxe"
+    },
+    {
+     "max": 20,
+     "name": "tambourine",
+     "price": 21,
+     "tile": 3741,
+     "type": "tambourine"
+    },
+    {
+     "max": 20,
+     "name": "lap harp",
+     "price": 21,
+     "tile": 3762,
+     "type": "lap_harp"
+    },
+    {
+     "max": 20,
+     "name": "lute",
+     "price": 21,
+     "tile": 3763,
+     "type": "lute"
+    }
+   ],
+   "title": "the tinker"
+  },
+  {
+   "buys": [
+    {
+     "name": "board",
+     "price": 1,
+     "tile": 7790,
+     "type": "board"
+    },
+    {
+     "name": "iron ingot",
+     "price": 3,
+     "tile": 7151,
+     "type": "iron_ingot"
+    },
+    {
+     "name": "necklace",
+     "price": 13,
+     "tile": 4229,
+     "type": "necklace"
+    },
+    {
+     "name": "silver necklace",
+     "price": 10,
+     "tile": 7946,
+     "type": "silver_necklace"
+    },
+    {
+     "name": "beads",
+     "price": 13,
+     "tile": 4235,
+     "type": "beads"
+    }
+   ],
+   "class": "Vagabond",
+   "era": "t2a",
+   "guild": "—",
+   "id": "vagabond",
+   "restock_ms": 3600000,
+   "shops": [
+    "SBVagabond"
+   ],
+   "source": "research/06 §2.2.1 + §2.4.1",
+   "stock": [
+    {
+     "max": 20,
+     "name": "necklace",
+     "price": 26,
+     "tile": 4229,
+     "type": "necklace"
+    },
+    {
+     "max": 20,
+     "name": "beads",
+     "price": 27,
+     "tile": 4235,
+     "type": "beads"
+    },
+    {
+     "max": 20,
+     "name": "board",
+     "price": 3,
+     "tile": 7790,
+     "type": "board"
+    },
+    {
+     "max": 20,
+     "name": "iron ingot",
+     "price": 6,
+     "tile": 7151,
+     "type": "iron_ingot"
+    }
+   ],
+   "title": "the vagabond"
+  },
+  {
+   "buys": [
+    {
+     "name": "arrow",
+     "price": 2,
+     "tile": 3903,
+     "type": "arrow"
+    },
+    {
+     "name": "mandrake root",
+     "price": 2,
+     "tile": 6365,
+     "type": "mandrake_root"
+    },
+    {
+     "name": "Garlic",
+     "price": 2,
+     "tile": 3972,
+     "type": "garlic"
+    },
+    {
+     "name": "Ginseng",
+     "price": 2,
+     "tile": 3973,
+     "type": "ginseng"
+    },
+    {
+     "name": "Nightshade",
+     "price": 2,
+     "tile": 3976,
+     "type": "nightshade"
+    },
+    {
+     "name": "Sulfurous Ash",
+     "price": 2,
+     "tile": 3980,
+     "type": "sulfurous_ash"
+    },
+    {
+     "name": "backpack",
+     "price": 7,
+     "tile": 2482,
+     "type": "backpack"
+    },
+    {
+     "name": "recall rune",
+     "price": 8,
+     "tile": 7956,
+     "type": "recall_rune"
+    },
+    {
+     "name": "spellbook",
+     "price": 9,
+     "tile": 3643,
+     "type": "spellbook"
+    },
+    {
+     "name": "Grave Dust",
+     "price": 2,
+     "tile": 3983,
+     "type": "grave_dust"
+    },
+    {
+     "name": "Daemon Blood",
+     "price": 3,
+     "tile": 3965,
+     "type": "daemon_blood"
+    },
+    {
+     "name": "Nox Crystal",
+     "price": 3,
+     "tile": 3982,
+     "type": "nox_crystal"
+    },
+    {
+     "name": "Pig Iron",
+     "price": 3,
+     "tile": 3978,
+     "type": "pig_iron"
+    }
+   ],
+   "class": "VarietyDealer",
+   "era": "t2a",
+   "guild": "—",
+   "id": "varietydealer",
+   "restock_ms": 3600000,
+   "shops": [
+    "SBVarietyDealer"
+   ],
+   "source": "research/06 §2.2.1 + §2.4.1",
+   "stock": [
+    {
+     "max": 999,
+     "name": "mandrake root",
+     "price": 3,
+     "tile": 6365,
+     "type": "mandrake_root"
+    },
+    {
+     "max": 999,
+     "name": "Garlic",
+     "price": 3,
+     "tile": 3972,
+     "type": "garlic"
+    },
+    {
+     "max": 999,
+     "name": "Ginseng",
+     "price": 3,
+     "tile": 3973,
+     "type": "ginseng"
+    },
+    {
+     "max": 999,
+     "name": "Nightshade",
+     "price": 3,
+     "tile": 3976,
+     "type": "nightshade"
+    },
+    {
+     "max": 999,
+     "name": "Sulfurous Ash",
+     "price": 3,
+     "tile": 3980,
+     "type": "sulfurous_ash"
+    },
+    {
+     "max": 20,
+     "name": "backpack",
+     "price": 15,
+     "tile": 2482,
+     "type": "backpack"
+    },
+    {
+     "max": 999,
+     "name": "Grave Dust",
+     "price": 3,
+     "tile": 3983,
+     "type": "grave_dust"
+    },
+    {
+     "max": 999,
+     "name": "Daemon Blood",
+     "price": 6,
+     "tile": 3965,
+     "type": "daemon_blood"
+    },
+    {
+     "max": 999,
+     "name": "Nox Crystal",
+     "price": 6,
+     "tile": 3982,
+     "type": "nox_crystal"
+    },
+    {
+     "max": 999,
+     "name": "Pig Iron",
+     "price": 5,
+     "tile": 3978,
+     "type": "pig_iron"
+    },
+    {
+     "max": 10,
+     "name": "recall rune",
+     "price": 15,
+     "tile": 7956,
+     "type": "recall_rune"
+    },
+    {
+     "max": 10,
+     "name": "spellbook",
+     "price": 18,
+     "tile": 3643,
+     "type": "spellbook"
+    }
+   ],
+   "title": "the variety dealer"
+  },
+  {
+   "buys": [
+    {
+     "name": "battle axe",
+     "price": 13,
+     "tile": 3911,
+     "type": "battle_axe"
+    },
+    {
+     "name": "double axe",
+     "price": 26,
+     "tile": 3915,
+     "type": "double_axe"
+    },
+    {
+     "name": "large battle axe",
+     "price": 16,
+     "tile": 5114,
+     "type": "large_battle_axe"
+    },
+    {
+     "name": "pickaxe",
+     "price": 11,
+     "tile": 3717,
+     "type": "pickaxe"
+    },
+    {
+     "name": "two handed axe",
+     "price": 16,
+     "tile": 5186,
+     "type": "two_handed_axe"
+    },
+    {
+     "name": "war axe",
+     "price": 14,
+     "tile": 5039,
+     "type": "war_axe"
+    },
+    {
+     "name": "axe",
+     "price": 20,
+     "tile": 3913,
+     "type": "axe"
+    },
+    {
+     "name": "bardiche",
+     "price": 30,
+     "tile": 3917,
+     "type": "bardiche"
+    },
+    {
+     "name": "halberd",
+     "price": 21,
+     "tile": 5182,
+     "type": "halberd"
+    },
+    {
+     "name": "butcher knife",
+     "price": 7,
+     "tile": 5110,
+     "type": "butcher_knife"
+    },
+    {
+     "name": "cleaver",
+     "price": 7,
+     "tile": 3778,
+     "type": "cleaver"
+    },
+    {
+     "name": "dagger",
+     "price": 10,
+     "tile": 3921,
+     "type": "dagger"
+    },
+    {
+     "name": "skinning knife",
+     "price": 7,
+     "tile": 3780,
+     "type": "skinning_knife"
+    },
+    {
+     "name": "club",
+     "price": 8,
+     "tile": 5043,
+     "type": "club"
+    },
+    {
+     "name": "hammer pick",
+     "price": 13,
+     "tile": 5180,
+     "type": "hammer_pick"
+    },
+    {
+     "name": "mace",
+     "price": 14,
+     "tile": 3932,
+     "type": "mace"
+    },
+    {
+     "name": "maul",
+     "price": 10,
+     "tile": 5178,
+     "type": "maul"
+    },
+    {
+     "name": "war hammer",
+     "price": 12,
+     "tile": 5176,
+     "type": "war_hammer"
+    },
+    {
+     "name": "war mace",
+     "price": 15,
+     "tile": 5126,
+     "type": "war_mace"
+    },
+    {
+     "name": "heavy crossbow",
+     "price": 27,
+     "tile": 5116,
+     "type": "heavy_crossbow"
+    },
+    {
+     "name": "bow",
+     "price": 17,
+     "tile": 5041,
+     "type": "bow"
+    },
+    {
+     "name": "crossbow",
+     "price": 23,
+     "tile": 3919,
+     "type": "crossbow"
+    },
+    {
+     "name": "composite bow",
+     "price": 25,
+     "tile": 9922,
+     "type": "composite_bow"
+    },
+    {
+     "name": "repeating crossbow",
+     "price": 28,
+     "tile": 9923,
+     "type": "repeating_crossbow"
+    },
+    {
+     "name": "scepter",
+     "price": 20,
+     "tile": 9916,
+     "type": "scepter"
+    },
+    {
+     "name": "bladed staff",
+     "price": 20,
+     "tile": 9917,
+     "type": "bladed_staff"
+    },
+    {
+     "name": "scythe",
+     "price": 19,
+     "tile": 9914,
+     "type": "scythe"
+    },
+    {
+     "name": "bone harvester",
+     "price": 17,
+     "tile": 9915,
+     "type": "bone_harvester"
+    },
+    {
+     "name": "pike",
+     "price": 19,
+     "tile": 9918,
+     "type": "pike"
+    },
+    {
+     "name": "double bladed staff",
+     "price": 17,
+     "tile": 9919,
+     "type": "double_bladed_staff"
+    },
+    {
+     "name": "lance",
+     "price": 17,
+     "tile": 9920,
+     "type": "lance"
+    },
+    {
+     "name": "crescent blade",
+     "price": 18,
+     "tile": 9921,
+     "type": "crescent_blade"
+    },
+    {
+     "name": "spear",
+     "price": 15,
+     "tile": 9594,
+     "type": "spear"
+    },
+    {
+     "name": "pitchfork",
+     "price": 9,
+     "tile": 3719,
+     "type": "pitchfork"
+    },
+    {
+     "name": "short spear",
+     "price": 11,
+     "tile": 5122,
+     "type": "short_spear"
+    },
+    {
+     "name": "black staff",
+     "price": 11,
+     "tile": 3568,
+     "type": "black_staff"
+    },
+    {
+     "name": "gnarled staff",
+     "price": 8,
+     "tile": 5112,
+     "type": "gnarled_staff"
+    },
+    {
+     "name": "quarter staff",
+     "price": 9,
+     "tile": 3721,
+     "type": "quarter_staff"
+    },
+    {
+     "name": "smith's hammer",
+     "price": 10,
+     "tile": 5091,
+     "type": "smith_s_hammer"
+    },
+    {
+     "name": "broadsword",
+     "price": 17,
+     "tile": 3934,
+     "type": "broadsword"
+    },
+    {
+     "name": "cutlass",
+     "price": 12,
+     "tile": 5184,
+     "type": "cutlass"
+    },
+    {
+     "name": "katana",
+     "price": 16,
+     "tile": 5118,
+     "type": "katana"
+    },
+    {
+     "name": "kryss",
+     "price": 16,
+     "tile": 5120,
+     "type": "kryss"
+    },
+    {
+     "name": "longsword",
+     "price": 27,
+     "tile": 3936,
+     "type": "longsword"
+    },
+    {
+     "name": "scimitar",
+     "price": 18,
+     "tile": 5045,
+     "type": "scimitar"
+    },
+    {
+     "name": "viking sword",
+     "price": 27,
+     "tile": 5049,
+     "type": "viking_sword"
+    },
+    {
+     "name": "hatchet",
+     "price": 13,
+     "tile": 3907,
+     "type": "hatchet"
+    },
+    {
+     "name": "war fork",
+     "price": 16,
+     "tile": 5124,
+     "type": "war_fork"
+    }
+   ],
+   "class": "Weaponsmith",
+   "era": "t2a",
+   "guild": "—",
+   "id": "weaponsmith",
+   "restock_ms": 3600000,
+   "shops": [
+    "SBWeaponSmith"
+   ],
+   "source": "research/06 §2.2.1 + §2.4.1",
+   "stock": [
+    {
+     "max": 20,
+     "name": "black staff",
+     "price": 22,
+     "tile": 3568,
+     "type": "black_staff"
+    },
+    {
+     "max": 20,
+     "name": "club",
+     "price": 16,
+     "tile": 5043,
+     "type": "club"
+    },
+    {
+     "max": 20,
+     "name": "gnarled staff",
+     "price": 16,
+     "tile": 5112,
+     "type": "gnarled_staff"
+    },
+    {
+     "max": 20,
+     "name": "mace",
+     "price": 28,
+     "tile": 3932,
+     "type": "mace"
+    },
+    {
+     "max": 20,
+     "name": "maul",
+     "price": 21,
+     "tile": 5178,
+     "type": "maul"
+    },
+    {
+     "max": 20,
+     "name": "quarter staff",
+     "price": 19,
+     "tile": 3721,
+     "type": "quarter_staff"
+    },
+    {
+     "max": 20,
+     "name": "smith's hammer",
+     "price": 21,
+     "tile": 5091,
+     "type": "smith_s_hammer"
+    },
+    {
+     "max": 20,
+     "name": "short spear",
+     "price": 23,
+     "tile": 5122,
+     "type": "short_spear"
+    },
+    {
+     "max": 20,
+     "name": "spear",
+     "price": 31,
+     "tile": 9594,
+     "type": "spear"
+    },
+    {
+     "max": 20,
+     "name": "war hammer",
+     "price": 25,
+     "tile": 5176,
+     "type": "war_hammer"
+    },
+    {
+     "max": 20,
+     "name": "war mace",
+     "price": 31,
+     "tile": 5126,
+     "type": "war_mace"
+    },
+    {
+     "max": 20,
+     "name": "scepter",
+     "price": 39,
+     "tile": 9916,
+     "type": "scepter"
+    },
+    {
+     "max": 20,
+     "name": "bladed staff",
+     "price": 40,
+     "tile": 9917,
+     "type": "bladed_staff"
+    },
+    {
+     "max": 20,
+     "name": "hatchet",
+     "price": 25,
+     "tile": 3907,
+     "type": "hatchet"
+    },
+    {
+     "max": 20,
+     "name": "war fork",
+     "price": 32,
+     "tile": 5124,
+     "type": "war_fork"
+    },
+    {
+     "max": 20,
+     "name": "bardiche",
+     "price": 60,
+     "tile": 3917,
+     "type": "bardiche"
+    },
+    {
+     "max": 20,
+     "name": "battle axe",
+     "price": 26,
+     "tile": 3911,
+     "type": "battle_axe"
+    },
+    {
+     "max": 20,
+     "name": "two handed axe",
+     "price": 32,
+     "tile": 5186,
+     "type": "two_handed_axe"
+    },
+    {
+     "max": 20,
+     "name": "bow",
+     "price": 35,
+     "tile": 5041,
+     "type": "bow"
+    },
+    {
+     "max": 20,
+     "name": "butcher knife",
+     "price": 14,
+     "tile": 5110,
+     "type": "butcher_knife"
+    },
+    {
+     "max": 20,
+     "name": "crossbow",
+     "price": 46,
+     "tile": 3919,
+     "type": "crossbow"
+    },
+    {
+     "max": 20,
+     "name": "heavy crossbow",
+     "price": 55,
+     "tile": 5116,
+     "type": "heavy_crossbow"
+    },
+    {
+     "max": 20,
+     "name": "cutlass",
+     "price": 24,
+     "tile": 5184,
+     "type": "cutlass"
+    },
+    {
+     "max": 20,
+     "name": "dagger",
+     "price": 21,
+     "tile": 3921,
+     "type": "dagger"
+    },
+    {
+     "max": 20,
+     "name": "halberd",
+     "price": 42,
+     "tile": 5182,
+     "type": "halberd"
+    },
+    {
+     "max": 20,
+     "name": "hammer pick",
+     "price": 26,
+     "tile": 5180,
+     "type": "hammer_pick"
+    },
+    {
+     "max": 20,
+     "name": "katana",
+     "price": 33,
+     "tile": 5118,
+     "type": "katana"
+    },
+    {
+     "max": 20,
+     "name": "kryss",
+     "price": 32,
+     "tile": 5120,
+     "type": "kryss"
+    },
+    {
+     "max": 20,
+     "name": "broadsword",
+     "price": 35,
+     "tile": 3934,
+     "type": "broadsword"
+    },
+    {
+     "max": 20,
+     "name": "longsword",
+     "price": 55,
+     "tile": 3936,
+     "type": "longsword"
+    },
+    {
+     "max": 20,
+     "name": "viking sword",
+     "price": 55,
+     "tile": 5049,
+     "type": "viking_sword"
+    },
+    {
+     "max": 20,
+     "name": "cleaver",
+     "price": 15,
+     "tile": 3778,
+     "type": "cleaver"
+    },
+    {
+     "max": 20,
+     "name": "axe",
+     "price": 40,
+     "tile": 3913,
+     "type": "axe"
+    },
+    {
+     "max": 20,
+     "name": "double axe",
+     "price": 52,
+     "tile": 3915,
+     "type": "double_axe"
+    },
+    {
+     "max": 20,
+     "name": "pickaxe",
+     "price": 22,
+     "tile": 3717,
+     "type": "pickaxe"
+    },
+    {
+     "max": 20,
+     "name": "pitchfork",
+     "price": 19,
+     "tile": 3719,
+     "type": "pitchfork"
+    },
+    {
+     "max": 20,
+     "name": "scimitar",
+     "price": 36,
+     "tile": 5045,
+     "type": "scimitar"
+    },
+    {
+     "max": 20,
+     "name": "skinning knife",
+     "price": 14,
+     "tile": 3780,
+     "type": "skinning_knife"
+    },
+    {
+     "max": 20,
+     "name": "large battle axe",
+     "price": 33,
+     "tile": 5114,
+     "type": "large_battle_axe"
+    },
+    {
+     "max": 20,
+     "name": "war axe",
+     "price": 29,
+     "tile": 5039,
+     "type": "war_axe"
+    },
+    {
+     "max": 20,
+     "name": "bone harvester",
+     "price": 35,
+     "tile": 9915,
+     "type": "bone_harvester"
+    },
+    {
+     "max": 20,
+     "name": "crescent blade",
+     "price": 37,
+     "tile": 9921,
+     "type": "crescent_blade"
+    },
+    {
+     "max": 20,
+     "name": "double bladed staff",
+     "price": 35,
+     "tile": 9919,
+     "type": "double_bladed_staff"
+    },
+    {
+     "max": 20,
+     "name": "lance",
+     "price": 34,
+     "tile": 9920,
+     "type": "lance"
+    },
+    {
+     "max": 20,
+     "name": "pike",
+     "price": 39,
+     "tile": 9918,
+     "type": "pike"
+    },
+    {
+     "max": 20,
+     "name": "scythe",
+     "price": 39,
+     "tile": 9914,
+     "type": "scythe"
+    },
+    {
+     "max": 20,
+     "name": "composite bow",
+     "price": 50,
+     "tile": 9922,
+     "type": "composite_bow"
+    },
+    {
+     "max": 20,
+     "name": "repeating crossbow",
+     "price": 57,
+     "tile": 9923,
+     "type": "repeating_crossbow"
+    }
+   ],
+   "title": "the weaponsmith"
+  },
+  {
+   "buys": [
+    {
+     "name": "scissors",
+     "price": 6,
+     "tile": 3998,
+     "type": "scissors"
+    },
+    {
+     "name": "dyes",
+     "price": 4,
+     "tile": 4009,
+     "type": "dyes"
+    }
+   ],
+   "class": "Weaver",
+   "era": "t2a",
+   "guild": "—",
+   "id": "weaver",
+   "restock_ms": 3600000,
+   "shops": [
+    "SBWeaver"
+   ],
+   "source": "research/06 §2.2.1 + §2.4.1",
+   "stock": [
+    {
+     "max": 20,
+     "name": "dyes",
+     "price": 8,
+     "tile": 4009,
+     "type": "dyes"
+    },
+    {
+     "max": 20,
+     "name": "scissors",
+     "price": 11,
+     "tile": 3998,
+     "type": "scissors"
+    }
+   ],
+   "title": "the weaver"
+  }
+ ]
+}

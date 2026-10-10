@@ -347,7 +347,32 @@ func _run_use(m: int, serial: int, cil: Dictionary, akce: String) -> Dictionary:
 		"open_container":
 			return _open_container(serial)
 		"open_vendor":
-			return _call("vendor", "stock", [serial], akce)
+			# ⚠ SERIAL vs INDEX (2026-10-10): `use` posila SERIAL mobily, ale
+			# `sim.vendor` pracuje s INDEXEM vendora v `data/vendors.json`.
+			# Preklad dela vazba, kterou naplnil `app/main`
+			# (`vendor.zaregistruj_serial`); kdyz vazba neni, rekne se to
+			# slovem - jinak by se ptalo na neexistujici vendory.
+			var v: int = -1
+			if _system("vendor") == null:
+				# System vubec neni - to je "neni k dispozici", ne "neni to
+				# vendor" (test `interaction` to meri presne takhle).
+				return _fail("not_available")
+			if _system("vendor").has_method("vendor_of_serial"):
+				v = int(_system("vendor").vendor_of_serial(serial))
+			if v < 0:
+				return _fail("no_vendor")
+			# ⚠ UDALOST SE MUSI POSLAT (2026-10-10): `vendor.stock()` vraci
+			# SEZNAM a `_call` umi jen slovnik, takze by se vratilo "ok" a
+			# `gump_open` by se NIKDY neposlal - obchodni okno by se neotevrelo
+			# (stejna vada jako u vyroby v 20. session, viz nize).
+			var gump: Dictionary = {}
+			if _system("vendor").has_method("gump_data"):
+				gump = _system("vendor").gump_data(m, v)
+			if not (gump is Dictionary) or str(gump.get("gump", "")) != "vendor":
+				return _fail("no_data")
+			_event("gump_open", gump)
+			return {"ok": true, "action": akce, "reason": "", "vendor": v,
+				"data": gump.get("data", {})}
 		"target":
 			_cursor += 1
 			_event("target_request", {"cursor": cursor(), "kind": "object", "allow_ground": true})

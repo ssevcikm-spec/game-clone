@@ -148,6 +148,9 @@ const UI_KEYS := {
 	# OKNO PRAVIDEL (2026-10-09, D3 jako HUD): `P` jako "politika". Okno je JEN
 	# CTENI (pravidla se needituji ve hre) - klavesa ho jen ukaze/schova.
 	"policy_toggle": [KEY_P],
+	# SEZNAM SKILLU (2026-10-10, D10 "herni zaklady"): `K` jako "skilly". Okno
+	# je JEN CTENI - hodnoty plni `app.main` ze `player.skills`.
+	"skill_list_toggle": [KEY_K],
 }
 
 # Doba jednoho animacniho framu (docs/05 §5.1.1 = `core/const.gd` TURN_MS).
@@ -166,6 +169,7 @@ var camera: Camera2D = null
 # prepina viditelnost - obsah plni `app/main` (UI je tenky klient).
 var backpack = null
 var policy_panel = null            # `ui.policy_panel` - P ho prepina (D3 jako HUD)
+var skill_list = null              # `ui.skill_list` - K ho prepina (D10)
 var debug_overlay = null           # `ui.debug_overlay` - F3 ho prepina
 var okno = null                    # `app.main` - F2 prepina fullsize (bod 5.2)
 
@@ -350,6 +354,12 @@ func _process(_delta: float) -> void:
 			and input_map.akce_just_pressed("policy_toggle"):
 		var pravidla_videt: bool = bool(policy_panel.toggle())
 		print("[controller] okno pravidel: ", "OTEVREL" if pravidla_videt else "ZAVREL")
+	# SEZNAM SKILLU (2026-10-10, D10): `K` ho ukaze/schova. Obsah plni
+	# `app.main._osvezi_skilly()`; okno samo o skillech nic nevi a nic nemeni.
+	if skill_list != null and input_map != null \
+			and input_map.akce_just_pressed("skill_list_toggle"):
+		var skilly_videt: bool = bool(skill_list.toggle())
+		print("[controller] seznam skillu: ", "OTEVREL" if skilly_videt else "ZAVREL")
 	# DEBUG OVERLAY (2026-10-09): `F3` ho schova/zapne. Stav se hlasi do
 	# konzole - ticho by znamenalo, ze hrac nevi, jestli neco zmackl.
 	# Overlay je jen pro cloveka; kdyz neni (test), klavesa nic nedeje.

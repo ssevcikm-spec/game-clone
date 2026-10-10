@@ -51,7 +51,7 @@ POZADAVKY: dict[str, tuple[bool, str]] = {
     "item_properties.json": (False, "research/03 (itemprops_table.tsv)"),
     "monsters.json": (False, "research/06 (tabulky monst)"),
     "spawns.json": (False, "research/06 (regiony)"),
-    "vendors.json": (False, "research/06 (NPC/shopy)"),
+    "vendors.json": (True, "research/06 §2.2.1 + §2.4.1 (NPC/shopy)"),
     "regions.json": (False, "research/06"),
     "moongates.json": (False, "research/06"),
     "dungeons.json": (False, "research/06"),
@@ -611,10 +611,238 @@ def gen_skills(root: Path) -> tuple[bytes, list[dict]]:
 
 
 # =============================================================================
+# vendors.json - vendori a obchody (granule data.vendors, docs/06 §6.6)
+# =============================================================================
+# ZDROJ: `research/06-world-content-npcs.md` §2.2.1 (klasicti shop vendori
+# s seznamem SBInfo) a §2.4.1 (tabulky vsech SBInfo z `Scripts/VendorInfo/*.cs`).
+#
+# CENY JSOU DATA, NE KOD: berou se Z TABULEK (`GenericSellInfo.Add(type, price)`).
+# `value` v `data/items.json` je odvozena z tiledata `count` a je nesmyslna -
+# NAMERENO: iron ingot 1, dagger 20, longsword 6 (mec levnejsi nez dyka). Proto
+# je `value * value_percent` jen FALLBACK pro predmet, ktery v tabulce neni.
+# `buy = ceil(buy_percent/100 * sell)` plati vzdy (`GenericSell.cs:126-129`;
+# research/06 §5.2). Restock 60 min a strop gumpu 250 radku: research/06 §2.3.
+#
+# POTREBUJE JEN `research/06` + `data/items.json` - NIKDY `assets/uo/` (v CI
+# nejsou; proto `vendors.json` NENI v `potrebuji_tiles` v `main()`).
+#
+# Mapovani C# typu na predmet je podle JMENA z `data/items.json` (vlastnosti),
+# ne podle poradi artu: `IronIngot` -> `iron ingot%s` -> typ `iron_ingot`.
+# Co se nenajde, jde do `content-report.json` - nikdy fiktivni tile.
+RESTOCK_MS = 60 * 60 * 1000
+BUY_PERCENT = 190
+VALUE_PERCENT = 100
+GUMP_MAX_ROWS = 250
+GOLD_ART = 0x4EED                      # zlato (`sim/entity/container.gd` case: GOLD)
+VENDOR_ERA = "t2a"
+VENDOR_SOURCE = "research/06 §2.2.1 + §2.4.1"
+
+# Vendory z vyvojovych sad (AoS/SE/SA) - do klasickych shopu nepatri
+# (research/06 §2.2.2). Kdyby zustaly, "vendors.json" by tvrdil pocet vcetne
+# obsahu, ktery tato era nema.
+SB_VYLOUCENE = {
+    "SBNecromancer", "SBMystic", "SBKeeperOfBushido", "SBKeeperOfNinjitsu",
+    "SBPlayerBarkeeper",
+}
+
+# Rucni aliasy pro odchylky jmen, ktere v `data/items.json` opravdu jsou pod
+# jinym nazvem. Kazdy se overuje tim, ze se jmeno opravdu najde - jinak skonci
+# v reportu jako nevyreseny (ticha nahrada by byla horsi nez zadna).
+VENDOR_ALIASY = {"smith hammer": "smith's hammer"}
+
+VENDOR_RADEK = re.compile(r"^\|\s*\*\*(?P<cls>[A-Za-z]+)\*\*")
+VENDOR_SB = re.compile(r"`(SB[A-Za-z]+)`")
+SB_NAZEV = re.compile(r"^#### `(SB[A-Za-z]+)`")
+SB_STOCK = re.compile(r"\|\s*([A-Za-z][A-Za-z0-9]*)\s*\|\s*(\d+)\s*\|\s*(\d+)\s*\|")
+SB_BUY = re.compile(r"\|\s*([A-Za-z][A-Za-z0-9]*)\s*\|\s*(\d+)\s*\|")
+
+
+def parsuj_vendory(text: str) -> list[dict]:
+    """§2.2.1 tabulka `Class | Title | Guild | ... | SBInfo | ...`."""
+    v_oddilu = False
+    out: list[dict] = []
+    for radek in text.splitlines():
+        if radek.startswith("#### "):
+            if radek.startswith("#### 2.2.1"):
+                v_oddilu = True
+                continue
+            if v_oddilu:
+                break
+        if not v_oddilu or not VENDOR_RADEK.match(radek):
+            continue
+        bunky = [b.strip() for b in radek.strip().strip("|").split("|")]
+        if len(bunky) < 6:
+            continue
+        out.append({
+            "class": bunky[0].replace("*", "").strip(),
+            "title": bunky[1], "guild": bunky[2],
+            "shops": VENDOR_SB.findall(bunky[5]),
+        })
+    return out
+
+
+def parsuj_sb(text: str) -> dict:
+    """§2.4.1 vsechny SBInfo: jmeno -> {stock: [(typ, cena, max)], buys: [(typ, cena)]}."""
+    out: dict[str, dict] = {}
+    aktualni: str | None = None
+    for radek in text.splitlines():
+        m = SB_NAZEV.match(radek)
+        if m:
+            aktualni = m.group(1)
+            out[aktualni] = {"stock": [], "buys": []}
+            continue
+        if radek.startswith("### "):
+            aktualni = None
+            continue
+        if aktualni is None:
+            continue
+        m3 = SB_STOCK.match(radek)
+        if m3:
+            out[aktualni]["stock"].append((m3.group(1), int(m3.group(2)), int(m3.group(3))))
+            continue
+        m2 = SB_BUY.match(radek)
+        if m2:
+            out[aktualni]["buys"].append((m2.group(1), int(m2.group(2))))
+    return out
+
+
+def vendor_kandidati(nazev: str) -> list[str]:
+    """C# typ -> kandidati na jmeno v `data/items.json` (poradi je dane)."""
+    zaklad = camel_jmeno(nazev).lower()
+    kandidati = [zaklad]
+    for role, jmeno in NASTROJE.items():
+        if role == zaklad and jmeno.lower() != zaklad:
+            kandidati.append(jmeno.lower())
+    for klic, hodnota in VENDOR_ALIASY.items():
+        if klic == zaklad and hodnota not in kandidati:
+            kandidati.append(hodnota)
+    return kandidati
+
+
+def gen_vendors(root: Path) -> tuple[bytes, list[dict]]:
+    """Vraci (bajty `data/vendors.json`, seznam nevyresenych referenci)."""
+    cesta = root / "research/06-world-content-npcs.md"
+    if not cesta.exists():
+        raise ValueError("research/06-world-content-npcs.md chybi - bez nej vendory nelze vygenerovat")
+    items_cesta = root / "data/items.json"
+    if not items_cesta.exists():
+        raise ValueError("data/items.json chybi - spust `--only items` (jmena predmetu)")
+    text = cesta.read_text(encoding="utf-8")
+    vendory = parsuj_vendory(text)
+    sb = parsuj_sb(text)
+    if not vendory:
+        raise ValueError("research/06 §2.2.1: tabulka klasickych vendoru se neprecetla")
+    if len(sb) < 50:
+        raise ValueError(f"research/06 §2.4.1: precteno {len(sb)} SBInfo, ocekavano ~88")
+
+    podle_jmena: dict[str, list[dict]] = {}
+    for rec in json.loads(items_cesta.read_text(encoding="utf-8")):
+        if isinstance(rec, dict) and rec.get("name"):
+            podle_jmena.setdefault(str(rec["name"]).lower(), []).append(rec)
+
+    nevyresene: list[dict] = []
+    zaznamy: list[dict] = []
+
+    def najdi_predmet(nazev: str) -> dict | None:
+        for kandidat in vendor_kandidati(nazev):
+            nalezy = najdi(podle_jmena, kandidat)
+            if nalezy:
+                return nalezy[0]
+        return None
+
+    def radek(rec: dict, cena: int, maximum: int | None) -> dict:
+        out = {
+            "type": str(rec.get("type", "")),
+            "tile": int(rec["tile"]),          # TILEDATA ID (prostor `data/items.json`)
+            "name": str(rec["name"]).replace("%s", "").replace("%", "").strip(),
+            "price": cena,
+        }
+        if maximum is not None:
+            out["max"] = maximum
+        return out
+
+    for v in vendory:
+        stock: list[dict] = []
+        buys: list[dict] = []
+        videne_stock: set[str] = set()
+        videne_buys: set[str] = set()
+        pouzite: list[str] = []
+        for jmeno_sb in v["shops"]:
+            if jmeno_sb in SB_VYLOUCENE or jmeno_sb.startswith(("SBSE", "SBSA")):
+                continue
+            tabulka = sb.get(jmeno_sb)
+            if tabulka is None:
+                nevyresene.append({"soubor": "vendors.json", "kind": "sb",
+                                   "nazev": f"{v['class']}/{jmeno_sb}",
+                                   "duvod": "SBInfo v §2.4.1 neni"})
+                continue
+            pouzite.append(jmeno_sb)
+            for nazev, cena, maximum in tabulka["stock"]:
+                rec = najdi_predmet(nazev)
+                if rec is None:
+                    nevyresene.append({
+                        "soubor": "vendors.json", "kind": "stock",
+                        "nazev": f"{v['class']}/{jmeno_sb}/{nazev}",
+                        "duvod": "jmeno neni v data/items.json (v instalaci chybi)"})
+                    continue
+                typ = str(rec.get("type", ""))
+                if typ in videne_stock:
+                    continue           # prvni vyskyt vyhrava (poradi SB je dane)
+                videne_stock.add(typ)
+                stock.append(radek(rec, cena, maximum))
+            for nazev, cena in tabulka["buys"]:
+                rec = najdi_predmet(nazev)
+                if rec is None:
+                    nevyresene.append({
+                        "soubor": "vendors.json", "kind": "buys",
+                        "nazev": f"{v['class']}/{jmeno_sb}/{nazev}",
+                        "duvod": "jmeno neni v data/items.json (v instalaci chybi)"})
+                    continue
+                typ = str(rec.get("type", ""))
+                if typ in videne_buys:
+                    continue
+                videne_buys.add(typ)
+                buys.append(radek(rec, cena, None))
+        if not stock or not buys:
+            # Vendor bez zbozi nebo bez poptavky neni shop: do dat nepatri a
+            # MUSI byt videt (jinak by "54 vendoru" bylo cislo z tabulky, ne z dat).
+            nevyresene.append({
+                "soubor": "vendors.json", "kind": "vendor",
+                "nazev": f"{v['class']} ({','.join(pouzite) or '-'})",
+                "duvod": f"nevyreseno: stock {len(stock)}, buys {len(buys)}"})
+            continue
+        zaznamy.append({
+            "id": slug(v["class"]), "class": v["class"], "title": v["title"],
+            "guild": v["guild"], "shops": pouzite, "restock_ms": RESTOCK_MS,
+            "source": VENDOR_SOURCE, "era": VENDOR_ERA,
+            "stock": stock, "buys": buys,
+        })
+
+    zaznamy.sort(key=lambda r: r["id"])        # deterministicke poradi
+    data = {
+        "config": {
+            "buy_percent": BUY_PERCENT, "value_percent": VALUE_PERCENT,
+            "restock_ms": RESTOCK_MS, "gump_max_rows": GUMP_MAX_ROWS,
+            "gold_art": GOLD_ART, "source": VENDOR_SOURCE, "era": VENDOR_ERA,
+            "_popis": [
+                "Ceny jsou TADY (data), ne v kódu: `stock[].price` = tabulkova cena",
+                "shopu (kolik dostane hrac za kus), `buys[].price` = tabulkova cena,",
+                "`buy_price = ceil(buy_percent/100 * sell_price)` (`GenericSell.cs:126-129`).",
+                "Predmet, ktery v tabulce neni, se oceni fallbackem `value_percent` z `value`",
+                "v `data/items.json` - NAMERENE nespolehlive (longsword 6 vs dagger 20),",
+                "proto je to fallback, ne zaklad. `restock_ms` = 60 min (research/06 §2.3).",
+            ],
+        },
+        "vendors": zaznamy,
+    }
+    return bajty(data), nevyresene
+
+
+# =============================================================================
 # rozdeleni prace: generatory, report, zapis
 # =============================================================================
 GENERATORY = {"items.json": gen_items, "recipes.json": gen_recipes,
-              "skills.json": gen_skills}
+              "skills.json": gen_skills, "vendors.json": gen_vendors}
 
 
 def bajty(json_obj) -> bytes:
