@@ -104,8 +104,11 @@ Sloupce (povinné): `name`, `tile`, `skill_used`, `hands`, `min_damage`,
 
 **Známá mezera, kterou je potřeba dořešit:** `layer` **není** v serverových
 zdrojích (ServUO ho bere z tiledata: `Layer = (Layer)ItemData.Quality`).
-→ Vrstvy se doplní **až z vyřešeného `tiledata.mul`** (O1) a do té doby je
+→ Vrstvy se doplní **z `tiledata.mul`** a do té doby je
 `layer: null` + `layer_source: "pending-tiledata"`. **Nikdy nehádat.**
+*(Aktualizováno 2026-10-10: dřív tu stálo „až z **vyřešeného** `tiledata.mul`
+(O1)" — **O1 je vyřešený** (`docs/11`:124: land 512×30 B, item 2048×41 B,
+rezerva 0 B), takže chybí jen **port do extraktoru**, ne rozluštění formátu.)*
 
 Materiály (kovy): iron, copper, bronze, gold, agapite, verite, valorite
 (+ jejich bonusy k damage/trvanlivosti v `research/03`).

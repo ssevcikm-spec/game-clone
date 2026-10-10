@@ -522,7 +522,9 @@ vybírat (vše `_src/…`, piny v `research/REJSTRIK-REFERENCI.md`):
    takže volba „pre-AoS damage/obrana" dnes znamená jen jinou tabulku v `docs/05`
    a `data/balance.json`; po M5 by to byl přepis hotového systému.
 
-**K rozhodnutí uživateli (otevřené):** (a) éra **obsahu předmětů a souboje**
+**⚠ HISTORICKÉ — k rozhodnutí uživateli (otevřené):** *(seznam z 2026-10-06,
+**níž je rozhodnutí**: kdo čte jen tenhle odstavec, plánuje podle neplatného
+stavu)* (a) éra **obsahu předmětů a souboje**
 (T2A klasika vs AoS itemizace), (b) zda zapnout **tooltipy** i v klasice
 (ModernUO to má jako config `opl.enable`, `ExpansionConfiguration.cs:10`),
 (c) zda vlastní vrstva „kov + úroveň" bude **místo** AoS atributů, nebo **vedle**
@@ -608,5 +610,8 @@ varianta **C** (3 s, 30 %) ≈ **360/h na stat** ≈ 1080/h.
 **Doporučení pro singleplayer (a proč):** zapnout prodlevu na **1–3 s** a šanci
 **20–30 %**. Vypnutá prodleva hru nezrychlí — jen zruší pojistku proti exploitu;
 skutečným limitem zůstává 5% hod. Krátká prodleva dělá růst **předvídatelným**
-(≈1000/h), což je v jednohráčovi čitelnější než náhodné skoky. **Rozhodnutí
-uživatele je otevřené** — hodnota patří do `data/balance.json`.
+(≈1000/h), což je v jednohráčovi čitelnější než náhodné skoky. **✅ ROZHODNUTO
+2026-10-06: prodleva 2 s, šance 25 %** (hodnota je v `data/balance.json`
+a laditelná; tohle doporučení 1–3 s / 20–30 % je jeho zdroj, ne otevřená
+otázka). *(Do 2026-10-10 tu stálo „Rozhodnutí uživatele je otevřené" — text
+zůstal po rozhodnutí, což je past pro každého, kdo čte jen konec oddílu.)*

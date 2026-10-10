@@ -142,3 +142,35 @@ na čtyřiceti.
   držet", bez nich by se sada nedala vyrenderovat znovu.
 * **Co se tím nemění:** `assets/uo/` zůstává ignorované a hra dál čte jen
   `assets/uo/`; `assets/own/` se zapojí až integrační granule.
+
+## 9. DOPLNĚNO 2026-10-10 (druhý krok koleje) — srovnání 1× vs 2×
+
+**Proč:** uživatel se ptá, jak dosáhnout hezčí a „modelovější" grafiky. Odpověď
+se nemá hádat — má se ukázat na obrázku. Naměřeno 2026-10-10: původní art má
+dlaždici **vždy 44×44 s 1 012 neprůhlednými pixely**, **13–34 % pixelů
+v dither-like vzoru** a jen **88–100 unikátních barev** na dlaždici; to je
+důvod, proč vypadá staře (ne rozlišení monitoru).
+
+**Co vyrobit (nad rámec §3):**
+
+1. Týž předmět (dýka) vyrenderovat **ve 2× geometrii**: diamant **88×44**,
+   `Z_SCALE 8` (poměr 2 : 1 zůstává, takže relace `ISO_STEP == TILE_W/2`
+   platí dál a brána `G1` se nerozbíjí „principem", jen konstantami).
+2. Ke 2× spritu přidat to, co dělá „reálný model": **jedno směrové slunce +
+   jemný ambient occlusion + kontaktní stín pod objektem** (aby objekt stál
+   NA dlaždici, ne byl nalepený).
+3. Jeden kontaktní list `tools/artgen/_srovnani-1x-2x.png` se třemi sloupci:
+   **původní UO sprite | náš 1× | náš 2× (AO + stín)**, ve stejném měřítku,
+   a k tomu **výřez 1 : 1**, aby bylo vidět, co vyšší rozlišení znamená.
+4. Do `MERENI.md` přidat, **kolik času navíc stojí 2× varianta** (render
+   i postprocess) — z toho se počítá cena celé sady.
+5. `read_image` na výsledek a **napsat, co je na něm špatně** (povinné).
+
+**Co to NEMĚNÍ:** geometrii hry (`core/const.gd`, 44×44, `Z_SCALE 4`) ani
+renderer — 2× je zatím jen **vyrenderovaná varianta pro rozhodnutí**. Přepnutí
+geometrie je samostatná koordinovaná změna (`core/const.gd`, literály
+v `render/chunk_renderer.gd` které hlídá `G1`, `docs/02` §2.4, výchozí zoom)
+a patří do plánu, ne do artové koleje.
+
+**Obrázky zůstávají necommitované** (§8) — i srovnávací list je snímek
+s artem z instalace UO.
