@@ -1,0 +1,315 @@
+{
+ "anim": {
+  "duvod": "2x vetev kresli JEN smer 0 (ZADANI-25 §9 odst. 2)",
+  "file": "anim/anim-sheets.json",
+  "frame_ms": 80,
+  "framu": 8,
+  "id_klic": "body*1000 + action*100 + dir*10 + frame",
+  "pixels_decoded": true,
+  "smeru": 1
+ },
+ "generator": "tools/artgen/pack_atlas_2x.py",
+ "pad": 1,
+ "page_size": 2048,
+ "pages": [
+  {
+   "count": 8,
+   "file": "atlas/anim_0.png",
+   "h": 2048,
+   "w": 2048
+  },
+  {
+   "count": 1,
+   "file": "atlas/item_0.png",
+   "h": 2048,
+   "w": 2048
+  }
+ ],
+ "report": {
+  "anim_box_2x": {
+   "400000": [
+    46,
+    152
+   ],
+   "400001": [
+    46,
+    152
+   ],
+   "400002": [
+    46,
+    152
+   ],
+   "400003": [
+    46,
+    152
+   ],
+   "400004": [
+    46,
+    152
+   ],
+   "400005": [
+    46,
+    152
+   ],
+   "400006": [
+    46,
+    152
+   ],
+   "400007": [
+    46,
+    152
+   ]
+  },
+  "anim_framu": 8,
+  "anim_listy": 1,
+  "anim_meritko_max": 0.090566,
+  "anim_meritko_min": 0.090566,
+  "anim_obsah_pod_kontaktem_max_px": 11.91,
+  "anim_obsah_sirka_px": {
+   "400000": 31,
+   "400001": 31,
+   "400002": 31,
+   "400003": 31,
+   "400004": 31,
+   "400005": 31,
+   "400006": 31,
+   "400007": 31
+  },
+  "anim_obsah_vyska_px": {
+   "400000": 121,
+   "400001": 121,
+   "400002": 121,
+   "400003": 121,
+   "400004": 121,
+   "400005": 121,
+   "400006": 121,
+   "400007": 121
+  },
+  "anim_pozadovano": 8,
+  "anim_px_na_jednotku": [
+   63.66
+  ],
+  "anim_rovina_sirka_px": [
+   89
+  ],
+  "anim_stin_max_alfa": 111,
+  "anim_stin_px_max": 723,
+  "anim_stin_px_min": 723,
+  "anim_vyrobeno": 8,
+  "item_box_2x": {
+   "3921": [
+    50,
+    69
+   ]
+  },
+  "item_meritko_max": 0.097345,
+  "item_meritko_min": 0.097345,
+  "item_obsah_pod_kontaktem_max_px": 9.72,
+  "item_obsah_sirka_px": {
+   "3921": 21
+  },
+  "item_obsah_vyska_px": {
+   "3921": 23
+  },
+  "item_pozadovano": 1,
+  "item_px_na_jednotku": [
+   68.42
+  ],
+  "item_rovina_sirka_px": [
+   96
+  ],
+  "item_stin_max_alfa": 118,
+  "item_stin_px_max": 182,
+  "item_stin_px_min": 182,
+  "item_vyrobeno": 1
+ },
+ "source": {
+  "2x_kontrakt": {
+   "1x_tile_px": 44,
+   "diamond": "1:1 (kosoctverec 88x88) - ZADANI-25 §3 OPRAVA, viz docstring",
+   "ground_px": 44,
+   "iso_step_px": 44,
+   "jednotka_vysky_px": 88,
+   "kam_azimut_deg": 45.0,
+   "kam_elevace_deg": 35.26439,
+   "kotva": "item/anim: ox=(w>>1)-44, oy=h-88; land: 0,0",
+   "mirror_x": true,
+   "odvozeno_z": "artgen_common.py (1x kontrakt se nemeni)",
+   "ortho_scale": 1.4545454545454546,
+   "pomer_proti_1x": 2.0,
+   "px_per_unit": 704,
+   "render_px": 1024,
+   "tile_px": 88,
+   "vystred_y": 1.732051,
+   "z_scale_px_na_jednotku": 88
+  },
+  "blender": "5.2.1 LTS (BLENDER_EEVEE, film_transparent, Fast-GI AO)",
+  "geometrie": "1 jednotka = 1 dlazdice = 88 px; kotva jako UO 2x (ox=(w>>1)-44, oy=h-88)",
+  "kamera": {
+   "azimut_deg": 45.0,
+   "elevace_deg": 35.26439,
+   "svisle_roztazeni": 1.732051,
+   "zrcadleni_x": true
+  },
+  "pipeline": "tools/artgen (build_model_2x.py -> render_2x.py -> postprocess_2x.py)",
+  "px_per_unit": 704,
+  "render_px": 1024,
+  "svetlo": "jedno smerove slunce + Fast-GI AO + kontaktni stin (renderovany z kontaktni roviny, viz postprocess_2x.py)"
+ },
+ "sprites": [
+  {
+   "h": 152,
+   "id": 400000,
+   "kind": "anim",
+   "ox": -21,
+   "oy": 64,
+   "page": "atlas/anim_0.png",
+   "rect": [
+    0,
+    0,
+    46,
+    152
+   ],
+   "w": 46,
+   "x": 0,
+   "y": 0
+  },
+  {
+   "h": 152,
+   "id": 400001,
+   "kind": "anim",
+   "ox": -21,
+   "oy": 64,
+   "page": "atlas/anim_0.png",
+   "rect": [
+    47,
+    0,
+    93,
+    152
+   ],
+   "w": 46,
+   "x": 47,
+   "y": 0
+  },
+  {
+   "h": 152,
+   "id": 400002,
+   "kind": "anim",
+   "ox": -21,
+   "oy": 64,
+   "page": "atlas/anim_0.png",
+   "rect": [
+    94,
+    0,
+    140,
+    152
+   ],
+   "w": 46,
+   "x": 94,
+   "y": 0
+  },
+  {
+   "h": 152,
+   "id": 400003,
+   "kind": "anim",
+   "ox": -21,
+   "oy": 64,
+   "page": "atlas/anim_0.png",
+   "rect": [
+    141,
+    0,
+    187,
+    152
+   ],
+   "w": 46,
+   "x": 141,
+   "y": 0
+  },
+  {
+   "h": 152,
+   "id": 400004,
+   "kind": "anim",
+   "ox": -21,
+   "oy": 64,
+   "page": "atlas/anim_0.png",
+   "rect": [
+    188,
+    0,
+    234,
+    152
+   ],
+   "w": 46,
+   "x": 188,
+   "y": 0
+  },
+  {
+   "h": 152,
+   "id": 400005,
+   "kind": "anim",
+   "ox": -21,
+   "oy": 64,
+   "page": "atlas/anim_0.png",
+   "rect": [
+    235,
+    0,
+    281,
+    152
+   ],
+   "w": 46,
+   "x": 235,
+   "y": 0
+  },
+  {
+   "h": 152,
+   "id": 400006,
+   "kind": "anim",
+   "ox": -21,
+   "oy": 64,
+   "page": "atlas/anim_0.png",
+   "rect": [
+    282,
+    0,
+    328,
+    152
+   ],
+   "w": 46,
+   "x": 282,
+   "y": 0
+  },
+  {
+   "h": 152,
+   "id": 400007,
+   "kind": "anim",
+   "ox": -21,
+   "oy": 64,
+   "page": "atlas/anim_0.png",
+   "rect": [
+    329,
+    0,
+    375,
+    152
+   ],
+   "w": 46,
+   "x": 329,
+   "y": 0
+  },
+  {
+   "h": 69,
+   "id": 3921,
+   "kind": "item",
+   "ox": -19,
+   "oy": -19,
+   "page": "atlas/item_0.png",
+   "rect": [
+    0,
+    0,
+    50,
+    69
+   ],
+   "w": 50,
+   "x": 0,
+   "y": 0
+  }
+ ],
+ "version": 1
+}

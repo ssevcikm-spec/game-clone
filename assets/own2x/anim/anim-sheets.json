@@ -1,0 +1,122 @@
+{
+ "actions": {
+  "0": "walk"
+ },
+ "anchor": "obrazek se kresli na (tile_x - cx, tile_y - (cy + h)); cy je -44, takze kontaktni bod je 44 px nad spodni hranou spritu (2x hodnota 1x kontraktu)",
+ "chyby": [],
+ "decoder": "tools/artgen/pack_atlas_2x.py (2x render Blenderu, kontaktni stin)",
+ "sprites": {
+  "400/0/0": {
+   "action": "walk",
+   "file": "own2x-400-0-0.png",
+   "frames": [
+    {
+     "cx": 23,
+     "cy": -44,
+     "h": 152,
+     "pixely_mimo": 0,
+     "rect": [
+      0,
+      0,
+      46,
+      152
+     ],
+     "w": 46
+    },
+    {
+     "cx": 23,
+     "cy": -44,
+     "h": 152,
+     "pixely_mimo": 0,
+     "rect": [
+      46,
+      0,
+      92,
+      152
+     ],
+     "w": 46
+    },
+    {
+     "cx": 23,
+     "cy": -44,
+     "h": 152,
+     "pixely_mimo": 0,
+     "rect": [
+      92,
+      0,
+      138,
+      152
+     ],
+     "w": 46
+    },
+    {
+     "cx": 23,
+     "cy": -44,
+     "h": 152,
+     "pixely_mimo": 0,
+     "rect": [
+      138,
+      0,
+      184,
+      152
+     ],
+     "w": 46
+    },
+    {
+     "cx": 23,
+     "cy": -44,
+     "h": 152,
+     "pixely_mimo": 0,
+     "rect": [
+      184,
+      0,
+      230,
+      152
+     ],
+     "w": 46
+    },
+    {
+     "cx": 23,
+     "cy": -44,
+     "h": 152,
+     "pixely_mimo": 0,
+     "rect": [
+      230,
+      0,
+      276,
+      152
+     ],
+     "w": 46
+    },
+    {
+     "cx": 23,
+     "cy": -44,
+     "h": 152,
+     "pixely_mimo": 0,
+     "rect": [
+      276,
+      0,
+      322,
+      152
+     ],
+     "w": 46
+    },
+    {
+     "cx": 23,
+     "cy": -44,
+     "h": 152,
+     "pixely_mimo": 0,
+     "rect": [
+      322,
+      0,
+      368,
+      152
+     ],
+     "w": 46
+    }
+   ],
+   "source": "assets/own2x"
+  }
+ },
+ "version": 1
+}

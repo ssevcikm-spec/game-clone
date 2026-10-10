@@ -187,3 +187,185 @@ python tools\artgen\contact_sheet.py           # kontaktní list na POHLED
 skriptu** (traceback na stderr). Proto každý krok kontroluje i *výstup*
 (`BUILD_OK`, `RENDER_OK`, existence PNG) a `run_all.py` na tom má bránu —
 „nespadlo to" není důkaz.
+
+---
+
+## 8. DOPLNĚNO 2026-10-10 (druhý krok koleje) — 2× varianta: co vzniklo a co stálo
+
+> **Co je tenhle oddíl:** **doplněk k měření** (nic výše se nepřepisuje), vznikl
+> z `ZADANI-25` §9 — „vyrobit 2× variantu téhož artu a srovnávací list, ze
+> kterého se dá rozhodnout". **Odkud brát současný stav:** `assets/own2x/manifest.json`
+> (`report`), `tools/artgen/_casy-2x.json`, `tools/artgen/_srovnani-1x-2x.png`.
+> **1× sada se neměnila** — `assets/own/` je pořád tentýž (brána `pack_atlas.py
+> --check` po celou dobu **476 kontrol / 0 chyb**).
+
+### 8.1 Co se vyrobilo (a kam to leží)
+
+| Co | 1× (`assets/own/`) | 2× (`assets/own2x/`) |
+|---|---|---|
+| dlaždice | 2 (44 × 44, krok 22, `ox=oy=0`) | **nedělá se** — §9 ji nechce (a „diamant 88×44" je rozpor, viz 8.5) |
+| dýka (item 3921) | obsah **11 × 12** px v boxu 14 × 28 | obsah **21 × 23** px v boxu 50 × 69 |
+| postava (tělo 400, směr 0) | 8 framů, obsah **60** px, box 18 × 76 | 8 framů, obsah **121** px, box 46 × 152 |
+| kotva | `ox=(w>>1)−22`, `oy=h−44` | `ox=(w>>1)−44`, `oy=h−88` |
+| render | 512 px, 352 px/jednotka, 3 slunce | 1024 px, 704 px/jednotka, **1 směrové slunce + Fast-GI AO + kontaktní stín** |
+| spritů celkem | **46** (2 land + 4 item + 40 anim) | **9** (1 item + 8 anim) |
+| skripty | `artgen_common.py`, `build_model_*.py`, `render_sprites.py`, `postprocess.py`, `pack_atlas.py` | `artgen_common_2x.py`, `artgen_blender_2x.py`, `build_model_2x.py`, `render_2x.py`, `postprocess_2x.py`, `pack_atlas_2x.py` |
+| zdroje | `blend/*.blend` | `blend/2x_*.blend` (předpona, aby `.blend1` chytil existující `.gitignore`) |
+| obrázky | `raw/` (ignorováno) | `_raw2x/` (ignorováno vzorem `tools/artgen/_*`) |
+
+**Kontaktní stín je renderovaný, ne dokreslovaný:** `render_2x.py` vyrenderuje
+kontaktní rovinu (přesně 1 × 1 jednotky = půdorys dlaždice, ověřeno sondou
+`probe_rovina.py`) dvakrát — **s objektem** a **bez objektu** — a
+`postprocess_2x.py` z poměru jasu počítá faktor zastínění
+(`1 − jas_stín/jas_ref`, naměřeno **0,163** v nejsilnějším místě). Vrstva se
+pak ztlumí radiálním úbytkem (0,14 → 0,34 jednotky), aby to byl **kontaktní**
+stín a ne dlouhý vrh přes celou dlaždici. Blender 5.2 na téhle stanici má
+v enumu engine **jen `BLENDER_EEVEE`** (Cycles není), takže shadow catcher
+(`object.is_shadow_catcher`) je nedostupný — měřeno sondou
+`probe_blender_capabilities.py`, ne odhadnuto.
+
+### 8.2 Naměřené časy (jeden běh, `python tools/artgen/mereni_2x.py`)
+
+**Postup:** skript měří **obě varianty teď a tady** na **téže práci** (dýka =
+1 sprite, postava = 8 framů směru 0, postprocess = týchž 9 spritů). Render se
+měří jako `subprocess` + `perf_counter` (celý běh Blenderu), postprocess
+**in-process** (bez startu Pythonu a bez zápisu), aby se porovnávalo totéž.
+Čísla jsou **jeden běh** — na téhle stanici kolísají o ±15 %.
+
+| Fáze | 1× | 2× | 2× / 1× |
+|---|---|---|---|
+| **render** dýka (1 sprite), celý proces | **5,88 s** | **6,79 s** | 1,15× |
+| — z toho práce v Blenderu | 1,30 s | 2,24 s | 1,7× |
+| **render** postava (8 framů), celý proces | **7,29 s** | **11,26 s** | 1,54× |
+| — z toho práce v Blenderu | 2,72 s | 6,70 s | 2,5× |
+| **postprocess** 9 spritů (příprava + sesazení) | **1,32 s** | **6,99 s** | **5,3×** |
+| — z toho 1 předmět | 0,10 s | 0,78 s | 7,6× |
+| — z toho 8 framů postavy | 0,77 s | 6,21 s | 8,1× |
+| **na 1 sprite** (render + postprocess) | **~0,34 s** | **~0,91 s** | **2,7×** |
+
+**Kde je čas uvnitř 2× renderu** (z `CAS pass=…`, součty za běh):
+
+| Průchod | dýka | postava (8 framů) |
+|---|---|---|
+| `beauty` (objekt s alfou) | 1,60 s (1. frame = kompilace shaderů) | 2,28 s = **0,29 s/frame** |
+| `stin` (rovina + objekt) | 0,31 s | 2,73 s = **0,34 s/frame** |
+| `ref` (rovina bez objektu) | 0,33 s | 1,67 s (jednou za dávku) |
+| start Blenderu + načtení .blend | ~4,5 s | ~4,5 s |
+
+**Překvapení, které stojí za zapsání:** `beauty` průchod je na frame u **2×
+LEVNĚJŠÍ** (0,29 s) než u 1× (0,34 s) — 2× má **jedno slunce místo tří**
+(míň shadow map) a shadery se zkompilují už při `ref` průchodu. Rozlišení
+1024² proti 512² je u takhle malé scény skoro zdarma; drahé je **světlo
+a druhé kolo renderu**, ne pixely.
+
+**Cena celé sady (přepočet, ne měření):** při ~0,91 s/sprite by 7 519 spritů
+facety vyšlo na **~1,9 h stroje** místo ~0,7 h u 1× (pilot §5: 63 min). Stroj
+tedy ani ve 2× není úzké hrdlo — tím zůstává **kontrola pohledem a autorství
+modelů** (pilot §5).
+
+**Plocha v atlase (měřená cena, která se snadno přehlédne):**
+
+| Prvek | 1× box | 2× box | plocha |
+|---|---|---|---|
+| dýka | 14 × 28 = 392 px² | 50 × 69 = 3 450 px² | **8,8×** |
+| postava | 18 × 76 = 1 368 px² | 46 × 152 = 6 992 px² | **5,1×** |
+
+Z rozlišení by vyšlo 4×; zbytek (u dýky víc než dvojnásobek) dělá **box
+nafouknutý kontaktním stínem** — sprite musí mít místo na stín kolem kontaktu.
+Stránka 2048² je 16 MB ve VRAM bez ohledu na PNG, takže 2× sada spotřebuje
+~5–9× víc stránek na tentýž obsah.
+
+### 8.3 Co je na 2× vidět lépe a co ne (měřeno na `_srovnani-1x-2x.png`)
+
+Čísla v tomhle oddílu měří `probe_2x.py` (barvy, ostrost hrany, krytí stínu)
+a `srovnani_1x_2x.py` (poměr obsahu, kotvy, stín) — nic z toho není od oka.
+
+**Lépe (a je to vidět na první pohled):**
+
+1. **Předmět STOJÍ na dlaždici.** Kontaktní stín pod dýkou i pod nohama
+   postavy je to, co v 1× (a v UO) chybí — bez něj je art „nalepený na
+   podklad". Naměřeno: stín má u dýky **56 viditelných poloprůhledných pixelů**
+   (ze 182 v celé vrstvě — zbytek je pod objektem), u postavy **418** (ze 723),
+   průměrné krytí 87/255 resp. 73/255.
+2. **Hrany jsou hladké (antialias), ne schodovité.** 2× sprite má na hranici
+   obsahu víc pixelů, takže přechod je plynulejší — měřeno průměrem |Laplace|
+   alfy na hraně obsahu: UO **1,54** · 1× **0,79** · 2× **0,53** (dýka).
+3. **Je na čem stavět detaily** — při pohledu 1 : 1 (řada B2/A2 listu) je
+   vidět, že 2× art unese tvar, který se do 44px dlaždice nevejde.
+
+**Hůř (a je to taky měřené):**
+
+1. **Ve stejném měřítku je 2× MĚKČÍ, ne ostřejší.** Po zmenšení na polovinu
+   (`postprocess.zmensi`) spadne ostrost hrany z 0,79 (1×) na **0,34**
+   (2×/2) — tedy *méně* než polovina. Kdo čeká, že „2× = ostřejší", dostane
+   opak: rozlišení se při zobrazení ve 44px měřítku **zahodí**.
+2. **2× není pixel art.** Je to antialiasovaný render — do sady UO stylu se
+   nehodí vedle ručně kreslených spritů (vypadá „vyhlazeně").
+3. **Barvy jsou o ~8 % tmavší** (jedno slunce + AO místo tří sluncí): dýka
+   (71, 67, 61) proti 1× (79, 72, 63); postava (109, 103, 101) proti
+   (117, 109, 106).
+4. **Box spritu se nafoukne** (8,8× u dýky, 5,1× u postavy) → víc stránek
+   atlasu a víc VRAM (viz 8.2).
+5. **Postprocess je 5–8× dražší** — a to je z celé 2× větve **nejdražší
+   položka** (6,99 s proti 1,32 s na 9 spritů).
+
+### 8.4 Co se muselo ručně sáhnout (a co to bylo za pasti)
+
+| # | Vada | Kdo ji našel | Poznámka |
+|---|---|---|---|
+| 1 | `fast_gi_method = "AMBIENT_OCCLUSION"` **neexistuje** (je `AMBIENT_OCCLUSION_ONLY`) | běh + `BUILD_OK` v výstupu | Blender přitom vrátil **exit 0** a traceback šel na stderr — přesně past ze ZADANI-25 §2. Skript teď hodnotu **vybírá z reálného enumu** a když ji nenajde, **spadne** (AO se nesmí tiše vynechat) |
+| 2 | **Postava oříznutá o hlavu** — 2× kamera mířila na kontakt (0,0,0), 1× míří na `(0, 0, world_h/2)` | **pohled** na náhled | obsah renderu začínal na `y=0`; spadlo by to jen na listu |
+| 3 | **1× větev hledala kontaktní rovinu**, kterou 1× scéna nemá | `RENDER_OK` ve výstupu | 1× .blend se nemění, takže `prepna_rovina` musí být podmíněná |
+| 4 | **1× měření otevíralo `2x_*.blend`** (natvrdo zapsané jméno) | `mereni_2x.py` (porovnával 1024 px s 512 px) | proto má `MERITKA` klíč `prefix` |
+| 5 | **Srovnávací list tiše zkrátil skupinu z 8 framů na 3** a u 2× zmenšil jen třetí frame | **pohled** na list | `g[:2] + [g[2].zmenseny(0.5)]` — vypadalo to jako „chybí framy" |
+| 6 | **Bunky listu ořezávaly spritu hlavu** (kotva se počítala jako `výška − 34`) | **pohled** na list | kotva se teď počítá z `ax`/`ay` všech framů skupiny |
+| 7 | **Brána „1 jednotka = 88 px" hlásila chybu u správného artu** | běh brány | měřeno: 1 jednotka je ve spritu **68,4 px** (dýka) a **63,7 px** (postava) — sprite se normalizuje na **naměřený obsah UO**, ne na pevné měřítko. Brána byla předělaná na to, co platit MÁ (poloměr stínu se musí vejít nad kontakt), a čísla se **hlásí**, nehlídají |
+| 8 | **Dvě zmínky o „diamant 88×44"** v zadání §9 proti měřené opravě §3 (1 : 1) | čtení zadání | vyřešeno jako **88 × 88** (kosočtverec 1 : 1); `88 × 44` by rozbilo relaci `ISO_STEP == TILE_W/2` a bránu `G1` |
+
+**Dvě měření, která vypadají jako vada a nejsou:**
+
+* **Dva běhy Blenderu dají RŮZNÉ bajty PNG** (`d324e127828a` vs `f2d92a536d63`),
+  a přitom **pixely jsou shodné na 0** (ověřeno u 9 snímků: `max|Δ| = 0`).
+  Hash souboru tedy **není důkaz obsahu** — proto `mereni_2x.py` porovnává
+  pixely, ne hashe. (Determinismus manifestu z pilotu §4 tím není dotčen:
+  hlídá se hash **manifestu**, ne PNG.)
+* **1× měřicí větev dala pixel za pixel totéž co pilot** (`raw/` vs
+  `_raw2x/_timing1x/`, 9/9 snímků, `max|Δ| = 0`) — takže časy „1×" v 8.2 jsou
+  časy **téhož**, co dělá `render_sprites.py`, ne něčeho podobného.
+
+### 8.5 Stav bran po zásahu
+
+| Brána | Výsledek |
+|---|---|
+| `pack_atlas.py --check` (1× sada, **nedotčená**) | **476 kontrol, 0 chyb** |
+| `pack_atlas_2x.py --check` (2× sada) | **123 kontrol, 0 chyb** |
+| — kotva `ox=(w>>1)−44, oy=h−88` | 9/9 spritů |
+| — obsah 2× proti 1× (měřeno z **pixelů obou atlasů**) | průměr **2,02×** (tolerance 25 %) |
+| — kontaktní stín **skutečně ve spritu** | 9/9 (jinak by „2× má stín" bylo tvrzení bez krytí) |
+| — poloměr stínu se vejde nad kontakt | 9/9 |
+
+### 8.6 Jak to pustit znovu
+
+```powershell
+$env:PYTHONIOENCODING='utf-8'
+cd E:\Workspaces\game-clone
+python tools\artgen\mereni_2x.py                 # celá 2× větev + ČASY do _casy-2x.json
+python tools\artgen\pack_atlas_2x.py             # 2× atlas + manifest (zapisuje do assets/own2x/)
+python tools\artgen\pack_atlas_2x.py --check     # brána 2× (nic nezapisuje)
+python tools\artgen\srovnani_1x_2x.py            # srovnávací list na POHLED
+python tools\artgen\probe_2x.py                  # barvy, ostrost hrany, krytí stínu (nic nezapisuje)
+python tools\artgen\pack_atlas.py --check        # brána 1× — musí zůstat 476/0
+& 'C:\Program Files\Blender Foundation\Blender 5.2\blender.exe' -b -P tools\artgen\build_model_2x.py -- --plan all
+& 'C:\Program Files\Blender Foundation\Blender 5.2\blender.exe' -b -P tools\artgen\render_2x.py -- --meritko 2x --plan dagger
+```
+
+### 8.7 Co se u 2× NEMĚŘILO
+
+* **Vzhled ve hře** — 2× sada se do `render/` nezapojuje (ZADANI-25 §9: je to
+  varianta pro rozhodnutí). Geometrie hry (`core/const.gd`: 44 px, `Z_SCALE 4`)
+  zůstala **nedotčená**; přepnutí je samostatná koordinovaná změna.
+* **Dlaždice ve 2×** — zadání je nechce (a kdyby ano, je to 88 × 88
+  kosočtverec 1 : 1, ne 88 × 44).
+* **Ostatní směry postavy a běh** — 2× větev kreslí jen směr 0 (8 framů).
+* **Kontaktní stín u dlaždic a u ostatních předmětů** — ověřeno na 9 spritech,
+  ne na celé sadě.

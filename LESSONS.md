@@ -63,6 +63,33 @@ v `ZADANI-25` §3.
 podlaze rhombus ≈ 1,73 : 1), **ne tvaru dlaždice v atlase**. Kdo to plete,
 navrhne art, kterému zůstane polovina místa nevykrytá.
 
+### 2026-10-10 — Vyšší rozlišení artu je ve stejném měřítku MĚKČÍ, ne ostřejší (past-nástroje)
+**Co se stalo:** čekalo se, že 2× art bude ostřejší. Naměřeno na hraně alfy
+(průměr |Laplace| v okně 3×3 po normování): **UO 1,54 · 1× 0,79 · 2× 0,53 ·
+2× zmenšené na 1× 0,34**. Vyšší rozlišení se při zobrazení 1 : 1 **zahodí**,
+takže výsledek je měkčí — a 2× navíc stojí **5–9× plochy spritu** (dýka 14×28 →
+50×69), **4,9× postprocess** a 2,7× času na sprite.
+**Doklad:** `tools/artgen/MERENI.md` §8, `tools/artgen/_srovnani-1x-2x.png`
+(sekce A/B, řada „stejné měřítko" i „1 : 1"), `_ZADANI-25` §10.
+**Ponaučení:** **rozlišení artu se nevyplácí samo o sobě** — vyplácí se jen
+spolu s vyšším výchozím zoomem (pak se pixely opravdu použijí). Co je na
+vyšším rozlišení vidět *vždy*, je **tvar v 1 : 1**. A co dělá „reálný model",
+není rozlišení, ale **světlo**: jedno směrové slunce + AO + **kontaktní stín**
+(objekt pak stojí NA dlaždici místo je nalepený) — to jde použít i v 1×.
+
+### 2026-10-10 — Brána, která měří pevné měřítko, hlásí vadu u správného artu (chyba)
+**Co se stalo:** první brána 2× artu tvrdila „1 světová jednotka = 88 px"
+a u **správného** artu hlásila chybu — naměřeno 68,4 px/jednotku (dýka) a 63,7
+(postava). Příčina: sprite se normalizuje na **naměřený obsah UO** (aby seděl
+měřítkem na referenci), ne na pevné pixely na jednotku, takže „px na jednotku"
+není vlastnost, kterou by pipeline řídila.
+**Doklad:** `tools/artgen/pack_atlas_2x.py` (předělaná brána: **123 kontrol /
+0 chyb**, měří kotvu 9/9, poměr obsahu 2×/1× = **2,02×** a přítomnost stínu
+9/9), `MERENI.md` §8.
+**Ponaučení:** u generovaného artu měř to, co je **smlouva** (kotva, poměr
+velikostí, přítomnost stínu, determinismus), ne to, co pipeline neřídí.
+Brána, která nutí „opravit" správný art, je dražší než brána slepá.
+
 # 2026-10-10 (druhá část) — CELÁ KRÁTKÁ SMYČKA VE HŘE: RNG V SONDĚ A SERIAL MÍSTO POČTU
 
 ### 2026-10-10 — „Jeden pokus = výsledek“ je v herní smyčce chyba měření (chyba)

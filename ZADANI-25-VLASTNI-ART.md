@@ -153,10 +153,12 @@ důvod, proč vypadá staře (ne rozlišení monitoru).
 
 **Co vyrobit (nad rámec §3):**
 
-1. Týž předmět (dýka) vyrenderovat **ve 2× geometrii**: diamant **88×44**,
-   `Z_SCALE 8` (art se zvětší na dvojnásobek, **poměr zůstává 1 : 1 — viz oprava
-   v §3**, takže relace `ISO_STEP == TILE_W/2` platí dál a brána `G1` se
-   nerozbíjí „principem", jen konstantami).
+1. Týž předmět (dýka) vyrenderovat **ve 2× geometrii**: **(OPRAVA 2026-10-10
+   po vykonání: `88×88`, ne `88×44`)** — poměr zůstává **1 : 1** jako u 1×
+   (viz oprava v §3), takže `88×44` by rozbilo relaci `ISO_STEP == TILE_W/2`
+   a bránu `G1`. Správně: dlaždice **88×88**, kroky **44**, kotva
+   `ox=(w>>1)−44, oy=h−88`, `Z_SCALE 8`. Chybu v tomhle zadání našel až běh,
+   který ji odmítl provést — a to je správné chování.
 2. Ke 2× spritu přidat to, co dělá „reálný model": **jedno směrové slunce +
    jemný ambient occlusion + kontaktní stín pod objektem** (aby objekt stál
    NA dlaždici, ne byl nalepený).
@@ -175,3 +177,45 @@ a patří do plánu, ne do artové koleje.
 
 **Obrázky zůstávají necommitované** (§8) — i srovnávací list je snímek
 s artem z instalace UO.
+
+## 10. VÝSLEDEK 2× (2026-10-10) — a proč se rozlišení samo nevyplácí
+
+**Vyrobeno:** `assets/own2x/` (9 spritů: dýka + 8 framů postavy, směr 0),
+`tools/artgen/_srovnani-1x-2x.png`, skripty `*_2x.py`, časy v `MERENI.md` §8.
+**Kontroly:** `pack_atlas.py --check` na 1× sadě **476/0** (nedotčená),
+`pack_atlas_2x.py --check` **123/0** (kotva 9/9, obsah 2×/1× naměřený z pixelů
+= **2,02×**, stín skutečně ve spritu 9/9), determinismus: dva běhy → shodný
+SHA-256 i pixely (`max|d| = 0`).
+
+| Co | 1× | 2× |
+|---|---|---|
+| na 1 sprite celkem | **~0,34 s** | **~0,91 s (2,7×)** |
+| postprocess 9 spritů | 1,42 s | **6,92 s (4,9×)** |
+| plocha spritu | dýka 14×28 | **50×69 = 8,8×** (postava 5,1×) |
+| ostrost hrany (průměr \|Laplace\| alfy) | **0,79** | 0,53 (po zmenšení na 1× **0,34**) |
+| UO (reference) | — | 1,54 |
+
+**Proč to dopadlo obráceně, než zadání čekalo:** 2× **není ostřejší** — ve
+stejném měřítku je **měkčí** (0,34 vs 0,79), protože se vyšší rozlišení při
+zobrazení 1 : 1 zahodí. Naopak **viditelný přínos 2× nedělá rozlišení, ale
+světlo**: objekty díky kontaktnímu stínu **stojí NA dlaždici** (u dýky 56, u
+postavy 418 viditelných px stínu), mají antialiasované hrany a v 1 : 1 je vidět
+tvar (čepel, záštita, rukojeť).
+
+**Závěr (doporučení k potvrzení):**
+1. **Zůstat u 1×** a vzít si z 2× **jen světlo** — jedno směrové slunce +
+   AO + kontaktní stín se dá použít i v 1× (malá změna `artgen_blender.py`
+   a `postprocess.py` + přegenerování).
+2. **2× vrátit na stůl jen spolu s rozhodnutím o zoomu** (vyšší výchozí zoom
+   znamená, že se 2× pixely opravdu použijí) — a to je koordinovaná změna
+   `core/const.gd` + literálů v `render/chunk_renderer.gd`, které hlídá `G1`,
+   ne samostatné rozhodnutí o artu.
+3. **Co se rozlišením nemění:** cena je pořád **autorství modelů a kontrola
+   pohledem** — 2× ji nezlevní ani nezdraží, jen přidá 5–9× plochy atlasu.
+
+**Dvě vady srovnávacího listu, které našel sám autor** (ať se příště neopakují):
+kreslí **box spritu, ne naměřený obsah** (UO dýka proto *vypadá* větší, i když
+obsah je 11×11 vs 11×12 px) a **červený křížek** (střed dlaždice) sedí postavě
+na chodidlech a čte se jako červené pixely v artu. A jedna **vada modelu, ne
+rozlišení**: náš tvar dýky neodpovídá UO (UO = kompaktní dýka se záštitou,
+náš = tenká dlouhá čepel).
