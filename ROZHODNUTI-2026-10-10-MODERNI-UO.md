@@ -265,7 +265,38 @@ je samostatná granule v plánu, ne součást artové koleje.
 | **„2D" jako rozhodnutí s důvodem** (ne vlastnost enginu) + měřená cena změny | `docs/02` §2.1 | totéž |
 | **Nová brána `G14` `check-state-float`** — hlídá float ve **stavu** simulace (ne ve výpočtu) | `tools/gates/check-state-float.py`, registrace v `run-all.py` za `G2`, popis v `docs/08` §8.2, mutace v §8.3 | **měřeno OK (exit 0)**; self-test **6 případů / 0 chyb**; na stromě: 30 souborů `sim/`, 71 řádků povoleného lokálního floatu, 1 povolený konfigurační člen, **0 vad** |
 | **4 zastaralé údaje v `docs/`** | `docs/07` (aktuální počty granulí; historická tabulka zůstala nepřepsaná), `docs/11` (1150 je jiný čítač než 1053), `docs/04` (quality Low/Normal/Exceptional), `docs/01` | doc brány exit 0 |
-| **M1 v kódu — tempo kroku je z DAT** (doděláno 2026-10-10 po commitu druhé session) | `data/balance.json` (`movement.walk_ms` 400 / `run_ms` 200 + `sources`), `app/config.gd` `SCHEMA` (typ/rozsah), `sim/systems/movement.gd` (`_read_balance` je načte, `delay_ms_for` je vrací, nový nepovinný vstup `balance_path` kvůli testu), `tests/cases/movement_tempo.gd` (5 měřených větví), mutace v `tools/gates/mutace-tests.py` (nový modul `movement_tempo`) | **testy 1 845 kontrol / 0 selhání** (73 case souborů); **mutace chycena** („tempo se čte z Const" → 5 selhání, návrat ověřen zelenou); brány `G1`, `G5`, `G14` a obě doc brány → exit 0 |
+| **M1 v kódu — tempo kroku je z DAT** (doděláno 2026-10-10 po commitu druhé session) | `data/balance.json` (`movement.walk_ms` 400 / `run_ms` 200 + `sources`), `app/config.gd` `SCHEMA` (typ/rozsah), `sim/systems/movement.gd` (`_read_balance` je načte, `delay_ms_for` je vrací, nový nepovinný vstup `balance_path` kvůli testu), `tests/cases/movement_tempo.gd` (5 měřených větví), mutace v `tools/gates/mutace-tests.py` (nový modul `movement_tempo`) | **testy 1 845 kontrol / 0 selhání** (73 case souborů); **mutace chycena** („tempo se čte z Const" → 5 selhání, návrat ověřen zelenou); **plný mutační harness 15/15 chyceno, smlouva vstupu OK**; brány `G1`, `G5`, `G14` a obě doc brány → exit 0 |
+| **Art pilot (první krok druhé koleje) HOTOV** — pipeline, kontrakt a měření | `tools/artgen/` (15 skriptů + `MERENI.md` + `SEAM.md` + 7 `.blend` zdrojů), `assets/own/` (`manifest.json` + 3 stránky 2048² + `anim/anim-sheets.json`) | **46 spritů ze 7 modelů**; `pack_atlas.py --check` = **476 kontrol / 0 chyb** (spuštěno 2026-10-10 Pythonem 3.12 se scipy, exit 0); klíče manifestu **9/9 a 10/10 shodné s UO**; kotva `ox=(w>>1)−22, oy=h−44`; **51 s stroje na 46 spritů** |
+
+**Zjištění z pilotu, která mění plánování:**
+
+1. **Stroj není cena.** 46 spritů za 51 s (0,5 s/sprite od hotového modelu); celá
+   faceta (1 496 land + 6 023 statik = 7 519 spritů) je **[O] ~2,5 h stroje**.
+   Úzké hrdlo je **kontrola pohledem** — doloženo: stav s černými linkami na
+   stycích dlaždic a 9px postavou prošel **476 kontrolami s 0 chybami**
+   (a maska dlaždice se přitom UO rovnala na pixel). Cenu sady proto neurčuje
+   postprocess, ale **počet modelů × počet pohledů**: jeden model postavy dal
+   40 spritů a jednu kontrolu; 3 000 statiků by znamenalo 3 000 modelů.
+   **Cesta k celé sadě vede přes „mít míň modelů"** (varianty z jednoho modelu,
+   sdílení, kontrola po sadách), ne přes „vyrobit víc spritů".
+2. **Oprava měření: „kosočtverec 2 : 1" bylo špatně** (můj přepis v `ZADANI-25`).
+   UO land art je **čtverec 44 × 44** s diamantem o **stejných úhlopříčkách**
+   (maska 1 012 px) — shoduje se s dřívějším měřením v `HANDOFF.md`. Projekce se
+   nastavuje **elevací 35,264°, zrcadlením X a svislým roztáhnutím 1,7321**
+   (naměřeno `probe_projection.py`). Zapsáno i do `LESSONS.md`.
+3. **Pozadí se neodebírá podle barvy, ale podle alfy** (`film_transparent`) —
+   měřený důvod: se `film_transparent=False` obarvuje světlo scény i model;
+   barva pozadí zůstává jen jako **kontrola** (0–2 px). Je to **odchylka od
+   `ZADANI-25` §1 s doloženým důvodem**, ne tichá změna.
+4. **Reprodukovatelnost:** skripty potřebují **Python 3.12 s Pillow + numpy +
+   scipy** (`%LOCALAPPDATA%\Programs\Python\Python312\python.exe`); dokumentovaný
+   `dsh` runtime scipy **nemá** a `pack_atlas.py --check` na něm spadne. Kdo
+   pouští kontrolu, musí sáhnout po tomhle interpretu.
+5. **Co pilot NEDODAL (a je to správně):** integraci do hry (zakázaný zápis do
+   `render/`), granule v plánu a nové brány — návrh seamu je v `SEAM.md`
+   (jedno místo: `render/texture_cache.gd` `_index`; `offset()` musí jít ze
+   stejného záznamu jako textura). **Kvalita** (předměty čtou jako „3D hladké",
+   tráva šedší, postava užší) je otevřená a míří na 2× variantu.
 
 **Proč je `G14` úzká, a ne plošná:** naměřeno, že `sim/` **legitimně** používá
 float ve výpočtech (71 řádků — `craft.gd` počítá šanci, `harvest.gd` rolluje,
@@ -279,7 +310,7 @@ jde **do stavu** (člen, jehož jméno je v `state()`), a jakýkoli
 | Co | Proč to čeká | Přesný další krok |
 |---|---|---|
 | **Automatizace útoku** (`attack` do `ACTION_KINDS`, podmínka o cíli, `policy_state()` o cíli) — `[O]` 1–2 granule | sahá na `sim/policy.gd`, `sim/executor.gd`, `sim_world.gd`; je to **změna specu hotových modulů `MK`**, takže si zaslouží vlastní zadání, ne „přilepení" k jiné práci | zadat jako granuli k `MK` se změnou specu |
-| **2× varianta artu** (88×44, `Z_SCALE 8`, slunce + AO + kontaktní stín) vedle 1× a původního spritu | běží **artový pilot** (`ZADANI-25`); 2× srovnání je jeho navazující krok | po pilotu vyrenderovat srovnávací list a rozhodnout geometrii **z obrázku**; zapojení do hry je samostatná granule |
+| **2× varianta artu** (88×44, `Z_SCALE 8`, slunce + AO + kontaktní stín) vedle 1× a původního spritu | spec je hotová (`ZADANI-25` §9); **pilot 1× doběhl** 2026-10-10 | vyrenderovat srovnávací list a rozhodnout geometrii **z obrázku**; zapojení do hry je samostatná granule |
 | **Art v plánu** (granule pro pipeline a pro integraci `assets/own/`) | chybí **změřená cena** — pilot ji dává; plánovat podle dojmu je to, co `M7` odmítá | po `tools/artgen/MERENI.md` doplnit granule v `tools/roadmap-gen.py` + `docs/07` (patří uživateli / integrační session) |
 | **Zbylých 7 rozporů z auditu** (`docs/08` F1/F4, `docs/06` C1–C10 vs `check-content`, `docs/05` trvanlivost nástrojů vs existující `entity.equipment`) | část se dotýká souborů, které druhá session **právě mění** (`harvest.gd`) — zapsané tvrzení o stavu by zestárlo dřív, než vznikne | po jejím commitu projít a doplnit |
 

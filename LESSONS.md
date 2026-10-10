@@ -24,6 +24,45 @@ Typy: `chyba` (moje vada) · `past-nástroje` (prostředí/nástroj, ne logika) 
 
 ---
 
+# 2026-10-10 (třetí část) — VLASTNÍ ART: PIPELINE FUNGUJE, TŘI VĚCI ZMĚŘENÉ
+
+### 2026-10-10 — `PIL.Image.resize` na RGBA rozbije RGB tam, kde je alfa 0 (past-nástroje)
+**Co se stalo:** ve spritech z Blenderu vznikaly na stycích dlaždic **černé
+linky**. Příčina nebyla v masce ani v barvě: `Image.resize` na režimu RGBA
+resampluje i alfu a v pixelech s alfou ≈ 0 **rozsype RGB** — naměřeno: čtverec
+`(200,100,50,0)` vyšel po zmenšení jako `(255,0,0,1)`. Neviditelná barva se
+stala viditelnou.
+**Doklad:** `tools/artgen/postprocess.py` (`zmensi` = zvlášť RGB a zvlášť alfa),
+sonda v `tools/artgen/MERENI.md`; oprava ověřena **pohledem**
+(`tools/artgen/_kontaktni-list.png`, 2 kola).
+**Ponaučení:** u obrázků s průhledností se **nikdy nezmenšuje RGBA najednou** —
+resampluj RGB a alfu zvlášť. Vada vypadá jako „špatná maska dlaždice“, ale je
+v resamplování, takže se hledá na špatném místě.
+
+### 2026-10-10 — 476 kontrol prošlo nad artem, který byl viditelně rozbitý (postup)
+**Co se stalo:** stav, ve kterém měly dlaždice černé linky na stycích a postava
+byla **9 px široká**, prošel kontrolou `pack_atlas.py --check` = **476 kontrol,
+0 chyb** — a maska dlaždice se přitom UO rovnala **na pixel**.
+**Doklad:** `pack_atlas.py --check` (znovu ověřeno 2026-10-10: 476/0, exit 0),
+`tools/artgen/MERENI.md` (11 kontrol pohledem, každá něco našla).
+**Ponaučení:** brána umí „sedí to na pixel“, neumí „vypadá to jako tráva“.
+U **generovaného artu** je kontrola pohledem **povinná součást postupu** a cena
+sady se počítá podle **počtu modelů × pohledů**, ne podle počtu spritů (jeden
+model postavy dal 40 spritů a jednu kontrolu).
+
+### 2026-10-10 — „kosočtverec 2:1“ v zadání artu je měřitelně špatně (vada-zadani)
+**Co se stalo:** `ZADANI-25` (a zkratka v `research/05`) popisovaly UO dlaždici
+jako kosočtverec 2:1. Pilot to vyvrátil měřením: UO land art je **čtverec
+44 × 44** s diamantem o **stejných úhlopříčkách (1 : 1, maska 1 012 px)** —
+shoduje se to s dřívějším měřením (`HANDOFF.md`: „UO je čtverec 44×44, který se
+při skládání PŘEKRÝVÁ“), které si nikdo nespojil s novým zadáním.
+**Doklad:** `tools/artgen/probe_projection.py` — naměřeno: elevace **35,264°**
+(= atan(1/√2)), **zrcadlení X**, svislé roztáhnutí **1,7321**; oprava
+v `ZADANI-25` §3.
+**Ponaučení:** „2 : 1 izometrie“ je popis **kamery** (pravá izometrie dá na
+podlaze rhombus ≈ 1,73 : 1), **ne tvaru dlaždice v atlase**. Kdo to plete,
+navrhne art, kterému zůstane polovina místa nevykrytá.
+
 # 2026-10-10 (druhá část) — CELÁ KRÁTKÁ SMYČKA VE HŘE: RNG V SONDĚ A SERIAL MÍSTO POČTU
 
 ### 2026-10-10 — „Jeden pokus = výsledek“ je v herní smyčce chyba měření (chyba)

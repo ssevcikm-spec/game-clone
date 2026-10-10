@@ -58,7 +58,7 @@ Vyrobit **vlastní** verzi těchto věcí — nic víc:
 
 | # | Co | Kolik spritů | Poznámka |
 |---|---|---|---|
-| 1 | **terénní dlaždice** | 2 (tráva, cesta) | 44 × 44, `ox/oy = 0/0`, kosočtverec 2 : 1 |
+| 1 | **terénní dlaždice** | 2 (tráva, cesta) | 44 × 44, `ox/oy = 0/0`. **⚠ OPRAVA 2026-10-10 (pilot, měřeno): „kosočtverec 2 : 1" v tomhle zadání je ŠPATNĚ** — UO dlaždice je **čtverec 44 × 44 s diamantem o stejných úhlopříčkách (1 : 1, maska 1 012 px)**; kosočtverec je jen tvar kresby uvnitř čtverce. (Shoduje se to s dřívějším měřením v `HANDOFF.md`: „UO je čtverec 44×44, který se při skládání PŘEKRÝVÁ".) Projekce se proto nastavuje takto: kamera v **elevaci 35,264° = atan(1/√2)**, **zrcadlení X**, **svislé roztáhnutí 1,7321 (≈√3)** — naměřeno sondou `probe_projection.py` na těžištích značek: +X (0,500; 0,500), +Y (−0,500; 0,500), +Z (0; −1,004) šířky artu. |
 | 2 | **postava — chůze** | 5 směrů × 8 framů = 40 | stejná konvence jako UO (5 směrů + zrcadlení); běh může být tatáž sada |
 | 3 | **předměty** | krumpáč, ruda, ingot, dýka = 4 | kotva jako UO `item` (`oy ≈ 30` u předmětu „na zemi") |
 | 4 | **kontaktní list** | 1 PNG | vlastní sprity **vedle** původních UO, aby byl rozdíl vidět |
@@ -154,8 +154,9 @@ důvod, proč vypadá staře (ne rozlišení monitoru).
 **Co vyrobit (nad rámec §3):**
 
 1. Týž předmět (dýka) vyrenderovat **ve 2× geometrii**: diamant **88×44**,
-   `Z_SCALE 8` (poměr 2 : 1 zůstává, takže relace `ISO_STEP == TILE_W/2`
-   platí dál a brána `G1` se nerozbíjí „principem", jen konstantami).
+   `Z_SCALE 8` (art se zvětší na dvojnásobek, **poměr zůstává 1 : 1 — viz oprava
+   v §3**, takže relace `ISO_STEP == TILE_W/2` platí dál a brána `G1` se
+   nerozbíjí „principem", jen konstantami).
 2. Ke 2× spritu přidat to, co dělá „reálný model": **jedno směrové slunce +
    jemný ambient occlusion + kontaktní stín pod objektem** (aby objekt stál
    NA dlaždici, ne byl nalepený).
