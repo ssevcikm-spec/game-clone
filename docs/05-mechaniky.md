@@ -297,7 +297,7 @@ proběhne efekt, reagenty zmizí, `skill_gain.check(Magery, …)`.
 | **Lumberjacking** | buckety 4×3, **20–45 logů** (`Lumberjacking.cs:46-47`; dřív tu stálo 10–45 — měřeno špatně), **10 logů za ÚDER** (dřív tu stálo „za sek"), respawn **20–30 min** (v dokumentu chybělo), 7 druhů dřeva, **1 log → 1 prkno**; bonus k damage sekerou `(LJ × 0.2 + (LJ ≥ 100 ? 10 : 0)) / 100` |
 | **Fishing** | **8 s na pokus**, hluboká voda od **75** skillu; mělká voda: `Fishing ≥ 75` uspěje **bez hodu** (`CheckHarvestSkill` v `Fishing.cs`); speciální úlovky (síť 1,12 %, mapa 1,11 %, láhev 2,99 %) |
 | **Kůže** | stažení zvířete nožem, druhy kůží dle zvířete. **⚠ UNVERIFIED:** v `HarvestSystemu` žádný Healing/Anatomy gate není (jediný nález `BaseCreature.cs:2223`, `cutHides`) — kdo to bude dělat, ať to nejdřív změří |
-| Nástroje | opotřebení **jen při úspěšném** skill checku (1 use). **⚠ V klonu se neopotřebuje** (vědomé omezení): `mine/chop/fish` mají 3 argumenty a nástroj se do nich neposílá, dokud není `entity.equipment` |
+| Nástroje | opotřebení **jen při úspěšném** skill checku (1 use). **⚠ V klonu se neopotřebuje — stav 2026-10-10:** `mine/chop/fish` mají 3 argumenty a nástroj se do nich neposílá. `sim/entity/equipment.gd` **už existuje** (commit `36cbe5c`), takže **překážka zmizela**: opotřebení je teď **neudělaná práce (nová granule)**, ne chybějící základ. Do té doby platí, že nástroj vydrží věčně |
 
 **Přijímací kritérium:** `mine(m, x, y)` se špatnou dlaždicí vrátí
 `{ok:false, reason:"not_ore"}`; se správnou horou vrátí rudu;

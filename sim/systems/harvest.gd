@@ -53,7 +53,9 @@ extends RefCounted
 #   * opotrebeni naradi: sber vi o dlazdici a mobilu, ale NE o predmetu, kterym
 #     hrac kope (`sim.interaction` ho zna, ale do `mine/chop/fish` ho neposila -
 #     smlouva ma 3 argumenty). Naradi se proto neopotrebuje; je to VEDOME
-#     omezeni, dokud nebude `entity.equipment` (docs/04 §4.2),
+#     omezeni. POZOR (2026-10-10): `entity.equipment` UZ EXISTUJE (commit 36cbe5c),
+#     takze "dokud nebude" uz neplati - chybi jen PROPOJENI (nova granule).
+#     Do te doby nastroj vydrzi vecne.
 #   * `_busy_until` (jeden sber na system, jako `GetLock` v referenci) NENI
 #     v save/load - stav bank se neuklada, dokud nesaveuje `sim.world_loop`.
 
