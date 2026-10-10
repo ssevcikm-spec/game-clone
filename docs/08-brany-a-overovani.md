@@ -41,14 +41,18 @@
 **Dvě brány z pocitu (`F1`, `F4`) jsou od 2026-10-09 součástí smlouvy**
 (rozhodnutí uživatele; návrh včetně kontrol a mutací:
 `NAVRH-BRAN-FEEL-2026-10-09.md`). Vycházejí z poznatků `F1` a `F4` v `docs/01`
-§1.8. **Do milníku `MK` vrací `2` (NEMĚŘENO)** — `sim.offline` a obchod ještě
-neexistují, a `2` se **nikdy** netváří jako zelená (§8.9). Do `run-all.py` se
-zapíšou, až budou soubory bran existovat; do té doby jsou v tabulce proto, aby
-se na ně nezapomnělo.
+§1.8. **Aktuální stav (2026-10-10, ověřeno v `run-all.py`):**
+**`F1` je zapojená** — soubor `tools/gates/check-world-clock.py` existuje,
+`sim.offline` taky, a `F1` je v závazném pořadí za `G9`. **`F4`
+(`check-no-waste.py`) soubor ještě nemá** — v tabulce je proto, aby se na ni
+nezapomnělo, a do `run-all.py` se zapíše, až vznikne. Když brána nemá co měřit,
+vrací `2` (`NEMĚŘENO`) a **nikdy** se to netváří jako zelená (§8.9).
 
-**Pořadí v CI je závazné:** G1 → G3 → G5 → G2 → G4 → G6 → G7 → G8 → G9 →
-G11 → G10 → G13 (a po implementaci **F1 → F4** za G9). Schéma je první, protože
-je nejlevnější a rozpor v zadání zneplatňuje všechno ostatní.
+**Pořadí v CI je závazné** (stav 2026-10-10, shodné s `run-all.py`):
+G1 → **G3** → G5 → G2 → **G14** → G4 → G6 → G7 → G8 → G9 → **F1** → G11 → G10.
+`G13` (vision) je **poradní** a jde mimo pořadí — nikdy neshodí běh, ale nesmí
+být ticho (když není implementovaná, hlásí se to). Schéma je první, protože je
+nejlevnější a rozpor v zadání zneplatňuje všechno ostatní.
 
 ## 8.3 Tři brány, které mají největší cenu
 

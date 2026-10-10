@@ -429,15 +429,25 @@ MODULY = {
         "prefix": "sim.movement",
         "prepinac": "--movement-script",
         "mutace": [
+            # ⚠ 2026-10-10 (M1): kotva se změnila - `delay_ms_for` už nečte
+            # `Const`, ale data (`_walk_ms`/`_run_ms`). Původní kotva
+            # `return Const.RUN_MS if run else Const.WALK_MS` v kódu NENÍ,
+            # takže by se mutace tiše neprovedla (což je stejně špatné jako
+            # když projde). Nový modul `movement_tempo` níž hlídá datovou cestu.
             ("chuze ma prodlevu behu (200 misto 400)",
-             "return Const.RUN_MS if run else Const.WALK_MS", "return Const.RUN_MS"),
+             "return _run_ms if run else _walk_ms", "return Const.RUN_MS"),
             ("krok se vykona hned (prodleva 0)",
              '"due_ms": start + delay,', '"due_ms": start,'),
             ("druhy krok v letu se neodmitne",
              'if _pending.has(m):', "if false:"),
+            # ⚠ 2026-10-10: kotva se změnila, když přibyl model `never`
+            # (`if _drain_model == "never"` je před ní). Původní kotva
+            # `if run or _drain_model == "emulator":` v kódu NENÍ → mutace se
+            # tiše neprovedla ("PATRANA VETA SE VE ZDROJI NENASLA"), což je
+            # stejně špatné jako když projde. Ověřeno běžícím harnessem.
             ("beh nebere staminu",
-             '\tif run or _drain_model == "emulator":\n\t\tconsume_stamina(m, 1)',
-             "\tif false:\n\t\tconsume_stamina(m, 1)"),
+             '\telif _drain_model == "always" or run or _drain_model == "emulator":\n\t\tconsume_stamina(m, 1)',
+             "\telif false:\n\t\tconsume_stamina(m, 1)"),
             ("emulator zapomina zbytek kroku",
              "var celkem: int = int(_carry.get(m, 0)) + steps",
              "var celkem: int = steps"),
@@ -461,6 +471,29 @@ MODULY = {
             ("turn nezapise smer (otoceni se neprovede)",
              "\tmob.dir = dir\n\t_events_push(\"mobile_turned\"",
              "\t_events_push(\"mobile_turned\""),
+        ],
+    },
+    # `M1` (2026-10-10): TEMPO KROKU JE Z DAT (`data/balance.json`,
+    # `movement.walk_ms`/`movement.run_ms`), ne zamrzlé pravidlo. Modul je
+    # zvlášť od `movement`, protože jeho test (`tests/cases/movement_tempo.gd`)
+    # měří jinou věc: že se datová cesta opravdu PŘEČTE a projeví - kdyby se
+    # klíč v datech ignoroval, hra by dál šlapala, ale ladit by nešla.
+    "movement_tempo": {
+        "soubor": ROOT / "sim" / "systems" / "movement.gd",
+        "prefix": "tempo:",
+        "prepinac": "--movement-script",
+        "mutace": [
+            ("tempo se cte z Const, ne z dat",
+             "return _run_ms if run else _walk_ms",
+             "return Const.RUN_MS if run else Const.WALK_MS"),
+            ("walk_ms se z dat neprecte",
+             '\t\t\t_walk_ms = int(mv["walk_ms"])',
+             "\t\t\tpass"),
+            ("nulova hodnota se prijme (krok za 0 ms)",
+             'if int(mv.get("walk_ms", 0)) > 0:', "if true:"),
+            ("castecna data prebiji i beh (run_ms z walk_ms)",
+             '\t\tif int(mv.get("run_ms", 0)) > 0:\n\t\t\t_run_ms = int(mv["run_ms"])',
+             '\t\t_run_ms = _walk_ms'),
         ],
     },
     "interaction": {

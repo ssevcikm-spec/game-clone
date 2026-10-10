@@ -94,9 +94,20 @@ var _registry = null              # sim.entity_registry: JEDINE misto pro mobily
 var _pending: Dictionary = {}     # serial -> {dir, run, due_ms}
 var _carry: Dictionary = {}       # serial -> zbytek kroku pro model "emulator"
 var _drain_model: String = "run_only"
+# Prodleva kroku (docs/05 §5.1.1). JE to **výchozí hodnota z DAT**, ne zákon
+# (rozhodnutí `M1`, 2026-10-10): v referenci je to anti-cheat throttling, ne
+# design, takže se tempo ladí daty a ne zásahem do kódu. Hodnoty níž jsou
+# výchozí; `_init` je vezme z `core/const.gd` a `_read_balance` přepíše daty.
+var _walk_ms: int = 400
+var _run_ms: int = 200
+var _balance_path: String = BALANCE_PATH
 
 
-func _init(walk = null, clock = null, events = null, drain_model: String = "", registry = null) -> void:
+func _init(walk = null, clock = null, events = null, drain_model: String = "", registry = null,
+		balance_path: String = BALANCE_PATH) -> void:
+	_walk_ms = int(Const.WALK_MS)
+	_run_ms = int(Const.RUN_MS)
+	_balance_path = balance_path
 	_walk = walk if walk != null else WalkScript.new()
 	_clock = clock if clock != null else ClockScript.new()
 	_events = events
@@ -111,11 +122,22 @@ func _init(walk = null, clock = null, events = null, drain_model: String = "", r
 
 
 func _read_balance() -> void:
-	if not FileAccess.file_exists(BALANCE_PATH):
-		return                        # vychozi "run_only" (docs/05 §5.1.4)
-	var parsed = JSON.parse_string(FileAccess.get_file_as_string(BALANCE_PATH))
-	if parsed is Dictionary and parsed.has("stamina_drain_model"):
+	if not FileAccess.file_exists(_balance_path):
+		return                        # vychozi "run_only" + tempo z `core/const.gd`
+	var parsed = JSON.parse_string(FileAccess.get_file_as_string(_balance_path))
+	if not (parsed is Dictionary):
+		return
+	if parsed.has("stamina_drain_model"):
 		_drain_model = str(parsed["stamina_drain_model"])
+	# Tempo kroku (`M1`): klíč `movement.walk_ms` / `movement.run_ms`. Kdo je
+	# v datech nemá, dostane výchozí hodnoty z `core/const.gd` (zpětná
+	# kompatibilita se starými uloženými daty i s fixture soubory testů).
+	var mv = parsed.get("movement")
+	if mv is Dictionary:
+		if int(mv.get("walk_ms", 0)) > 0:
+			_walk_ms = int(mv["walk_ms"])
+		if int(mv.get("run_ms", 0)) > 0:
+			_run_ms = int(mv["run_ms"])
 
 
 func register(mobile) -> void:
@@ -264,7 +286,9 @@ func consume_stamina(m: int, steps: int) -> void:
 
 
 func delay_ms_for(run: bool) -> int:
-	return Const.RUN_MS if run else Const.WALK_MS
+	# Tempo je z DAT (`movement.walk_ms`/`movement.run_ms`, rozhodnutí `M1`);
+	# když v datech nejsou, platí výchozí hodnoty z `core/const.gd`.
+	return _run_ms if run else _walk_ms
 
 
 func tick(_ms: int) -> void:

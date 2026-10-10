@@ -10,10 +10,16 @@
 
 ### 5.1.1 Rychlosti (ověřeno ve třech nezávislých kódech)
 
+> **DOPLNĚNO 2026-10-10 (`M1`): hodnoty v tabulce jsou VÝCHOZÍ, ne zamrzlé.**
+> Chůze a běh se čtou z `data/balance.json` (`movement.walk_ms` / `run_ms`),
+> výchozí 400/200 ms; co v datech není, platí z `core/const.gd`. Mount
+> (200/100 ms) do dat patří, až bude mount existovat. Důvod, proč tempo není
+> zákon: `docs/05` §5.1.4 a `ROZHODNUTI-2026-10-10-MODERNI-UO.md` (M1).
+
 | Stav | Prodleva na krok | Zdroj |
 |---|---|---|
-| Chůze pěšky | **400 ms** | ServUO `Server/Mobile.cs:3063`, ModernUO `…/Movement.cs:33`, ClassicUO `…/MovementSpeed.cs:12` |
-| Běh pěšky | **200 ms** | totéž |
+| Chůze pěšky | **400 ms** (výchozí) | ServUO `Server/Mobile.cs:3063`, ModernUO `…/Movement.cs:33`, ClassicUO `…/MovementSpeed.cs:12` |
+| Běh pěšky | **200 ms** (výchozí) | totéž |
 | Chůze na mountu | **200 ms** | totéž |
 | Běh na mountu | **100 ms** | totéž |
 | Otočení na místo | **80 ms** (klient) / **0 ms** (server) | ClassicUO `Constants.cs:17`, ModernUO `Movement.cs:32` |

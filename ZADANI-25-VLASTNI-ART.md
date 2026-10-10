@@ -127,3 +127,18 @@ postprocess → zapsat do manifestu → porovnat s původním artem ve stejném 
 a **podívat se na to**. Teprve pak postava (40 spritů) a zbytek — kdyby se
 konvence kotev nebo měřítko rozjely, je to vidět na jednom kuse za minuty, ne
 na čtyřiceti.
+
+## 8. DOPLNĚNO 2026-10-10 (po startu pilotu) — licence a co se commituje
+
+* **Obrázky z `tools/artgen/` se NEcommitují** — každý je srovnání s artem
+  z instalace UO, tedy autorské dílo EA/Broadsword (stejný důvod jako
+  `assets/uo/`). Do `.gitignore` přidáno: `tools/artgen/raw/`,
+  `tools/artgen/*.png`, `tools/artgen/_*`, `tools/artgen/blend/*.blend1`.
+  Ověřeno `git check-ignore -v`.
+* **Skripty a měření se commitují** (`*.py`, `MERENI.md`, `SEAM.md`) — jsou to
+  důkazy postupu, ne assety.
+* **`assets/own/` se commituje** (vlastní art je náš a je to cesta
+  k distribuci); **`tools/artgen/blend/*.blend` taky** — `M6` říká „zdroje
+  držet", bez nich by se sada nedala vyrenderovat znovu.
+* **Co se tím nemění:** `assets/uo/` zůstává ignorované a hra dál čte jen
+  `assets/uo/`; `assets/own/` se zapojí až integrační granule.

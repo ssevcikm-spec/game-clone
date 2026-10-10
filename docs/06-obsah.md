@@ -172,5 +172,12 @@ Hra je obsahově hotová, když platí **všechno**:
 | C9 | 3 dungeony mají spawn a loot | test regionu |
 | C10 | Každý záznam v `data/` má `source` a `era` | schéma |
 
+> **⚠ Stav 2026-10-10 — sloupec „Jak se ověří" je CÍL, ne dnešní stav.**
+> Brána `check-content` sama hlásí: *„počty C1–C10: SCHÉMA NEURČENO (docs/06
+> §6.x) — kontrola je zatím neměří"* (`tools/gates/check-content.py:44-45`).
+> Tabulka tedy **slibuje měření, která neexistují**; doplní se, až se počty
+> připnou ve schématu (patří uživateli / integrační session). Do té doby se
+> „obsahová hotovost" **nesmí** hlásit jako splněná.
+
 **Pozor na past:** „máme 1150 receptů v JSON" **není** obsahová hotovost, když
 je dostupných 50. Počítá se **dostupné** (C4), ne **přítomné**.

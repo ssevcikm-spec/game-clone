@@ -250,3 +250,36 @@ je samostatná granule v plánu, ne součást artové koleje.
 * **Nezměněné:** plán, brány, simulace i běžící práce na demu (D10) — artová
   kolej se jich nedotýká.
 
+## 9. Provedení (2026-10-10) — co je hotové a co čeká
+
+> **Co je tenhle oddíl:** **záznam o provedení** rozhodnutí M1–M8 — doplňuje se,
+> nepřepisuje. Kdo hledá dnešní stav projektu, čte `HANDOFF.md`.
+
+### Hotové (commit `933193a`, pushnuto, `ahead 0`)
+
+| Co | Kde | Doklad |
+|---|---|---|
+| **M1 v zadání** — tempo kroku je výchozí hodnota v datech, ne zamrzlé pravidlo (s důvodem: naměřeno jako anti-cheat throttling) | `docs/05` §5.1.4, `docs/01` §1.2 V2 | `check-docs-refs` + `check-zadani` → exit 0 |
+| **M2 v zadání** — let projektilu je vizuální, zásah se počítá při akci | `docs/05` §5.5.1 (archery) + §5.5.2 | totéž |
+| **Síť: rozpor vyřešen** — „žádná síť, žádný protokol" → „síť odložená, hranice `Command`/`Event` závazná už dnes" | `docs/01` §1.1 + §1.5 bod 1 | totéž |
+| **„2D" jako rozhodnutí s důvodem** (ne vlastnost enginu) + měřená cena změny | `docs/02` §2.1 | totéž |
+| **Nová brána `G14` `check-state-float`** — hlídá float ve **stavu** simulace (ne ve výpočtu) | `tools/gates/check-state-float.py`, registrace v `run-all.py` za `G2`, popis v `docs/08` §8.2, mutace v §8.3 | **měřeno OK (exit 0)**; self-test **6 případů / 0 chyb**; na stromě: 30 souborů `sim/`, 71 řádků povoleného lokálního floatu, 1 povolený konfigurační člen, **0 vad** |
+| **4 zastaralé údaje v `docs/`** | `docs/07` (aktuální počty granulí; historická tabulka zůstala nepřepsaná), `docs/11` (1150 je jiný čítač než 1053), `docs/04` (quality Low/Normal/Exceptional), `docs/01` | doc brány exit 0 |
+| **M1 v kódu — tempo kroku je z DAT** (doděláno 2026-10-10 po commitu druhé session) | `data/balance.json` (`movement.walk_ms` 400 / `run_ms` 200 + `sources`), `app/config.gd` `SCHEMA` (typ/rozsah), `sim/systems/movement.gd` (`_read_balance` je načte, `delay_ms_for` je vrací, nový nepovinný vstup `balance_path` kvůli testu), `tests/cases/movement_tempo.gd` (5 měřených větví), mutace v `tools/gates/mutace-tests.py` (nový modul `movement_tempo`) | **testy 1 845 kontrol / 0 selhání** (73 case souborů); **mutace chycena** („tempo se čte z Const" → 5 selhání, návrat ověřen zelenou); brány `G1`, `G5`, `G14` a obě doc brány → exit 0 |
+
+**Proč je `G14` úzká, a ne plošná:** naměřeno, že `sim/` **legitimně** používá
+float ve výpočtech (71 řádků — `craft.gd` počítá šanci, `harvest.gd` rolluje,
+`skill_gain.gd` vrací float ze `_gain_chance`, `regen.gd` má koeficient).
+Plošný zákaz by hlásil vadu o **správném** kódu. Brána proto hlídá jen to, co
+jde **do stavu** (člen, jehož jméno je v `state()`), a jakýkoli
+`Vector2(`/`Vector3(` v `sim/`; co toleruje, **vypisuje do měření**.
+
+### Čeká (pojmenované, s důvodem)
+
+| Co | Proč to čeká | Přesný další krok |
+|---|---|---|
+| **Automatizace útoku** (`attack` do `ACTION_KINDS`, podmínka o cíli, `policy_state()` o cíli) — `[O]` 1–2 granule | sahá na `sim/policy.gd`, `sim/executor.gd`, `sim_world.gd`; je to **změna specu hotových modulů `MK`**, takže si zaslouží vlastní zadání, ne „přilepení" k jiné práci | zadat jako granuli k `MK` se změnou specu |
+| **2× varianta artu** (88×44, `Z_SCALE 8`, slunce + AO + kontaktní stín) vedle 1× a původního spritu | běží **artový pilot** (`ZADANI-25`); 2× srovnání je jeho navazující krok | po pilotu vyrenderovat srovnávací list a rozhodnout geometrii **z obrázku**; zapojení do hry je samostatná granule |
+| **Art v plánu** (granule pro pipeline a pro integraci `assets/own/`) | chybí **změřená cena** — pilot ji dává; plánovat podle dojmu je to, co `M7` odmítá | po `tools/artgen/MERENI.md` doplnit granule v `tools/roadmap-gen.py` + `docs/07` (patří uživateli / integrační session) |
+| **Zbylých 7 rozporů z auditu** (`docs/08` F1/F4, `docs/06` C1–C10 vs `check-content`, `docs/05` trvanlivost nástrojů vs existující `entity.equipment`) | část se dotýká souborů, které druhá session **právě mění** (`harvest.gd`) — zapsané tvrzení o stavu by zestárlo dřív, než vznikne | po jejím commitu projít a doplnit |
+

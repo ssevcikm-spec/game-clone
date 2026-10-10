@@ -55,6 +55,14 @@ const SCHEMA := {
 	# "emulator" je model z emulatoru (1 bod za 16 kroku vcetne chuze).
 	"stamina_drain_model": {"type": TYPE_STRING, "default": "run_only",
 		"values": ["run_only", "always", "never", "emulator"]},
+	# TEMPO KROKU (rozhodnuti M1, 2026-10-10): prodleva kroku je LADITELNA
+	# vychozi hodnota, ne zamrzle pravidlo - v referenci je to anti-cheat
+	# throttling (`_src/servuo/Scripts/Misc/Fastwalk.cs:5-6`), ne design.
+	# Cte je `sim.systems.movement` (`_read_balance`), ktere ma vychozi hodnoty
+	# z `core/const.gd` (WALK_MS/RUN_MS) - kdo klice v datech smaze, dostane
+	# presne to same chovani jako dosud.
+	"movement.walk_ms": {"type": TYPE_INT, "default": 400, "min": 50, "max": 2000},
+	"movement.run_ms": {"type": TYPE_INT, "default": 200, "min": 50, "max": 2000},
 	"ggs_on": {"type": TYPE_BOOL, "default": true},
 	"insurance_on": {"type": TYPE_BOOL, "default": false},
 	"anti_macro": {"type": TYPE_BOOL, "default": false},

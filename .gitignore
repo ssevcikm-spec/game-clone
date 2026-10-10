@@ -24,6 +24,15 @@ research/_src/servuo/
 research/_src/modernuo/
 .cache/
 
+# --- artová kolej (ZADANI-25): referenční výpisy z instalace UO se NEcommitují ---
+# `tools/artgen/` obsahuje skripty (ty se commitují) i OBRÁZKY. Každý obrázek
+# v té složce je srovnání s artem z instalace UO, takže je to autorské dílo
+# EA/Broadsword stejně jako `assets/uo/` - do gitu nesmí. Vlastní art
+# (`assets/own/`) se naopak commituje: je náš a je to cesta k distribuci.
+tools/artgen/raw/
+tools/artgen/*.png
+tools/artgen/_*
+tools/artgen/blend/*.blend1
 # --- Godot ---
 .godot/
 *.import

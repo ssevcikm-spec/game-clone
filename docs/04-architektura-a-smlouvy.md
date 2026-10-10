@@ -599,12 +599,15 @@ Tyto toky jsou **jádro shody s referencí**; každý má test s konkrétní hod
 ui klik do světa → app.input → Command{t:"move", dir, run}
 sim.commands.dispatch → sim.movement.request_step(m, dir, run)
    → world.walk.can_step()   # Z, StepHeight, flagy, diagonála
-   → pokud ok: naplánuj apply_step za delay_ms (400/200/100)
+   → pokud ok: naplánuj apply_step za delay_ms **z DAT** (400/200/100 jsou
+     výchozí hodnoty; rozhodnutí `M1` — `data/balance.json: movement.walk_ms/run_ms`)
    → event mobile_moved + mobile_anim
    → pokud ne: event message{"You cannot move there."}
 ```
 **Přijímací kritérium:** `request_step` na volné dlaždici vrátí
-`{ok:true, delay_ms:400}` pro chůzi a `200` pro běh; na dlaždici s vodou
+`{ok:true, delay_ms:400}` pro chůzi a `200` pro běh **při výchozích datech**
+(kdo změní `movement.walk_ms`/`run_ms`, dostane jinou hodnotu — obojí měří
+`tests/cases/movement_tempo.gd`); na dlaždici s vodou
 (`Wet`) vrátí `{ok:false, reason:"blocked"}`; diagonála vedle zdi vrátí
 `{ok:false, reason:"diagonal"}` **pro hráče** a `{ok:true}` pro NPC
 (ověřeno v kódu: hráč potřebuje obě ortogonální dlaždice, NPC jen jednu).
