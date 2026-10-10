@@ -88,18 +88,28 @@ v simulaci; UI drží „predikovanou" pozici, dokud nedorazí událost.
 | Váha (encumbrance) | nad nosnost se pohyb zpomalí/znemožní | `research/01` §1.5 |
 
 **Pravidlo (PŘEPSÁNO 2026-10-07 — dřív tu byl zákaz, naměřeno jako věcně
-nesprávný):** pohyb je **diskrétní krok 400 ms (běh 200 ms)** — to je pravidlo
-**simulace** a nemění se. **Klient ale SMÍ vykreslit posun mezi dlaždicemi
-plynule:** referenční klient to přesně tak dělá (ClassicUO `Mobile.cs:776-782`
+nesprávný; DOPLNĚNO 2026-10-10 rozhodnutím `M1`):** pohyb je **diskrétní krok**
+(400 ms chůze / 200 ms běh) a **prodleva kroku je výchozí hodnota v datech**, ne
+zamrzlé pravidlo — kdo mění dojem z tempa, mění `data/balance.json`, ne
+mechaniku. **Klient ale SMÍ vykreslit posun mezi dlaždicemi plynule:**
+referenční klient to přesně tak dělá (ClassicUO `Mobile.cs:776-782`
 a `MovementSpeed.GetPixelOffset` — dlaždici potvrdí až na **konci** kroku, do té
 doby kreslí postavu posunutou o pixely, a **týž 80ms clock řídí i framy
 animace**). Původní zákaz („lerp mezi dlaždicemi jako moderní hry") vycházel
 z omylu o tom, co UO dělá, a jeho důsledkem bylo, že animace chůze byla
 **v protifázi s pohybem** (doklad: `REVIZE-POHYB-2026-10-07.md` §2.2).
 
-**Co zůstává zakázané:** měnit kvůli dojmu z plynulosti **pravidla** — prodlevu
-kroku, průchodnost, dosah ani spotřebu staminy. Plynulost je věc **vykreslení**,
-ne mechaniky.
+**Proč se 2026-10-10 změnilo „to je pravidlo simulace a nemění se":** prodleva
+kroku je v referenci **anti-cheat throttling, ne design** — ServUO má fastwalk
+detekci výslovně **vypnutou** s odůvodněním, že ji nahradilo „movement packet
+throttling" (`_src/servuo/Scripts/Misc/Fastwalk.cs:5-6,10`) a ModernUO má na
+totéž `MovementThrottle` s prahy a detekcí speedhacku
+(`_src/modernuo/Projects/Server/Network/MovementThrottle.cs:23-28,42-51`).
+Doložení pro „400 ms je designový záměr" → **NENALEZENO**. Rozhodnutí a ceny:
+`ROZHODNUTI-2026-10-10-MODERNI-UO.md` (M1).
+
+**Co zůstává pravidlem (a mění se jen se zápisem v `docs/`):** **průchodnost**,
+**dosah** a **spotřeba staminy**. Plynulost je věc **vykreslení**, ne mechaniky.
 
 ## 5.2 Interakce mezi objekty (§ V3)
 
@@ -233,7 +243,7 @@ větev **a** test. Když větev chybí, hra na použití odpoví hláškou
 | **Damage** | **AoS**: `base + base × součet bonusů` (STR 0.300/+5@100, Anatomy 0.500/+5, Tactics 0.625/+6.25, Lumber 0.200/+10), DI strop **100 %**, **bez půlení** proti hráčům |
 | **Obrana** | **AoS**: `Σ(dmg × podíl × (100 − resist)) / 10000`, minimum 1, strop přímého damage 35 |
 | **Parry** | štít `(Parry − Bushido)/400`; obouruční zbraň `Parry × Bushido / 48000` |
-| **Archery** | stání na místě 1000/500/250 ms dle éry, munice se spotřebuje **při každém** výstřelu, 40 % návratnost, dostřel 7–10 |
+| **Archery** | stání na místě 1000/500/250 ms dle éry, munice se spotřebuje **při každém** výstřelu, 40 % návratnost, dostřel 7–10. **DOPLNĚNO 2026-10-10 (`M2`): zásah se počítá v okamžiku výstřelu, let šípu je jen VIZUÁLNÍ efekt** — přesně tak to dělá reference (`_src/servuo/Scripts/Items/Equipment/Weapons/BaseRanged.cs:91-102` = `Swing` → `OnFired` → `CheckHit` → `OnHit`, let je `MovingEffect` na `:221`). Projektil, který rozhoduje o zásahu, je **odchylka** (nová smlouva, +3–6 granulí) |
 | **Healing obvazy** | vzorce AoS i klasika + prodlevy + podmínky `60/60` pro vyléčení a `80/80` pro vzkříšení (v `research/03`) |
 | **Zvláštní útoky** | 31 útoků s přesnou cenou many a branami 70/90 skillu |
 
@@ -248,6 +258,9 @@ v `research/03` popsané také** — přepnutí je konstanta
 
 - Animace útoku (frame podle směru), zvuk zásahu, číslo damage v žurnálu,
   jméno cíle a jeho HP pruh po kliku, smrt a tělo s lootem.
+- **Let projektilu je vidět, ale nerozhoduje** (`M2`): zásah se počítá při akci,
+  let je efekt — kdyby let rozhodoval, mění se balanc (uhýbání) i smysl
+  automatizace (`D3`).
 - `war/peace` režim (v klidu hráč neútočí omylem).
 - Combat timer: po posledním zásahu se cíl „zapomene" po známé prodlevě.
 

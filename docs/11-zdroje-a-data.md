@@ -79,7 +79,7 @@ Do `CREDITS.md`: které repo dalo které číslo. Do kódu: **žádná kopie GPL
 | `research/01-core-mechanics.md` (1921 řádků) | pohyb, interakce, postava, čas, ekonomika; 40 čísel „která klon nesmí splést"; 487 citací `soubor:řádek` | **normativní** pro §5.1–5.4, §5.9, §5.11 |
 | `research/02-skills.md` | 58 skillů, gain, gump menu, bard/hide/steal | normativní pro §5.10 |
 | `research/03-combat-magic-items.md` (2678 řádků) | 4 éry swing timingu, 2 vzorce damage, 64 kouzel, 159 vlastností předmětů, loot | normativní pro §5.5, §5.6, §6.4 |
-| `research/04-gathering-crafting.md` (2332 řádků) + `04-craft-data.json` | **1150 receptů** strojově extrahovaných + engine výroby, tavení, oprava | normativní pro §5.7, §5.8, §6.3 |
+| `research/04-gathering-crafting.md` (2332 řádků) + `04-craft-data.json` | **1150 receptů** strojově extrahovaných (⚠ **jiný čítač než u hry** — do hry jde **1053** receptů, měřeno v `docs/06` §6.3 a `docs/05` §5.8; dvě čísla téhož jména) + engine výroby, tavení, oprava | normativní pro §5.7, §5.8, §6.3 |
 | `research/05-data-formats.md` | binární formáty `.mul`/`.uop` (art, gump, tiledata, anim, mapa) | normativní pro §3.4, §3.5 |
 | `research/06-world-content-npcs.md` (5164 řádků) | facety, 19 měst, 9 moongate, 15 dungeonů, 88 monster, spawnery, obchod, profese | normativní pro §5.9, §5.12, §6.5, §6.6 |
 | `research/07-extractor-verification.md` | co z extraktoru **skutečně funguje** (art ověřen a viděn, statics ověřeny, tiledata předměty ověřeny; 4 rozpory s `research/05`) + funkční kód v `tools/uoextract/` a vzorky PNG | normativní pro granuli `assets.*`, ale **rozpory R1–R4 se rozhodují testem** (§3.5.4) |

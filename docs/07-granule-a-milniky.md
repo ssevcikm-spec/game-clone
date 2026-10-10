@@ -166,6 +166,13 @@ Skutečné počty granul hlásí generátor — naměřeno 2026-10-06 po revizi 
 | M9 | 3 |
 | **celkem** | **111** |
 
+> **⚠ Aktuální počty granulí se berou z `python tools/roadmap-gen.py --check`
+> (nebo `tools/plan-status.py`), ne z tabulky výš** — ta je **snapshot
+> z 2026-10-06** a je „ve svém čase správná". **Dnešní stav (2026-10-10,
+> měřeno): 122 granulí** — M0 17, M1 23, M2 34, M3 5, M4 6, **M5 11**, M6 3,
+> M7 4, M8 3, M9 3, **MK 9**, **MP 4**. Kdo plánuje podle 111 nebo podle
+> zastaralého „M5 9", plánuje podle snapshotu.
+
 **Naměřeno 2026-10-08** po vložení granul z plánu NPC a souboje
 (`python tools/roadmap-gen.py`): M2 **34**, M5 **11**, M7 **7**, M8 **3**,
 ostatní beze změny, **celkem 112** (přibyla `app.pick`; `data.spawns`

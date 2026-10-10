@@ -10,7 +10,7 @@
 |---|---|---|
 | Engine | **Godot 4.7.2 stable** | je na stanici (`orchestra\tools\godot\`), zvládá 2D iso scénu, má headless testy, export na Windows |
 | Jazyk | **GDScript, typovaný** (`var x: int = 0`, `func f(a: int) -> void:`) | žádná kompilace, agenti ho umí, testy se pouští `--headless --script` |
-| Renderer | **Forward+ / Mobile** — hra je 2D, použij `CanvasItem` a `_draw()`; `gl_compatibility` jen pro CI snímky | snímky v CI běží na `opengl3` |
+| Renderer | **Forward+ / Mobile** — hra je **2D izo**, použij `CanvasItem` a `_draw()`; `gl_compatibility` jen pro CI snímky. **DOPLNĚNO 2026-10-10 (`M5`): „2D" je ROZHODNUTÍ S DŮVODEM, ne vlastnost enginu** — art je 2D předrenderovaný (49 705 spritů, dlaždice 44×44) a drží ho kontrakt atlasu i brána `G1`. Změna na 3D (billboardy) je **vratná opce** s měřenou cenou 20–30 granulí, 4–7 session a **522 z 1 628 kontrol**; patří klientovi podle `D5`, ne téhle hře | snímky v CI běží na `opengl3` |
 | Verzování | git, `main` je vždy spustitelná | CI běží na každý push |
 
 **Godot past, která se už jednou zaplatila:** `--user-data-dir` tento build

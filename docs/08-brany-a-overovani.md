@@ -23,6 +23,7 @@
 |---|---|---|---|---|
 | G1 | `check-schema.py` | **rozpor v zadání**: `docs/` + `data/*.json` + kód + atlas musí říkat totéž (tile 44, ISO_STEP 22, Z_SCALE 4, rozsahy id) | každý PR | některý zdroj tvrdí jiné číslo, nebo se číslo **nedá přečíst** |
 | G2 | `check-layers.py` | **směry závislostí**: `sim/**` nesmí odkazovat `ui/`, `render/`, `app/`; nesmí obsahovat `Input.`, `Time.`, `OS.`, `randf(`, `randi(` | každý PR | jediný zakázaný odkaz (tvrdá brána) |
+| **G14** | `check-state-float.py` (**přidáno 2026-10-10**) | **žádný float ve STAVU simulace** (`docs/01` §1.5 bod 3): členská proměnná typu `float`, která vstupuje do `state()`, a jakýkoli `Vector2(`/`Vector3(` v `sim/**`. **Lokální float ve výpočtu a členská konfigurace mimo stav jsou dovolené** a vypisují se do měření (naměřeno: 71 řádků s floatem ve výpočtu, 1 konfigurační člen) | každý PR | float ve stavu (rozbitý hash/save/replay) nebo float vektor v sim |
 | G3 | `tests/run_tests.gd` | **chování simulace** (bez assetů, bez scény) | každý PR | kterákoli nepodmíněná kontrola spadne |
 | G4 | `check-wiring.py` | **mrtvý kód**: každé deklarované `provides` je volané z **produkčního** kódu; každý `_on_*` je připojený k signálu | každý PR | funkce není volaná nebo handler není připojený |
 | G5 | `check-content.py` | **obsah**: schémata `data/*.json`, existence art ID v manifestu, křížové odkazy (recept → materiál → předmět), počty C1–C10 | každý PR | chybí art, neplatný odkaz, nesplněný minimální počet |
@@ -147,6 +148,8 @@ Když nespadne, brána je slabá — oprav bránu, ne test.
 |---|---|---|
 | G1 | změň `ISO_STEP` na 23 v `const.gd` | chyba „nesedí s TILE_W/2" |
 | G2 | přidej `Input.` do `sim/systems/movement.gd` | chyba „sim nesmí používat Input" |
+| G14 | přidej do `sim/` členský `var koef: float` a vlož ho do `state()` | chyba „je float A VSTUPUJE DO STAVU" |
+| G14 | použij v `sim/` `Vector2(` místo `Vector2i(` | chyba „float vektor v sim/" |
 | G3 | rozbij `swing_delay_ms` (vrať 0) | selhání testu boje |
 | G4 | odpoj `_on_use_pressed` od signálu | chyba „handler není připojen" |
 | G5 | smaž položku z `items.json`, na kterou odkazuje recept | chyba „neplatný odkaz" |

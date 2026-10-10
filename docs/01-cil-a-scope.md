@@ -31,7 +31,11 @@ a vyrábějí, NPC se kterými se obchoduje, souboj se skilly které rostou
 používáním — a to všechno nad **originálními datovými soubory UO Classic**,
 které leží na této stanici.**
 
-Hra **není** MMO, nemá server, nemá síťový protokol a nepočítá s jiným hráčem.
+Hra dnes **běží jako singleplayer** (jeden proces: klient + simulace)
+a **nepočítá s jiným hráčem**; síť je **odložená, ne zamítnutá** — `D9` rozhodl
+session u hostitele první a milník `MP` je za `M9`
+(`ROZHODNUTI-2026-10-09-SMER.md`; rozpor s původním zněním je zapsaný
+v `ROZHODNUTI-2026-10-10-MODERNI-UO.md`).
 Vše, co v UO dělal server, dělá v klonu simulace v jednom procesu — ale
 **rozhraní mezi simulací a klientem zůstává** (viz `04-architektura-a-smlouvy.md`),
 protože právě ono dělá UO tím, čím je (zpožděné akce, target cursor, gumpy,
@@ -70,6 +74,12 @@ měří **regresi** („něco se rozbilo"), ne cíl.
 > obrazu mezi dvěma polohami). Přesně to dělá i originál v podání ClassicUO
 > a v klonu to řeší `REVIZE-POHYB-2026-10-07.md` §5 oprava B. Kdo by „plynulost"
 > četl jako volný pohyb, rozbije V2 i brány na kadenci.
+>
+> **DOPLNĚNO 2026-10-10 (`M1`):** **tempo kroku (400/200 ms) je výchozí
+> hodnota v datech**, ne zamrzlé pravidlo — důvod (naměřeno: je to anti-cheat
+> throttling) a ceny jsou v `ROZHODNUTI-2026-10-10-MODERNI-UO.md` (M1)
+> a v `docs/05` §5.1.4. Pravidlem zůstávají **průchodnost, dosah a spotřeba
+> staminy**.
 >
 > **⚠ Poznámka musí zůstat POD tabulkou, ne uvnitř ní** — vložená mezi řádky
 > V2 a V3 tabulku rozbije (řádky za ní ztratí hlavičku a nevykreslí se).
@@ -138,8 +148,14 @@ tím, co je nejblíž. Odůvodnění a ceny: `ROZHODNUTI-2026-10-09-SMER.md` (ro
 Tohle je **explicitní seznam zákazů**. Každý bod, který by agent „domyslel",
 vyrábí druhý zdroj pravdy a rozbíjí plán:
 
-1. **Žádná síť, žádný server, žádný protokol.** Žádné `ENet`, žádné
-   `MultiplayerSpawner`, žádná serializace paketů.
+1. **Žádná vlastní síťová vrstva se nepíše, dokud není hra hratelná**
+   (změněno 2026-10-10 — dřív tu stálo „žádná síť, žádný server, žádný
+   protokol", což si odporovalo s `D9` a milníkem `MP`). **Hranice
+   `Command`/`Event` mezi klientem a simulací je závazná už dnes** (klient
+   posílá jen záměr, simulace rozhoduje) — je to zároveň příprava na session
+   u hostitele. Konkrétní síť (protokol, replikace, predikce) je **odložená, ne
+   zamítnutá**; `ENet` a `MultiplayerSpawner` se nepoužívají, dokud k nim
+   nebude smlouva (`mp.contract`) a zápis v `docs/`.
 2. **Žádná fyzika enginu pro pohyb.** Pozice jsou celá čísla dlaždic; pohyb
    řeší simulace, ne `CharacterBody2D`/`move_and_slide`.
 3. **Žádné plovoucí desetinné číslo ve stavu simulace** (skilly, hp, čas,

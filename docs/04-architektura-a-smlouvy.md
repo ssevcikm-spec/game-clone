@@ -566,7 +566,7 @@ Vector3i  # pozice: x, y = dlaždice (int), z = světová výška (int)
   layer:int,             # 0 = nenasazený
   pos:Vector3i,          # platné jen na zemi
   flags:int,             # 0x01 blessed, 0x02 newbie, 0x04 locked, 0x08 insured
-  durability:int, max_durability:int, quality:int,  # 0 normal, 1 exceptional
+  durability:int, max_durability:int, quality:int,  # Low 0 / Normal 1 / Exceptional 2 (viz `entity.item` §4.2; do 2026-10-10 tu stálo „0 normal, 1 exceptional" — posun o jednu)
   props:Dictionary }     # AoS properties: {"damage_increase":25, ...}
 
 # Kontejner NENÍ pole v Item (2026-10-07): obsah drží `sim/entity/container.gd`

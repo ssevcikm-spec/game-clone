@@ -41,6 +41,10 @@ ORDER = [
     ("G1", "check-schema.py"),
     ("G5", "check-content.py"),
     ("G2", "check-layers.py"),
+    # G14 (zadny float ve STAVU simulace) patri hned za G2: je to taky staticka
+    # kontrola `sim/**`, ale hlida invariantu z docs/01 §1.5 bodu 3, ktera do
+    # 2026-10-10 nemela vlastni branu. Pridano 2026-10-10 (rozhodnuti M1).
+    ("G14", "check-state-float.py"),
     ("G4", "check-wiring.py"),
     ("G6", "check-assets.py"),
     ("G7", "check-save.py"),
