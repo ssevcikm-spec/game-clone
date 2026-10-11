@@ -94,6 +94,7 @@ v `.forge/roadmap.json`.
 |---|---|---|
 | `sim.commands` | `sim/commands.gd` | `parse(d:Dictionary)->Dictionary`, `validate(c:Dictionary)->Dictionary` (`{ok, reason}`), `dispatch(sim, c:Dictionary)->void` |
 | `sim.world_loop` | `sim/sim_world.gd` | `new(seed:int, data:Dictionary)`, `enqueue(c:Dictionary)->void`, `tick(ms:int)->void`, `snapshot()->Dictionary` (read-only pro UI), `state_hash()->String`, `save(path:String)->bool`, `load(path:String)->bool`; **pořadí v `tick` je pravidlo: hodiny → systémové ticky → dispatch příkazů** (2026-10-07) — kdyby se příkazy dispatchovaly první, krok, který je v tomto ticku na řadě, vrací `busy` a kadence kroku se zdvojnásobí (`REVIZE-POHYB` §2.1) |
+| `sim.content` | `sim/content.gd` | **DOPLNĚNO 2026-10-11** (modding, S1): `add(id, version, order, files, root, required)->bool`, `path_for(rel)->String` (`""` = žádná vrstva soubor neposkytuje), `path_or_default(rel)->String`, `providers(rel)->Array`, `declared_files()->Array`, `missing_files()->Array`, `override_count()->int`, `manifest()->Array`, `manifest_hash()->String`, `layers()/layer_ids()/layer_count()`, `errors()->Array`, `report()->Dictionary`, `discover(decl_path, mods_dir)->int`; kontrakt je v **§4.9** |
 
 ### ui (klient) — kompaktně
 
@@ -783,3 +784,58 @@ požadavek „vrať do fixture vadu a ukaž, že test spadne").
 měří bez instalace UO jen `self-test` a **řekne to** (`realna sonda: NEMERENA`;
 jeho sonda na reálných datech má navíc baseline na originále, aby chybějící data
 nevypadala jako „mutace chycena").
+
+## 4.9 Vrstvy obsahu (modding, S1 — DOPLNĚNO 2026-10-11)
+
+> **Co je nové a co se změnilo:** tenhle oddíl **přidává** kontrakt modulu
+> `sim.content`; **žádná dřívější smlouva se nemění** (save `§4.7`, `state_hash()`,
+> příkazy `§4.3` i brány zůstávají). Kdo hledá plán dalších kroků (verzované
+> ukládání vázané na obsah, stabilní ID záznamů, sandbox skriptů): je
+> v [`NAVRH-MODDING-2026-10-11.md`](../NAVRH-MODDING-2026-10-11.md), a to
+> včetně toho, co z něj **ještě není hotové**.
+
+**Proč to existuje:** cesty k datům byly zapečené v modulech (**27 konstant**,
+**17 literálů v `app/main`** — naměřeno 2026-10-11) a nikde neexistovalo místo,
+které odpoví „odkud se ten soubor bere". Modder neměl jak říct „tenhle soubor
+ber odsud".
+
+**Vrstva** je `(id, version, order, files, root, required)`:
+
+| Prvek | Pravidlo |
+|---|---|
+| `id` | **stabilní ID zdroje**: malé ASCII `[a-z0-9_.-]`, např. `base`, `mod.example`; musí být **unikátní**. Je to ID **zdroje**, ne záznamu v datech (klíč předmětu je dnes `tile` = art UO) |
+| `version` | `int >= 1`; verze **obsahu té vrstvy** (použije ji save v S2) |
+| `order` | `int >= 0`, **povinný**; **vyšší vyhrává**. Při shodě rozhoduje `id` **vzestupně** — výsledek tedy nezávisí na pořadí vložení ani na pořadí složek v adresáři |
+| `files` | relativní cesty (`data/items.json`), bez `..`, `:` a `\`; soubor, který v `root` **není**, se přeskočí a je vidět v `missing_files()` |
+| `root` | kde vrstva leží; `base` má `res://`, **mod vlastní `root` mít nesmí** (bere se jeho adresář — mod nemůže utéct ze své složky) |
+| `required` | `true` = bez té vrstvy se save z uložení nemá načítat (použije S2) |
+
+**Kde je co deklarované:**
+
+* `data/content-layers.json` — **základní vrstva `base`** (soubory, které jsou
+  v gitu). Seznam se **generuje z disku**; test `tests/cases/content.gd` měří,
+  že deklarace a obsah `data/` se **shodují** (jinak by seznam zestaral a mod
+  by „nefungoval" u nového souboru).
+* `user://mods/<jmeno>/mod.json` — **mod**: `{id, version, order, files}`.
+  Neznámý klíč je **chyba** (preklep se neignoruje), chybějící `order` je
+  **chyba**, rozbitý `mod.json` se přeskočí a **ohlásí jménem modu**.
+
+**Rozhraní modulu** (kanonicky v `§4.2`): `discover(decl_path, mods_dir)` načte
+deklaraci a mody a vrátí počet přidaných vrstev; `path_for(rel)` vrátí vítěze
+nebo `""`; `path_or_default(rel)` vrátí základní `res://` cestu, když o souboru
+nikdo nic neví; `providers(rel)` je doklad „kdo to přebil"; `manifest()` nese
+**jen identitu** (`id, version, order, required`), **žádné cesty** — save nesmí
+záviset na umístění instalace.
+
+**Kdo to používá:** `app/main` (kompoziční kořen) — `_nacti_obsah()` se volá
+**před** `_load_data()` a překládá cesty přes `_cesta(rel)`; přepínač
+**`--no-mods`** vypne mody a nechá jen `base` (cesta zpět a A/B). Moduly si
+cesty drží jako **parametr konstruktoru** (jako `sim.systems.combat`), aby se
+rozhodovalo na jednom místě.
+
+**Chyby se vracejí seznamem**, ne výjimkou: rozbitý mod **nesmí shodit start**,
+ale musí být vidět (`docs/08 §8.6`).
+
+**Co tenhle oddíl NEPINUJE (a je to pojmenované):** slučování záznamů (mod
+přebíjí **celý soubor**), hash obsahu (to je `data_version` v `§4.7`), spouštění
+skriptů modu a **9 modulových konstant**, které se pořád čtou přímo (§4.2).
