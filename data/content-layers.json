@@ -1,0 +1,33 @@
+{
+ "_popis": "Vrstvy obsahu (moduly `sim.content`). `base` je obsah hry, ktery je v gitu. Mod je adresar v `user://mods/<jmeno>/` s `mod.json` a s soubory, ktere deklaruje; vyssi `order` vyhrava, pri shode rozhoduje `id` vzestupne.",
+ "_format": 1,
+ "layers": [
+  {
+   "id": "base",
+   "version": 1,
+   "order": 0,
+   "required": true,
+   "root": "res://",
+   "files": [
+    "data/armor.json",
+    "data/balance.json",
+    "data/defs.json",
+    "data/doors.json",
+    "data/help.json",
+    "data/item_properties.json",
+    "data/items.json",
+    "data/misc.json",
+    "data/mobtypes.json",
+    "data/monsters.json",
+    "data/recipes.json",
+    "data/skill_groups.json",
+    "data/skills.json",
+    "data/spawns.json",
+    "data/stairs.json",
+    "data/teleports.json",
+    "data/vendors.json",
+    "data/weapons.json"
+   ]
+  }
+ ]
+}

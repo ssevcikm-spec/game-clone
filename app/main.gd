@@ -7,6 +7,11 @@ extends Node2D
 # ("Identifier SimWorld not declared", namEReno 2026-10-02). Proto preload
 # s vlastnim jmenem, ktere s globalnim nekoliduje (docs/02 §2.6.2).
 const SimScript = preload("res://sim/sim_world.gd")
+# VRSTVY OBSAHU (2026-10-11, `sim.content`): JEDNO misto, kde hra preklada
+# `res://data/*.json` na vrstvy (zaklad + mody z `user://mods/`). Konfigurace je
+# `data/content-layers.json`; kontrakt je v `docs/04 §4.9`. Vypnout se da
+# pripojnem `--no-mods`.
+const ContentScript = preload("res://sim/content.gd")
 const Loop = preload("res://app/loop.gd")
 const InputMapScript = preload("res://app/input_map.gd")
 const MapScript = preload("res://sim/world/map.gd")
@@ -171,6 +176,15 @@ var hotkeys = null               # `ui.hotkeys` (session D) - napoveda pro hrace
 # neparsoval pri kazdem otevreni okna. Prazdny slovnik = data se neprecetla
 # a kazdy, kdo se na ne ptá, to MUSI nahlasit (zadna ticha prazdna napoveda).
 var _help_data: Dictionary = {}
+# CESTY K DATUM ROZLISENE PRES VRSTVY OBSAHU (`sim.content`, docs/04 §4.9).
+# Konstanta vyse je ZAKLADNI cesta (`res://data/...`); tady je to, co hra
+# OPRAVDU pouzije po nacteni vrstev. Kdo saha na data, saha na tyhle promenne -
+# jinak by mod prebil soubor, ktery se stejne necte z konstanty.
+var content = null
+var items_data: String = ITEMS_DATA
+var skills_data: String = SKILLS_DATA
+var help_data: String = HELP_DATA
+var _mods_vypnuto: bool = false      # `--no-mods` (bere se jen zakladni vrstva)
 # VADY NAPOVEDY z posledniho skladani (akce, ktera v `InputMap` neni, vadny
 # radek dat). Pocitaji se do vystupu a `_osvezi_napovedu()` je VYPISE - vada
 # napovedy se nesmi tvarit jako "napoveda je kratka".
@@ -244,6 +258,10 @@ func _ready() -> void:
 	# jestli vrstvy vlastniho artu vubec nacte - kdyby se ctly az po stavbe
 	# sveta, `--no-own-art` by nemelo zadny efekt (a to by se hledalo tezko).
 	_parsuj_prepinace()
+	# OBSAH PRED DATY: `_load_data()` i systemy dostavaji cesty z vrstev
+	# (docs/04 §4.9). Kdyby se vrstvy nactly az po `_load_data()`, cetl by se
+	# `balance.json` jeste ze zakladni cesty a mod by u nej nemel efekt.
+	_nacti_obsah()
 	var data: Dictionary = _load_data()
 	metrics = MetricsScript.new()
 	sim = SimScript.new(DEFAULT_SEED, data)
@@ -280,6 +298,8 @@ func _parsuj_prepinace() -> void:
 	# JEDNO misto pro prikazovou radku. Prepinace:
 	#   --policy | --policy=<cesta> ... zapne automatizaci (M10, opt-in)
 	#   --no-own-art ................. vypne vlastni art jako CELEK (A/B srovnani)
+	#   --no-mods .................... ignoruje `user://mods/` (bere se jen
+	#                                  zakladni vrstva obsahu; A/B a "cista hra")
 	# Neznamy argument se NEPOLKNE tise - hodi se videt, kdyz se preklepne.
 	for arg in OS.get_cmdline_user_args():
 		var a := str(arg)
@@ -289,8 +309,47 @@ func _parsuj_prepinace() -> void:
 			_policy_cesta = a.substr("--policy=".length())
 		elif a == "--no-own-art":
 			_vlastni_vypnuto = true
+		elif a == "--no-mods":
+			_mods_vypnuto = true
 		elif a.begins_with("--"):
 			print("[main] neznamy prepinac: ", a)
+
+
+func _nacti_obsah() -> void:
+	# Vrstvy obsahu (docs/04 §4.9). Rozbita deklarace nebo rozbity mod NESMI
+	# shodit start - ale musi byt VIDET (chyby do warningu, cisla do logu).
+	# `--no-mods` vypne jen MODY; zakladni deklarace se cte vzdy, aby cesty
+	# k datum zustaly na jednom miste (jinak by existovaly dve cesty: s mody
+	# a bez nich).
+	content = ContentScript.new()
+	var mods_dir: String = "" if _mods_vypnuto else ContentScript.MODS_DIR
+	var pridano: int = content.discover(ContentScript.BASE_DECL, mods_dir)
+	for chyba in content.errors():
+		push_warning("app.main: obsah: " + str(chyba))
+	var rep: Dictionary = content.report()
+	print("[main] obsah: vrstev ", rep["layers"], " (", ", ".join(content.layer_ids()),
+		"), souboru ", rep["files"], ", prekryti ", rep["overrides"],
+		", chyb ", rep["errors"], ", manifest ", content.manifest_hash().substr(0, 12))
+	if _mods_vypnuto:
+		print("[main] mody VYPNUTY pripojnem --no-mods (bere se jen zakladni obsah)")
+	elif pridano > 1:
+		print("[main] mody: ", pridano - 1, " vrstva(y) z ", ContentScript.MODS_DIR)
+	var chybejici: Array = content.missing_files()
+	if not chybejici.is_empty():
+		push_warning("app.main: obsah: " + str(chybejici.size())
+			+ " deklarovanych souboru neexistuje: " + ", ".join(chybejici))
+	items_data = content.path_or_default("data/items.json")
+	skills_data = content.path_or_default("data/skills.json")
+	help_data = content.path_or_default("data/help.json")
+
+
+func _cesta(cesta: String) -> String:
+	# `res://data/x.json` -> cesta z VRSTEV OBSAHU (mod muze prebit zaklad).
+	# Vola se pro vsechno, co `app/main` predava systemum nebo cte samo; moduly
+	# maji sve cesty jako PARAMETR (`_init`), takze se rozhoduje tady.
+	if content == null:
+		return cesta
+	return content.path_or_default(cesta.trim_prefix("res://"))
 
 
 func _nacti_vlastni_art() -> Array:
@@ -879,19 +938,19 @@ func _setup_player(view) -> void:
 	# Do `sim.systems` se registruji VSECHNY: `SimWorld.SYSTEM_ORDER` je radi
 	# a `sim.commands` je odtud bere (dynamicky routing).
 	loot = LootScript.new(container, items, sim.rng(), sim.events(), sim,
-		"res://data/items.json", "res://data/vendors.json", "res://data/balance.json")
+		_cesta("res://data/items.json"), _cesta("res://data/vendors.json"), _cesta("res://data/balance.json"))
 	sim.systems["loot"] = loot
 	decay = DecayScript.new(sim.clock(), sim.events(), container, items)
 	sim.systems["decay"] = decay
 	death = DeathScript.new(registry, container, items, sim.events(), sim, decay,
-		0, "res://data/balance.json", loot, self)
+		0, _cesta("res://data/balance.json"), loot, self)
 	death.set_player(serial)
 	sim.systems["death"] = death
 	equipment = EquipmentScript.new(registry, container, items, tiledata)
 	combat = CombatScript.new(registry, null, items, equipment, null, sim.rng(),
-		sim.clock(), sim.events(), death, "res://data/weapons.json",
-		"res://data/armor.json", "res://data/balance.json",
-		"res://data/skills.json")
+		sim.clock(), sim.events(), death, _cesta("res://data/weapons.json"),
+		_cesta("res://data/armor.json"), _cesta("res://data/balance.json"),
+		_cesta("res://data/skills.json"))
 	sim.systems["combat"] = combat
 	poison = PoisonScript.new(registry, sim.rng(), sim.clock(), sim.events())
 	sim.systems["poison"] = poison
@@ -911,10 +970,10 @@ func _setup_player(view) -> void:
 	# `app/main` vi, kde data jsou, tak je precte a preda hodnotou.
 	# Kompatibilita: 8. a 9. argument zustavaji cesty (pro pripadne dalsi
 	# volajici), ale rozhoduje predany obsah.
-	var d_spawns = _read_json_file("res://data/spawns.json")
-	var d_monstra = _read_json_file("res://data/monsters.json")
+	var d_spawns = _read_json_file(_cesta("res://data/spawns.json"))
+	var d_monstra = _read_json_file(_cesta("res://data/monsters.json"))
 	spawn = SpawnScript.new(registry, sim, sim.clock(), sim.events(), sim.rng(),
-		d_spawns, d_monstra, "res://data/spawns.json", "res://data/monsters.json")
+		d_spawns, d_monstra, _cesta("res://data/spawns.json"), _cesta("res://data/monsters.json"))
 	sim.systems["spawn"] = spawn
 	# SPAWN BODY ZE SOUCASTI PREDANYCH DAT: registrace je tady, protoze
 	# `sim.spawn._init` cte data jen jako zaznamy; body zaklada volajici
@@ -1017,12 +1076,12 @@ func _starting_kit() -> Dictionary:
 	#   * Art zlata je z `data/vendors.json` (`config.gold_art`), ne z hlavy -
 	#     namEReno 2026-10-10: zlato ma vic artu podle velikosti hromady.
 	var zlata: int = 60
-	if not FileAccess.file_exists(ITEMS_DATA):
-		push_warning("app.main: chybi " + ITEMS_DATA + " - hrac nedostane zadny nastroj")
+	if not FileAccess.file_exists(items_data):
+		push_warning("app.main: chybi " + items_data + " - hrac nedostane zadny nastroj")
 		return {"nastroju": 0, "zlata": 0}
-	var parsed = JSON.parse_string(FileAccess.get_file_as_string(ITEMS_DATA))
+	var parsed = JSON.parse_string(FileAccess.get_file_as_string(items_data))
 	if not (parsed is Array):
-		push_warning("app.main: " + ITEMS_DATA + " neni seznam - hrac nedostane zadny nastroj")
+		push_warning("app.main: " + items_data + " neni seznam - hrac nedostane zadny nastroj")
 		return {"nastroju": 0, "zlata": 0}
 	var pocet: int = 0
 	var jmena: Array[String] = []
@@ -1076,10 +1135,14 @@ func _starting_kit() -> Dictionary:
 	return {"nastroju": pocet, "zlata": zlata}
 
 
-static func start_skills(balance_skills: Dictionary, skills_data) -> Dictionary:
+static func start_skills(balance_skills: Dictionary, skills_data,
+		cesta: String = SKILLS_DATA) -> Dictionary:
 	# Nazev skillu -> `id` (z `data/skills.json`) a hodnota v desetinach.
 	# Vraci `{id: hodnota}`; nezname jmeno se NAHLASI a preskoci - ticha nula by
 	# vypadala jako "skill se pridal", i kdyz se preklepl nazev.
+	# `cesta` je jen pro HLASKU (od 2026-10-11 ji volajici predava ROZLISENOU
+	# pres vrstvy obsahu) - funkce je `static`, takze na `skills_data` (ktery se
+	# jmenuje stejne jako parametr!) sahat nesmi.
 	var podle_jmena: Dictionary = {}
 	if skills_data is Array:
 		for rec in skills_data:
@@ -1089,7 +1152,7 @@ static func start_skills(balance_skills: Dictionary, skills_data) -> Dictionary:
 	for jmeno in balance_skills.keys():
 		if not podle_jmena.has(str(jmeno)):
 			push_warning("app.main: skill '" + str(jmeno)
-				+ "' z `player_start_skills` neni v " + SKILLS_DATA)
+				+ "' z `player_start_skills` neni v " + cesta)
 			continue
 		out[int(podle_jmena[str(jmeno)])] = int(balance_skills[jmeno])
 	return out
@@ -1117,12 +1180,12 @@ func _apply_start_skills() -> int:
 		push_warning("app.main: zadne `player_start_skills` ve SCHEMA - hrac zacne se skilly 0")
 		return 0
 	var data = null
-	if FileAccess.file_exists(SKILLS_DATA):
-		data = JSON.parse_string(FileAccess.get_file_as_string(SKILLS_DATA))
+	if FileAccess.file_exists(skills_data):
+		data = JSON.parse_string(FileAccess.get_file_as_string(skills_data))
 	else:
-		push_warning("app.main: chybi " + SKILLS_DATA + " - pocatecni skilly se nepridaji")
+		push_warning("app.main: chybi " + skills_data + " - pocatecni skilly se nepridaji")
 		return 0
-	var hodnoty: Dictionary = start_skills(mapa, data)
+	var hodnoty: Dictionary = start_skills(mapa, data, skills_data)
 	for id in hodnoty.keys():
 		player.skills.set_value(int(id), int(hodnoty[id]))
 	var jmena: Array[String] = []
@@ -1230,13 +1293,13 @@ func _radky_skillu() -> Array:
 	if player == null or player.skills == null:
 		return radky
 	var jmena: Dictionary = {}
-	var parsed = JSON.parse_string(FileAccess.get_file_as_string(SKILLS_DATA))
+	var parsed = JSON.parse_string(FileAccess.get_file_as_string(skills_data))
 	if parsed is Array:
 		for rec in parsed:
 			if rec is Dictionary and rec.has("id"):
 				jmena[int(rec["id"])] = str(rec.get("name", ""))
 	else:
-		push_warning("app.main: " + SKILLS_DATA + " neni seznam - skilly budou bez jmen")
+		push_warning("app.main: " + skills_data + " neni seznam - skilly budou bez jmen")
 	for i in range(SkillsScript.SKILL_COUNT):
 		radky.append({
 			"id": i,
@@ -1295,10 +1358,10 @@ func _postav_stanice() -> int:
 	# je dalsi krok (patri do `render` s paritni branou a snimkem).
 	var chci: Array = [{"role": "forge", "x": 1, "y": 0, "smer": "east"},
 		{"role": "anvil", "x": 0, "y": 1, "smer": "south"}]
-	if not FileAccess.file_exists(ITEMS_DATA):
-		push_warning("app.main: chybi " + ITEMS_DATA + " - stanice se nepostavi")
+	if not FileAccess.file_exists(items_data):
+		push_warning("app.main: chybi " + items_data + " - stanice se nepostavi")
 		return 0
-	var parsed = JSON.parse_string(FileAccess.get_file_as_string(ITEMS_DATA))
+	var parsed = JSON.parse_string(FileAccess.get_file_as_string(items_data))
 	if not (parsed is Array):
 		return 0
 	var podle_role: Dictionary = {}
@@ -1309,7 +1372,7 @@ func _postav_stanice() -> int:
 	for stanice in chci:
 		var role: String = str(stanice["role"])
 		if not podle_role.has(role):
-			push_warning("app.main: role '" + role + "' v " + ITEMS_DATA + " neni - stanice se nepostavi")
+			push_warning("app.main: role '" + role + "' v " + items_data + " neni - stanice se nepostavi")
 			continue
 		var art: int = int(podle_role[role]) + ITEM_OFFSET
 		var predmet = ItemScript.new(sim.next_serial(), art, 1)
@@ -1401,10 +1464,10 @@ func _nasad_zbran_hraci() -> String:
 	# muselo projit hledanim podle artu znovu. Tady jde o JEDNOZNACNY start.
 	if player == null:
 		return "(bez hrace)"
-	if not FileAccess.file_exists("res://data/weapons.json"):
+	if not FileAccess.file_exists(_cesta("res://data/weapons.json")):
 		push_warning("app.main: chybi data/weapons.json - hrac zustane bez zbrane")
 		return "(bez dat zbrani)"
-	var zbrane = JSON.parse_string(FileAccess.get_file_as_string("res://data/weapons.json"))
+	var zbrane = JSON.parse_string(FileAccess.get_file_as_string(_cesta("res://data/weapons.json")))
 	if not (zbrane is Array):
 		return "(data zbrani nejsou seznam)"
 	var podle_artu: Dictionary = {}
@@ -1635,11 +1698,11 @@ func _monstrum_data(typ: String) -> Dictionary:
 	# za proces; chybejici soubor se HLASI, ne ticha nula.
 	if _monstra_data.is_empty() and not _monstra_nactena:
 		_monstra_nactena = true
-		if not FileAccess.file_exists("res://data/monsters.json"):
+		if not FileAccess.file_exists(_cesta("res://data/monsters.json")):
 			push_warning("app.main: chybi data/monsters.json - monstra se nepostavi")
 			return {}
 		var parsed = JSON.parse_string(FileAccess.get_file_as_string(
-			"res://data/monsters.json"))
+			_cesta("res://data/monsters.json")))
 		if not (parsed is Array):
 			push_warning("app.main: data/monsters.json neni seznam")
 			return {}
@@ -1681,8 +1744,8 @@ func _skill_id(jmeno: String) -> int:
 	# nikdy tichy fallback na wrestling.
 	if _skill_ids.is_empty() and not _skill_ids_nactene:
 		_skill_ids_nactene = true
-		if FileAccess.file_exists(SKILLS_DATA):
-			var parsed = JSON.parse_string(FileAccess.get_file_as_string(SKILLS_DATA))
+		if FileAccess.file_exists(skills_data):
+			var parsed = JSON.parse_string(FileAccess.get_file_as_string(skills_data))
 			if parsed is Array:
 				for rec in parsed:
 					if rec is Dictionary and rec.has("name") and rec.has("id"):
@@ -1792,12 +1855,12 @@ func _load_help() -> Dictionary:
 	# prazdny slovnik (napoveda pak rekne, ze neni - nikdy tise prazdno).
 	if not _help_data.is_empty():
 		return _help_data
-	if not FileAccess.file_exists(HELP_DATA):
-		push_warning("app.main: chybi " + HELP_DATA + " - napoveda bude prazdna")
+	if not FileAccess.file_exists(help_data):
+		push_warning("app.main: chybi " + help_data + " - napoveda bude prazdna")
 		return {}
-	var parsed = JSON.parse_string(FileAccess.get_file_as_string(HELP_DATA))
+	var parsed = JSON.parse_string(FileAccess.get_file_as_string(help_data))
 	if not (parsed is Dictionary):
-		push_warning("app.main: " + HELP_DATA + " neni slovnik - napoveda bude prazdna")
+		push_warning("app.main: " + help_data + " neni slovnik - napoveda bude prazdna")
 		return {}
 	_help_data = parsed
 	return _help_data
@@ -1981,7 +2044,9 @@ func _load_data() -> Dictionary:
 	# ze se hra chova jinak, nez data rikaji.
 	var out: Dictionary = {}
 	for key in DATA_FILES.keys():
-		var path: String = DATA_FILES[key]
+		# Cesta se preklada pres vrstvy obsahu (`_cesta`) - `data/balance.json`
+		# je taky obsah a mod ho muze prebit (docs/04 §4.9).
+		var path: String = _cesta(DATA_FILES[key])
 		if key == "balance":
 			config = ConfigScript.new(path)
 			var chyby: Array = config.check()
