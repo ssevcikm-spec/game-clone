@@ -151,12 +151,17 @@ doklad je změna měřeného stavu (`3779 → 3780`), ne řetězec. Druhý běh:
 
 ## 🔗 COMMITY TÉTO SESSION (a ověřený push)
 
-`C1` — kód a smlouva: `sim/` (11 souborů), `app/main.gd`, `app/world_view.gd`,
-`tests/cases/content_paths.gd` (nový case), `tools/check-data-paths.py` (nová
-metrika v repu), `docs/04 §4.9.1`, `NAVRH-MODDING-2026-10-11.md` (záznam
-„hotovo“), `DALSI-SESSION.md` (stav kolej E), `LESSONS.md` (devátá část),
-`HANDOFF.md` (tento blok).
-**Push ověřen živě:** `git rev-list --count origin/main..HEAD` → **0**.
+**`cb3b072`** — kód a smlouva: `sim/` (11 souborů), `app/main.gd`,
+`app/world_view.gd`, `app/config.gd`, `tests/cases/content_paths.gd` (nový
+case), `tools/check-data-paths.py` (nová metrika v repu), `docs/04 §4.9.1`,
+`NAVRH-MODDING-2026-10-11.md` (záznam „hotovo“), `DALSI-SESSION.md` (stav
+koleje E), `LESSONS.md` (devátá část), `HANDOFF.md` (tento blok).
+**Push ověřen živě:** `b012b3f..cb3b072 main -> main`,
+`git rev-list --count origin/main..HEAD` → **0**, `origin/main` = `HEAD` =
+`cb3b072`.
+⚠ **Necommitted zůstaly** (mimo tuhle práci, viz „Co zůstává otevřené“):
+`assets/cobble/` a 52 necommitnutých `.uid` souborů (v repu je 92 `.uid`
+trackovaných; novější skripty je nemají — Godot je vygeneruje znovu).
 
 ---
 
