@@ -92,10 +92,16 @@ na rozhodnutí (obojí mění **trvalá pravidla**, proto je nedělal agent sám
 
 ## 🔗 COMMITY TÉTO SESSION (a ověřený push)
 
-`<DOPLNIT>` — `tools/gates/mutace-tests.py` (4 kotvy + `--kotvy` + ochrana
-`nenacetl`), `LESSONS.md` (šestá část), `HANDOFF.md` (tento blok),
-`DALSI-SESSION.md` (§F označeno jako hotové). **Ověřeno živě:**
-`git rev-list --count origin/main..HEAD` → **0**.
+`58d9219` — `tools/gates/mutace-tests.py` (4 kotvy + `--kotvy` + ochrana
+`nenacetl` + `--only`), `LESSONS.md` (šestá část), `HANDOFF.md` (tento blok),
+`DALSI-SESSION.md` (§F označeno jako hotové); **tento commit** už jen doplňuje
+hash do předání. **Ověřeno živě po pushi:** `git rev-list --count
+origin/main..HEAD` → **0**, `origin/main` = `HEAD` = tento commit
+(`git rev-parse --short origin/main`).
+
+> **Stav k `58d9219` (konec session F):** celý mutační harness **329 z 329
+> chyceno; smlouva vstupu: OK** (exit 0, 96,5 min), brány **15 měřeno / 0 chyb**,
+> testy **2751/0** — podrobnosti v tabulce výše.
 
 ---
 
