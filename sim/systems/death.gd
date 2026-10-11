@@ -71,11 +71,15 @@ var _corpses: Dictionary = {}           # serial -> objekt tela (pro loot)
 var _player_serial: int = 0
 var _corpse_art: int = DEFAULT_CORPSE_ART
 var _corpse_art_source: String = "default-constant"
+# Kdo umi rict art tela podle cisla tela tvora (`0x4000 + body`). Dava ho
+# `app/main` - v UO je art mrtvoly staticky art tvora a ten v nasem manifestu
+# JE, kdezto `DEFAULT_CORPSE_ART` (0x2006) v nem NENI (telo bylo neviditelne).
+var _art_provider = null
 
 
 func _init(registry = null, container = null, items = null, events = null,
 		serials = null, decay = null, corpse_art: int = 0, path: String = BALANCE_PATH,
-		loot = null) -> void:
+		loot = null, art_provider = null) -> void:
 	_registry = registry if registry != null else RegistryScript.new()
 	_container = container
 	_items = items
@@ -83,6 +87,7 @@ func _init(registry = null, container = null, items = null, events = null,
 	_serials = serials
 	_decay = decay
 	_loot = loot
+	_art_provider = art_provider
 	if corpse_art > 0:
 		_corpse_art = corpse_art
 		_corpse_art_source = "constructor"
@@ -235,11 +240,29 @@ func _vytvor_telo(mob):
 	# Telo = `entity.item` s `parent == 0` (na zemi) a pozici zemreleho
 	# (kontrakt M5 §2). `pos` ma smysl JEN kdyz `parent == 0` (`item.gd:177-179`),
 	# proto se telo nevnoruje do zadneho kontejneru.
-	var telo = ItemScript.new(_next_serial(), _corpse_art, 1)
+	#
+	# ART TELA (M5, 2026-10-11): `DEFAULT_CORPSE_ART` (0x2006) je v UO spravny
+	# art mrtvoly, ale **v nasem exportu atlasu NENI** (`assets/uo/manifest.json`
+	# ho nezna), takze se telo v simulaci vytvorilo a na obrazovce BYLO NEVIDITELNE.
+	# Kdyz zna volajici art tela podle cisla tela (`corpse_art_provider`, dava ho
+	# `app/main`), pouzije se TEN: UO kresli mrtvolu tvora jeho statickym artem
+	# (`0x4000 + body`), ktery v manifestu JE (namEReno: 0x4032 = kostlivec).
+	# Kdyz provider neni, zustava stara konstanta a `corpse_art_source` to rekne.
+	var art: int = _corpse_art
+	var zdroj: String = _corpse_art_source
+	if _art_provider != null and _art_provider is Object \
+			and _art_provider.has_method("corpse_art_for"):
+		var z: int = int(_art_provider.corpse_art_for(int(mob.body)))
+		if z > 0:
+			art = z
+			zdroj = "provider(0x4000+body)"
+	var telo = ItemScript.new(_next_serial(), art, 1)
 	telo.type = "corpse"
 	telo.parent = 0
 	telo.pos = Vector3i(int(mob.pos.x), int(mob.pos.y), int(mob.pos.z))
 	telo.flags = CORPSE_FLAG
+	telo.props = {"corpse": true, "owner": int(mob.serial), "body": int(mob.body),
+		"art_source": zdroj}
 	if _items is Dictionary:
 		(_items as Dictionary)[int(telo.serial)] = telo
 	return telo

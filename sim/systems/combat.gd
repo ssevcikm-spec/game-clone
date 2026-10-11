@@ -346,7 +346,14 @@ func resolve_swing(m: int, target: int) -> Dictionary:
 		"chance": chance, "resist": int(obrana["resist"]),
 		"unknown_resist": bool(obrana["unknown"]), "direct": false}
 	if killed:
-		_anim_dir(cil, ACTION_DEATH)
+		# ⚠⚠ VADA (namERena 2026-10-11): tady stalo `_anim_dir(cil, ACTION_DEATH)` -
+		# ale `cil` je MOBIL (objekt), ne serial, zatimco `_anim_dir(m: int, …)`
+		# chce SERIAL. Godot 4 vyhodi "Cannot convert argument 1 from Object to
+		# int" a - protoze je to pred `_death.die(...)` - **smrt se NIKDY
+		# nedokoncila**: monstrum melo hp 0, ale telo nevzniklo, loot nebyl a
+		# hrac nemel co sebrat. Presne to je "hráč zabije monstrum, loot jde
+		# sebrat" z prijimaciho kriteria.
+		_anim_dir(int(cil.serial), ACTION_DEATH)
 		_events_push("sound", {"serial": int(cil.serial), "kind": "death"})
 		if _death != null and _death.has_method("die"):
 			# Telo, ducha a `mobile_removed` resi `sim.death` (jedno misto).
@@ -541,15 +548,41 @@ func _base_damage(mob, zbroj: Dictionary) -> int:
 
 
 func _data_of(mob, klic: String):
-	# Data monstra z `mob.ai["data"]` (`sim.spawn`), zaloha `mob.get(klic)` pro
-	# pripad, ze `entity.mobile` nekdy dostane vlastni pole. JEDNO misto, kde se
-	# vi, odkud data monstra jsou - druhe by znamenalo dve pravdy.
+	# DATA TVORA (M5, 2026-10-11): PRVNI je DEKLAROVANE pole mobilu
+	# (`entity.mobile: damage/resist/type/loot_pack`) - to se uklada i do save.
+	# Zaloha `mob.ai["data"]` zustava pro mobil, ktery pole nema (starsi ulozene
+	# hry a cizi tvurce mobili). JEDNO misto, kde se vi, odkud data jsou.
+	#
+	# ⚠ PRAZDNO NENI DATA: deklarovana pole maji neutralni hodnotu `[]`/`{}`
+	# (nikdy `null` - `int(null)` v Godotu 4 hází), takze "prazdne" se musi
+	# preskocit a nesmi zastavit hledani v zaloze. Jinak by mobil bez vyplnenych
+	# poli vratil prazdno a `sim.combat` by z nej udelal pěst.
+	var hodnota = mob.get(klic)
+	if not _prazdno(hodnota):
+		return hodnota
 	var ai = mob.get("ai")
 	if ai is Dictionary:
 		var data = (ai as Dictionary).get("data")
 		if data is Dictionary and (data as Dictionary).has(klic):
-			return (data as Dictionary)[klic]
-	return mob.get(klic)
+			var z: Variant = (data as Dictionary)[klic]
+			if not _prazdno(z):
+				return z
+	return null
+
+
+func _prazdno(hodnota) -> bool:
+	# Je hodnota "zadna data"? `null`, prazdne pole, prazdny slovnik a prazdny
+	# retezec - nic z toho neni pouzitelna hodnota (a nula sem NEPATRI:
+	# `damage: [0, 0]` je platna, i kdyz divna, hodnota z dat).
+	if hodnota == null:
+		return true
+	if hodnota is Array and (hodnota as Array).is_empty():
+		return true
+	if hodnota is Dictionary and (hodnota as Dictionary).is_empty():
+		return true
+	if hodnota is String and str(hodnota) == "":
+		return true
+	return false
 
 
 func _scale_damage(mob, zbroj: Dictionary, base: int) -> int:

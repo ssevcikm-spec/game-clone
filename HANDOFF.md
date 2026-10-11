@@ -85,11 +85,14 @@ opravdu zasáhlo. Sonda: `_analyza/p48-m5-snimek.gd` (běh s oknem, zapisuje PNG
 
 ### 4) Co zůstává otevřené (NENÍ hotové, nezakrývat)
 
-1. **`entity.mobile` nemá `damage`/`resist`/`loot_pack`/`type`** — `Object.set()`
-   na nedeklarovanou vlastnost je v Godotu 4 tiché no-op (naměřeno), takže data
-   monster žijí v `mob.ai["data"]`. **`mobile.state()` je ale neukládá** → po
-   `save → load` monstra ztratí staty lootu. Oprava patří do `entity.mobile`
-   (deklarovaná pole + `state()/restore()`).
+> **DOPLNĚNO 2026-10-11 (dokončení M5):** body 1 (data monster v save),
+> 5 (G10) a 6 (zbraň hráče) jsou **vyřešené**, viz §6 níže. Otevřené zůstávají
+> 2, 3 a 4.
+
+1. ~~`entity.mobile` nemá `damage`/`resist`/`loot_pack`/`type`~~ → **VYŘEŠENO**
+   (§6): pole jsou deklarovaná a `state()/restore()` je nese. Save/load
+   round-trip ověřen sondou `_analyza/p53-save-sonda.gd` (hash shodný, data
+   `type=skeleton loot=poor dmg=[3,7]` přežila).
 2. **Replaye rostou jen o `scheduler` + `entities`** — nové stavové zdroje
    (`combat`, `death`, `decay`, `ai`, `spawn`) se registrují **jen v `app/main`**,
    takže je `check-replay.py` (běží nad holým `SimWorld`) **neměří**. Hashe se
@@ -98,12 +101,55 @@ opravdu zasáhlo. Sonda: `_analyza/p48-m5-snimek.gd` (běh s oknem, zapisuje PNG
    (`region_check_source` to hlásí).
 4. **Strop 35 pro direct damage** je načtený, ale neměřený (žádná zbraň tu
    větev nemá).
-5. **`G10` (vzhled) hlásí chybu** — „0 pixelů vlastní postavy po erozi“. Je to
-   práce souběžné session A (vlastní art), ne M5.
-6. **`app/main` už hráči nasadí zbraň** (`_nasad_zbran_hraci`, první předmět
-   z batohu, který je v `data/weapons.json`) — naměřeno: `weapon=hatchet`,
-   `delay=2000 ms`, zásahy **13 a 16 damage**. Je to rozhodnutí pro demo
-   (bez něj má hráč `damage` 1 a kostlivce s 38 hp nezabije).
+5. ~~`G10` (vzhled) hlásí chybu~~ → **VYŘEŠENO souběžnou session A**: poslední
+   `run-all.py` hlásí **15 měřeno / 0 chyb** (vlastní postava 265 px po erozi).
+6. ~~`app/main` už hráči nasadí zbraň~~ → **VYŘEŠENO** (§6): `_nasad_zbran_hraci`
+   + oprava hledání zbraně podle artu (JSON float vs int).
+
+### 6) DODĚLÁNÍ M5 (2026-10-11, druhá část) — cyklus je doložený CELÝ
+
+**Naměřeno:** testy **2638 kontrol / 0 selhání**, brány `run-all.py`
+**15 měřeno / 0 chyb**, replaye **2/2 zelené**. Sonda celého cyklu
+`_analyza/p54-cyklus-sonda.gd` (běží nad reálnou scénou `app/main`):
+
+| Krok | Naměřené |
+|---|---|
+| hráč | hp 87/87, zbraň **hatchet**, swing delay **2000 ms** |
+| monstrum | `skeleton`, hp 38/38, dmg `[3, 7]`, loot `poor` |
+| boj | **8 swingů → 3 zásahy → 42 damage** → hp 0 |
+| tělo | vzniklo (serial 32) s **1 předmětem a 22 zlatými** |
+| sebraní | 1 předmět přesunut, v těle zbylo **0** |
+| prodej | kovář zaplatil **108 zlata** (zlato 82 → 190) |
+| save/load | `state_hash` shodný, data monstra přežila |
+
+**Tři vady nalezené a opravené v této části:**
+
+1. **Smrt monstra se NIKDY nedokončila** — `sim/systems/combat.gd` volal
+   `_anim_dir(cil, ACTION_DEATH)`, ale `cil` je MOBIL (objekt) a funkce chce
+   SERIAL. Godot vyhodil „Cannot convert argument 1 from Object to int“ **před**
+   `death.die(...)`, takže monstrum mělo hp 0 a tělo nevzniklo → **loot nebyl
+   a hráč neměl co sebrat** (přesně přijímací kritérium). Opraveno na
+   `int(cil.serial)`. Zjistila to až sonda celého cyklu — testy systémů ji
+   minuly, protože `death.die` volaly přímo.
+2. **`entity.mobile` neměl `type`/`loot_pack`/`damage`/`resist`** →
+   `Object.set()` na nedeklarovanou vlastnost je tiché no-op a `state()` data
+   nenesl, takže po `save → load` monstrum ztratilo staty. Pole jsou teď
+   deklarovaná (prázdno je `[]`/`{}`/`""`, NIKDY `null` — `int(null)` hází),
+   `state()/restore()` je nese jako serazené dvojice a `sim.combat._data_of`
+   je čte PRVNÍ (záloha `ai["data"]` zůstává pro starší uložené hry).
+   Ověřeno v `tests/cases/entity_state.gd` (round-trip i přes JSON).
+3. **Tělo se nekreslilo** — `sim.death` dával `DEFAULT_CORPSE_ART` 0x2006,
+   který **v našem manifestu atlasu NENÍ** (naměřeno), takže se tělo vytvořilo
+   a na obrazovce nebylo. `app/main` teď dává `corpse_art_for(body)` =
+   `0x4000 + body` (UO kreslí mrtvolu statickým artem tvora; v manifestu JE),
+   s kontrolou proti manifestu a `tela_bez_artu()` jako VIDITELNÝM počtem.
+   Snímek: `tela=1`, dřív `tela=0`.
+
+**Snímek:** `p20b-obrazky/m5-souboj.png` — nyní je na něm **tělo kostlivce**
+(viditelné), monstra se jmény a HP pruhy, žurnál `You hit skeleton for …`
+i `You cannot move there.` (monstrum zkouší krok) a **hp hráče 0/87** — monstrum
+hráče zabilo.
+
 
 ### 5) Mutace (důkaz, že testy měří)
 

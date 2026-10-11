@@ -46,6 +46,18 @@ class StubSerials:
 		return hodnota
 
 
+class StubArtProvider:
+	# Predstira `app.main.corpse_art_for`: v UO je art mrtvoly `0x4000 + body`.
+	# `-1` znamena "tenhle art v manifestu neni" - a telo se pak kresli
+	# konstantou (proto test meri i tuhle vetev).
+	var chybejici: bool = false
+
+	func corpse_art_for(body: int) -> int:
+		if chybejici:
+			return 0
+		return 0x4000 + int(body)
+
+
 func _arg(name: String, fallback: String) -> String:
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--" + name + "="):
@@ -206,6 +218,64 @@ func run(t) -> void:
 		"po vzkriseni je obsah tela v batohu (%d predmetu)" % v_batohu.size())
 	t._check(v_batohu.has(0x600001) and v_batohu.has(0x600004),
 		"v batohu je mec i nasazena zbroj z tela (%s)" % str(v_batohu))
+
+	# -- D2) ART TELA: bez providera konstanta, s providerem `0x4000 + body` --
+	# Duvod: `DEFAULT_CORPSE_ART` (0x2006) v nasem manifestu atlasu NENI
+	# (namEReno 2026-10-11), takze telo vzniklo a na obrazovce BYLO NEVIDITELNE.
+	# `app.main` proto dava `art_provider` a UO kresli mrtvolu statickym artem
+	# tvora (`0x4000 + body`) - ten v manifestu JE.
+	var cart_c = ContainerScript.new()
+	var items_c: Dictionary = {}
+	var ev_c = EventsScript.new()
+	var clk_c = ClockScript.new()
+	var dec_c = s_decay.new(clk_c, ev_c, cart_c, items_c)
+	var bez = s_death.new(RegistryScript.new(), cart_c, items_c, ev_c, StubSerials.new(), dec_c)
+	var svet_c: Array = _svet(cart_c, items_c, clk_c, ev_c)
+	bez._registry = svet_c[0]
+	bez.set_player(PLAYER)
+	svet_c[1].hp = 0
+	bez.die(PLAYER)
+	var telo_bez = bez.corpse_of(PLAYER)
+	t._check(telo_bez != null and int(telo_bez.tile) > 0,
+		"bez providera ma telo art z konstanty (%s)"
+		% (str(int(telo_bez.tile)) if telo_bez != null else "zadne telo"))
+
+	var cart_p = ContainerScript.new()
+	var items_p: Dictionary = {}
+	var ev_p = EventsScript.new()
+	var clk_p = ClockScript.new()
+	var dec_p = s_decay.new(clk_p, ev_p, cart_p, items_p)
+	var provider = StubArtProvider.new()
+	var s_prov = s_death.new(RegistryScript.new(), cart_p, items_p, ev_p, StubSerials.new(),
+		dec_p, 0, "res://data/balance.json", null, provider)
+	var svet_p: Array = _svet(cart_p, items_p, clk_p, ev_p)
+	s_prov._registry = svet_p[0]
+	s_prov.set_player(PLAYER)
+	svet_p[1].hp = 0
+	s_prov.die(PLAYER)
+	var telo_prov = s_prov.corpse_of(PLAYER)
+	t._check(telo_prov != null and int(telo_prov.tile) == 0x4000 + 400,
+		"provider da art tela = 0x4000 + body (ocekavano 0x%X, je %s)"
+		% [0x4000 + 400, str(int(telo_prov.tile)) if telo_prov != null else "zadne"])
+	# A kdyz provider art v manifestu NEMA (vraci 0), musi se pouzit konstanta -
+	# "telo bez artu" se nesmi tvarit jako uspech.
+	provider.chybejici = true
+	var cart_ch = ContainerScript.new()
+	var items_ch: Dictionary = {}
+	var ev_ch = EventsScript.new()
+	var clk_ch = ClockScript.new()
+	var dec_ch = s_decay.new(clk_ch, ev_ch, cart_ch, items_ch)
+	var s_ch = s_death.new(RegistryScript.new(), cart_ch, items_ch, ev_ch, StubSerials.new(),
+		dec_ch, 0, "res://data/balance.json", null, provider)
+	var svet_ch: Array = _svet(cart_ch, items_ch, clk_ch, ev_ch)
+	s_ch._registry = svet_ch[0]
+	s_ch.set_player(PLAYER)
+	svet_ch[1].hp = 0
+	s_ch.die(PLAYER)
+	var telo_ch = s_ch.corpse_of(PLAYER)
+	t._check(telo_ch != null and int(telo_ch.tile) == int(telo_bez.tile),
+		"provider bez artu vraci konstantu (ocekavano %s, je %s)"
+		% [str(int(telo_bez.tile)), str(int(telo_ch.tile)) if telo_ch != null else "zadne"])
 
 	# -- E) DECAY: telo po 7 min (i s obsahem), predmet na zemi po 60 min -
 	var c2 = ContainerScript.new()

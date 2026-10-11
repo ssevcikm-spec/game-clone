@@ -158,6 +158,7 @@ var player_frames: int = 0
 var _mobilu_kresleno: int = 0
 var _mobily_bez_sprite: int = 0
 var _tel_kresleno: int = 0
+var _tel_bez_artu: int = 0
 
 var _iso
 var _chunk = null
@@ -387,6 +388,13 @@ func tela_videt() -> int:
 	return _tel_kresleno
 
 
+func tela_bez_artu() -> int:
+	# Kolik těl se NEKRESLILO, protoze jejich art neni v atlase (`sim.death`
+	# dava `corpse_art` 0x2006, ktery v nasem exportu NENI). Nula a "nemerene"
+	# nejsou uspech - kdo se ptá, dostane obe cisla.
+	return _tel_bez_artu
+
+
 func mobily_bez_sprite() -> int:
 	# Kolik mobilu se NEKRESLILO (chybi sprite pro jejich telo). Neni to ticho:
 	# `sim.world.spawn` dava telo z DAT, ale export `assets/uo/anim` muze telo
@@ -441,10 +449,12 @@ func _draw_mobil(mob) -> bool:
 func _draw_tela() -> void:
 	# Tela (corpse) a predmety na zemi (`parent == 0`). Do M5 se nekreslily
 	# VUBEC (ani kovadlina a balvany) - hrac je musel hledat po pameti.
+	#
+	# ⚠ `tela_bez_artu` je VIDET vada, ne ticho: telo ma art z `sim.death`
+	# (`corpse_art`, dnes 0x2006) a ten v nasem exportu atlasu NENI - kdyby se
+	# pocitalo jen "kreslilo se", vypadalo by to jako "telo neexistuje".
 	_tel_kresleno = 0
-	# POZOR: `_items is null` je v GDScript PARSE ERROR ("Expected type
-	# specifier after is") - `is` je test typu, ne porovnani. Namerено 2026-10-11
-	# pri prvnim spusteni sondy `p43-souboj-sonda.gd`.
+	_tel_bez_artu = 0
 	if _items == null or _textures == null:
 		return
 	var serialy: Array = _items.keys()
@@ -455,14 +465,17 @@ func _draw_tela() -> void:
 			continue
 		if int(it.tile) <= 0:
 			continue
+		var je_telo: bool = _je_telo(it)
 		var tex: Texture2D = _textures.texture(int(it.tile))
 		if tex == null:
+			if je_telo:
+				_tel_bez_artu += 1
 			continue
 		var ground: Vector2 = _ground_of(Vector3i(int(it.pos.x), int(it.pos.y),
 			int(it.pos.z)))
 		var off: Vector2i = _textures.offset(int(it.tile))
 		draw_texture(tex, ground - Vector2(float(off.x), float(off.y)))
-		if _je_telo(it):
+		if je_telo:
 			_tel_kresleno += 1
 			if _jmena != null:
 				_jmena.kresli(self, ground, {"name": str(it.get("name")),

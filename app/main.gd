@@ -177,6 +177,9 @@ var _monstra_data: Dictionary = {}
 var _monstra_nactena: bool = false
 var _skill_ids: Dictionary = {}
 var _skill_ids_nactene: bool = false
+# Mnozina art ID z manifestu atlasu (pro `corpse_art_for`) - cache, aby se
+# JSON nectl pri kazdem umrti.
+var _atlas_arts: Dictionary = {}
 var prodejce = 0                 # serial vendora NPC ve svete (0 = nikdo)
 var balvany: Array = []          # pozice rudnych balvanu (pro sondu smycky)
 var _skill_s: float = 0.0        # casovac obnovy seznamu skillu (2x/s)
@@ -819,7 +822,7 @@ func _setup_player(view) -> void:
 	decay = DecayScript.new(sim.clock(), sim.events(), container, items)
 	sim.systems["decay"] = decay
 	death = DeathScript.new(registry, container, items, sim.events(), sim, decay,
-		0, "res://data/balance.json", loot)
+		0, "res://data/balance.json", loot, self)
 	death.set_player(serial)
 	sim.systems["death"] = death
 	equipment = EquipmentScript.new(registry, container, items, tiledata)
@@ -1344,6 +1347,43 @@ func _nasad_zbran_hraci() -> String:
 	return "(zadna zbran v batohu)"
 
 
+func corpse_art_for(body: int) -> int:
+	# Art TELA podle cisla tela tvora (`sim.death` si ho bere odsud, kdyz ho
+	# `app/main` preda jako `art_provider`). V UO je to `0x4000 + body`
+	# (`_src/servuo` `Scripts/Items/Corpses/Corpse.cs`: mrtvola kresli staticky
+	# art tvora) - a ten v nasem manifestu JE, kdezto `DEFAULT_CORPSE_ART`
+	# (0x2006) v nem NENI (namEReno 2026-10-11: telo se vytvorilo a nebylo
+	# videt). Kontrola proti manifestu je tu proto, aby se nevracel art, ktery
+	# v atlase chybi - "telo existuje, ale neni videt" je presne to, co nechceme.
+	var art: int = 0x4000 + int(body)
+	if art <= 0x4000 or art > 0xFFFF:
+		return 0
+	if _atlas_arts.is_empty():
+		_atlas_arts = _nacti_atlas_arty()
+	if _atlas_arts.has(art):
+		return art
+	push_warning("app.main: art tela 0x%X (telo %d) v manifestu neni - telo se nekresli"
+		% [art, int(body)])
+	return 0
+
+
+func _nacti_atlas_arty() -> Dictionary:
+	# Mnozina art ID, ktera jsou v manifestu atlasu (`kind == "item"`, art ID =
+	# `id + 0x4000`). Nacte se JEDNOU - je to jen pro kontrolu artu tela.
+	var out: Dictionary = {}
+	var cesta: String = "res://assets/uo/manifest.json"
+	if not FileAccess.file_exists(cesta):
+		push_warning("app.main: chybi " + cesta + " - art tel se neoveri")
+		return out
+	var d = JSON.parse_string(FileAccess.get_file_as_string(cesta))
+	if not (d is Dictionary):
+		return out
+	for sp in (d as Dictionary).get("sprites", []):
+		if sp is Dictionary and str(sp.get("kind", "")) == "item":
+			out[int(sp.get("id", -1)) + 0x4000] = true
+	return out
+
+
 func _zaregistruj_body(d) -> int:
 	# SPAWN BODY: kazdy bod z `data/spawns.json` se zaregistruje do `sim.spawn`
 	# (index je jeho identita pro `alive_at`). Data dostava hotova volajici -
@@ -1446,12 +1486,21 @@ func _monstrum(typ: String, pos: Vector3i):
 				continue
 			var v = (skills as Dictionary)[jmeno]
 			mob.skills.set_value(sid, _rozsah(v) if v is Array else int(v))
-	# `sim.combat` bere damage z `mob.damage` a resist z `mob.resist` (mobil je
-	# jako pole nema - kontrakt M5 §2/-3.4); `loot_pack` bere `sim.death`.
-	mob.set("damage", rec.get("damage", []))
-	mob.set("resist", rec.get("resist", {}))
-	mob.set("loot_pack", str(rec.get("loot_pack", "")))
-	mob.set("type", typ)
+	# DATA TVORA (M5): od 2026-10-11 ma `entity.mobile` DEKLAROVANA pole `type`,
+	# `loot_pack`, `damage`, `resist` - zapisuji se PRIMO (a ukladaji do save).
+	# Driv tu bylo `mob.set(...)`, coz je u nedeklarovane vlastnosti v Godotu 4
+	# tiche no-op (namEReno 2026-10-11).
+	mob.type = typ
+	mob.loot_pack = str(rec.get("loot_pack", ""))
+	var dmg = rec.get("damage", [])
+	if dmg is Array and (dmg as Array).size() >= 2:
+		mob.damage = [int((dmg as Array)[0]), int((dmg as Array)[1])]
+	var res = rec.get("resist", {})
+	if res is Dictionary:
+		var rk: Dictionary = {}
+		for k in (res as Dictionary).keys():
+			rk[str(k)] = int((res as Dictionary)[k])
+		mob.resist = rk
 	return mob
 
 

@@ -211,8 +211,19 @@ func run(t) -> void:
 			vsechna_ok = false
 	t._check(vsechna_ok,
 		"vsechna monstra maji staty z dat, home = bod a ai idle (neznamy typ '%s')" % neznamy_typ)
-	t._check(sim.registry.all()[0].get("type") == null,
-		"`mob.get(\"type\")` je null - `entity.mobile` pole nema (nalez 2026-10-11)")
+	# ⚠ PUVODNI KONTROLA (2026-10-11) TVRDILA VADU: "`mob.get("type")` je null -
+	# `entity.mobile` pole nema". To byl NALEZ, ne smlouva - a 2026-10-11 se
+	# opravil: `entity.mobile` ma DEKLAROVANA pole `type`, `loot_pack`, `damage`
+	# a `resist` (drive se data ukladala pres `Object.set()` na nedeklarovanou
+	# vlastnost, coz je tiche no-op, a po `save/load` se ztratila). Kontrola se
+	# proto obrací: pole musi byt VYPLNENA a musi se shodovat s daty.
+	var m0 = sim.registry.all()[0]
+	t._check(str(m0.type) != "",
+		"`entity.mobile.type` je vyplneny (je '%s'; driv to byl nalez - pole neexistovalo)"
+		% str(m0.type))
+	t._check(str(m0.loot_pack) != "" and not (m0.damage as Array).is_empty(),
+		"`loot_pack` i `damage` jsou na mobilu (loot_pack '%s', damage %s)"
+		% [str(m0.loot_pack), str(m0.damage)])
 	t._check(serialy.size() == POINT_MAX, "v registru jsou 3 monstra (je %d)" % serialy.size())
 	t._check(serialy.size() == 3 and serialy[0] != serialy[1] and serialy[1] != serialy[2],
 		"kazde monstrum ma svuj serial (%s)" % str(serialy))

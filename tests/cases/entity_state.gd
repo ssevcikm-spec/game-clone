@@ -52,6 +52,14 @@ func _mobil(mobile_script, serial: int, x: int, y: int):
 	m.equip = {1: 400001, 3: 400002}
 	m.ai = {"state": "wander", "target": 400009, "home": Vector3i(x + 1, y + 2, 3),
 		"timer_ms": 2500}
+	# DATA TVORA (M5, 2026-10-11): deklarovana pole, ktera drzi staty monstra.
+	# Do teto doby se data davala pres `Object.set()` na NEDEKLAROVANOU
+	# vlastnost (tiche no-op) a `state()` je nenesl - po save/load monstrum
+	# prislo o damage, resisty i loot pack.
+	m.type = "skeleton"
+	m.loot_pack = "poor"
+	m.damage = [3, 7]
+	m.resist = {"physical": 12, "fire": 5}
 	return m
 
 
@@ -108,6 +116,28 @@ func run(t) -> void:
 		"entity.mobile: restore() z JSONu da tyz stav (pozor na float a PackedInt32Array)")
 	t._check(str(treti.skills.cap(7)) == "1200",
 		"entity.mobile: strop 1200 prezije JSON (namEReno %s)" % str(treti.skills.cap(7)))
+	# DATA TVORA (M5): musi prezit JSON - a byt POUZITELNA (ne jen pritomna).
+	# `damage` je serazene pole, `resist` serazeny seznam dvojic (na poradi klicu
+	# slovniku nesmi zaviset hash). Kontrola se ptá i na HODNOTY, ne jen na
+	# "klic existuje" - jinak by prosla i prazdna pole.
+	t._check(str(treti.type) == "skeleton" and str(treti.loot_pack) == "poor",
+		"entity.mobile: `type` a `loot_pack` preziji JSON (type=%s loot=%s)"
+		% [str(treti.type), str(treti.loot_pack)])
+	t._check(treti.damage == [3, 7],
+		"entity.mobile: `damage` prezije JSON jako [min, max] (namEReno %s)"
+		% str(treti.damage))
+	t._check(int(treti.resist.get("physical", -1)) == 12
+		and int(treti.resist.get("fire", -1)) == 5 and treti.resist.size() == 2,
+		"entity.mobile: `resist` prezije JSON jako slovnik typu (namEReno %s)"
+		% str(treti.resist))
+	t._check(treti.state() == stav,
+		"entity.mobile: data tvora jsou SYMETRICKA (state() po restore() sedi)")
+	# A NESMI to byt `null`: `int(null)` v Godotu 4 hází výjimku (namEReno
+	# 2026-10-11) - neutralni hodnota je prazdno, ne null.
+	var bez_dat = mobile_script.new()
+	t._check(bez_dat.damage is Array and bez_dat.resist is Dictionary
+		and str(bez_dat.type) == "" and str(bez_dat.loot_pack) == "",
+		"entity.mobile: prazdna data tvora jsou [], {} a '' - NIKDY null")
 
 	# -- 3) registry: stav je serazeny podle serialu, ne podle poradi vlozeni
 	var a = registry_script.new()

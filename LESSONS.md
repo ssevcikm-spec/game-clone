@@ -3467,3 +3467,55 @@ přepsána na **smlouvu exportu** (každé potřebné tělo má 5 směrů chůze
 (`tests/cases/debug_overlay.gd`) porovnává **celý text** (`ZNAMY_TEXT`), takže
 každý nový klíč v `text_for` by ho shodil. Hodnoty se proto počítají
 v `app/main._debug_values()` (jsou k dispozici), ale do textu se nepřidaly.
+
+
+## 2026-10-11 (2. část) — M5 dodělání: tři vady, které našla až sonda CELÉHO cyklu
+
+### `_anim_dir(cil, …)` místo `_anim_dir(cil.serial, …)`: smrt se nikdy nedokončila
+
+**Co se stalo:** v `sim/systems/combat.gd` stálo `_anim_dir(cil, ACTION_DEATH)`,
+ale `cil` je MOBIL (objekt) a `_anim_dir(m: int, …)` chce SERIAL. Godot 4
+vyhodil `Invalid type in function '_anim_dir' … Cannot convert argument 1 from
+Object to int` — a protože to bylo **před** `_death.die(...)`, monstrum mělo
+hp 0, ale **tělo nevzniklo, loot nebyl a hráč neměl co sebrat**. Přesně to je
+přijímací kritérium `ZADANI-20` („hráč zabije monstrum, loot jde sebrat").
+**Proč to minuly testy systémů:** `tests/cases/death.gd` volá `death.die()`
+přímo a `tests/cases/combat.gd` zase `resolve_swing()` — každý měřil SVOU
+polovinu a **spoj je nikdo neměřil**. Našla to až sonda nad reálnou scénou
+(`_analyza/p54-cyklus-sonda.gd`).
+**Pravidlo:** testy granul nevynahradí test TOKU. Kde smlouva popisuje řetěz
+(útok → smrt → tělo → loot), musí existovat měření, které projde CELÝM
+řetězem, ne jen jeho uzly.
+
+### `Object.set()` na NEDEKLAROVANOU vlastnost je tiché no-op — a `state()` ho nespasí
+
+**Co se stalo:** `sim.world.spawn` ukládal data monstra přes
+`mob.set("damage", …)`, `mob.set("resist", …)`. `entity.mobile` ta pole neměl,
+takže se hodnota NIKAM neuložila (a `int(null)` při čtení navíc házel výjimku).
+Data pak žila v `mob.ai["data"]` — jenže `mobile.state()` serializuje `ai` jen
+jako `[state, target, home, timer_ms]`, takže po `save → load` monstrum přišlo
+o damage, resisty i loot pack.
+**Řešení:** pole jsou v `entity.mobile` deklarovaná (`type`, `loot_pack`,
+`damage`, `resist`), `state()/restore()` je nese jako serazené dvojice
+(`resist` → `[[typ, hodnota], …]`, na pořadí klíčů nesmí záviset hash)
+a `sim.combat._data_of` je čte PRVNÍ. **Neutralní hodnota je `[]`/`{}`/`""`,
+nikdy `null`** — a `_data_of` musí prázdno přeskočit, jinak by z mobilu bez
+vyplněných polí udělal pěst.
+**Doklad:** `_analyza/p53-save-sonda.gd` (`type=skeleton loot=poor dmg=[3,7]`
+před i po `load`, `state_hash` shodný), `tests/cases/entity_state.gd`.
+
+### Art, který v manifestu NENÍ: tělo se vytvořilo a nebylo vidět
+
+**Co se stalo:** `sim/death.gd` dával tělům `DEFAULT_CORPSE_ART` = 0x2006.
+V UO je to správný art mrtvoly, ale **v našem exportu atlasu NENÍ** — a
+`app/world_view._draw_tela` chybějící art tiše přeskočí (`_textures.texture()`
+vrátí `null`). Výsledek: sonda hlásila `tela=0`, i když `death.corpse_count()`
+bylo 1 — a to je nejhorší druh tichosti: „tělo neexistuje" a „tělo nemá art"
+vypadají stejně.
+**Řešení:** `app/main` dává `art_provider` (`corpse_art_for(body)` = `0x4000 +
+body`, což je UO art mrtvoly tvora a v manifestu JE, naměřeno), s **kontrolou
+proti manifestu**; když art chybí, `world_view.tela_bez_artu()` to řekne
+číslem. `sim.death` si provider bere jako poslední (nepovinný) argument, takže
+testy bez něj fungují dál.
+**Pravidlo:** „kreslilo se" není totéž jako „existuje". Kde kód tiše přeskočí
+objekt kvůli chybějícímu artu, musí to být VIDĚT ve počítadle.

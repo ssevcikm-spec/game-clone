@@ -346,19 +346,28 @@ func _vytvor(i: int, p: Dictionary):
 			var v = (skills as Dictionary)[jmeno]
 			var hodnota: int = _rozsah(v) if v is Array else int(v)
 			mob.skills.set_value(sid, hodnota)
-	# `damage`/`resist`/`loot_pack` jsou pro `sim.combat` a `sim.loot` (mobil je
-	# nema jako pole - berou se z dat).
-	# ⚠⚠ NALEZ 2026-10-11 (namEReno): `Object.set()` na NEDEKLAROVANOU vlastnost
-	# v Godotu 4 NIC NEUDELA a `get()` vrati `<null>` - `mob.set("resist", {...})`
-	# -> `mob.get("resist")` == null. `entity.mobile` (NENI moje granule) pole
-	# `damage`/`resist`/`loot_pack` nema, takze se data monstra ukladaji do
-	# `mob.ai["data"]`, ktery EXISTUJE (`mobile.gd:47`) a `mobile.state()` ho
-	# nese (`ai` je v save i v hashi). Az `entity.mobile` dostane `damage` a
-	# `resist`, zmeni se JEDNA funkce tady a `sim.combat._data_of`.
+	# DATA TVORA (M5): od 2026-10-11 je `entity.mobile` ma jako DEKLAROVANA pole
+	# (`type`, `loot_pack`, `damage`, `resist`), takze se zapisuji PRIMO a
+	# ukladaji se do save. Drive se tu pouzivalo `mob.set(...)` na nedeklarovanou
+	# vlastnost - to je v Godotu 4 tiche no-op (namEReno) a data pak zila jen
+	# v `mob.ai["data"]`, ktery `state()` neserializuje (po save/load monstrum
+	# ztratilo staty). `ai["data"]` se jeste plni jako ZALOHA pro cizi tvurce
+	# mobili - cte ji `sim.combat._data_of`.
+	mob.type = typ
+	mob.loot_pack = str(rec.get("loot_pack", ""))
+	var dmg = rec.get("damage", [])
+	mob.damage = [int((dmg as Array)[0]), int((dmg as Array)[1])] \
+		if dmg is Array and (dmg as Array).size() >= 2 else []
+	var res = rec.get("resist", {})
+	var resist_kopie: Dictionary = {}
+	if res is Dictionary:
+		for k in (res as Dictionary).keys():
+			resist_kopie[str(k)] = int((res as Dictionary)[k])
+	mob.resist = resist_kopie
 	var data: Dictionary = {
-		"damage": rec.get("damage", []),
-		"resist": rec.get("resist", {}),
-		"loot_pack": str(rec.get("loot_pack", "")),
+		"damage": mob.damage,
+		"resist": mob.resist,
+		"loot_pack": mob.loot_pack,
 		"type": typ,
 		"virtual_armor": int(rec.get("virtual_armor", 0)),
 	}

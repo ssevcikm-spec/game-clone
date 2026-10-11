@@ -45,6 +45,23 @@ var fame: int = 0
 var karma: int = 0
 var hunger: int = 0
 var ai: Dictionary = {"state": "idle", "target": 0, "home": Vector3i.ZERO, "timer_ms": 0}
+# --- DATA TVORA (M5, 2026-10-11) -------------------------------------------
+# PROC ZVLASŤ DEKLAROVANE: `sim.world.spawn` dával data monstra přes
+# `mob.set("damage", …)`, ale **`Object.set()` na NEDEKLAROVANOU vlastnost je
+# v Godotu 4 tiché no-op** (namEReno 2026-10-11) - hodnota se nikam neuložila
+# a `mob.get("damage")` vracelo `null`. Data pak žila v `mob.ai["data"]`, což
+# ale `state()` NESERIALIZUJE (nese z `ai` jen `[state, target, home, timer]`),
+# takže po `save → load` monstrum ztratilo staty, damage, resisty i loot pack.
+# Deklarovaná pole tenhle dluh zavírají.
+#
+# PRÁZDNÉ HODNOTY (rozhodnutí): `type` a `loot_pack` jsou prázdný řetězec,
+# `damage` prázdné pole, `resist` prázdný slovník. NIKDY `null` - `int(null)`
+# v Godotu 4 hází výjimku (namEReno) a volající by na tom spadl. Prázdno
+# znamená "data nejsou", ne "nula damage" (to řeší `sim.combat` zvlášť).
+var type: String = ""            # identita tvora z `data/monsters.json`
+var loot_pack: String = ""       # `loot_pack` monstra (`sim.loot`)
+var damage: Array = []           # `[min, max]` (mobil zbran NEMA - viz combat)
+var resist: Dictionary = {}      # AoS typ -> procenta (monstrum je má v sobě)
 
 
 func _init(serial_value: int = 0, body_value: int = 400, pos_value: Vector3i = Vector3i.ZERO) -> void:
@@ -106,6 +123,14 @@ func state() -> Dictionary:
 		"fame": fame,
 		"karma": karma,
 		"hunger": hunger,
+		# DATA TVORA (M5): `type`/`loot_pack` jsou řetězce, `damage` je SERAZENE
+		# pole `[min, max]`, `resist` se vypisuje jako serazeny seznam dvojic
+		# `[typ, hodnota]` - na poradi klicu slovniku nesmi zaviset stav (stejny
+		# duvod jako u `equip`).
+		"type": type,
+		"loot_pack": loot_pack,
+		"damage": [int(_prvek(damage, 0)), int(_prvek(damage, 1))] if not damage.is_empty() else [],
+		"resist": _dvojice(resist),
 		"ai": [str(ai.get("state", "idle")), int(ai.get("target", 0))] + _home_parts() \
 			+ [int(ai.get("timer_ms", 0))],
 	}
@@ -141,6 +166,12 @@ func restore(d: Dictionary) -> void:
 	fame = int(d.get("fame", fame))
 	karma = int(d.get("karma", karma))
 	hunger = int(d.get("hunger", hunger))
+	type = str(d.get("type", type))
+	loot_pack = str(d.get("loot_pack", loot_pack))
+	var dmg = d.get("damage", [])
+	if dmg is Array and (dmg as Array).size() >= 2:
+		damage = [int((dmg as Array)[0]), int((dmg as Array)[1])]
+	resist = _dvojice_zpet(d.get("resist", []))
 	var a = d.get("ai", [])
 	if a is Array and a.size() >= 6:
 		ai = {
@@ -151,8 +182,43 @@ func restore(d: Dictionary) -> void:
 		}
 
 
-func _home_parts() -> Array:
-	# `ai.home` je `Vector3i`, ale po `restore()` z JSONu muze prijit i pole -
+func _prvek(pole: Array, index: int) -> int:
+	# Bezpecny pristup do pole, ktere muze byt kratsi (data z JSONu jsou
+	# "vsechno nebo nic" a chybejici prvek nesmi shodit `state()`).
+	if index < 0 or index >= pole.size():
+		return 0
+	var v: Variant = pole[index]
+	if v == null:
+		return 0
+	return int(v)
+
+
+func _dvojice(slovnik: Dictionary) -> Array:
+	# `{typ: hodnota}` -> SERAZENE `[[typ, hodnota], …]` pro stav (JSON-safe,
+	# na poradi klicu slovniku nesmi zaviset hash).
+	var klice: Array = slovnik.keys()
+	klice.sort()
+	var out: Array = []
+	for k in klice:
+		out.append([str(k), int(slovnik[k])])
+	return out
+
+
+func _dvojice_zpet(d) -> Dictionary:
+	# Opak `_dvojice`: prijmi seznam dvojic; ze starych uložených slovniku
+	# (kdyby nekdo ulozil jinou verzi) vezmi i slovnik.
+	var out: Dictionary = {}
+	if d is Array:
+		for row in (d as Array):
+			if row is Array and (row as Array).size() >= 2:
+				out[str((row as Array)[0])] = int((row as Array)[1])
+	elif d is Dictionary:
+		for k in (d as Dictionary).keys():
+			out[str(k)] = int((d as Dictionary)[k])
+	return out
+
+
+func _home_parts() -> Array:	# `ai.home` je `Vector3i`, ale po `restore()` z JSONu muze prijit i pole -
 	# obe podoby musi `state()` zapsat stejne (jinak by se stav po round-tripu
 	# rozešel a hash by se zmenil).
 	var h = ai.get("home", Vector3i.ZERO)
