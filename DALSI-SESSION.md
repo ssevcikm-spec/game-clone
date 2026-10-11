@@ -18,6 +18,18 @@
 | Brána `G14` (float ve stavu) | `tools/gates/check-state-float.py`, self-test 6/0 |
 | Pravidlo „UO duchovně, ne tělesně" | `docs/01` §1.2.1 |
 
+**Automatizace je vypnutá, ale zapnout se dá** (`M10`): `HRA.cmd` předává
+argumenty dál (`%*`), takže stačí
+
+```bat
+HRA.cmd -- --policy              :: vezme user://policy.json
+HRA.cmd -- --policy=C:\cesta\moje-pravidla.json
+```
+
+Bez přepínače se politika **nenačte ani když soubor existuje** a do žurnálu
+neteče nic. Spam je navíc opraven u zdroje (throttle podle pravidla), takže
+i se zapnutou politikou jdou do žurnálu jen **změny**.
+
 **Běží:** session, která na 1× sadu aplikuje **světlo** (kontaktní stín + AO +
 jedno slunce) → `assets/own-lit/` + srovnávací list. Až doběhne, je to základ
 pro session **A**.
