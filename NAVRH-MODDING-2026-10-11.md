@@ -16,6 +16,9 @@
 > jsou **PLÁN**: nic z nich není hotové a nic z nich se nesmí číst jako hotové.
 > Kde je napsané číslo, je u něj i postup, kterým vzniklo.
 >
+> **Rozhodnutí (2026-10-11):** uživatel pověřil agenta, ať část rozhodne sám —
+> **co jsem rozhodl (R1–R6) a co potřebuju od uživatele, je v §6.**
+>
 > **Co tenhle dokument NEDĚLÁ:** nerozhoduje o prioritách za uživatele,
 > nezapisuje nové granule do `.forge/roadmap.json` (`docs/07` §7.1 bod 5)
 > a nepřidává brány (počet bran je součást smlouvy, `docs/08`).
@@ -142,6 +145,24 @@ zmizel záznam, na který odkazuje stav světa (to je S3).
 mod přidává / chyba) a naučit loader **slučovat seznamy**, ne jen přebíjet
 soubor.
 
+**Naměřeno 2026-10-11 (`_analyza/p66-id-zaznamu.py`, pokrytí stringovým ID
+a kolik z nich je unikátních):**
+
+| Soubor | Záznamů | Dnešní ID | Unikátních |
+|---|---|---|---|
+| `monsters.json` | 53 | `id` / `type` | **53 / 53** |
+| `recipes.json` | 1053 | `id` | **1053 / 1053** |
+| `skills.json` | 58 | `id` | **58 / 58** |
+| `weapons.json` | 134 | `type` | **134 / 134** |
+| `armor.json` | 165 | `type` | **165 / 165** |
+| **`items.json`** | **8748** | `tile` (art UO) | **8748 / 8748** — ale `type` jen **3779** (jeden typ = víc artových variant) |
+
+**Co z toho plyne:** u monster, receptů, skillů, zbraní a zbrojí **stabilní ID
+už existuje** — S3 tam znamená hlavně „umět přidat záznam“, ne vymyslet ID.
+**Předměty jsou výjimka:** jejich jediné jednoznačné ID je dnes `tile`, což je
+**art z instalace UO**, ne naše ID. Proto S3 u předmětů znamená přidat `id`
+a `tile` nechat jen jako „který obrázek to je“.
+
 **Hotovo, když:** mod v `user://mods` přidá **jeden recept a jedno monstrum**
 a hra je použije, aniž by se změnil `state_hash` bez modu; a je změřené, co
 se stane při kolizi ID.
@@ -216,25 +237,40 @@ ID, vyřčené pořadí, rozlišení souboru) a hra ho **opravdu používá**:
 
 ---
 
-## 6. Co potřebuje ROZHODNUTÍ uživatele (a proč to nemůže udělat agent)
+## 6. Rozhodnutí: co jsem rozhodl sám a co potřebuju od tebe
 
-1. **S2 — co má `load()` udělat, když obsah nesedí?** Dnes: odmítnout
-   (hash). Návrh: `required` vrstvy odmítnout **jmenovitě**, přidané povolit
-   s hlášením. Je to **zeslabení dnešní záruky** („data se nezměnila"), takže
-   to patří tobě. Cena: ~1 session, mění `docs/04 §4.7`.
-2. **S3 — mají mody PŘIDÁVAT záznamy, a jak vypadá ID záznamu?** Dnes je
-   identita předmětu `tile` = **art z instalace UO**; to jako naše ID použít
-   nejde. Cena: **největší** krok (datové smlouvy + `G5`/`G1`).
-3. **S5 — smí mod obsahovat SKRIPT?** Pokud ano, v čem (data / DSL /
-   externí proces). **GDScript sandbox v Godotu není**, takže „ano, ať je to
-   bezpečné" není proveditelné zadání. Doporučení: **nejdřív (a) data-only**,
-   skripty řešit, až bude co rozšiřovat.
-4. **Smí vzniknout nová brána a nové granule v roadmapě?** Počet bran je
-   součást smlouvy (`docs/08`) a plán mění uživatel (`docs/07` §7.1 bod 5).
-   Agent to záměrně neudělal — S1 má **jen testy**, žádnou novou bránu.
-5. **Licence:** mod, který distribuuje art z instalace UO, se distribuovat
-   nesmí (`README`, `M4`). Má to být **vynucené** (kontrola v modu), nebo
-   stačí pravidlo v dokumentaci pro moddery?
+**Uživatel 2026-10-11:** „Chci hru rozšiřitelnou, ale některé věci můžeš
+rozhodnout podle svého uvážení." Níž je tedy **co rozhoduji sám** (a je to
+vratné) a **co zůstává na tobě** (protože to mění směr, smlouvy nebo se to týká
+cizích práv).
+
+### 6.1 Rozhodl jsem sám (2026-10-11, vratné)
+
+| # | Rozhodnutí | Proč ho můžu udělat | Cena / cesta zpět |
+|---|---|---|---|
+| **R1** | **Mod je OBSAH, ne kód** — mody nespouštějí žádné skripty. Kdo chce novou mechaniku, musí ji mít ve hře (nebo je to samostatné zadání). | Godot GDScript **sandbox nemá** („bezpečný skript“ není volba) a bez stabilních ID záznamů by skript ani neměl na co sahat | nulová dnes (skripty neexistují); kdyby bylo potřeba, doporučená cesta je **omezený DSL**, ne GDScript |
+| **R2** | **Mod smí přidávat i přebíjet, ale VYŘČENĚ** — u každého souboru `mod.json` řekne `replace` (přebít) nebo `add` (přidat záznamy). Kolize = **chyba s výpisem obou stran**, nikdy „poslední vyhrál“ | je to technická volba, vratná; dnešní S1 už přebíjení má na úrovni souboru | kdyby se ukázalo, že dva mody se perou, omezí se `add` bez kolizí |
+| **R3** | **Save: nic se neděje tiše.** O tom, jestli save „patří“ k obsahu, rozhoduje **manifest** (id + verze vrstvy); změna obsahu se **ohlásí jmenovitě** (hash řekne „co se liší“) a `--strict-content` obnoví dnešní odmítání. Neznámý záznam v save (předmět, který mod odebral) se **nevypustí tiše** — hlásí se | mění to dnešní záruku, ale **směrem k víc informace**, ne k míň; a je to přesně to, co dělá mod použivatelný | jeden přepínač navíc; `--strict-content` = dnešní chování |
+| **R4** | **Žádná nová brána teď.** S1 měří testy a sondy; bránu dostane až S2/S3, až bude co hlídat (nová brána = změna `docs/08`) | brána, která nemá co měřit, je horší než žádná (naměřeno v projektu víckrát) | bránu lze přidat kdykoli, je to přírůstek |
+| **R5** | **UO art v modu: pravidlo pro moddery, bez technického vynucení.** Hra sama UO assety nedistribuuje (platí dál); detektor „tenhle mod veze odvozený art“ se spolehlivě postavit nedá, takže by to bylo falešné bezpečí | technická část je moje (co jde a co ne); **právní rámec se nemění** | kdykoli lze přidat varování v dokumentaci pro moddery |
+| **R6** | **Pořadí prací: S1b → S2 → S3.** Nejdřív aby mod fungoval **všude** (ne jen u 2 souborů z 20), pak aby **nerozbil rozehranou hru**, pak aby **mohl přidat obsah** | vyplývá z naměřených mezer; pořadí je vratné | dá se přeskočit, ale S3 bez S1b znamená „mod funguje zdánlivě“ |
+
+### 6.2 Potřebuju od tebe (a proč to není moje)
+
+1. **Kdo má hru rozšiřovat?** (a) ty sám, (b) i cizí lidé bez programování,
+   (c) i cizí lidé s vlastní logikou. *(Určuje, jestli R1 zůstane navždy.)*
+2. **Má mod smět MĚNIT to, co už ve hře je** (cena předmětu, recept, monstrum),
+   nebo jen přidávat nové? *(Dva mody, které mění totéž, se mohou poprat.)*
+3. **Co se má stát s rozehranou hrou, když si přidáš mod?** Návrh R3: načte se
+   a hra to napíše. Alternativa: odmítnout a říct proč.
+4. **Čím mám pokračovat** (návrh R6: S1b → S2 → S3)?
+
+### 6.3 Co zůstává na tobě i po R1–R6 (neměním to sám)
+
+5. **Nové granule v `.forge/roadmap.json`** — plán je tvůj (`docs/07` §7.1 bod 5).
+   Až budu chtít zapsat S1b/S2/S3 jako granule, řeknu si.
+6. **Licence:** jestli chceš UO art v modech **vynucovat** (kontrolou), je to
+   změna smlouvy a musíš to nařídit ty — R5 zatím říká „jen pravidlo“.
 
 ---
 
