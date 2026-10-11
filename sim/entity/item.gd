@@ -61,6 +61,11 @@ static var _jmeno_podle_typu: Dictionary = {}   # type -> jmeno pro hrace
 static var _arty_podle_typu: Dictionary = {}    # type -> [art, ...]
 static var _nacteno: bool = false
 static var _rozpory: Array = []
+# CESTA JE PARAMETR (NAVRH-MODDING §4 S1b): mod prebiji `data/items.json`, takze
+# soubor NESMI byt zapeeny v konstante. Data jsou pro cely proces spolecna
+# (staticka cache), proto je cesta ulozena tady - `loaded_path()` rekne, ktery
+# soubor se OPRAVDU nacetl (ne ktery se mel).
+static var _nactena_cesta: String = ""
 
 var serial: int = 0
 var tile: int = 0                # ART ID (0x4000-0xFFFF)
@@ -88,19 +93,22 @@ func _init(serial_value: int = 0, tile_value: int = 0, amount_value: int = 1) ->
 
 # -- identita: art -> typ -> role/kategorie (jedno misto pro cely projekt) ----
 
-static func nacti_data() -> bool:
+static func nacti_data(path: String = ITEMS_PATH) -> bool:
 	# Nacte `data/items.json` JEDNOU pro cely proces. Vraci false, kdyz data
 	# nejsou - pak je `type` prazdny a `same_pile` se vraci k porovnani artu
 	# (a volajici to vidi pres `known()`; ticha nahrada by predstirala data).
+	# CESTA JE PARAMETR (NAVRH-MODDING §4 S1b): cestu z vrstev obsahu predava
+	# `app/main`; kdo ji neda, dostane zaklad.
 	if _nacteno:
 		return not _typ_podle_artu.is_empty()
 	_nacteno = true
-	if not FileAccess.file_exists(ITEMS_PATH):
-		push_warning("sim.entity.item: chybi " + ITEMS_PATH + " - typy predmetu nejsou")
+	_nactena_cesta = path
+	if not FileAccess.file_exists(path):
+		push_warning("sim.entity.item: chybi " + path + " - typy predmetu nejsou")
 		return false
-	var parsed = JSON.parse_string(FileAccess.get_file_as_string(ITEMS_PATH))
+	var parsed = JSON.parse_string(FileAccess.get_file_as_string(path))
 	if not (parsed is Array):
-		push_warning("sim.entity.item: " + ITEMS_PATH + " neni seznam")
+		push_warning("sim.entity.item: " + path + " neni seznam")
 		return false
 	for rec in parsed:
 		if not (rec is Dictionary) or not rec.has("tile"):
@@ -132,6 +140,32 @@ static func nacti_data() -> bool:
 		push_warning("sim.entity.item: " + str(_rozpory.size())
 			+ " rozporu typu v datech (viz conflicts())")
 	return true
+
+
+static func loaded_path() -> String:
+	# Ktery soubor se OPRAVDU nacetl ("" = jeste nic). Kdo meri mod, musi se
+	# ptat na tuhle hodnotu - existence souboru nic netvrdi o tom, odkud se cetl.
+	return _nactena_cesta
+
+
+static func typ_count() -> int:
+	# Kolik typu se z toho souboru nacetlo. Je to MERENY STAV (ne cesta): kdyz
+	# mod prida zaznam, cislo se zmeni - a kdyby modul cetl konstantu, zustane.
+	return _arty_podle_typu.size()
+
+
+static func reset_data() -> void:
+	# MERICI SEV (NAVRH-MODDING §4 S1b): zapomene nactena data, aby test mohl
+	# dolozit, ZE SE SOUBOR VZAL Z JINE CESTY (a pak stav vratit). Hra ji
+	# nevola - data jsou pro proces spolecna a nacitaji se jednou.
+	_typ_podle_artu.clear()
+	_role_podle_typu.clear()
+	_kat_podle_typu.clear()
+	_jmeno_podle_typu.clear()
+	_arty_podle_typu.clear()
+	_rozpory.clear()
+	_nactena_cesta = ""
+	_nacteno = false
 
 
 static func type_of(tile_hodnota: int) -> String:

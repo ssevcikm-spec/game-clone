@@ -1,3 +1,165 @@
+# Předání — game-clone (2026-10-11, SESSION „S1b“: CESTA K DATŮM JE PARAMETR — mod přestal fungovat zdánlivě)
+
+> **Co je tenhle soubor:** **stav projektu** pro další session agenta. Přepisuje
+> se celý; historie je v `git log`. Nový blok je vždy **nahoře**; starší bloky se
+> needitují (jen doplňují). **Současný stav se bere z tohoto bloku.**
+>
+> **Odkud brát detaily téhle práce:** zadání `NAVRH-MODDING-2026-10-11.md`
+> (§3 bod 2 a §4 S1b — v obou je záznam „hotovo“), smlouva `docs/04 §4.9.1`,
+> metrika **`tools/check-data-paths.py`** (v repu!), case
+> `tests/cases/content_paths.gd`, sondy v gitignorovaném `_analyza/`:
+> `p67-mod-data-e2e.py` (E2E přes HRU), `p68-mutace-s1b.py` + `p68-diag.gd`
+> (mutační důkaz). Záznamy v `LESSONS.md` 2026-10-11 (**devátá část**).
+> Širší souvislost: `NAVRH-MODDING-2026-10-11.md` §5 (co je hotové ze S1).
+
+## ✅ CO SE UDĚLALO (a proč právě to)
+
+**Jak se session vybírala:** uživatel řekl jen „Pokračuj“. Podle `DALSI-SESSION.md`
+(„Blok nevím co dál“) se nejdřív četl stav: `HANDOFF.md`, `DALSI-SESSION.md`,
+`NAVRH-MODDING-2026-10-11.md` a `docs/04 §4.9`. Nejbližší krok je **S1b**:
+předchozí session ho sama zařadila (R6: **S1b → S2 → S3**) a je to jediný krok
+té kolej, který **nepotřebuje rozhodnutí uživatele** — S2 mění smlouvu save
+(`docs/04 §4.7`) a S3 datové smlouvy, kdežto S1b je „levné, ale nutné“.
+Bez něj mod funguje u `data/balance.json` a **ne** u `data/items.json`, tedy
+**funguje zdánlivě** — nejhorší varianta (vypadá hotový).
+
+**Co je hotové:** devět modulových konstant, které čtou cestu k datům přímo,
+bere cestu jako **parametr** (a tři další, které odhalila zpřísněná metrika).
+`app/main` rozhoduje na jednom místě a předává cesty z vrstev obsahu všem.
+
+| Věc | Soubor | Naměřeno |
+|---|---|---|
+| Cesta je parametr (9 jmenovaných) | `sim/entity/item.gd`, `sim/entity/skills.gd`, `sim/systems/craft.gd` (2×), `sim/systems/interaction.gd`, `sim/systems/skill_gain.gd`, `sim/world/doors.gd`, `sim/world/stairs.gd`, `sim/world/tiledata.gd` | všechny mají `_init(…, cesta := KONSTANTA)` a tělo čte členskou proměnnou |
+| Tři další, které metrika odhalila | `sim/systems/movement.gd`, `sim/world/regions.gd`, `sim/systems/poison.gd` | `var _x: String = KONSTANTA` → `""` + přiřazení v `_init`; **`sim.poison.source()` vracelo konstantu** (doklad, který mohl lhát o tom, odkud data jsou) — dnes vrací použitou cestu |
+| Statická metrika **v repu** | `tools/check-data-paths.py` (nový) | `23 parametr / 0 přímo / 0 smíšené / 0 nepoužité`, `exit 0`; mimo `sim/content.gd` zůstávají v `app/` **dvě** konstanty a obě jsou **jen default parametru**; mrtvé `ITEMS_DATA`/`HELP_DATA` smazány; **není to brána** v `run-all.py` (nová brána = `docs/08`, rozhodnutí uživatele) |
+| Test chování | `tests/cases/content_paths.gd` (nový) | u **každé** z 9 konstant vezme modul soubor z **jiné cesty** (`user://`) a ověří měnitelný stav; **zároveň** ověří, že v základu ta hodnota není |
+| E2E přes HRU | `_analyza/p67-mod-data-e2e.py` | dveře `37 → 1` kategorií, schody `19 → 1` skupin, recepty `1053 → 1`, **typů předmětů `3779 → 3780`**, cesta `res://data/items.json → user://mods/e2e-s1b/data/items.json`; `--no-mods` zpět |
+| Mutační důkaz | `_analyza/p68-mutace-s1b.py` | **9 z 9 mutací chyceno** (metrika + case + E2E), každé soubor **vrácen bajtově shodný** (sha256) |
+| Zapojení do hry | `app/main.gd`, `app/world_view.gd` | `_nacti_obsah()` → `ItemScript.nacti_data(items_data)` **před** `_load_data()`; `tiledata`/`doors`/`stairs` zakládá `app/main` a předává je `world.walk` **i** `sim.interaction`; `world_view.setup(map, textures, items_path)` |
+| Smlouva | `docs/04 §4.9.1` (nový oddíl) | pravidlo „konstanta smí být **jen** hodnota default parametru“ + tabulka změněných rozhraní |
+
+**Rozhodnutí, která byla potřeba (a proč):**
+
+1. **Metrika se přepsala, protože měřila něco jiného.** Původní `p65` hledala
+   jméno konstanty v **jakékoli** signatuře souboru — takže `sim.poison` prošel
+   jako „parametr“, i když `source()` čte konstantu z těla, a `var _x = KONST`
+   taky. Nová verze **odstraňuje komentáře** a rozlišuje **signaturu od těla**;
+   verdikt je `exit 1`, když v `sim/` zbyde jediné přímé čtení.
+2. **Metrika se přestěhovala z `_analyza/` do `tools/`.** `_analyza/` je
+   v `.gitignore` — nástroj, na kterém stojí přijímací kritérium, se do repa
+   dovézt musí (tentýž důvod, jako když minule vznikl
+   `tools/artgen/pbr_dlazdice.py`). Původní `_analyza/p65-konstanty-param.py`
+   byl smazán, aby nebyly **dva zdroje pravdy**.
+3. **Členská proměnná se inicializuje `""`, ne konstantou.** „Jen výchozí
+   hodnota“ je z textu nerozeznatelná od skutečného čtení — a mechanicky
+   kontrolovatelná vlastnost musí být jednoznačná. Týž vzor se srovnal i v
+   `app/`: `main.items_data`/`skills_data`/`help_data` a `config._cesta`
+   začínají prázdné (plní je `_nacti_obsah()`/`_init`) a **mrtvé konstanty
+   `ITEMS_DATA` a `HELP_DATA` se smazaly** — díky tomu je kritérium S1b
+   splněné **doslova**: mimo `sim/content.gd` se konstanta s cestou do `data/`
+   nikde nečte, jen předává jako default parametru.
+4. **`item.gd` dostal měřicí šev** `reset_data()` a `loaded_path()`/`typ_count()`:
+   data jsou statická pro celý proces, takže bez resetu by test „vezmi soubor
+   odjinud“ nemohl proběhnout později než první načtení. Hra `reset_data()`
+   nevolá.
+5. **`sim.interaction` dostává skutečné `doors`** (dřív `null` s poznámkou
+   „world.doors zatím neexistuje“). Od chvíle, kdy dveře zakládá `app/main`
+   kvůli cestě z vrstev, by `null` znamenalo **dvoje dveře** (mod a základ).
+6. **E2E pro `items.json` se musel opravit** — viz „Co odhalil mutační
+   harness“ níž.
+
+### 1) Co odhalil mutační harness (a proč to bylo drahé)
+
+Devět mutací („vrať konstantu zpět do těla“) šlo přes tři vrstvy: metriku, case
+a E2E. **Osm spadlo hned; devátá prozradila, že E2E u `sim.entity.item` nic
+neměří**: kontroloval jen **cestu**, kterou modul *hlásí* (`loaded_path()` se
+nastaví z parametru, i když se soubor přečte z konstanty). Opraveno tak, že mod
+přidá do kopie `items.json` **jeden záznam** a hra vypisuje **`typ_count()`** —
+doklad je změna měřeného stavu (`3779 → 3780`), ne řetězec. Druhý běh: `9 z 9`.
+
+## 📊 NAMĚŘENO (2026-10-11, tato session)
+
+| Co | Hodnota | Doklad (příkaz / soubor) |
+|---|---|---|
+| **Statická metrika** | `parametr 23 / primo 0 / smisene 0 / nepouzita 0`, `deklarace 1`, `volajici 2` (obě jen default parametru), `exit 0` | `python tools/check-data-paths.py` (`.cache/check-data-paths.json`) |
+| **Před opravou (naměřeno, ne odhad)** | stará metrika: `parametr 17 / primo 11`; nová (přísnější) na původním kódu: **11 smíšených** | uložený `.json` staré metriky + běh před přepisem |
+| **Testy** | **2 800 kontrol / 0 selhání**, `exit 0` (baseline před prací 2 767) | `godot --headless --path . --script res://tests/run_tests.gd` |
+| **Nový case** | `content_paths.gd` = **33 kontrol** (89 case souborů místo 88) | tamtéž |
+| **Brány** | **16 měřeno / 0 čeká / 0 chyb** (G13 poradní) | `python tools/gates/run-all.py` |
+| **Replaye beze změny hashů** | `tic_1000` `3f94a925…`, `tic_200` `b203767b…` — stejné jako baseline | G9 `check-replay.py` |
+| **Determinismus** | dva běhy = stejný hash `20e250ed…` | G8 `check-determinism.py` |
+| **E2E přes hru** | A) `37 / 19 / 1053 / 3779` (bez modu) → B) `1 / 1 / 1 / 3780` (s modem) → C) zpět A | `python _analyza/p67-mod-data-e2e.py` |
+| **Mutační důkaz** | **9 z 9** chyceno, po každé `sha256` souboru vráceno | `python _analyza/p68-mutace-s1b.py` (log `.cache/p68-mutace-s1b.txt`) |
+| **Smoke hry (G11)** | `exit 0`, 120 framů, **0 script error / 0 parse error**, 165 `.gd` souborů hry | `tools/gates/smoke.py` |
+
+## 🚧 CO ODHALILA PRÁCE (vady a meze, pojmenované)
+
+1. **`sim.poison.source()` vracelo konstantu** (ne použitou cestu). Byl to
+   doklad, který mohl tvrdit něco jiného, než modul udělal. Opraveno; není to
+   ale nijak zvlášť otestované (E2E i case měří `poison` jen přes metriku).
+2. **Statická metrika měřila přítomnost jména, ne použití** (viz výš) —
+   kdyby se podle ní hlásilo „hotovo“, byla by zelená nad kódem, který
+   konstantu pořád čte.
+3. **E2E, který měří cestu, neměří použití souboru** (viz výš) — jedenáctá
+   mutace (devátá) ho odhalila.
+4. **Dvojí čtení `data/items.json` v kreslení**: `app/world_view` dostává
+   cestu parametrem, ale `render/chunk_renderer` si `tiledata` bere injekcí —
+   kontrola `docs/08` (G6/G10) to vidí, ale **nikdo neměří, že se cesty
+   v simulaci a v kreslení rovnají** (dnes ano, protože je předává `app/main`).
+
+## ⚠ CO ZŮSTÁVÁ OTEVŘENÉ (pojmenované, ne zamlčené)
+
+1. **Přepnutí dveří hrou (vada „dvoje dveře“ vyřešena jen kódem).** `sim.interaction`
+   dostává skutečné `doors`; chování „use na dveře“ **v produkci nikdo neměřil**
+   (E2E sonda měří jen počet kategorií). Kdo na to sáhne, ať doplní sondu
+   (dveře v okně hráče + `Command{t:"use"}`).
+2. **Sondy `p67`/`p68`/`p68-diag` jsou v gitignorovaném `_analyza/`.** Metrika
+   je v repu, ale **důkaz chování ne** — kdyby se měl dovézt, patří do `tools/`
+   (a je to zároveň kandidát na novou bránu `G18`, což je změna `docs/08`).
+3. **`tools/check-data-paths.py` není v `.forge/roadmap.json`** jako granule
+   (stejná situace jako `sim/content.gd`, `render/own_art.gd`,
+   `tools/artgen/pbr_dlazdice.py`). Plán mění uživatel (`docs/07` §7.1 bod 5).
+4. **Ve stromě pořád běží cizí soak** (`_analyza/p43-souboj-sonda.gd`, Godot
+   z 7:28, log `.cache/p43.txt` přes 89 MB) — **žádné číslo o výkonu z této
+   session není izolované** (žádné se ani neměřilo; je to jen upozornění pro
+   toho, kdo bude měřit FPS).
+5. **Necommitnuté `.uid` soubory** (`sim/…`, `tests/cases/…`, `ui/…`): v repu
+   je 92 `.uid` trackovaných, ale novější `.gd` soubory `.uid` nemají
+   (např. `tests/cases/content_paths.gd` — stejně jako `content.gd`).
+   Není to vada téhle práce; jen to znamená, že je Godot vygeneruje znovu.
+6. **`assets/cobble/`** (necommitnutá terakota s lživým manifestem z minulé
+   session) leží dál ve stromě a **čeká na rozhodnutí uživatele** — agent
+   nemaže cizí rozdělanou práci.
+7. **Rychlost:** `variant_id` ani jiné horké cesty se nedotkly; nový kód
+   přidává jen čtení cesty (jednou při startu) — **žádné měření výkonu**, a to
+   ani netvrdím.
+
+## 🧍 CO ČEKÁ NA TEBE (rozhodnutí, která agent nemá dělat za tebe)
+
+1. **S2, nebo S3?** (`NAVRH-MODDING-2026-10-11.md` §6.2 bod 4 + otázky 1–3.)
+   S2 = verzované ukládání vázané na identitu obsahu — mění smlouvu save
+   (`docs/04 §4.7`); S3 = stabilní ID záznamů a slučování — větší, mění datové
+   smlouvy. S1b je hotové, takže R6 tím dotčené není.
+2. **Má `tools/check-data-paths.py` být brána `G18`** v `tools/gates/run-all.py`
+   (tj. zápis do `docs/08`)? Dnes je to nástroj, který se pouští ručně.
+3. **Mají se sondy `p67`/`p68` dovézt do repa** (do `tools/`), nebo zůstat
+   v `_analyza/` jako jednorázový důkaz?
+4. **Z minulých session pořád platí:** výběr PBR sady cesty
+   (`Stone_Path_007` vs. jiná z 13), co s `assets/cobble/`, zda sáhnout i na
+   hlínu `100` / dřevěnou podlahu `1030`–`1033` ve městě — viz blok
+   „KAMENNÁ CESTA“ níž.
+
+## 🔗 COMMITY TÉTO SESSION (a ověřený push)
+
+`C1` — kód a smlouva: `sim/` (11 souborů), `app/main.gd`, `app/world_view.gd`,
+`tests/cases/content_paths.gd` (nový case), `tools/check-data-paths.py` (nová
+metrika v repu), `docs/04 §4.9.1`, `NAVRH-MODDING-2026-10-11.md` (záznam
+„hotovo“), `DALSI-SESSION.md` (stav kolej E), `LESSONS.md` (devátá část),
+`HANDOFF.md` (tento blok).
+**Push ověřen živě:** `git rev-list --count origin/main..HEAD` → **0**.
+
+---
+
 # Předání — game-clone (2026-10-11, SESSION „KAMENNÁ CESTA V BRITAINU“: PBR sada Stone_Path_007 na 4 id cesty místo terakoty)
 
 > **Co je tenhle soubor:** **stav projektu** pro další session agenta. Přepisuje

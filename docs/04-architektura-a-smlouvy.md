@@ -837,5 +837,75 @@ rozhodovalo na jednom místě.
 ale musí být vidět (`docs/08 §8.6`).
 
 **Co tenhle oddíl NEPINUJE (a je to pojmenované):** slučování záznamů (mod
-přebíjí **celý soubor**), hash obsahu (to je `data_version` v `§4.7`), spouštění
-skriptů modu a **9 modulových konstant**, které se pořád čtou přímo (§4.2).
+přebíjí **celý soubor**), hash obsahu (to je `data_version` v `§4.7`) a
+spouštění skriptů modu. **Devět modulových konstant se čte přímo** — to byl
+stav **do 2026-10-11**; opravuje to `§4.9.1` (S1b), který je závazný.
+
+### 4.9.1 Cesta k datům je parametr, ne zapečená konstanta (S1b — DOPLNĚNO 2026-10-11)
+
+> **Co se změnilo a proč:** `§4.9` sliboval, že „moduly si cesty drží jako
+> parametr konstruktoru“, ale **9 konstant** (`ITEMS_PATH` v `entity.item`,
+> `SKILLS_PATH` v `entity.skills`, `RECIPES_PATH`+`ITEMS_PATH` v `sim.craft`,
+> `SKILLS_PATH` v `sim.interaction`, `BALANCE_PATH` v `sim.skill_gain`,
+> `DOORS_PATH`, `STAIRS_PATH`, `ITEMS_PATH` v `world.tiledata`) se četlo
+> **přímo v těle modulu**. Důsledek byl horší než „mod nefunguje“: mod
+> fungoval u `data/balance.json` a **ne** u `data/items.json` — tedy
+> **fungoval zdánlivě** (`NAVRH-MODDING-2026-10-11.md` §3 bod 2). Naměřeno
+> 2026-10-11 statickou metrikou `tools/check-data-paths.py`: **11
+> konstant** se četlo přímo (mimo `sim/content.gd`) — devět z nich jmenovalo
+> zadání S1b, tři další (`sim.movement`, `sim.world.regions`,
+> `sim.systems.poison`) odhalila až zpřísněná metrika.
+
+**Závazné pravidlo (nové):** v `sim/` se konstanta `const X := "res://data/*.json"`
+smí objevit **jen jako hodnota default parametru**. Kdekoli jinde (v těle
+funkce, v inicializaci členské proměnné) je to **vada modifikovatelnosti**:
+modul pak soubor bere z konstanty, i když mu volající předal jinou cestu.
+
+| Kde | Jak to vypadá | Proč |
+|---|---|---|
+| konstruktor | `_init(..., items_path: String = ITEMS_PATH)`, uvnitř `_items_path = items_path` | volající (`app/main`) rozhoduje, odkud se čte |
+| členská proměnná | `var _items_path: String = ""` (**ne** `= ITEMS_PATH`) | prázdno do prvního `_init`; inicializace konstantou by byla čtení z konstanty |
+| statická cache | `entity.item.nacti_data(path := ITEMS_PATH)`, `loaded_path()`, `reset_data()` | data jsou pro proces společná, takže cesta i „co se opravdu načetlo“ musí být čitelné; `reset_data()` je **měřicí šev pro testy** (hra ji nevolá) |
+
+**Rozhraní, která S1b přidal nebo změnila** (kanonické tabulky `§4.2` se
+needitují, platí tohle):
+
+| Modul | Změna |
+|---|---|
+| `entity.item` | `nacti_data(path: String = ITEMS_PATH)` (dřív bez parametru), nově `loaded_path()->String` a `reset_data()->void` |
+| `entity.skills` | `_init(skill_count := SKILL_COUNT, skills_path := SKILLS_PATH)`; nově `data_skill_count()->int` (naměřený počet ze souboru, `-1` = soubor není) |
+| `sim.craft` | `_init(..., registry, recipes_path := RECIPES_PATH, items_path := ITEMS_PATH)` |
+| `sim.interaction` | `_init(..., items, skills_path := SKILLS_PATH)` |
+| `sim.skill_gain` | `_init(..., balance_path := BALANCE_PATH)`; nově `stats()->Dictionary` (`balance_path`, `ggs_on`, `stat_delay_ms`, `stat_chance_percent`, `failure_weight`) |
+| `world.doors`, `world.stairs`, `world.tiledata` | `_init(doors_path := DOORS_PATH)`, `_init(stairs_path := STAIRS_PATH)`, `_init(items_path := ITEMS_PATH)` |
+| `sim.movement`, `world.regions`, `sim.poison` | členská cesta se inicializuje `""` a nastavuje v `_init`; **`sim.poison.source()` vrací použitou cestu** (dřív vracel konstantu — doklad, který mohl lhát) |
+| `app.world_view` | `setup(map, textures, items_path := TiledataScript.ITEMS_PATH)` — kreslení dostává **tutéž** cestu jako simulace |
+| `app.main` | zakládá `world.doors` a `world.stairs` s cestou z vrstev a předává je `world.walk` i `sim.interaction` (do 2026-10-11 dostával `sim.interaction` `null`, protože „dveře zatím neexistují“); `items_data`/`skills_data`/`help_data` začínají **prázdné** a plní je `_nacti_obsah()`; **smazány mrtvé konstanty** `ITEMS_DATA`, `HELP_DATA`; `app.config._cesta` se inicializuje `""` |
+
+**Jak je to měřené (aby to nebylo jen tvrzení):**
+
+* `tests/cases/content_paths.gd` — u **každé** z devíti konstant vezme modul
+  soubor z **jiné cesty** (fixture v `user://`) a ověří měnitelný stav
+  (`type_of`, `data_skill_count`, `recipe_count`, `material_tile`, `skill_id`,
+  `stats`, `is_door`, `is_stair`, `value`); **zároveň** ověří, že v základu ta
+  hodnota **není** (jinak by „projevilo se to“ nic nedokazovalo).
+* `_analyza/p67-mod-data-e2e.py` — **hra** (ne modul) s modem v `user://mods`:
+  dveře `37 → 1` kategorií, schody `19 → 1` skupin, recepty `1053 → 1`, typů
+  předmětů `3779 → 3780` (mod přidá jeden záznam) a cesta k předmětům
+  `res://data/items.json → user://mods/e2e-s1b/data/items.json`;
+  `--no-mods` vrátí původní čísla.
+* `_analyza/p68-mutace-s1b.py` — devět vrácených vad (konstanta zpět do těla):
+  každá musí shodit metriku, case (a u čtyř modulů i E2E), a po navrácení
+  je soubor **bajtově shodný** (`9 z 9 chyceno`).
+* Statická metrika: `python tools/check-data-paths.py` → `23 parametr /
+  0 přímo / 0 smíšené / 0 nepoužité`, `exit 0`. **Je v `tools/` (v repu), ne
+  v `_analyza/`** — metrika, která zůstane v gitignorovaném adresáři, pro další
+  session neexistuje. **Není to ale brána** v `run-all.py` (nová brána = změna
+  `docs/08`, rozhodnutí uživatele).
+  Mimo `sim/content.gd` (deklarace zakladu) zůstávají v `app/` **dvě**
+  konstanty (`main.SKILLS_DATA`, `config.BALANCE_PATH`) a obě jsou **jen
+  default parametru**; `main.ITEMS_DATA` a `main.HELP_DATA` byly **smazány**
+  (byly to mrtvé konstanty) a `items_data`/`skills_data`/`help_data` začínají
+  **prázdné** — plní je `_nacti_obsah()`, první věc v `_ready()`.
+  Výsledek: **konstanta s cestou do `data/` se nikde nečte**, jen se předává.
+

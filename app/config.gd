@@ -103,7 +103,7 @@ var _data: Dictionary = {}
 var _hodnoty: Dictionary = {}        # "teckove" klice -> hodnota
 var _nezname: Array = []             # klice v datech, ktere SCHEMA nezna
 var _hlasene: Dictionary = {}        # nezname klice, o kterych uz bylo hlaseno
-var _cesta: String = BALANCE_PATH
+var _cesta: String = ""
 var _nacteno: bool = false
 
 

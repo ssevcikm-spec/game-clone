@@ -32,7 +32,10 @@ extends RefCounted
 
 const DATA_PATH := "res://data/regions.json"
 
-var _path: String = DATA_PATH
+# Prazdno do prvniho `_init` (cesta je VSTUP konstruktoru, ne zapeena hodnota):
+# konstanta se smi objevit JEN jako default parametru, aby se dalo staticky
+# overit, ze modul soubor neprebiji z konstanty (`tools/check-data-paths.py`).
+var _path: String = ""
 var _regions: Array = []
 var _known: bool = false
 var _skipped: int = 0

@@ -55,6 +55,14 @@ modulů hlásila „čte se přímo", i když šlo o default parametru** — sta
 metrika, která nic nespustí, dělá falešné pozitivy. Opraveno hledáním přes
 celou signaturu; číslo výše je z opravené verze.
 
+> **Poznámka 2026-10-11 (S1b):** metrika se **přestěhovala do repa** jako
+> [`tools/check-data-paths.py`](tools/check-data-paths.py) a byla **zpřísněna**
+> (rozlišuje **signaturu od těla** a odstraňuje komentáře) — starý soubor
+> `_analyza/p65-…` už neexistuje, aby nebyly **dva zdroje pravdy**. Nová verze
+> na původním kódu naměřila **11 „smíšených“** (jméno v signatuře **i** v těle)
+> a mezi nimi **skutečnou vadu**: `sim.poison.source()` vracelo konstantu.
+> Podrobnosti a doklady: §3 bod 2 a §4 S1b níž.
+
 ---
 
 ## 2. Co to slovo znamená: pět vlastností a kde dnes chybí
@@ -87,6 +95,16 @@ Pořadí **není** podle ceny, ale podle **závislostí**:
 2. **S1b — dopnout zbytek modulů** na cesty z vrstev (9 konstant). Levné,
    ale nutné: jinak mod funguje u `balance.json` a ne u `items.json` — tedy
    **funguje zdánlivě**, což je nejhorší varianta.
+   > **✅ HOTOVO 2026-10-11** (session „S1b“): devět jmenovaných konstant bere
+   > cestu jako parametr a **tři další** (`sim.movement`, `sim.world.regions`,
+   > `sim.systems.poison`), které odhalila zpřísněná metrika
+   > `tools/check-data-paths.py` (dřív `_analyza/p65-…`; metrika se kvůli
+   > dovozu do repa přestěhovala). Měření: `23 parametr / 0 přímo / 0 smíšené`;
+   > case `tests/cases/content_paths.gd` (33 kontrol), E2E
+   > `_analyza/p67-mod-data-e2e.py` (dveře `37→1`, schody `19→1`, recepty
+   > `1053→1`, typů předmětů `3779→3780`), mutační důkaz
+   > `_analyza/p68-mutace-s1b.py` (**9 z 9**). Smlouva: `docs/04 §4.9.1`.
+   > **Zadání níž zůstává jako záznam**, needituje se.
 3. **S2 — verzované ukládání vázané na identitu obsahu.** Save zapíše
    `manifest()` (co bylo načtené) a load při rozchodu pojmenuje **co** chybí
    nebo má jinou verzi. Stojí na S1 (manifest) a mění smlouvu `docs/04 §4.7`,
@@ -107,6 +125,9 @@ Pořadí **není** podle ceny, ale podle **závislostí**:
 ## 4. Kroky S1b–S6 (co, hotovo když, co to NEDÁ)
 
 ### S1b — dopnout 9 modulových konstant na cesty z vrstev
+
+> **✅ HOTOVO 2026-10-11** (session „S1b“) — viz záznam u §3 bodu 2.
+> **Zadání níž zůstává jako záznam**, needituje se.
 
 **Co:** `sim/entity/item.gd`, `sim/entity/skills.gd`, `sim/systems/craft.gd`
 (2×), `sim/systems/interaction.gd`, `sim/systems/skill_gain.gd`,
@@ -264,6 +285,11 @@ cizích práv).
 3. **Co se má stát s rozehranou hrou, když si přidáš mod?** Návrh R3: načte se
    a hra to napíše. Alternativa: odmítnout a říct proč.
 4. **Čím mám pokračovat** (návrh R6: S1b → S2 → S3)?
+   > **Stav 2026-10-11:** S1b **hotové** (session „S1b“). Otázka tedy dnes zní
+   > **„S2, nebo S3?“** — S2 (verzované ukládání vázané na obsah) mění smlouvu
+   > save `docs/04 §4.7`; S3 (stabilní ID záznamů a slučování) je větší a mění
+   > datové smlouvy. Body 1–3 výš na to pořád čekají — do odpovědi se nic
+   > nerozhoduje samo.
 
 ### 6.3 Co zůstává na tobě i po R1–R6 (neměním to sám)
 

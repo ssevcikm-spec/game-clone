@@ -42,19 +42,24 @@ const PIECES := 8                  # artu na kategorii (8 smeru; viz hlavicka)
 
 var _by_tile: Dictionary = {}      # art z doors.txt (= ZAVRENY) -> {category, index}
 var _categories: Array = []        # index -> {category, tiles: [...], feature_mask, name}
+# CESTA JE PARAMETR (NAVRH-MODDING §4 S1b): mod prebiji `data/doors.json`, takze
+# soubor NESMI byt zapeeny v konstante. Bez argumentu se bere zaklad; cestu
+# z vrstev obsahu predava `app/main`.
+var _doors_path: String = ""
 
 
-func _init() -> void:
+func _init(doors_path: String = DOORS_PATH) -> void:
+	_doors_path = doors_path
 	_load()
 
 
 func _load() -> void:
-	if not FileAccess.file_exists(DOORS_PATH):
-		push_warning("world.doors: chybi " + DOORS_PATH)
+	if not FileAccess.file_exists(_doors_path):
+		push_warning("world.doors: chybi " + _doors_path)
 		return
-	var data = JSON.parse_string(FileAccess.get_file_as_string(DOORS_PATH))
+	var data = JSON.parse_string(FileAccess.get_file_as_string(_doors_path))
 	if not (data is Dictionary) or not (data.get("rows") is Array):
-		push_warning("world.doors: " + DOORS_PATH + " nema tvar {rows: [...]}")
+		push_warning("world.doors: " + _doors_path + " nema tvar {rows: [...]}")
 		return
 	for row in data["rows"]:
 		var tiles: Array = []

@@ -147,16 +147,21 @@ var _registry = null         # sim.entity_registry
 var _items = null            # {serial: Item} nebo objekt s `get_item(serial)`
 var _skills: Dictionary = {}    # jmeno -> id (data/skills.json)
 var _cursor: int = 0
+# Cesta k datum je PARAMETR konstruktoru (NAVRH-MODDING §4 S1b), ne zapeena
+# konstanta: mod prebiji `data/skills.json` a modul to musi videt.
+var _skills_path: String = ""
 
 
 func _init(world = null, events = null, doors = null, containers = null,
-		registry = null, items = null) -> void:
+		registry = null, items = null, skills_path: String = SKILLS_PATH) -> void:
 	_world = world
 	_events = events
 	_doors = doors
 	_containers = containers
 	_registry = registry
 	_items = items
+	# CESTA JE PARAMETR (NAVRH-MODDING §4 S1b): mod prebiji `data/skills.json`.
+	_skills_path = skills_path
 	_load_skills()
 
 
@@ -742,12 +747,12 @@ func _item_event(item) -> Dictionary:
 
 
 func _load_skills() -> void:
-	if not FileAccess.file_exists(SKILLS_PATH):
-		push_warning("sim.interaction: chybi " + SKILLS_PATH + " - craft gump se nespusti")
+	if not FileAccess.file_exists(_skills_path):
+		push_warning("sim.interaction: chybi " + _skills_path + " - craft gump se nespusti")
 		return
-	var parsed = JSON.parse_string(FileAccess.get_file_as_string(SKILLS_PATH))
+	var parsed = JSON.parse_string(FileAccess.get_file_as_string(_skills_path))
 	if not (parsed is Array):
-		push_warning("sim.interaction: " + SKILLS_PATH + " neni seznam")
+		push_warning("sim.interaction: " + _skills_path + " neni seznam")
 		return
 	for rec in parsed:
 		if rec is Dictionary and rec.has("name") and rec.has("id"):

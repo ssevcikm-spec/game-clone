@@ -25,9 +25,14 @@ const ITEM_NAME := 8
 var _land: Array = []
 var _item: Array = []
 var _item_value: Dictionary = {}
+# CESTA K HODNOTAM JE PARAMETR (NAVRH-MODDING §4 S1b): mod prebiji
+# `data/items.json`, takze soubor NESMI byt zapeeny v konstante. `TILES_PATH`
+# zustava konstanta - je to ART z instalace UO, ne datovy soubor vrstev.
+var _items_path: String = ""
 
 
-func _init() -> void:
+func _init(items_path: String = ITEMS_PATH) -> void:
+	_items_path = items_path
 	var tiles = _read_json(TILES_PATH)
 	if tiles is Dictionary:
 		_land = tiles.get("land", [])
@@ -37,13 +42,13 @@ func _init() -> void:
 		push_warning("world.tiledata: chybi data v %s (land %d, item %d) - spust "
 			% [TILES_PATH, _land.size(), _item.size()]
 			+ "`python tools/uoextract/tiledata.py --extract assets/uo`")
-	var items = _read_json(ITEMS_PATH)
+	var items = _read_json(_items_path)
 	if items is Array:
 		for rec in items:
 			if rec is Dictionary and rec.has("tile"):
 				_item_value[int(rec["tile"])] = int(rec.get("value", 0))
 	else:
-		push_warning("world.tiledata: %s neni seznam - hodnoty predmetu nejsou" % ITEMS_PATH)
+		push_warning("world.tiledata: %s neni seznam - hodnoty predmetu nejsou" % _items_path)
 
 
 func _read_json(path: String):

@@ -11,19 +11,24 @@ const STAIRS_PATH := "res://data/stairs.json"
 
 var _by_tile: Dictionary = {}      # tile -> {category, role}
 var _groups: Array = []            # index -> {category, tiles: {role: tile}, name}
+# CESTA JE PARAMETR (NAVRH-MODDING §4 S1b): mod prebiji `data/stairs.json`,
+# takze soubor NESMI byt zapeeny v konstante. Kdo nic nerekne, dostane zaklad
+# (`app/main` predava cestu z vrstev obsahu; `sim/content.gd`).
+var _stairs_path: String = ""
 
 
-func _init() -> void:
+func _init(stairs_path: String = STAIRS_PATH) -> void:
+	_stairs_path = stairs_path
 	_load()
 
 
 func _load() -> void:
-	if not FileAccess.file_exists(STAIRS_PATH):
-		push_warning("world.stairs: chybi " + STAIRS_PATH)
+	if not FileAccess.file_exists(_stairs_path):
+		push_warning("world.stairs: chybi " + _stairs_path)
 		return
-	var data = JSON.parse_string(FileAccess.get_file_as_string(STAIRS_PATH))
+	var data = JSON.parse_string(FileAccess.get_file_as_string(_stairs_path))
 	if not (data is Dictionary) or not (data.get("rows") is Array):
-		push_warning("world.stairs: " + STAIRS_PATH + " nema tvar {rows: [...]}")
+		push_warning("world.stairs: " + _stairs_path + " nema tvar {rows: [...]}")
 		return
 	for row in data["rows"]:
 		var tiles: Dictionary = {}

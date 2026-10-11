@@ -111,21 +111,38 @@ var _stat_chance_percent: int = STAT_DEFAULT_CHANCE
 var _next_ggs_ms: Dictionary = {}        # skill -> ms, kdy je rust garantovany
 var _last_stat_gain_ms: Dictionary = {}  # "serial:stat" -> ms posledniho zisku
 var _failure_weight: float = 0.0         # vaha neuspechu v sanci na rust (era)
+# CESTA JE PARAMETR (NAVRH-MODDING §4 S1b): mod prebiji `data/balance.json`.
+var _balance_path: String = ""
 
 
-func _init(registry = null, rng = null, clock = null, events = null) -> void:
+func _init(registry = null, rng = null, clock = null, events = null,
+		balance_path: String = BALANCE_PATH) -> void:
 	_registry = registry if registry != null else RegistryScript.new()
 	_rng = rng if rng != null else RngScript.new(0)
 	_clock = clock if clock != null else ClockScript.new()
 	_events = events
+	_balance_path = balance_path
 	_read_balance()
+
+
+func stats() -> Dictionary:
+	# Co modul OPRAVDU nacetl z `data/balance.json` (docs/08 §8.6: kdo se ptá
+	# jen na pritomnost souboru, nemeri chovani). Slouzi testu S1b a diagnostice
+	# - kdyby cesta zustala konstantou, hodnoty by se nezmenily.
+	return {
+		"balance_path": _balance_path,
+		"ggs_on": _ggs_on,
+		"stat_delay_ms": _stat_delay_ms,
+		"stat_chance_percent": _stat_chance_percent,
+		"failure_weight": _failure_weight,
+	}
 
 
 func _read_balance() -> void:
 	# GGS a stat gain jsou DATA, ne konstanty v kode (docs/05 §5.16.3).
-	if not FileAccess.file_exists(BALANCE_PATH):
+	if not FileAccess.file_exists(_balance_path):
 		return                       # vychozi hodnoty z docs/05 §5.16
-	var parsed = JSON.parse_string(FileAccess.get_file_as_string(BALANCE_PATH))
+	var parsed = JSON.parse_string(FileAccess.get_file_as_string(_balance_path))
 	if not (parsed is Dictionary):
 		return
 	if parsed.has("ggs_on"):

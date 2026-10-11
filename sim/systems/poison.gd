@@ -79,6 +79,9 @@ var _events = null
 # serial -> {level, due_ms, tiky}
 var _aktivni: Dictionary = {}
 var _tabulka: Array = []
+# Cesta, ze ktere se tabulka OPRAVDU nacetla (S1b). `source()` ji musi hlasit
+# a ne konstantu: jinak by modul tvrdil neco jineho, nez pouzil.
+var _path: String = ""
 
 
 func _init(registry = null, rng = null, clock = null, events = null,
@@ -87,6 +90,7 @@ func _init(registry = null, rng = null, clock = null, events = null,
 	_rng = rng if rng != null else RngScript.new(0)
 	_clock = clock if clock != null else ClockScript.new()
 	_events = events
+	_path = path
 	_tabulka = _read_data(path)
 
 
@@ -279,7 +283,10 @@ func _read_data(path: String) -> Array:
 
 
 func source() -> String:
-	return "code:TABLE" if FileAccess.file_exists(POISON_PATH) == false else POISON_PATH
+	# Hlasi CESTU, ktera se opravdu pouzila (`_path`), ne konstantu: kdyz mod
+	# prebiji `data/poison.json` a `source()` by vracel zaklad, byl by to doklad,
+	# ktery lze (S1b, `tools/check-data-paths.py`).
+	return "code:TABLE" if FileAccess.file_exists(_path) == false else _path
 
 
 func _mobile(m: int):

@@ -294,13 +294,16 @@ func _ready() -> void:
 			+ "spust `python tools/uoextract/hues.py --install \"<UO>\"`")
 
 
-func setup(map, textures) -> void:
+func setup(map, textures, items_path: String = TiledataScript.ITEMS_PATH) -> void:
 	# Vola `app.main` po nacteni dat; do te doby se nekresli (a je to videt).
 	_textures = textures
 	_jmena = NamePlates.new()
 	# `world.tiledata` je potreba pro `TexID` (textura svahu) - bez nej by se
 	# svah kreslil jako rovna plocha a zustala by v nem dira.
-	_tiledata = TiledataScript.new()
+	# ⚠ CESTA JE PARAMETR (S1b, 2026-10-11): hodnoty predmetu jdou z vrstev
+	# obsahu; kdyby si je kresleni cetlo z konstanty a simulace z modu, dve
+	# instance téhož modulu by si odporovaly.
+	_tiledata = TiledataScript.new(items_path)
 	_chunk = Chunk.new(map, textures, _tiledata)
 	# M9: davka se stavi nad HOTOVYM seznamem z `render.chunk` (stejna data,
 	# stejne poradi) - `look_at_tile` ho necha postavit. `self` je rodic pro

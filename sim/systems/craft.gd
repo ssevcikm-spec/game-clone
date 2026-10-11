@@ -160,10 +160,15 @@ var _recipes: Array = []             # recepty podle id (index == id)
 var _by_skill: Dictionary = {}       # jmeno systemu -> Array id
 var _tile_by_name: Dictionary = {}   # nazev -> tiledata id (data/items.json)
 var _made: int = 0
+# Cesty k datum jsou PARAMETR konstruktoru (NAVRH-MODDING §4 S1b), ne konstanta
+# zapeena v modulu: mod prebiji soubor a modul to musi videt.
+var _recipes_path: String = ""
+var _items_path: String = ""
 
 
 func _init(container = null, items = null, map = null, tiledata = null, skill_gain = null,
-		serials = null, rng = null, clock = null, events = null, registry = null) -> void:
+		serials = null, rng = null, clock = null, events = null, registry = null,
+		recipes_path: String = RECIPES_PATH, items_path: String = ITEMS_PATH) -> void:
 	_container = container
 	_items = items
 	_map = map
@@ -174,6 +179,11 @@ func _init(container = null, items = null, map = null, tiledata = null, skill_ga
 	_clock = clock if clock != null else ClockScript.new()
 	_events = events
 	_registry = registry if registry != null else RegistryScript.new()
+	# CESTY JSOU PARAMETRY (NAVRH-MODDING §4 S1b): mod prebiji `data/recipes.json`
+	# i `data/items.json`, takze je NESMI mit zapeene v konstantach. Cestu
+	# z vrstev obsahu predava `app/main`.
+	_recipes_path = recipes_path
+	_items_path = items_path
 	_load_items()
 	_load_recipes()
 
@@ -724,12 +734,12 @@ func _recipe_info(recipe: Dictionary, mob, jmeno: String) -> Dictionary:
 
 
 func _load_recipes() -> void:
-	if not FileAccess.file_exists(RECIPES_PATH):
-		push_warning("sim.craft: chybi " + RECIPES_PATH + " - vyroba nebude fungovat")
+	if not FileAccess.file_exists(_recipes_path):
+		push_warning("sim.craft: chybi " + _recipes_path + " - vyroba nebude fungovat")
 		return
-	var parsed = JSON.parse_string(FileAccess.get_file_as_string(RECIPES_PATH))
+	var parsed = JSON.parse_string(FileAccess.get_file_as_string(_recipes_path))
 	if not (parsed is Array):
-		push_warning("sim.craft: " + RECIPES_PATH + " neni seznam")
+		push_warning("sim.craft: " + _recipes_path + " neni seznam")
 		return
 	for rec in parsed:
 		if not (rec is Dictionary):
@@ -748,12 +758,12 @@ func _load_recipes() -> void:
 
 func _load_items() -> void:
 	# `role` a jmeno -> tiledata id (kovadlina, vyhen, nastroje, materialy).
-	if not FileAccess.file_exists(ITEMS_PATH):
-		push_warning("sim.craft: chybi " + ITEMS_PATH + " - role kovadliny/vyhne nebudou")
+	if not FileAccess.file_exists(_items_path):
+		push_warning("sim.craft: chybi " + _items_path + " - role kovadliny/vyhne nebudou")
 		return
-	var parsed = JSON.parse_string(FileAccess.get_file_as_string(ITEMS_PATH))
+	var parsed = JSON.parse_string(FileAccess.get_file_as_string(_items_path))
 	if not (parsed is Array):
-		push_warning("sim.craft: " + ITEMS_PATH + " neni seznam")
+		push_warning("sim.craft: " + _items_path + " neni seznam")
 		return
 	for rec in parsed:
 		if not (rec is Dictionary) or not rec.has("tile"):

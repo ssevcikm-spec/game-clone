@@ -130,6 +130,13 @@ a je schopen říct, co dělal a proč.
 
 ## E) Modding (nová práce, `SMER` §3)
 
+> **Stav 2026-10-11:** **S1 hotové** (vrstvy obsahu `sim/content.gd`,
+> `data/content-layers.json`) a **S1b hotové** (cesta k datům je parametr —
+> 9+3 konstant; smlouva `docs/04 §4.9.1`). **Další krok je S2 (verzované
+> ukládání vázané na obsah), nebo S3 (stabilní ID záznamů)** — obojí mění
+> smlouvy, takže čeká na odpověď na `NAVRH-MODDING-2026-10-11.md` §6.2
+> (otázky 1–4). Návrh a naměřené mezery: tamtéž.
+
 **Cíl:** „modifikovatelná a rozšiřitelná" je dnes **chybějící vlastnost**:
 pevné smlouvy a brány jsou dobré pro měření, ne pro moddery. Znamená to švy,
 stabilní ID, pořadí načítání, verzované ukládání, sandbox skriptů.

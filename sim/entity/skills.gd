@@ -31,28 +31,41 @@ var values: PackedInt32Array
 var locks: PackedInt32Array
 
 var _caps: PackedInt32Array
+# Cesta k datum je PARAMETR konstruktoru (NAVRH-MODDING §4 S1b), ne zapeena
+# konstanta: mod prebiji `data/skills.json` a modul to musi videt.
+var _skills_path: String = ""
+# Kolik skillu modul v tom souboru NASEL (-1 = soubor neni / neni seznam).
+# Je to MERENA hodnota, ne odhad: kdo se pta jen na existenci souboru, nemeri
+# chovani (docs/08 §8.6).
+var _data_skill_count: int = -1
 
 
-func _init(skill_count: int = SKILL_COUNT) -> void:
+func _init(skill_count: int = SKILL_COUNT, skills_path: String = SKILLS_PATH) -> void:
 	values = PackedInt32Array()
 	values.resize(skill_count)
 	locks = PackedInt32Array()
 	locks.resize(skill_count)
 	_caps = PackedInt32Array()
 	_caps.resize(skill_count)
+	_skills_path = skills_path
 	_check_data()
 
 
+func data_skill_count() -> int:
+	return _data_skill_count
+
+
 func _check_data() -> void:
-	if not FileAccess.file_exists(SKILLS_PATH):
-		push_warning("entity.skills: chybi " + SKILLS_PATH
+	if not FileAccess.file_exists(_skills_path):
+		push_warning("entity.skills: chybi " + _skills_path
 			+ " - hodnoty skillu zustavaji nuly (spust `python tools/gates/gen-content.py --only skills`)")
 		return
-	var parsed = JSON.parse_string(FileAccess.get_file_as_string(SKILLS_PATH))
+	var parsed = JSON.parse_string(FileAccess.get_file_as_string(_skills_path))
 	var pocet: int = (parsed as Array).size() if parsed is Array else -1
+	_data_skill_count = pocet
 	if pocet != values.size():
 		push_warning("entity.skills: %s ma %d skillu, ocekavano %d"
-			% [SKILLS_PATH, pocet, values.size()])
+			% [_skills_path, pocet, values.size()])
 
 
 func _index(skill: int) -> int:

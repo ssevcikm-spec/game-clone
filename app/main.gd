@@ -21,6 +21,10 @@ const TextureCache = preload("res://render/texture_cache.gd")
 # `render.textures` (atlasovy art) a `app.world_view` (animace postavy).
 const OwnArtScript = preload("res://render/own_art.gd")
 const WalkScript = preload("res://sim/world/walk.gd")
+# `world.doors` / `world.stairs` se zakladaji s CESTou z vrstev obsahu (S1b):
+# driv si je zakladal `sim.walk` sam a mod je nemohl prebit.
+const DoorsScript = preload("res://sim/world/doors.gd")
+const StairsScript = preload("res://sim/world/stairs.gd")
 const MovementScript = preload("res://sim/systems/movement.gd")
 const MobileScript = preload("res://sim/entity/mobile.gd")
 const TimeScript = preload("res://sim/world/time.gd")
@@ -75,7 +79,9 @@ const SkillListScript = preload("res://ui/skill_list.gd")
 # a z REALNYCH vazeb v `InputMap` (klavesy se do dat NEPISUJI - dve pravdy
 # o klavesach by znamenaly, ze hrac maze klavesu, ktera nic nedela).
 const HotkeysScript = preload("res://ui/hotkeys.gd")
-const HELP_DATA := "res://data/help.json"
+# `HELP_DATA` tu BYLO do 2026-10-11 (S1b): cestu k napovede drzi jen `help_data`
+# (plni ji `_nacti_obsah()` z vrstev obsahu). Mrtva konstanta je dluh - kdyby
+# zustala, cetl by z ni nekdo "zakladni" cestu a mod by u napovedy nefungoval.
 # 2026-10-10 (`ui.vendor_gump`, D10): obchodni okno. Otevre ho udalost
 # `gump_open{gump:"vendor"}` (stejne jako okno vyroby) - a `sim.vendor` ji
 # posle, kdyz hrac pouzije vendora (`Command{t:"use"}` -> `interaction`).
@@ -126,7 +132,9 @@ const PLAYER_BODY: int = 400            # 400 = muz (tělo je jen v anim.mul)
 # ne z kodu - kdyz data pribudou, pribudnou i ve hre. Dva zaznamy s kategorii
 # `tool` jsou CILE, ne nastroje (`TARGET_ROLES` v `sim.interaction`): kovadlina
 # a vyhen. Cisla se odsud neopisuji.
-const ITEMS_DATA := "res://data/items.json"
+# `ITEMS_DATA` tu BYLO do 2026-10-11 (S1b) - viz poznamka u `HELP_DATA`.
+# `SKILLS_DATA` zustava: je DEFAULT PARAMETR staticke `start_skills()`, tedy
+# misto, kde se cesta rozhoduje (ne cteni v tele).
 const SKILLS_DATA := "res://data/skills.json"
 const TOOL_CATEGORY := "tool"
 const TOOL_TARGET_ROLES: Array[String] = ["anvil", "forge"]
@@ -177,13 +185,15 @@ var hotkeys = null               # `ui.hotkeys` (session D) - napoveda pro hrace
 # a kazdy, kdo se na ne ptá, to MUSI nahlasit (zadna ticha prazdna napoveda).
 var _help_data: Dictionary = {}
 # CESTY K DATUM ROZLISENE PRES VRSTVY OBSAHU (`sim.content`, docs/04 §4.9).
-# Konstanta vyse je ZAKLADNI cesta (`res://data/...`); tady je to, co hra
-# OPRAVDU pouzije po nacteni vrstev. Kdo saha na data, saha na tyhle promenne -
-# jinak by mod prebil soubor, ktery se stejne necte z konstanty.
+# Tady je to, co hra OPRAVDU pouzije; plni je `_nacti_obsah()` (prvni vec
+# v `_ready()`, tedy driv, nez je kdokoli cte). Kdo saha na data, saha na tyhle
+# promenne. Prazdno do te doby je ZAMERNE (S1b, `docs/04 §4.9.1`): konstanta
+# `res://data/...` se v `app/` smi objevit jen jako default parametru, aby se
+# dalo staticky overit, ze se nikde necte mimo `sim/content.gd` a `_cesta()`.
 var content = null
-var items_data: String = ITEMS_DATA
-var skills_data: String = SKILLS_DATA
-var help_data: String = HELP_DATA
+var items_data: String = ""
+var skills_data: String = ""
+var help_data: String = ""
 var _mods_vypnuto: bool = false      # `--no-mods` (bere se jen zakladni vrstva)
 # VADY NAPOVEDY z posledniho skladani (akce, ktera v `InputMap` neni, vadny
 # radek dat). Pocitaji se do vystupu a `_osvezi_napovedu()` je VYPISE - vada
@@ -225,6 +235,11 @@ var items: Dictionary = {}       # serial -> Item (smelt/repair hledaji podle se
 var harvest = null
 var craft = null
 var interaction = null           # `sim.interaction` - obecna interakce (20. session)
+# `world.doors` a `world.stairs` zaklada `app/main` (S1b, 2026-10-11): driv je
+# zakladal `sim.walk` sam, takze mod nemel jak prebit `data/doors.json` /
+# `data/stairs.json` - cesta byla zapeena v konstante modulu.
+var doors = null
+var stairs = null
 var config = null
 var metrics = null
 var world_view = null            # `app.world_view` (pro metriky)
@@ -262,6 +277,12 @@ func _ready() -> void:
 	# (docs/04 §4.9). Kdyby se vrstvy nactly az po `_load_data()`, cetl by se
 	# `balance.json` jeste ze zakladni cesty a mod by u nej nemel efekt.
 	_nacti_obsah()
+	# IDENTITA PREDMETU (S1b, 2026-10-11): `sim.entity.item` ma statickou cache
+	# pro cely proces, takze se musi nacist PRVNI - jinak by ji prvni volani
+	# `type_of()` nacetlo z KONSTANTY a mod u `data/items.json` by nemel efekt
+	# (presne ta vada, kterou S1b odstranuje). `loaded_path()` rekne, co se
+	# opravdu nacetlo (ne co se melo).
+	ItemScript.nacti_data(items_data)
 	var data: Dictionary = _load_data()
 	metrics = MetricsScript.new()
 	sim = SimScript.new(DEFAULT_SEED, data)
@@ -756,7 +777,7 @@ func _setup_world() -> void:
 	# Ikony do batohu jdou INJEKCI (`ui/` nesmi na `render/`, docs/04 §4.1).
 	if backpack != null:
 		backpack.nastav_textury(textures)
-	view.setup(map, textures)
+	view.setup(map, textures, _cesta("res://data/items.json"))
 	# ⚠ 2026-10-09 (bod 5.5): STAVBA SEZNAMU PO CASTECH. Cela stavba stoji
 	# **179-199 ms** (`_analyza/p29-zasek.gd`: spike 145 ms na framu, kdy
 	# `prestaveb` stouplo; atlas to NENI - `hold 0`, `ceka 0`) a byla to jedina
@@ -777,7 +798,20 @@ func _setup_player(view) -> void:
 	# world.walk -> entity.mobile -> sim.movement -> registrace v SimWorld.
 	# Systemy se registruji TADY (integraci misto), protoze `sim/sim_world.gd`
 	# je granule `sim.world_loop` a agent ji needituje.
-	var walk = WalkScript.new(map)
+	# TABULKA DLAZDIC a KONTEJNER: jedina instance pro cely svet (docs/04 §4.2
+	# `entity.container` - dve instance = duplikaty predmetu). `walk` dostava
+	# stejnou instanci, aby se `tiles.json` nectlo dvakrat.
+	# ⚠ CESTA JE PARAMETR (S1b, 2026-10-11): hodnoty predmetu jdou z vrstev
+	# obsahu, takze mod muze prebit `data/items.json` i tady.
+	tiledata = TiledataScript.new(_cesta("res://data/items.json"))
+	container = ContainerScript.new(tiledata)
+	# DVEŘE A SCHODY (S1b): zaklada je `app/main`, aby jejich cestu rozhodovaly
+	# VRSTVY OBSAHU. Do teto chvile si je `sim.walk` zakladal sam z konstanty,
+	# takze mod u `data/doors.json` / `data/stairs.json` fungoval zdanlive.
+	# `sim.interaction` dostava TYTÉŽ instance - dvoje dvere = dve pravdy.
+	doors = DoorsScript.new(_cesta("res://data/doors.json"))
+	stairs = StairsScript.new(_cesta("res://data/stairs.json"))
+	var walk = WalkScript.new(map, tiledata, stairs, doors)
 	var serial: int = sim.next_serial()
 	player = MobileScript.new(serial, PLAYER_BODY, Vector3i(BRITAIN.x, BRITAIN.y, 0))
 	# ⚠⚠ 19. session (2026-10-08) - VADA V3 ZE ZADANI 19: "Postava bezi jen asi
@@ -805,8 +839,7 @@ func _setup_player(view) -> void:
 	# TABULKA DLAZDIC a KONTEJNER: jedina instance pro cely svet (docs/04 §4.2
 	# `entity.container` - dve instance = duplikaty predmetu). `walk` dostava
 	# stejnou instanci, aby se `tiles.json` nectlo dvakrat.
-	tiledata = TiledataScript.new()
-	container = ContainerScript.new(tiledata)
+	# (Instance uz je zalozena vyse - S1b: potrebuje ji `world.walk`.)
 	# Batoh hrace: bez nej by sber i vyroba vracely `no_pack`. Vrstva 0x15
 	# (`data/items.json`, art 0x4E75) je v UO batoh; `entity.equipment` jeste
 	# neni, takze batoh nema vrstvu - je to serial v `player.backpack`.
@@ -867,22 +900,35 @@ func _setup_player(view) -> void:
 	# `sim.skill_gain` dostava STEJNY registr jako `sim.movement` a RNG z
 	# `SimWorld` (vlastni RNG by rozbil determinismus). System nema `tick`,
 	# takze ho `SimWorld._tick_system` jen preskoci - slouzi volanim.
-	sim.systems["skill_gain"] = SkillGainScript.new(registry, sim.rng(), sim.clock(), sim.events())
+	sim.systems["skill_gain"] = SkillGainScript.new(registry, sim.rng(), sim.clock(), sim.events(),
+		_cesta("res://data/balance.json"))
 	# Sber a vyroba (16. session): obe dostavaji STEJNY registr, kontejner,
 	# slovnik predmetu a RNG/clock z `SimWorld`. `sim.interaction` je pak najde
 	# v `SimWorld.systems` a prestane na ne vracet `not_available`.
 	harvest = HarvestScript.new(map, tiledata, registry, sim.rng(), sim.clock(),
 		sim.events(), sim.systems["skill_gain"], container, sim, items)
 	sim.systems["harvest"] = harvest
+	# CESTY JSOU PARAMETRY (S1b): recepty i tabulka predmetu jdou z vrstev obsahu.
 	craft = CraftScript.new(container, items, map, tiledata, sim.systems["skill_gain"],
-		sim, sim.rng(), sim.clock(), sim.events(), registry)
+		sim, sim.rng(), sim.clock(), sim.events(), registry,
+		_cesta("res://data/recipes.json"), _cesta("res://data/items.json"))
 	sim.systems["craft"] = craft
 	# Obecna interakce (20. session): `sim.interaction` dostava STEJNY kontejner,
 	# registr a slovnik predmetu jako sber/vyroba (dve instance = duplikaty).
-	# `world.doors` zatim neexistuje, proto `null` - `use` na dvere odpovi
-	# `not_available` (viditelne), dokud je nekdo nezalozi.
-	interaction = InteractionScript.new(sim, sim.events(), null, container, registry, items)
+	# ⚠ DVEŘE UZ EXISTUJI (S1b, 2026-10-11): do te doby tu bylo `null` s
+	# poznamkou "world.doors zatim neexistuje" - jenze od chvile, kdy je zaklada
+	# `app/main` (kvuli ceste z vrstev), se SEM predavaji TYTÉŽ instance.
+	# Kdyby tu zustalo `null`, mod i zaklad by meli dvoje dvere.
+	interaction = InteractionScript.new(sim, sim.events(), doors, container, registry, items,
+		_cesta("res://data/skills.json"))
 	sim.systems["interaction"] = interaction
+	# MERENI PRO MODY (S1b): co si hra OPRAVDU nacetla - cisla se meni, kdyz mod
+	# prebije `data/doors.json` / `data/stairs.json` / `data/recipes.json`, a
+	# `loaded_path()` u `data/items.json`. E2E sonda (`_analyza/p67-*.py`) cte
+	# tenhle radek; kdyby cesta zustala konstantou, cisla by byla stejna.
+	print("[main] data modulu: dvere ", doors.category_count(), " kategorii, schody ",
+		stairs.group_count(), " skupin, receptu ", craft.recipe_count(),
+		", item typu ", ItemScript.typ_count(), " z ", ItemScript.loaded_path())
 	# TLACITKO "use" V SEZNAMU SKILLU (D10): UI jen OHLASTI, co hrac zmackl
 	# (`ui/` nesmi menit stav simulace); tady se z toho stane `Command`.
 	# `Command{t:"skill"}` dnes v `sim/commands.gd` NENI, takze se posle jen

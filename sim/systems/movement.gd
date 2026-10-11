@@ -100,7 +100,7 @@ var _drain_model: String = "run_only"
 # výchozí; `_init` je vezme z `core/const.gd` a `_read_balance` přepíše daty.
 var _walk_ms: int = 400
 var _run_ms: int = 200
-var _balance_path: String = BALANCE_PATH
+var _balance_path: String = ""
 
 
 func _init(walk = null, clock = null, events = null, drain_model: String = "", registry = null,

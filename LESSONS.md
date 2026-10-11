@@ -24,6 +24,85 @@ Typy: `chyba` (moje vada) · `past-nástroje` (prostředí/nástroj, ne logika) 
 
 ---
 
+# 2026-10-11 (devátá část) — SESSION „S1b“: CESTA K DATŮM JE PARAMETR (A DVĚ BRÁNY, KTERÉ MĚŘILY NĚCO JINÉHO)
+
+> **Zadání:** `NAVRH-MODDING-2026-10-11.md` §4 **S1b** — dopnout 9 modulových
+> konstant (cesta k datům zapečená v modulu) na cesty z vrstev obsahu, aby mod
+> nefungoval „zdánlivě“ (u `balance.json` ano, u `items.json` ne). Co je hotové
+> a naměřené, je v `HANDOFF.md` (blok nahoře); smlouva je v `docs/04 §4.9.1`.
+
+### 2026-10-11 — Statická metrika měřila PŘÍTOMNOST jména, ne POUŽITÍ konstanty (chyba)
+**Co se stalo:** `_analyza/p65-konstanty-param.py` rozděloval konstanty na
+„parametr“ a „primo“ podle toho, jestli se jméno objeví v **nějaké** signatuře
+funkce v témž souboru. Jenže `sim/systems/poison.gd` měl `_init(..., path :=
+POISON_PATH)` **a zároveň** `source()` vracelo `POISON_PATH` z těla — metrika to
+hlásila jako „parametr“. Stejně „prošla“ inicializace členské proměnné
+(`var _x: String = KONST`), která je taky čtení konstanty. Kdyby se podle téhle
+metriky hlásilo „S1b hotovo“, byla by to zelená nad kódem, který v těle pořád
+čte konstantu.
+**Doklad:** výstup staré metriky před přepisem: `"parametr": 17, "primo": 11`
+(tištěný, ne dopočítaný); nová metrika po přepsání na **témž** původním kódu
+našla **11 „smíšených“** (jméno v signatuře I v těle), mezi nimi
+`sim/systems/poison.gd:282` = `FileAccess.file_exists(POISON_PATH)`. Po opravě:
+`23 parametr / 0 primo / 0 smíšené`, `exit 0` (a `exit 1`, když se vada vrátí).
+**Ponaučení:** metrika, která hledá **jméno kdekoli v souboru**, neměří, kde se
+používá — musí rozlišit **signaturu od těla** a **odstranit komentáře**
+(komentář popisující vadu nesmí vypadat jako vada). A „výskyt“ musí být
+**jednoznačný**: mutační harness S1b proto u každé kotvy vyžaduje, aby byla
+v souboru **právě jednou** — jinak se mutace provede na jiném místě, než se
+myslelo.
+
+### 2026-10-11 — E2E, který měří CESTU, neměří POUŽITÍ souboru (chyba)
+**Co se stalo:** E2E sonda `_analyza/p67-mod-data-e2e.py` dokazovala, že hra
+bere `data/items.json` z modu, tím, že se v logu hry objevila cesta
+z `user://mods/`. Jenže tu cestu vypisuje `sim.entity.item.loaded_path()` —
+a ta se nastaví **z parametru**, i když se soubor přečte z konstanty. Mutační
+harness (`p68`) vrátil do `item.gd` konstantu a sonda **neselhal** (`exit 0`):
+dokazovala, co modul **hlásí**, ne co **udělal**.
+**Doklad:** `_analyza/p68-mutace-s1b.py`, běh 1:
+`VADA: items (sim.entity.item): E2E sonda s vracenou vadou neselhal (exit 0)`;
+po opravě (mod přidá do kopie `items.json` **jeden záznam** a hra vypisuje
+`typ_count()`) běh 2: **9 z 9 mutací chyceno**, hodnoty `3779 → 3780 → 3779`
+(bez modu / s modem / `--no-mods`).
+**Ponaučení:** doklad „použil se ten soubor“ musí být **změna měřeného stavu**,
+která by bez použití souboru nenastala (počet typů, počet kategorií), ne řetězec
+cesty — ten umí modul vrátit i z proměnné, kterou ignoruje. Přesně to je případ
+„brána se ptá na přítomnost, neměří chování“ z `AGENTS.md`.
+
+### 2026-10-11 — `var _cesta: String = KONSTANTA` je čtení konstanty; `""` + `_init` je měřitelné (postup)
+**Co se stalo:** devět modulů dostalo cestu jako parametr konstruktoru, ale
+členskou proměnnou jsem inicializoval na konstantu („jen jako výchozí hodnotu“).
+Statická metrika to **správně** označila za čtení konstanty — a měla pravdu
+v tom, že z textu se to od skutečného čtení rozeznat nedá. Sjednotilo se to na
+`var _x: String = ""` + přiřazení v `_init`; tři další moduly (`sim.movement`,
+`world.regions`, `sim.poison`) měly tentýž vzor a srovnaly se taky.
+**Doklad:** `python tools/check-data-paths.py` → `primo 0 / smíšené 0`,
+`exit 0`; `tests/cases/content_paths.gd` **33 kontrol / 0 selhání**;
+`_analyza/p67-mod-data-e2e.py` → dveře `37 → 1`, schody `19 → 1`, recepty
+`1053 → 1`.
+**Ponaučení:** když chceš vlastnost **mechanicky kontrolovat**, musí být
+v textu **jednoznačná**: konstanta smí být jen hodnotou default parametru.
+„Výchozí hodnota členské proměnné“ je taky použití — a v `sim.poison` se přitom
+našla **skutečná vada**: `source()` vracelo konstantu, tedy doklad, který mohl
+lhát o tom, odkud data jsou.
+
+### 2026-10-11 — Mutační harness je zub, který najde slabou bránu (postup)
+**Co se stalo:** devět mutací („vrať konstantu zpět do těla“) se pustilo přes
+tři nezávislé vrstvy: statická metrika `p65`, case `tests/cases/content_paths.gd`
+a E2E sonda `p67`. Osm mutací spadlo hned; **devátá prozradila, že jedna vrstva
+neměří** (viz záznam výš). Kdyby se běžel jen case, slabina E2E by zůstala
+nedotčená.
+**Doklad:** `_analyza/p68-mutace-s1b.py` — u každé mutace se ověří, že se
+**opravdu provedla** (jinak by „prošla“ stejně jako ta, která se neprovedla),
+že spadly všechny tři vrstvy, a že je soubor po navrácení **bajtově shodný**
+(sha256); výstup `9 z 9 mutaci chyceno`.
+**Ponaučení:** u nové práce nestačí „test je zelený“ — pusť **jednu vadu na
+každou novou smlouvu** a dívej se, **která** vrstva ji chytí. Vrstva, která ji
+nechytí, je slepá, i když je zelená; a harness, který po sobě neuklidí a
+neověří sha256, tiše rozbije strom.
+
+---
+
 # 2026-10-11 (osmá část) — SESSION „KAMENNÁ CESTA“: ARTEFAKT A MANIFEST SE ROZEŠLY, BRÁNA PADALA NA SPRÁVNÉ ZMĚNĚ
 
 > **Zadání:** „načti aktuální PBR sety z `E:\Workspaces\assets\3d_sample` a zaveď
