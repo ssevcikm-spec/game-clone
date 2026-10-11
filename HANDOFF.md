@@ -68,7 +68,7 @@ cihlová podlaha.
 |---|---|---|
 | **Cesta je souvislá (v záběru)** | `1001:654 1002:640 1003:635 1004:643` dlaždic = **2 572**, **všechny čtyři z `assets/stone-path/`**; `own 9`, `variants {groups 1, members 4}` | `own_art_probe.gd --snimek=… --pole=1500,1630`; `.cache/render/stone-path-po.png` |
 | **Předtím to byly 2 id ze 4** | `1002:569` + `1003:613` z vlastní vrstvy, zbytek UO → diagonální vzor | `_analyza/p53-nabor/p53-hra-ab.png` (A/B z 21:42) |
-| **Změna obrazu (měřená, ne od oka)** | PŘED (terakota) → PO: **47,9 % pixelů**; UO → PO: **52,0 %** (prah 12/765) | `_analyza/p53-nabor/s33-ab.py` → `s33-cesta-abc.png` (tři panely na TÉMŽ místě) |
+| **Změna obrazu (měřená, ne od oka)** | PŘED (terakota) → PO: **50,5 % pixelů**; UO → PO: **51,6 %** (prah 12/765); na snímku bez `groups` (před zapnutím variant) to bylo 47,9 / 52,0 | `_analyza/p53-nabor/s33-ab.py` → `s33-cesta-abc.png` (tři panely na TÉMŽ místě) |
 | **Reprodukovatelnost zapeku** | `--kontrola` → atlas **SHODNÝ** (`894e3fff9ae980d4`); ruční přezápis taky dal **stejný sha256** | `python tools/artgen/pbr_dlazdice.py --kontrola assets/stone-path --sada Stone_Path_007` |
 | **Testy** | **2 766 kontrol / 0 selhání** | `godot --headless --path . --script res://tests/run_tests.gd` |
 | **Brány** | **16 měřeno / 0 čeká / 0 chyb** (G13 poradní) | `python tools/gates/run-all.py` |
