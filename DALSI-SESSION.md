@@ -140,6 +140,15 @@ stabilní ID, pořadí načítání, verzované ukládání, sandbox skriptů.
 
 ## F) Úklid: mrtvé kotvy v mutačním harnessu (malá, ale měřitelná)
 
+> **✅ HOTOVO 2026-10-11** (session „F“): našly se **4 mrtvé kotvy** (čekaly se
+> tři) + **1 mutace, která se vůbec nezkompilovala a byla počítaná jako
+> CHYCENÁ**. Nic se nerušilo — všech **329 vzorů** zůstalo a kotvy se přepsaly
+> na dnešní kód. Harness má nově **`--kotvy`** (statický sken kotev za sekundy,
+> bez Godotu) a místo falešného „CHYCENA“ hlásí `NEPLATNA - MUTANT SE NEMERIL`.
+> Celý běh: **`329 z 329 mutaci chyceno; smlouva vstupu: OK`**, exit 0,
+> **96,5 min**. Detaily: `HANDOFF.md` (blok nahoře) a `LESSONS.md` 2026-10-11
+> (**šestá část**). **Zadání níž zůstává jako záznam**, needituje se.
+
 **Co se stalo 2026-10-10:** při práci se našly **tři mrtvé kotvy** v
 `tools/gates/mutace-tests.py` — vzory, které se ve zdroji už nenajdou, takže se
 mutace **tiše neprovede** a harness ji počítá jako nechycenu (nebo ji přeskočí

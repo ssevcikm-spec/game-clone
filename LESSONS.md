@@ -24,6 +24,97 @@ Typy: `chyba` (moje vada) · `past-nástroje` (prostředí/nástroj, ne logika) 
 
 ---
 
+# 2026-10-11 (šestá část) — SESSION F: MRTVÉ KOTVY V MUTAČNÍM HARNESSU
+
+> **Zadání:** `DALSI-SESSION.md` §F — najít vzory, které se ve zdroji už
+> nenašly (`PATRANA VETA SE VE ZDROJI NENASLA`); taková mutace se tiše
+> neprovede a harness ji počítá jako nechycenu. Našly se **čtyři** (čekaly se
+> tři) a k tomu **jedna mutace, která se vůbec nezkompilovala, a přesto byla
+> počítána jako CHYCENÁ**. Žádný vzor se nerušil — všechny se přepsaly na
+> dnešní kód.
+
+### 2026-10-11 — Mrtvé kotvy se dají najít za sekundy, ale platí se za ně celý běh (nástroj)
+**Co se stalo:** harness hlásí `PATRANA VETA SE VE ZDROJI NENASLA` až uprostřed
+běhu, který trvá **96,5 min** (naměřeno 2026-10-11: 19:35:52 → 21:12:24);
+podmínka je přitom čistě statická (`stare not in zdroj`).
+Do harnessu proto přibyl přepínač `--kotvy` (bez Godotu) a před baseline se
+stejný seznam hlásí jako `POZOR: N mrtvých kotev`. Naměřeno před opravou:
+**4 mrtvé z 329 vzorů ve 40 modulech**.
+**Doklad:** `python tools/gates/mutace-tests.py --kotvy` → před opravou 4 mrtvé,
+po opravě `329 vzoru, 0 mrtvych` (exit 0); první měření dělal
+`_analyza/p36-mrtve-kotvy.py`.
+**Ponaučení:** Bránu, která trvá hodiny, rozděl na to, co jde zjistit ze
+souborů, a na to, co potřebuje běh — statická část patří PŘED drahou. A novou
+metriku nech spadnout na vymyšlené vadě: „0 mrtvých“ vypadá stejně jako
+„neměřím“. Proto `_analyza/p36-kotvy-selftest.py` (3/3) vymyšlenou kotvu najde
+a u zdravé mlčí.
+
+### 2026-10-11 — Čtyři kotvy zabil refaktor; každou jiným přejmenováním (past-nástroje)
+**Co se stalo:** všechny čtyři mrtvé vzory zabilo POUHÉ přejmenování nebo
+přesun (žádná změna chování): `sort` hledal `klice[i] = (sort_key(obj) << shift) | i`
+a dnes je to `return (sort_key(obj) << shift) | i` v `klic_objektu()`;
+`chunk_renderer` hledal `zrohy`/`sirka` a dnes má `_st_zrohy`/`_st_sirka`;
+`input` hledal `center_for(...), mouse_position)` a dnes to drží proměnná
+`stred_hrace`; `input` hledal v `mouse_run` výpočet `view_size / 2.0` a dnes
+tam je proměnná `cil`.
+**Doklad:** `--kotvy` před opravou vypsal právě ty čtyři; cílený běh
+`python tools/gates/mutace-tests.py --only sort,chunk_renderer,input` dal
+**37 z 37 chyceno** (u `input` po opravě kotvy **12 z 12**), každá
+s `PROVEDENA ano`.
+**Ponaučení:** Kotva na doslovný text umírá při každém refaktoru — a umírá
+TICHE (vypadá to jako nechycená mutace, ne jako vadný vzor). Po každé změně
+mutovaného souboru pusť `--kotvy` (vteřiny).
+
+### 2026-10-11 — Mutace, která se ani nezkompilovala, byla počítána jako CHYCENÁ (chyba)
+**Co se stalo:** vzor „kurzor na hraci se posle jako krok“ měl kotvu začínající
+UPROSTŘED řádku a nahrazoval ji prázdnem. Smazáním „celého bloku“ zůstalo
+osiřelé odsazení, to se slilo s odsazením následujícího řádku (**6 tabulátorů**)
+a mutant měl `Parse Error`. Godot ho vůbec nenačetl, case ohlásil
+„app.input NENI HOTOVA: app/input_map.gd chybi“ — a protože ta hláška
+neobsahuje cestu mutanta, ochrana `nenacetl` (hledala cestu v FAIL řádku) byla
+mrtvá. Harness tedy hlásil `CHYCENA` u mutace, jejíž kód se nikdy nespustil.
+**Doklad:** `_analyza/p36-repro-nenacteny-mutant.py` — Godot sám řekl
+`SCRIPT ERROR: Parse Error: Expected statement, found "Indent" instead.`
+a `ERROR: Failed to load script "res://.cache/…/mutante-input.gd"` (exit 1,
+2681 kontrol místo 2751). Sabotáž opravy `_analyza/p36-sabotaz-guard.py`
+(vrací vadnou kotvu do KOPIE harnessu) dala `NEPLATNA - MUTANT SE NEMERIL`
+a souhrn `11 z 12 … NECHYCENE`, exit 1 — před opravou by hlásila `12 z 12`.
+**Ponaučení:** „CHYCENA“ musí znamenat „mutovaný kód se spustil a kontrola na
+něm spadla“ — ne „sada skončila nenulově“. Ochrana, která stav poznává podle
+ZNĚNÍ hlášky, je ruční seznam; parser to řekne sám (`Failed to load script
+<soubor>`), takže se to má hledat v CELÉM výstupu Godotu. A když vzor maže celý
+řádek, patří do kotvy i jeho odsazení — lepší je měnit PODMÍNKU (`if false:`)
+a tělo nechat: mutant se pak i čte a nezalomí se odsazení.
+
+### 2026-10-11 — `--check-only` prověří všechny mutanty za dvě minuty (nástroj)
+**Co se stalo:** `godot --headless --check-only --script <mutant>` je hotový
+parser Godotu a trvá **~0,4 s** (kdežto běh testovací sady ~20 s). Projetím
+všech `.gd` mutantů se celá třída „mutant se nenacte“ vyloučí PŘED drahým
+během: naměřeno **327 zkontrolováno, 1 nekompilovatelný** (ten z předchozího
+záznamu), **po opravě kotvy 0**; 1 modul přeskočen (`data/recipes.json` —
+mutuje data, ne skript).
+**Doklad:** `_analyza/p36-parsujici-mutanty.py` → před opravou `zkouseno 327,
+preskoceno modulu 1, nekompilovatelnych 1` (exit 1), po opravě
+`… nekompilovatelnych 0` (exit 0) — nástroj tedy umí i projít.
+**Ponaučení:** Statické kontroly patří na začátek — platí to pro kotvy
+(`--kotvy`) i pro kompilovatelnost mutantů (`--check-only`). Obě odpovědi jsou
+na disku za minuty, ale bez nich se na ně platí celý běh.
+
+### 2026-10-11 — Stejný mechanismus má i brána F1; dnes bez mrtvé kotvy (postup)
+**Co se stalo:** `tools/gates/check-world-clock.py --mutace` má vlastní seznam
+kotev se stejnou hláškou, ale PŘÍSNĚJŠÍ vyhodnocení: `CHYCENA` tam vyžaduje,
+aby spadla KONTROLA, kvůli které vzor existuje (ne jen aby sada skončila
+nenulově). Staticky naměřeno: **5 kotev, 0 mrtvých** — takže se o ní nedá
+napsat „je v pořádku“ z dojmu, ale z měření.
+**Doklad:** `_analyza/p36-f1-kotvy.py` → `[f1-kotvy] mutaci 5, mrtvych 0`,
+exit 0.
+**Ponaučení:** Když se čistí jedna brána, projdi STEJNÝM vzorem i její
+sourozence — jinak se opraví jeden a druhý zůstane tichý. A všímavost k typu
+vady: F1 měří „chytila to správná kontrola“, kdežto `mutace-tests.py` připouští
+jakýkoli FAIL daného modulu.
+
+---
+
 # 2026-10-11 (pátá část) — SESSION E: MODDING, KROK S1 (vrstvy obsahu)
 
 > **Zadání:** `DALSI-SESSION.md` §E. Návrh (co je potřeba a v jakém pořadí) je

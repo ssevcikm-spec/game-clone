@@ -1,3 +1,104 @@
+# Předání — game-clone (2026-10-11, SESSION F: MRTVÉ KOTVY V MUTAČNÍM HARNESSU — 4 kotvy + 1 falešně chycená mutace)
+
+> **Co je tenhle soubor:** **stav projektu** pro další session agenta. Přepisuje
+> se celý; historie je v `git log`. Nový blok je vždy **nahoře**; starší bloky se
+> needitují (jen doplňují). **Současný stav se bere z tohoto bloku.**
+>
+> **Odkud brát detaily téhle práce:**
+> `DALSI-SESSION.md` §F (zadání), `LESSONS.md` 2026-10-11 (**šestá část** —
+> 5 ponaučení s naměřenými doklady), `tools/gates/mutace-tests.py` (nový
+> přepínač `--kotvy` + verdikt `NEPLATNA - MUTANT SE NEMERIL`) a sondy
+> `_analyza/p36-*.py` (jsou v `.gitignore`, čísla z nich jsou níž **s postupem**).
+
+## ✅ CO SE UDĚLALO (a proč právě to)
+
+**Zadání (§F): „spusť `python tools/gates/mutace-tests.py` (celý) a najdi
+všechny vzory, které hlásí `PATRANA VETA SE VE ZDROJI NENASLA`.“**
+
+Mrtvá kotva je **statická** podmínka (`stare not in zdroj`) — ale odpověď se
+dozvíš až po ~96 minutách běhu. Proto se **napřed změřilo, co je na disku**:
+do harnessu přibyl přepínač `--kotvy` (bez Godotu, sekundy) a před baseline se
+mrtvé kotvy hlásí jako `POZOR: N mrtvých kotev`. Našly se **4 mrtvé kotvy**
+(čekaly se tři) a k tomu **jedna mutace, která se vůbec nezkompilovala, a přesto
+byla počítána jako CHYCENÁ** — obojí je stejná třída vady: „mutace, která se
+tiše neprovede, tvrdí totéž co mutace, která projde“.
+
+| Věc | Soubor | Naměřeno |
+|---|---|---|
+| **4 mrtvé kotvy přepsané na dnešní kód** | `tools/gates/mutace-tests.py` | `sort` (`klice[i]=` → `klic_objektu()`), `chunk_renderer` (`zrohy`→`_st_zrohy`), `input` (`center_for(...)` → proměnná `stred_hrace`), `input` (`view_size/2.0` → proměnná `cil`) |
+| **Nic se nerušilo** | tamtéž | všech 329 vzorů zůstalo; každý opravený má `PROVEDENA ano` + `CHYCENA` |
+| **Statický predsken kotev** | tamtéž (`--kotvy`) | `329 vzoru, 0 mrtvych`, exit 0; umí spadnout (`_analyza/p36-kotvy-selftest.py` 3/3 — vymyšlenou kotvu najde, u zdravé mlčí) |
+| **Falešné „CHYCENA“ opraveno** | tamtéž | vzor „kurzor na hraci…“ mazal blok kotvou začínající **uprostřed řádku** → osiřelý tabulátor (6 tabulátorů) → **Parse Error** → case hlásil „NENI HOTOVA“ a harness to počítal jako chycené. Kotva dnes vypíná **podmínku** (`if false:`), ne maže blok |
+| **Ochrana `nenacetl` rozšířena** | tamtéž | hledá se v **celém výstupu Godotu** (`Failed to load script <mutant>`, `Parse Error`), ne jen ve FAIL řádcích — jinak stačilo, aby case svou hlášku nesložila z cesty mutanta; neplatný mutant se hlásí `NEPLATNA - MUTANT SE NEMERIL` a shodí běh |
+| **`--only` bez ručního seznamu** | tamtéž | výčet modulů v nápovědě byl zastaralý — naměřeno `_analyza/p36-stara-napoveda.py`: **28 z 40**, chybělo **12**; dnes odkazuje na `MODULY` |
+| **Statický preflight všech mutantů** | `_analyza/p36-parsujici-mutanty.py` (v `.gitignore`) | `godot --check-only` je 0,4 s/mutant: **327 zkontrolováno, 1 nekompilovatelný** (před opravou kotvy), **0** (po opravě) |
+
+## 📊 NAMĚŘENO (2026-10-11, tato session)
+
+| Co | Hodnota | Doklad (příkaz / soubor) |
+|---|---|---|
+| **Celý mutační harness** | **`329 z 329 mutaci chyceno; smlouva vstupu: OK`**, exit **0**, **96,5 min** | log `.tmp/p36-mutace-cely.log` (1030 řádků, 92 656 B; běh 19:35:52 → 21:12:24) — v `.gitignore` |
+| `PATRANA VETA` v celém běhu | **0** (statický sken před opravou: **4 mrtvé**) | `Select-String` nad týmž logem; `--kotvy` |
+| `NEPLATNA` / `PROSLA - TEST JE SLEPY` / `PROVEDENA NE` / `PROBEHLALA NE` | **0 / 0 / 0 / 0** | tamtéž |
+| Smlouva vstupu | **40 z 40** modulů „test selhal (spravne)“ | tamtéž (41. výskyt je souhrn) |
+| Baseline testů | **2751 kontrol / 0 selhání** | `godot --headless --path . --script res://tests/run_tests.gd` |
+| Brány projektu (celé) | **15 měřeno / 0 čeká / 0 chyb** (G13 poradní), 1,3 min | `python tools/gates/run-all.py` (log `.tmp/p36-run-all.log`) |
+| Kontrola dokumentů | interní odkazy OK (204 odkazů), zadávací balíček OK | `tools/check-docs-refs.py`, `tools/check-zadani.py` |
+| Cílený běh (3 dotčené moduly) | **37 z 37 chyceno**; `input` po opravě kotvy **12 z 12** | `python tools/gates/mutace-tests.py --only sort,chunk_renderer,input` |
+| Falešně chycená mutace (doklad) | Godot: `Parse Error: Expected statement, found "Indent" instead.` + `Failed to load script …, 2681 kontrol` místo 2751 | `_analyza/p36-repro-nenacteny-mutant.py` |
+| Sabotáž opravené ochrany | `NEPLATNA - MUTANT SE NEMERIL`, souhrn `11 z 12 … NECHYCENE`, **exit 1** (před opravou hlásila `12 z 12`) | `_analyza/p36-sabotaz-guard.py` |
+| Kotvy brány F1 (`check-world-clock.py --mutace`) | **5 kotev, 0 mrtvých** | `_analyza/p36-f1-kotvy.py` |
+| `--kotvy` (statický sken) | **329 vzorů / 40 modulů / 0 mrtvých** | `python tools/gates/mutace-tests.py --kotvy` |
+
+## ⚠ CO ZŮSTÁVÁ OTEVŘENÉ (pojmenované, ne zamlčené)
+
+1. **`mutace-tests.py` připouští jako CHYCENOU jakýkoli FAIL daného modulu** —
+   na rozdíl od brány F1, která vyžaduje, aby spadla **konkrétní kontrola**
+   (`check-world-clock.py`: `sve = [e for e in gate.errors if e.startswith(kontrola)]`).
+   Vzory jsou proto psané tak, aby chytila ta správná kontrola, ale **strojově to
+   vynucené není**. Zpřísnění je změna kontraktu (může odhalit dnešní zelené).
+2. **`--kotvy` není v CI** — umí odpovědět za sekundy, ale nikdo ho nespouští
+   automaticky; kotva dál umírá tiše při refaktoru. Totéž platí pro
+   `--check-only` preflight (`_analyza/p36-parsujici-mutanty.py` je mimo git).
+3. **`--kotvy` nedokazuje `PROVEDENA`/`CHYCENA`** — je to předsken. Náhrada
+   běhu to není (drží to i komentář v hlavičce nástroje).
+4. **Ostatní čtyři mutační nástroje** (`mutace-skills.py`, `mutace-render-hue.py`,
+   `mutace-render-anim.py`, `mutace-anim.py`) hledání mrtvých kotev nemají;
+   brána F1 ho má a **dnes je bez mrtvé kotvy** (měřeno staticky, bod níž).
+   Kdo do nich bude sahat, ať změřit nezapomene.
+5. **Sondy `p36-*` jsou v `.gitignore`** (`_analyza/`) — čísla z nich jsou výše
+   **s postupem**, aby šla přeměřit i bez nich (stejná konvence jako u `p59`–`p65`).
+6. **Otevřené body z bloku SESSION E (8 bodů) a z bloků níž tento blok
+   NEUZAVÍRÁ** — platí dál (9 modulových konstant, manifest v save, mod umí jen
+   přebít soubor, `sim.content` nespouští skript, chybějící `data/regions.json`,
+   lidská zkouška hry…).
+
+## 🧍 CO ČEKÁ NA TEBE (rozhodnutí, která agent nemá dělat za tebe)
+
+**Nic z téhle práce neblokuje další běh** — šlo o úklid nástroje: nic se
+nemazalo, chování hry se nezměnilo, počet bran se nezměnil. Dvě věci jsou ale
+na rozhodnutí (obojí mění **trvalá pravidla**, proto je nedělal agent sám):
+
+1. **Má se do `docs/09` §9.6 přidat bod „mutace, která se neprovede nebo se
+   nenačte, není důkaz“?** Dnes to hlídá jen nástroj (`NEPLATNA`). Navržené
+   znění (7. bod oddílu): *„Mutace, která se neprovede nebo se nenačte, není
+   důkaz. Když kotva zmizí (`PATRANA VETA SE VE ZDROJI NENASLA`) nebo mutant
+   neprojde parserem, nesmí to projít jako chycené — vypadá to jako hotovo
+   a je to horší než slepá brána. Obojí se dá zjistit staticky (`--kotvy`,
+   `godot --check-only`), bez drahého běhu.“*
+2. **Má `--kotvy` (a preflight `--check-only`) běžet v CI?** Dnes ručně.
+   Cena: sekundy až minuty; přínos: mrtvá kotva se pozná v PR, ne za 96 minut.
+   Když ano, patří to i do `docs/08` (seznam bran je součást smlouvy).
+
+## 🔗 COMMITY TÉTO SESSION (a ověřený push)
+
+`<DOPLNIT>` — `tools/gates/mutace-tests.py` (4 kotvy + `--kotvy` + ochrana
+`nenacetl`), `LESSONS.md` (šestá část), `HANDOFF.md` (tento blok),
+`DALSI-SESSION.md` (§F označeno jako hotové). **Ověřeno živě:**
+`git rev-list --count origin/main..HEAD` → **0**.
+
+---
+
 # Předání — game-clone (2026-10-11, SESSION E: MODDING — NÁVRH + KROK S1 „VRSTVY OBSAHU")
 
 > **Co je tenhle soubor:** **stav projektu** pro další session agenta. Přepisuje

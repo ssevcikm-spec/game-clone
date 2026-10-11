@@ -26,8 +26,19 @@ jako spravny kod), takze v seznamu NENI - tvrdit u ni "CHYCENA" by bylo
 tvrzeni o nemerenem. Kdo ji tam prida, dostane PROSLA a vi, ze je to slepe
 misto, ne vada testu.
 
+⚠ ROZSIRENO 2026-10-11 (sekce F, mrtve kotvy): CHYCENA neni ani mutant, ktery
+se VUBEC NENACTL (parse error). U kazdeho vzoru se proto hleda i v CELEM
+vystupu Godotu ("Failed to load script <mutant>", "Parse Error") - jinak staci,
+aby case svou hlasku neslozila z cesty mutanta, a neplatna mutace se pocita
+jako chycena. U takoveho vzoru se hlasi "NEPLATNA - MUTANT SE NEMERIL"
+a beh kvuli nemu konci nenulove.
+
   python tools/gates/mutace-tests.py            # vsechny moduly
   python tools/gates/mutace-tests.py --only sort
+  python tools/gates/mutace-tests.py --kotvy    # jen staticky sken kotev
+                                                # (sekundy, bez Godotu; nedokazuje
+                                                #  PROVEDENA/CHYCENA - to umi jen
+                                                #  cely beh)
 """
 
 from __future__ import annotations
@@ -99,9 +110,17 @@ MODULY = {
             ("diagonala x-y",
              'int(obj.get("x", 0)) + int(obj.get("y", 0))',
              'int(obj.get("x", 0)) - int(obj.get("y", 0))'),
+            # ⚠ PREDELANO 2026-10-11 (sekce F, mrtva kotva): 2026-10-09 se
+            # pocitani klicu presunulo z `klice()` do `klic_objektu()`, takze
+            # `klice[i] = (sort_key(obj) << shift) | i` v souboru UZ NENI a
+            # mutace se tise neprovadela ("PATRANA VETA SE VE ZDROJI NENASLA").
+            # Novy vzor miri na TOTEZ: klic objektu NESMI obsahovat poradi
+            # vstupu. V dnesnim kode to neni jen stabilita - `serad()` si z
+            # klice pres `& mask` bere INDEX objektu, takze bez `| i` vrati
+            # kazdy prvek objekt 0 (a case to vidi jako rozhozene poradi).
             ("nestabilni razeni (poradi vstupu se do klice neda)",
-             "klice[i] = (sort_key(obj) << shift) | i",
-             "klice[i] = sort_key(obj) << shift"),
+             "return (sort_key(obj) << shift) | i",
+             "return sort_key(obj) << shift"),
             ("spatny radix vrstev (LAYERS 3 -> 2)",
              "const LAYERS: int = 3", "const LAYERS: int = 2"),
             # ⚠ 18. session: dve veci, na kterych stoji vady ze snimku
@@ -622,10 +641,17 @@ MODULY = {
             ("texmap se do seznamu nedava",
              '"texmap": _tiledata.texture(land) if _tiledata != null else 0,',
              '"texmap": 0,'),
+            # ⚠ PREDELANO 2026-10-11 (sekce F, mrtva kotva): pri stavbe seznamu
+            # PO CASTECH se lokalni promenne prejmenovaly (`zrohy` ->
+            # `_st_zrohy`, `sirka` -> `_st_sirka`), takze stara kotva v souboru
+            # UZ NENI. Novy vzor miri na TOTEZ: `z_corners` jsou vysky ROHU
+            # z mrizky rohu (vlastni, vychodni, jizni, jihovychodni), ne vlastni
+            # vyska dlazdice - s `z` na vsech ctyrech se svah kresli jako rovna
+            # plocha. Kryje to `tests/cases/chunk_renderer.gd` (sekce 3b).
             ("z_corners berou vlastni vysku misto sousedu",
-             '"z_corners": [z, zrohy[radek + 1], zrohy[radek + sirka],\n'
-             "\t\t\t\t\tzrohy[radek + sirka + 1]]}",
-             '"z_corners": [z, z, z, z]}'),
+             '"z_corners": [z, _st_zrohy[radek + 1], _st_zrohy[radek + _st_sirka],\n'
+             "\t\t\t\t_st_zrohy[radek + _st_sirka + 1]]})",
+             '"z_corners": [z, z, z, z]})'),
             # PRIORITY_Z (vada V6, `REVIZE-POHYB-2026-10-07.md` §2.6): plocha
             # mostu (podlaha) musi jit PRED jeho zabradlim. Kdyz se podlaha
             # neodečte nebo vyska nepricte, na molu u Britannie vyjde poradi
@@ -674,17 +700,29 @@ MODULY = {
             ("drzeni se neopakuje (pta se jen na just_pressed)",
              "var stisknuto: bool = Input.is_action_pressed(input_action)",
              "var stisknuto: bool = Input.is_action_just_pressed(input_action)"),
+            # ⚠ PREDELANO 2026-10-11 (sekce F, mrtva kotva): `poll()` si stred
+            # nejdriv ulozi do `stred_hrace` a teprve pak ho preda - text
+            # `center_for(...), mouse_position)` tedy v souboru UZ NENI. Novy
+            # vzor miri na TOTEZ misto: stred pro SMER je pozice hrace na
+            # obrazovce, ne stred okna (s cernym pasem GUI je to rozdil 171 px,
+            # vada V14). Kryje to `tests/cases/input.gd` (9d - `poll`).
             ("stred pro smer je stred okna, ne hrac na obrazovce",
-             "center_for(player, camera_offset, z), mouse_position)",
-             "view_size / 2.0, mouse_position)"),
+             "var stred_hrace: Vector2 = center_for(player, camera_offset, z)",
+             "var stred_hrace: Vector2 = view_size / 2.0"),
             ("krok se vyda pri kazdem pollu (prodleva se ignoruje)",
              "if now_ms - minule < prodleva:",
              "if false:"),
             ("pusteni nevynuluje prodlevu (prvni krok po pusteni se ztrati)",
              "\t\t\t_krok_ms.erase(action)\n",
              ""),
+            # ⚠ PREDELANO 2026-10-11 (sekce F, mrtva kotva): mereny bod uz neni
+            # `view_size / 2.0` primo, ale promenna `cil` (zaloha na stred okna
+            # se presunula do `if not cil.is_finite()`). Vzor miri na TOTEZ:
+            # `run` pro drzene prave tlacitko se rozhoduje podle vzdalenosti
+            # kurzoru od stredu (ClassicUO prah 190 px). Kryje to
+            # `tests/cases/input.gd` (8) a `zoom_prevod.gd`.
             ("drzene prave tlacitko ignoruje vzdalenost kurzoru",
-             "return (mouse_position - view_size / 2.0).length() >= MOUSE_RUN_PX",
+             "return (mouse_position - cil).length() >= MOUSE_RUN_PX",
              "return always_run"),
             ("hranice behu je ostre vetsi (na 190 px se jde krokem)",
              ".length() >= MOUSE_RUN_PX",
@@ -703,9 +741,21 @@ MODULY = {
             # player, camera_offset, z), mouse_position)`) byl MRTVY: V14 zavedla
             # `center_for(...)`, ktery presnou pozici hrace dostava od klienta.
             # Vzor na TOTEZ v novem kode je u modulu vyse.
+            #
+            # ⚠ PREDELANO 2026-10-11 (sekce F): kotva ZACINALA uprostred radku
+            # (`if smer < 0:`, ne `\t\t\tif smer < 0:`). Smazanim "celeho bloku"
+            # se proto smazala jen slova a ZBYLO jeho uvodni odsazeni - to se
+            # slilo s odsazenim dalsiho radku (6 tabulatoru) a mutant se NEDAL
+            # ZKOMPILOVAT. Godot ho nenacetl, case zahlasi "app.input NENI
+            # HOTOVA" a harness to pocital jako CHYCENO, i kdyz se mutovany kod
+            # nikdy nespustil (doklad: `_analyza/p36-repro-nenacteny-mutant.py`,
+            # vystup "Parse Error ... found Indent instead"). Dnes se misto
+            # mazani bloku vypina PODMINKA (`if false:`) - telo zustava, mutant
+            # se kompiluje a test opravdu meri ("kurzor na hraci nespali
+            # prodlevu").
             ("kurzor na hraci se posle jako krok (a spali prodlevu)",
-             "if smer < 0:\n\t\t\t\tcontinue\n",
-             ""),
+             "if smer < 0:\n\t\t\t\tcontinue",
+             "if false:\n\t\t\t\tcontinue"),
             # --- 19. session, zadani 19 -------------------------------------------------
             # V14: klient posila PRESNOU pozici hrace (`player_screen`); kdyz se
             # ignoruje, pocita se stred z `z = 0`, ktery je o 40 px jinde
@@ -1543,6 +1593,25 @@ def fail_radky(vystup: str, prefix: str) -> list[str]:
             if line.strip().startswith("[test] FAIL") and prefix in line]
 
 
+def mrtve_kotvy(zdroje: dict[str, str]) -> list[tuple[str, str, str]]:
+    """Vzory, jejichz text ve ZDROJI NENI = mrtve kotvy.
+
+    PROVEDENA se u nich nema jak stat (mutace se tise neprovede), takze je
+    harness pocita jako nechycene - a vypisuje to pozdeji jako
+    "PATRANA VETA SE VE ZDROJI NENASLA". Podminka je CISTE STATICKA (viz
+    smycka v `main`), proto se da zjistit za sekundy. NENAHRAZUJE beh: jen
+    beh dokaze PROVEDENA + CHYCENA (zmena na DISKU a selhani KONTROLY).
+    """
+    out: list[tuple[str, str, str]] = []
+    for klic, modul in MODULY.items():
+        if klic not in zdroje:
+            continue
+        for nazev, stare, _nove in modul["mutace"]:
+            if stare not in zdroje[klic]:
+                out.append((klic, nazev, modul["soubor"].name))
+    return out
+
+
 def _bez_class_name(text: str) -> str:
     """Mutant NESMI mit `class_name` - jinak se vubec nenacte.
 
@@ -1561,20 +1630,36 @@ def _bez_class_name(text: str) -> str:
 def main() -> int:
     ap = argparse.ArgumentParser(description="Mutacni dukaz testu")
     ap.add_argument("--only", default=None,
-                    help="sort, map, walk, doors, movement, registry, pathfind, textures, "
-                         "item, container, interaction, skill_gain, hud, status_bar, "
-                         "chunk_renderer, world_view, input, player_controller, chunk_mesh, "
-                         "config, metrics, harvest, craft, journal, policy, executor, "
-                         "decision_log, policy_hook (nebo vic carkami)")
+                    help="klice modulu z MODULY (viz vyse), vic carkami, napr. sort,input. "
+                         "Vyjmenovavat je tady se nevyplaci: rucni seznam zestarne "
+                         "a tvari se, ze modul neexistuje.")
+    ap.add_argument("--kotvy", action="store_true",
+                    help="JEN staticky sken mrtvych kotev (bez Godotu, sekundy). "
+                         "Nedokazuje PROVEDENA/CHYCENA - to umi jen cely beh.")
     args = ap.parse_args()
-    if godot_bin() is None:
-        print("CHYBA: Godot nenalezen (nastav $GODOT) - mutace by nic nemerily")
-        return 2
     klice = list(MODULY) if not args.only else [k.strip() for k in args.only.split(",")]
 
     puvodni = {k: MODULY[k]["soubor"].read_text(encoding="utf-8") for k in MODULY}
-    hash_pred = {k: sha(v) for k, v in puvodni.items()
-}
+    mrtve = mrtve_kotvy(puvodni)
+    if args.kotvy:
+        for klic, nazev, _soubor in mrtve:
+            print(f"[mutace] {klic}: {nazev}: PATRANA VETA SE VE ZDROJI NENASLA")
+        vzoru = sum(len(m["mutace"]) for m in MODULY.values())
+        print(f"[mutace] kotvy: {vzoru} vzoru, {len(mrtve)} mrtvych")
+        return 1 if mrtve else 0
+    if mrtve:
+        # ⚠ Staticky predsken (2026-10-11, sekce F): odpoved je na disku za
+        # sekundu, ale pozna se az po desitkach minut behu. Hlasi se VPREDU -
+        # a NESMI se kvuli tomu koncit: PROSLA mutace (slepy test) je taky
+        # nalez a ten se dozvi jen cely beh.
+        print(f"[mutace] POZOR: {len(mrtve)} mrtvych kotev - mutace se vubec "
+              "neprovedou a NEJSOU to zelene (cely beh je kvuli nim neuplny):")
+        for klic, nazev, _soubor in mrtve:
+            print(f"[mutace]   MRTVY VZOR {klic}: {nazev}")
+    if godot_bin() is None:
+        print("CHYBA: Godot nenalezen (nastav $GODOT) - mutace by nic nemerily")
+        return 2
+    hash_pred = {k: sha(v) for k, v in puvodni.items()}
 
     # 0) baseline: bez mutace musi sada projit a NECO zmerit
     rc, vystup, checks, failures = spust(None)
@@ -1632,9 +1717,19 @@ def main() -> int:
             # takze to harness do teto chvile pocital jako CHYCENO, i kdyz se
             # mutovany kod vubec nespustil (`world_loop`). Dnes se to pozna:
             # mutant je na DISKU, ale FAIL rika, ze soubor chybi / nejde nacist.
+            # ⚠ ROZSIRENO 2026-10-11 (sekce F): stacilo, aby case svou hlasku
+            # NESLOZILA z cesty mutanta (`app.input` hlasi "input_map.gd chybi"
+            # napevno), a ochrana byla MRTA - i kdyz Godot o radek vys vypsal
+            # `ERROR: Failed to load script "res://.../mutante-input.gd"`.
+            # NamEReno: kotva zacinajici UPROSTRED radku nechala po smazani
+            # osirely tabulator, mutant mel 6 tabulatoru a neparsoval se; case
+            # to hlasil jako "NENI HOTOVA" a harness jako CHYCENO (doklad:
+            # `_analyza/p36-repro-nenacteny-mutant.py`). Hleda se proto v CELEM
+            # vystupu Godotu, ne jen ve FAIL radcich.
             nenacetl = any(uri(cesta) in radek and (
                 "chybi" in radek or "nejde nacist" in radek or "nelze nacist" in radek
-                or "NENI HOTOVA" in radek) for radek in radky)
+                or "NENI HOTOVA" in radek or "Failed to load script" in radek
+                or "Parse Error" in radek) for radek in vystup.splitlines())
             chycena = (rc != 0 and probehla and bool(radky) and not nenacetl)
             if not probehla:
                 poznamka = "SADA VUBEC NEPROBEHLA (0 kontrol)"
@@ -1645,12 +1740,18 @@ def main() -> int:
                 poznamka = radky[0][:110]
             else:
                 poznamka = "sada selhala, ale bez FAIL tohoto modulu"
+            if nenacetl or not probehla:
+                verdikt = "NEPLATNA - MUTANT SE NEMERIL"
+            elif chycena:
+                verdikt = "CHYCENA"
+            else:
+                verdikt = "PROSLA - TEST JE SLEPY"
             vysledek.append((klic, nazev, provedena, probehla, chycena, checks, poznamka))
             print(f"[mutace] {klic}: {nazev}\n"
                   f"          PROVEDENA {'ano' if provedena else 'NE'} ({sha(mutant)}) | "
                   f"PROBEHLALA {'ano' if probehla else 'NE'} ({checks} kontrol, "
                   f"{failures} selhani, exit {rc}) | "
-                  f"{'CHYCENA' if chycena else 'PROSLA - TEST JE SLEPY'}\n"
+                  f"{verdikt}\n"
                   f"          {poznamka}")
 
     for soubor in MUTANT_DIR.glob("mutante-*.gd"):
@@ -1667,7 +1768,7 @@ def main() -> int:
     chycene = sum(1 for _, _, p, pr, c, _, _ in vysledek if p and pr and c)
     slepe = [f"{k}/{n}" for k, n, p, pr, c, _, _ in vysledek if not (p and pr and c)]
     print(f"\n[mutace] {chycene} z {len(vysledek)} mutaci chyceno"
-          + (f"; NECHYCENE: {', '.join(slepe)}" if slepe else "")
+          + (f"; NECHYCENE (slepe nebo neplatne): {', '.join(slepe)}" if slepe else "")
           + f"; smlouva vstupu: {'OK' if smlouva_ok else 'CHYBA'}")
     return 0 if (not slepe and smlouva_ok) else 1
 
