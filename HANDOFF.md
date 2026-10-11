@@ -173,7 +173,13 @@ majiteli těla) jsou v SIMULACI, klient jen předá serial.
 **Naměřeno** (`_analyza/p55-loot-sonda.gd`, cesta přes `Command{t:"loot"}`):
 zabitý kostlivec → tělo 32 → `nearest_lootable = 32` → `batoh 17 → 17 předmětů,
 v těle zbylo 0`, **zlato v batohu 60 → 82**. Testy **2638/0**, brány
-**15 měřeno / 0 chyb**.
+**15 měřeno / 0 chyb**, `smoke.py` 0 script/parse error.
+
+### 8) Commity této session
+
+`d25ca6f` (integrace M5) → `8898c45` (dodělání: smrt, save/load, tělo) →
+`23be578` (loot klávesou `Q`) → `99ee9fc` (snímek). Vše pushnuto
+(`git rev-list --count origin/main..HEAD` → **0**).
 
 
 
