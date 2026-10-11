@@ -14,6 +14,15 @@ Kontroluje se:
      neposuzuje - jeho mekkost je zamer; pozna se podle barvy stinu),
   K3 pocet barev v tele je pod stropem (pixel art ma malou paletu).
 
+⚠ MATERIAL "pbr" (2026-10-11, kamenna cesta v Britainu): sada muze v manifestu
+rict `"material": "pbr"` = "nejsem pixel art z `tools/artgen/styl.py`, jsem
+zapek PBR sad (basecolor+normal+AO)". U takove sady se K1 nevyzaduje (nema co
+tvrdit o stylu) a MISTO toho se MERI K2 na VŠECH spricich, ktere sada dodava -
+i na dlazdicich (ty jinak meri G6). Paleta (K3) se u pbr NEMERI: fotorealna
+textura ma barev mnoho a strop 80 je o pixel artu - merit by ji znamenalo hlasit
+vadu o SPRAVNEM obrazku. Kdyz sada tvrdi "pbr" a pritom se z ni nezmeri ani
+jeden sprite, je to vada (nula neni uspech).
+
 ⚠ CO BRANA ZAMERNE NEMERI: **ostrost hrany**. Zkusila to (hranice 28 mezi
 namerenymi 26,3 pred a 31,5 po stylu) a ukazalo se, ze u rudy hlasi vadu
 o SPRAVNEM obrazku: ruda ma po stylu 19,4 (pred 14,5) a je CITELNEJSI - je to
@@ -184,9 +193,14 @@ def check(root: Path, gate: Gate) -> None:
             continue
         data = load_json(man)
         rep = data.get("report", {})
-        # K1: report musi tvrdit zapnuty styl
+        # MATERIAL "pbr" (viz docstring): sada se nepece z 3D modelu pres
+        # `tools/artgen/styl.py`, ale je zapekem PBR sad. Misto reportu o stylu se
+        # u ni MERI tvrda alfa na vsech spricich, ktere dodava (i na dlazdicich).
+        je_pbr = str(data.get("material", "")) == "pbr"
+        pbr_mereno = 0
+        # K1: report musi tvrdit zapnuty styl (u pbr to nema co tvrdit)
         prah = int(rep.get("styl_tvrda_alfa_prah", 0)) if isinstance(rep, dict) else 0
-        if prah <= 0:
+        if prah <= 0 and not je_pbr:
             gate.error(f"{man.name}: report netvrdi tvrdou alfu (`styl_tvrda_alfa_prah`) "
                        "- styl se bud nezapnul, nebo se nemeri")
         for s in data.get("sprites", []):
@@ -194,7 +208,7 @@ def check(root: Path, gate: Gate) -> None:
             ident = int(s.get("id", -1))
             if (kind, ident) not in vyber:
                 continue          # tenhle kus hra z teto sady nebere
-            if kind not in ("item", "anim"):
+            if kind not in ("item", "anim") and not je_pbr:
                 continue          # dlazdice ma presnou masku kosoctverce (meri G6)
             cesta = man.parent / str(s.get("page", ""))
             if not cesta.exists():
@@ -206,17 +220,23 @@ def check(root: Path, gate: Gate) -> None:
             if m.get("prazdny"):
                 gate.error(f"{man.name}: {kind} {s.get('id')} je prazdny sprite")
                 continue
-            nejvic_barev = max(nejvic_barev, m["barvy"])
-            nejmensi_ostrost = min(nejmensi_ostrost, m["ostrost"])
-            nejvetsi_ostrost = max(nejvetsi_ostrost, m["ostrost"])
+            if je_pbr:
+                pbr_mereno += 1
+            else:
+                nejvic_barev = max(nejvic_barev, m["barvy"])
+                nejmensi_ostrost = min(nejmensi_ostrost, m["ostrost"])
+                nejvetsi_ostrost = max(nejvetsi_ostrost, m["ostrost"])
             if m["polopruh"] > 0:
                 vad += 1
                 gate.error(f"{man.name}: {kind} {s.get('id')} ma {m['polopruh']} "
                            "polopruhlednych pixelu na siluete (pixel art = 0/255)")
-            if m["barvy"] > MAX_BAREV:
+            if not je_pbr and m["barvy"] > MAX_BAREV:
                 vad += 1
                 gate.error(f"{man.name}: {kind} {s.get('id')} ma {m['barvy']} barev "
                            f"(strop {MAX_BAREV}) - to je rozmazany render, ne pixel art")
+        if je_pbr and pbr_mereno == 0:
+            gate.error(f"{man.name}: material 'pbr', ale nezmeril se z nej ani jeden "
+                       "sprite - tvrzeni o tvrde alfe by zustalo jen v manifestu")
     gate.measure("spritu_mereno", spritu)
     gate.measure("spritu_s_vadou", vad)
     gate.measure("nejvic_barev", nejvic_barev)
@@ -244,7 +264,9 @@ def selftest() -> int:
     shutil.rmtree(base, ignore_errors=True)
 
     def fixture(label: str, barvy: int = 8, polopruhle: bool = False,
-                prah_v_reportu: int = 128) -> Path:
+                prah_v_reportu: int = 128, material: str = "",
+                kind: str = "item", report: bool = True,
+                vyber_id: int = 1) -> Path:
         root = base / label
         (root / "assets" / "own-lit" / "atlas").mkdir(parents=True, exist_ok=True)
         img = Image.new("RGBA", (16, 16), (0, 0, 0, 0))
@@ -260,14 +282,17 @@ def selftest() -> int:
             for y in range(2, 14):
                 img.putpixel((1, y), (200, 200, 200, 120))   # mekky lem
         img.save(root / "assets" / "own-lit" / "atlas" / "item_0.png")
-        (root / "assets" / "own-lit" / "manifest.json").write_text(json.dumps({
-            "report": {"styl_tvrda_alfa_prah": prah_v_reportu},
-            "sprites": [{"kind": "item", "id": 1, "page": "atlas/item_0.png",
-                         "x": 0, "y": 0, "w": 16, "h": 16}],
-        }, ensure_ascii=False), encoding="utf-8")
+        man: dict = {"sprites": [{"kind": kind, "id": 1, "page": "atlas/item_0.png",
+                                  "x": 0, "y": 0, "w": 16, "h": 16}]}
+        if report:
+            man["report"] = {"styl_tvrda_alfa_prah": prah_v_reportu}
+        if material != "":
+            man["material"] = material
+        (root / "assets" / "own-lit" / "manifest.json").write_text(
+            json.dumps(man, ensure_ascii=False), encoding="utf-8")
         (root / CONFIG).write_text(json.dumps({"version": 1, "layers": [
             {"name": "x", "manifest": "res://assets/own-lit/manifest.json",
-             "sprites": {"item": [1]}}]}, ensure_ascii=False), encoding="utf-8")
+             "sprites": {kind: [vyber_id]}}]}, ensure_ascii=False), encoding="utf-8")
         return root
 
     cases = [
@@ -275,6 +300,14 @@ def selftest() -> int:
         ("mekka_alfa", fixture("mekka_alfa", polopruhle=True), VADA),
         ("styl_vypnuty", fixture("styl_vypnuty", prah_v_reportu=0), VADA),
         ("bez_konfigurace", fixture("bez_konfigurace"), NEMERENO),
+        # MATERIAL "pbr" (kamenna cesta): misto reportu o stylu se meri TVRDA ALFA
+        # na dlazdicich, ktere sada dodava.
+        ("pbr_tvrda_alfa", fixture("pbr_tvrda_alfa", material="pbr", kind="land",
+                                   report=False), OK),
+        ("pbr_mekka_alfa", fixture("pbr_mekka_alfa", material="pbr", kind="land",
+                                   report=False, polopruhle=True), VADA),
+        ("pbr_nezmereno", fixture("pbr_nezmereno", material="pbr", kind="land",
+                                  report=False, vyber_id=2), VADA),
     ]
     (base / "bez_konfigurace" / CONFIG).unlink()
     return selftest_cli(NAME, check, [(l, e) for l, _, e in cases],

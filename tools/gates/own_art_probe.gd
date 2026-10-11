@@ -22,13 +22,18 @@ const AnimScript = preload("res://render/anim_player.gd")
 const WalkScript = preload("res://sim/world/walk.gd")
 const MapScript = preload("res://sim/world/map.gd")
 
-# Id, ktera MA vlastni art (land 3 a 1001, itemy krumpac/ruda/dyka/ingot).
-# Cisla jsou z `data/items.json` (tile) a z `assets/own-art.json` - nevybirala
-# se od oka. Art id itemu = tile + 0x4000 (viz hlavicka `render/texture_cache.gd`).
-const VLASTNI: Array = [3, 1001, 0x4E85, 0x4F51, 0x59B7, 0x5BEF]
-# Id, ktera vlastni art NEMA - musi zustat z UO (land 1004 = trava u Britainu,
-# item 0x4E75 = batoh, ktery hra na startu opravdu pouziva).
-const CIZI: Array = [1004, 0x4E75]
+# ⚠ VLASTNI ID SE BEROU Z KONFIGURACE, NE Z KONSTANTY (opraveno 2026-10-11).
+# NamEReno: sonda mela id natvrdo (`VLASTNI = [3, 1001, …]`), ale brana je bere
+# z `assets/own-art.json` - takze pridani vrstvy (kamenna cesta 1001-1004) shodilo
+# G15 falsenymi hlasenimi "art 1002 se nenacetl (None)". Konstantni seznam navic
+# prestane byt pravdivy, aniz by si toho kdokoli vsimnul (docs/07 past "mrtva
+# kotva"). Sonda proto cte `cfg["layers"]` a art_id pocita stejnym vzorcem jako
+# `render/texture_cache.gd`.
+# FALLBACK (id, ktera MUSI zustat z UO): kandidati niz jsou id, ktera produkce
+# opravdu pouziva; sonda z nich vybere ta, ktera v konfiguraci NEJSOU. Brana si
+# tyz seznam spocita SAMA z konfigurace - kdyby se obe strany rozesly, je to vada
+# brany, ne ticho.
+const FALLBACK_KANDIDATI: Array = [1004, 100, 116, 5, 1030, 0x4E75]
 
 var _f: int = 0
 var _scena = null
@@ -211,6 +216,26 @@ func _fakta() -> void:
 	print("[probe] cfg_layers=", vrstvy.size())
 	print("[probe] cfg_names=", ",".join(_jmena(vrstvy)))
 
+	# Ktera id MAJI vlastni art: z konfigurace (ne z konstanty) - viz hlavicka.
+	var vlastni: Array = []
+	for v in vrstvy:
+		var sp = v.get("sprites", null)
+		if not (sp is Dictionary):
+			continue
+		for kind in sp.keys():
+			for ident in sp[kind]:
+				var aid: int = _art_id(str(kind), int(ident))
+				if aid >= 0 and not vlastni.has(aid):
+					vlastni.append(aid)
+	vlastni.sort()
+	# Ktera id musi zustat z UO: kandidati minus to, co je ve vlastnich vrstvach.
+	var cizi: Array = []
+	for k in FALLBACK_KANDIDATI:
+		if not vlastni.has(int(k)):
+			cizi.append(int(k))
+	print("[probe] vlastni_ids=", _join_cisel(vlastni))
+	print("[probe] fallback_ids=", _join_cisel(cizi))
+
 	var ma_uo: bool = FileAccess.file_exists(TextureCacheScript.MANIFEST_PATH)
 	print("[probe] uo_manifest=", 1 if ma_uo else 0)
 	if not ma_uo:
@@ -231,7 +256,7 @@ func _fakta() -> void:
 	print("[probe] stats_off_own=", int(off.stats()["own"]))
 	print("[probe] own_ids=", _join_cisel(on.own_ids()))
 
-	for art in VLASTNI + CIZI:
+	for art in vlastni + cizi:
 		_on(on, "on", int(art))
 		_on(off, "off", int(art))
 
@@ -286,6 +311,18 @@ func _jmena(vrstvy: Array) -> Array:
 	for v in vrstvy:
 		out.append(str(v.get("name", "?")))
 	return out
+
+
+func _art_id(kind: String, ident: int) -> int:
+	# STEJNY vzorec jako `render/texture_cache.gd._index` a `check-own-art.py:art_id`.
+	# Kdyby se sem dostal jiný, sonda by se ptala na jiná id, než brana ocekava.
+	if kind == "land":
+		return ident
+	if kind == "item":
+		return ident + 0x4000
+	if kind == "texmap":
+		return ident + 0x10000
+	return -1
 
 
 func _join_cisel(seznam: Array) -> String:

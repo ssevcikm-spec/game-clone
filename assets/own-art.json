@@ -7,7 +7,7 @@
    "manifest": "res://assets/own-lit/manifest.json",
    "anim": "res://assets/own-lit/anim/anim-sheets.json",
    "sprites": {
-    "land": [3, 1001],
+    "land": [3],
     "item": [3717, 6583]
    }
   },
@@ -17,6 +17,19 @@
    "anim": null,
    "sprites": {
     "item": [3921, 7151]
+   }
+  },
+  {
+   "name": "stone-path",
+   "manifest": "res://assets/stone-path/manifest.json",
+   "anim": null,
+   "sprites": {
+    "land": [1001, 1002, 1003, 1004]
+   },
+   "groups": {
+    "land": [
+     [1001, 1002, 1003, 1004]
+    ]
    }
   }
  ]

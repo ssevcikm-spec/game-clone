@@ -52,9 +52,15 @@ UO_MANIFEST = "assets/uo/manifest.json"
 PROBE = "tools/gates/own_art_probe.gd"
 ITEM_OFFSET = 0x4000
 TEXMAP_OFFSET = 0x10000
-# Id bez vlastniho artu, na kterych se meri fallback. Cisla jsou z produkce:
-# 1004 = trava u Britainu (kde hrac stoji), 0x4E75 = batoh ze startovni sady.
-FALLBACK_IDS = (1004, 0x4E75)
+# ⚠ FALLBACK ID SE ODVOZUJI Z KONFIGURACE (opraveno 2026-10-11). NamEReno: brana
+# mela fallback id natvrdo (`FALLBACK_IDS = (1004, 0x4E75)`), ale 1004 je jedno
+# ze CTYR land id, ktera mapa v Britainu pouziva na cestu - jakmile je vlastni
+# vrstva prevezme, brana hlasila "testovaci fallback id 1004 je omylem ve vlastni
+# sade" a spadla na SPRAVNE zmene. Kandidati niz jsou id, ktera produkce opravdu
+# pouziva; meri se ta, ktera v konfiguraci NEJSOU (a aspon jedno zustat musi,
+# jinak by K3 merila prazdno). Sonda `own_art_probe.gd` pocita tyz seznam SAMA -
+# kdyz se obe strany rozejdou, je to vada, ne ticho.
+FALLBACK_KANDIDATI = (1004, 100, 116, 5, 1030, 0x4E75)
 
 
 def art_id(kind: str, ident: int) -> int:
@@ -226,7 +232,18 @@ def check_mereni(root: Path, gate: Gate, mereni: dict[str, str]) -> None:
     gate.measure("prepnuto", prepnuto)
 
     # --- K3: fallback se netyka niceho, co vlastni sada nema ---
-    for aid in FALLBACK_IDS:
+    # Co se ma merit, se ODVOZUJE: kandidati minus id, ktera jsou ve vlastnich
+    # vrstvach. Sonda hlasi tyz seznam vlastnim vypoctem - kdyby se rozesly, je to
+    # vada (a jinak by stacilo, aby sonda o par id mlcela a brana by byla zelena).
+    ocekavany_fallback = [aid for aid in FALLBACK_KANDIDATI if aid not in ocekavane]
+    hlaseny_fallback = cisla(mereni.get("fallback_ids", ""))
+    if hlaseny_fallback != ocekavany_fallback:
+        gate.error(f"K3: sonda hlasi fallback id {hlaseny_fallback}, z konfigurace a "
+                   f"kandidatu vychazi {ocekavany_fallback} - dva nezavisle vypocty se musi sejit")
+    if not ocekavany_fallback:
+        gate.error("K3: zadne fallback id nezustalo (vsechna kandidatni id prebrala vlastni "
+                   "vrstva) - fallback by se meril na prazdnem seznamu")
+    for aid in ocekavany_fallback:
         if aid in ocekavane:
             gate.error(f"K3: testovaci fallback id {aid} je omylem ve vlastni sade")
             continue
@@ -237,7 +254,7 @@ def check_mereni(root: Path, gate: Gate, mereni: dict[str, str]) -> None:
         if "assets/uo/" not in str(mereni.get(f"on_page_{aid}", "")):
             gate.error(f"K3: id {aid} bez vlastniho artu nebere art z assets/uo/ "
                        f"('{mereni.get(f'on_page_{aid}')}')")
-    gate.measure("fallback_id", ",".join(str(i) for i in FALLBACK_IDS))
+    gate.measure("fallback_id", ",".join(str(i) for i in ocekavany_fallback))
 
     # --- K4: animace po klicich ---
     if "anim_own_count" not in mereni:
@@ -391,6 +408,15 @@ def selftest() -> int:
         }
         for d in range(8):
             m[f"anim_walk_own_{d}"] = "1"
+        # K3 se odvozuje z konfigurace: fixture nema ve vlastni vrstve ZADNEHO
+        # z kandidatu, takze se meri vsechna kandidatni id - a sonda to musi hlasit
+        # stejne (jinak by stacilo, aby o par id mlcela).
+        for aid in FALLBACK_KANDIDATI:
+            for rezim in ("on", "off"):
+                m.setdefault(f"{rezim}_page_{aid}", "res://assets/uo/atlas/land_0.png")
+                m.setdefault(f"{rezim}_region_{aid}", "0,0,44,44")
+                m.setdefault(f"{rezim}_offset_{aid}", "0,0")
+        m["fallback_ids"] = ",".join(str(i) for i in FALLBACK_KANDIDATI)
         m.update(zmeny)
         return root, m
 

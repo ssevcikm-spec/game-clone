@@ -1,0 +1,87 @@
+{
+ "version": 1,
+ "material": "pbr",
+ "generator": "tools/artgen/pbr_dlazdice.py",
+ "zdroj": "Stone_Path_007: E:/Workspaces/assets/3d_sample/Stone_Path_007_SD-20261011T210655Z-1-001.zip",
+ "comment": "Zapek PBR sady do dlazdic 1:1 (krok 22 px), svetlo N.L zleva, jas srovnan na TARGET=58. `material: pbr` rika brane G16, ze tahle sada neni pixel art z tools/artgen/styl.py - misto reportu o stylu se u ni meri tvrda alfa.",
+ "pad": 1,
+ "page_size": 256,
+ "pages": [
+  {
+   "file": "atlas/land_0.png",
+   "w": 256,
+   "h": 256,
+   "count": 4
+  }
+ ],
+ "sprites": [
+  {
+   "id": 1001,
+   "kind": "land",
+   "page": "atlas/land_0.png",
+   "x": 0,
+   "y": 0,
+   "w": 44,
+   "h": 44,
+   "ox": 0,
+   "oy": 0,
+   "rect": [
+    0,
+    0,
+    44,
+    44
+   ]
+  },
+  {
+   "id": 1002,
+   "kind": "land",
+   "page": "atlas/land_0.png",
+   "x": 45,
+   "y": 0,
+   "w": 44,
+   "h": 44,
+   "ox": 0,
+   "oy": 0,
+   "rect": [
+    45,
+    0,
+    89,
+    44
+   ]
+  },
+  {
+   "id": 1003,
+   "kind": "land",
+   "page": "atlas/land_0.png",
+   "x": 90,
+   "y": 0,
+   "w": 44,
+   "h": 44,
+   "ox": 0,
+   "oy": 0,
+   "rect": [
+    90,
+    0,
+    134,
+    44
+   ]
+  },
+  {
+   "id": 1004,
+   "kind": "land",
+   "page": "atlas/land_0.png",
+   "x": 135,
+   "y": 0,
+   "w": 44,
+   "h": 44,
+   "ox": 0,
+   "oy": 0,
+   "rect": [
+    135,
+    0,
+    179,
+    44
+   ]
+  }
+ ]
+}
