@@ -1,3 +1,161 @@
+# Předání — game-clone (2026-10-11, SESSION D: HRA PRO ČLOVĚKA — NÁPOVĚDA A CESTA HRÁČE)
+
+> **Co je tenhle soubor:** **stav projektu** pro další session agenta. Přepisuje
+> se celý; historie je v `git log`. Nový blok je vždy **nahoře**; starší bloky se
+> needitují (jen doplňují). **Současný stav se bere z tohoto bloku.**
+>
+> **Odkud brát detaily téhle práce:** `data/help.json` (text nápovědy),
+> `ui/hotkeys.gd`, `LESSONS.md` (2026-10-11, čtvrtá část — 11 ponaučení),
+> `_analyza/p58-smycka-hracem.gd` (cesta hráče celou smyčkou, **17 kontrol / 0 vad**),
+> `_analyza/p57-mutace-session-d.py` (**9 z 9 mutací chyceno**).
+> **Snímky nejsou v gitu** (obsahují mapu z instalace UO) — jsou v
+> `.cache/dukaz-onboarding/`: `smycka.png` (konec smyčky: nápověda + obchod v prodeji),
+> `po.png` (první obraz s nápovědou), `pred.png` (stav **PŘED** session).
+> Znovu je vyrobí příkaz v hlavičce `_analyza/p58-smycka-hracem.gd`.
+
+## ✅ CO SE UDĚLALO (a proč právě to)
+
+**Zadání (§D): vybrat a udělat to, co potřebuje člověk, který hru nezná.**
+Vybral jsem **cestu hráče** a **nápovědu** — protože měření na začátku session
+ukázalo, že **čtyři věci z přijímacího kritéria šly sehrát jen ze sondy** a hráč
+se k nim nedostal (viz „Naměřeno" níž). Tabulka rozhodnutí (cena je měřená, ne
+odhad):
+
+| Kandidát | Co by to znamenalo | Cena | Vzato? |
+|---|---|---|---|
+| **`ui.hotkeys` + `data/help.json`** | okno s klávesami a s cílem hry; klávesy se do dat **nepisují** (berou se z `InputMap`) | ~200 ř. nového (okno + data + napojení), **0 zásahů do smyčky hry** | ✅ **VZATO** |
+| **cesta hráče** (obchod, prodej, stavový pruh, překryv cílů, spam, swing) | to, bez čeho se hráč k smyčce vůbec nedostane | ~60 ř. v 7 souborech, každá změna s měřením | ✅ **VZATO** |
+| tvorba postavy + profese (`M7`) | nová obrazovka, `data/professions.json`, startovní sada per profese | **vysoká** (nová UI plocha + data + determinismus startu) — a je to krok **PŘED** smyčkou: neodpovídá na „co mám dělat" | ❌ |
+| světlo (`render.light`) | nová vrstva, světelné zdroje, stínování svahů | **vysoká** (`M7`, a `docs/05` má nedořešený rozpor den/noc) — a hlavně **ztmaví první obraz**, tedy zhorší čitelnost pro nováčka | ❌ |
+| zvuk (`assets.sounds`, `audio.playback`) | volné CC0 assety + modul + napojení `sound` událostí | **střední až vysoká**, a je to **vlastní trať** (rozhodnutí uživatele 2026-10-07); hráči neřekne, co dělat | ❌ |
+| tooltipy (`ui.tooltip`) | jméno/váha/cena předmětu na hover | **střední**; batoh **už jména ukazuje** a hráč musí nejdřív vědět, že se má hoverovat — tedy méně užitku než klávesy a pravdivý stav | ❌ |
+
+## 📊 NAMĚŘENO (2026-10-11, tato session)
+
+| Co | Hodnota | Doklad |
+|---|---|---|
+| Testy | **2696 kontrol / 0 selhání** (85 case souborů) | `godot --headless --script res://tests/run_tests.gd` |
+| Brány | **15 měřeno / 0 chyb** (G13 poradní, neblokuje) | `python tools/gates/run-all.py` |
+| Mutace (9 vzorů) | **9 z 9 chyceno** (každá: PROVEDENA + PROBĚHLA + CHYCENA + VRÁCENO) | `python _analyza/p57-mutace-session-d.py` |
+| **Cesta hráče celou smyčkou** | **17 kontrol / 0 vad**: boj (`A`, 4 příkazy) → loot (`Q`, zlato 60 → 70) → těžba (6 pokusů) → tavení (7 ingotů) → výroba (dyka na 2. pokus) → **prodej** (zlato 70 → 80) | `_analyza/p58-smycka-hracem.gd` |
+| Hráč po smyčce | hp **87/87**, zlato **80**, batoh 18 předmětů | tamtéž (`[stav]`) |
+| Žurnál po opravě spamu | **žádné** „You cannot move there." (před: **33 240** hlášek za ~2 min) | `_czech` — viz `LESSONS.md` |
+
+### 1) Nápověda (`ui.hotkeys` + `data/help.json`) — VZATO
+
+* **Okno je OTEVŘENÉ OD STARTU** a uvádí klávesy i cíl hry (těžba → tavení →
+  výroba → prodej). Zavírá/otevírá `H` nebo `F1`.
+* **Klávesy nejsou v datech**: řádek nápovědy odkazuje na **akce z `InputMap`**
+  a text klávesy se doplní z toho, co hra **opravdu** umí. Test proto hlídá
+  **oba směry**: každá akce z dat musí v `InputMap` být **a každá vazba z kódu**
+  musí být v nápovědě (kdo přidá klávesu do kódu a ne do nápovědy, tomu test
+  spadne).
+* `uvod` v `data/help.json` se posílá do žurnálu jako **7 zpráv**; značky `{akce}`
+  se nahradí skutečnou klávesou (neznámá značka se **ohlásí** a řádek se přeskočí).
+
+### 2) Cesta hráče — VZATO (to bylo to nejdražší na nalezení)
+
+Naměřeno **před** opravami (`p58`, první běh): **0 rudy po 60 pokusech** a
+hráč **umřel (hp 0/87)**. Příčiny, všechny opravené:
+
+1. **Obchod se nedal otevřít.** Okno otevírá `Command{t:"use", serial}`, ale
+   `object_command()` v `app/input_map` **neměl v produkci žádného volajícího** —
+   žurnál přitom radil „use him to trade". Oprava: `sim.interaction.interact`
+   umí i **bytost na dláždici** (cíl `{kind:"tile"}` se převede na `use`);
+   klient dál posílá jen to, co má pod kurzorem.
+2. **Priorita cílů je změřená:** uzel suroviny a stanice **před** bytostí.
+   Když cíl vybíral klient (`{kind:"mobile"}`), vzalo monstrum přes rudu hráči
+   těžbu (0 rudy / 60 pokusů).
+3. **Okno obchodu umělo jen NAKUPOVAT** (`nastav_smer("sell")` volal jen test).
+   Popis směru je teď **tlačítko** (počet uzlů v boxu zůstává 3, jak měří
+   `tests/cases/vendor_gump.gd`).
+4. **Balvan stál na dláždici výhně a kovář na dláždici balvanu** — „použij" mělo
+   dvě odpovědi a hráč dostal jen ticho. Balvany jsou na volných dlaždicích a
+   `app/main._zkontroluj_cile_interakce()` to **hlásí při startu**
+   (`cile interakce: 7 dlazdic, kolizi 0`).
+5. **Stavový pruh lhal:** `"weight": 0, "gold": 0` natvrdo (komentář tvrdil
+   „hráč dnes nic nemá", ale hráč měl 60 zlata a 16 nástrojů). Teď
+   `container.weight_of()` + `sim.vendor.gold_of()`.
+6. **Opakovaný `attack` restartoval swing** — kdo mačká `A` častěji než je
+   prodleva zbraně, **nikdy neudeří** (30 příkazů = 3 swingly). Swing se
+   přesune jen při **změně cíle**.
+7. **Žurnál lhal, kdo udeřil** („You hit it" při útoku monstra) a **spamoval**:
+   hláška „You cannot move there." se posílala i za blokované kroky monster
+   (**33 240** hlášek / ~2 min, žurnál má 200 řádků). Obě opraveno.
+8. **Trojice monster u startu zabila hráče, který se učí** (hp 0/87, batoh
+   v těle). U startu zůstává **jedno slabé monstrum** (krysa: 6 hp, damage 1–2)
+   — dost na to naučit se `A` a získat loot, ne dost na zabití. Skelet a zombie
+   zůstávají u spawn bodu `graveyard_britain`.
+9. **Debug overlay je od startu VYPNUTÝ** (`F3` ho zapíná; je uvedený
+   v nápovědě). Byl vidět vždy — na prvním obrazu hry nesl `loc/state/gf/c fps`
+   přes půl světa, což je pro člověka, který hru nezná, jen šum. Schopnost
+   „zachytit se screenshotem" zůstala (`F3`, a `own_art_probe.gd` si ho vypíná
+   sám). Cesta zpět: jeden řádek `debug_overlay.visible = true` v `app/main.gd`.
+
+### 3) Snímek a **co je na něm vidět špatně**
+
+`.cache/dukaz-onboarding/smycka.png` (1280×720, není v gitu) — **co je vidět:**
+vlevo nápověda s klávesami a cílem, vpravo obchod **v režimu prodeje** (dýka
+10 gp → 1) a žurnál, který **odvypráví smyčku**: `You gather some iron.` →
+`You smelt the ore and get 3 ingots.` → `You create the item.` →
+`You sell 1 items for 10 gold.` Stavový pruh: `hp=87/87, weight=52, gold=80`.
+
+**Co je na něm ŠPATNĚ (přiznané):**
+1. **Okno nápovědy leží přes levou polovinu světa** a okno obchodu se s ním
+   překrývá — hráč si je musí zavřít (`H`), aby viděl, co dělá. Je to daň za to,
+   že nápověda je otevřená od startu.
+2. **Jmenovky bytostí se pořád překrývají** (`blacksmith` přes `rat`) — vada
+   z M5, tato session ji neřešila.
+3. **Ikony v obchodním okně nejsou** (jen text a cena) — okno obchodu kreslí
+   `Button` s textem; ikony by chtěly `render` injekci jako batoh.
+4. **Nápověda je jen jedna obrazovka textu** bez scrollu; delší seznam by
+   přetekl (měřeno: obsah 515 px při rámu 540 px). Scroll patří `ui.hud`.
+5. **Snímek obsahuje mapu z instalace UO** → nesmí do gitu (drží se stejné
+   pravidlo jako `assets/uo/`), takže důkaz je lokální.
+
+## ⚠ CO ZŮSTÁVÁ OTEVŘENÉ (pojmenované, ne zamlčené)
+
+1. **Lidská zkouška neproběhla.** Sonda dokazuje, že **cesta existuje**
+   (17/17 kontrol), ne že ji člověk projde. Zadání žádá „člověk, který hru
+   nezná, projde krátkou smyčku bez rady" — to je **na tobě** (viz „Co čeká
+   na tebe").
+2. **`data/help.json` a `ui/hotkeys.gd` nejsou v `.forge/roadmap.json`** jako
+   nová granule (`ui.hotkeys` tam je od M2, ale s jiným rozsahem: „výchozí
+   sada, poslední cíl, obvaz sebe" — makra). Plán a `docs/` mění uživatel.
+3. **Přepínač prodeje není v datech** (text tlačítka je konstanta
+   `ui/vendor_gump.PREPINAC_BUY/SELL`) — je to popis komponenty, ne obsah hry;
+   kdyby měl být laditelný, patří do `data/`.
+4. **`sim.combat` má nově `set_player`** (`app/main` ho volá) — patří do
+   smlouvy `docs/04 §4.2` (modul dosud o hráči nevěděl).
+5. **`interact` na bytost je NAD RÁMEC `docs/04 §4.3`** (stejně jako `interact`
+   sám) — zapsáno v hlavičce `sim/systems/interaction.gd`.
+6. **`app/main.gd` nemá mutační modul** — integrační cesty (stavový pruh,
+   úvodní hlášky, překryv cílů) kryje **statická kontrola** v `tests/cases/trade_path.gd`
+   a **sonda** `p58`, ne brána, která by spustila `app/main`.
+7. **Krysa u startu se po zabití neobnoví** (je to ruční sešitek pro demo, stejná
+   třída jako `_postav_stanice`/`_postav_balvany`). Kdo chce bojovat dál, musí
+   dojít ke spawn bodu `graveyard_britain` (120 dlaždic).
+8. **Snímek `p20b-obrazky/m5-souboj.png` JE v gitu a obsahuje UO mapu** —
+   `HANDOFF` u něj tvrdil „gitignore", ale `git check-ignore` vrací **exit 1**
+   (ignorovaný není) a commit `99ee9fc` ho přidal. Odporuje to pravidlu z
+   `M4`/`README` („assety z instalace UO se nedistribuují"). **Nemažu ho** —
+   přepis historie a publikované výstupy patří tobě; jen to hlásím.
+9. **`data/help.json` není v `check-content.py`** (nový datový soubor bez
+   granule) — brána G5 ho nevidí; test `ui_hotkeys.gd` ho čte napřímo.
+
+## 🧍 CO ČEKÁ NA TEBE (a je to levné)
+
+1. **Zahraj si to bez čtení kódu** a řekni, kde ses zasekl:
+   `HRA.cmd` → nápověda je otevřená; `E`/`T` na kámen, výheň, kovadlinu, kováře;
+   `A` na krysu; `Q` na tělo. **Když se někde zasekneš, je to nález** — sonda
+   prošla všude, ale sonda není člověk.
+2. **Rozhodni o monster u startu** (krysa vs. původní trojice): měření je
+   v `LESSONS.md` („Trojice monster u startu zabila hráče…"). Cesta zpět je
+   jeden řádek v `app/main._postav_monstra_u_hrace`.
+3. **Rozhodni, co s `p20b-obrazky/m5-souboj.png`** (bod 8 výše).
+
+---
+
 # Předání — game-clone (2026-10-11, ART v3: STÍN PRO PLACATÉ PŘEDMĚTY + NÁVRAT KONTRASTU)
 
 > **Co je tenhle soubor:** **stav projektu** pro další session agenta. Přepisuje

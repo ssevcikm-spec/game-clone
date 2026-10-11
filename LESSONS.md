@@ -24,6 +24,160 @@ Typy: `chyba` (moje vada) · `past-nástroje` (prostředí/nástroj, ne logika) 
 
 ---
 
+# 2026-10-11 (čtvrtá část) — SESSION D: CO POTŘEBUJE ČLOVĚK, KTERÝ HRU NEZNÁ
+
+> **Zadání:** `DALSI-SESSION.md` §D. Které kandidáty jsem vybral a proč (a co
+> jsem NEVZAL) je v `HANDOFF.md` v bloku této session; tady jsou jen ponaučení,
+> každé s naměřeným dokladem.
+
+### 2026-10-11 — „Sonda to umí“ není „hráč to umí“: čtyři mrtvé cesty hráče (chyba)
+**Co se stalo:** než jsem cokoli přidal, změřil jsem, co hráč **skutečně** může
+udělat - a čtyři věci z přijímacího kritéria dema šly sehrát jen ze sondy:
+(1) **obchod se nedal otevřít**: okno otevírá `Command{t:"use", serial}`, ale
+`object_command()` v `app/input_map` **neměl v produkci žádného volajícího**
+(hledáno v celém `app/`), takže „use him to trade“ v žurnálu byla
+**nesplnitelná rada**; (2) **v obchodním okně chyběl přepínač na prodej** -
+`nastav_smer("sell")` volal jen test; (3) **stavový pruh lhal**: `app/main.gd`
+posílal `"weight": 0, "gold": 0` natvrdo s komentářem „hráč dnes nic nemá“, a
+hráč měl 60 zlata a 16 nástrojů; (4) **balvan stál na dláždici výhně** a kovář
+na dláždici balvanu - „použij“ mělo na jedné dláždici dvě odpovědi a hráč
+dostal jen ticho (`no_pair`).
+**Doklad:** `_analyza/p58-smycka-hracem.gd` (první běh: **0 rudy po 60
+pokusech**, kolize `forge + balvan na (1496,1630)`, `balvan + kovar na
+(1497,1630)`); po opravách **17 kontrol / 0 vad** - celá smyčka (boj → loot →
+těžba → tavení → výroba → **prodej**, zlato 60 → 74) jde **přes klienta
+`app/input_map` a signály tlačítek**, ne přes `sim.enqueue`.
+**Ponaučení:** u „hotovo“ kritéria se **nejdřív hledá cesta hráče** (kdo ten
+příkaz pošle?) a teprve pak se přidává obsah. Sonda, která volá `sim.enqueue`
+přímo, měří simulaci - ne hru.
+
+### 2026-10-11 — Dláždice unese JEDEN cíl interakce; dva se navzájem umlčí (chyba)
+**Co se stalo:** `sim.interaction` vybírá „co se hodí“ podle **jedné** role
+(`station_role` přebije `"tile"`), takže na dláždici, kde je uzel suroviny
+I stanice, vyjde `no_pair` - a protože se to hlásí jen obecnou hláškou
+(„You see nothing special.“), vypadá to jako „nic tu není“.
+**Doklad:** kolize z `p58` (viz výše); `app/main._zkontroluj_cile_interakce()`
+je od této session **viditelná kontrola při startu** (`cile interakce: 7
+dlazdic, kolizi 0`) a nové pozice balvanů jsou volné.
+**Ponaučení:** když se do světa staví ručně víc věcí, patří k tomu **kontrola
+překryvu** - jinak jedna z nich tiše zmizí a hráč to nemá jak poznat.
+
+### 2026-10-11 — Opakovaný `attack` restartoval swing: hráč mohl mačkat `A` navěky (chyba)
+**Co se stalo:** `combat.attack` pokaždé **přepsal stav** (`due_ms = 0`)
+a `_planuj` nastavil nový čas. Kdo mačká `A` (nebo kliká na monstrum) častěji,
+než je prodleva zbraně, **nikdy neudeří**.
+**Doklad:** sonda `p58`: **30 příkazů `attack` za 51 s = 3 swingly** (2 minely,
+1 zásah) - krysa s 6 hp přežila 30 útoků; po opravě (swing se přesune jen při
+**změně cíle**) krysu zabilo **5 příkazů** (hp 87 → 83). Nový test
+`tests/cases/combat_player.gd` a mutace „`stejny_cil = false`“ → **CHYCENA**.
+**Ponaučení:** u časovače se ptej, **co ho resetuje**. `tests/cases/combat.gd`
+volá `resolve_swing` přímo, takže cestu hráče (příkaz `attack`) neměřil nikdo -
+a přesně tam vada byla.
+
+### 2026-10-11 — Žurnál lhal, KDO udeřil: „You hit it“ při útoku monstra (chyba)
+**Co se stalo:** hlášky souboje byly psané jen z pohledu hráče a `_jmeno(hrac)`
+vrací „it“ (hráč nemá `name`), takže když udeřilo **monstrum**, hráč četl
+`You hit it for 9 damage.` - přesně ve chvíli, kdy mu padaly hp.
+**Doklad:** naměřeno v prvním pozorování: hp **87 → 65** a v žurnálu čtyři
+`You hit it ...`; po opravě (`combat.set_player(serial)`, hlášky
+`%s hits you for %d damage.` / `You are dead.`) je v žurnálu
+`skeleton hits you for 8 damage.` a `You are dead. You are a ghost.`
+**Ponaučení:** hláška, která neřekne **kdo komu**, je horší než žádná - hráč
+podle ní pochopí opak toho, co se děje.
+
+### 2026-10-11 — 33 240 hlášek „You cannot move there.“ v žurnálu o 200 řádcích (chyba)
+**Co se stalo:** `sim.movement.request_step` posílal hlášku psanou hlasem
+hráče za **každý** blokovaný krok - i za monstra, která se nedostanou k hráči
+a zkoušejí krok každý tik. `ui.journal` má `MAX_LINES = 200`, takže na snímku
+byl žurnál **jen spam** a hráč neviděl ani úvodní nápovědu.
+**Doklad:** sonda `p58` (33 240 hlášek za ~2 minuty běhu); snímek
+`.cache/dukaz-onboarding/smycka.png` **před** opravou. Nový test
+`tests/cases/movement_spam.gd` (hráč hlásí, monstrum ne, bez `player_serial`
+zůstává staré chování) a mutace → **CHYCENA**.
+**Ponaučení:** u textu v **hlase hráče** se vždycky ptej, **komu** se posílá.
+A spam v žurnálu není kosmetika: vytlačí informaci, kterou hráč potřebuje.
+
+### 2026-10-11 — Trojice monster u startu zabila hráče dřív, než se stačil rozkoukat (chyba)
+**Co se stalo:** M5 postavil vedle hráče tři monstra kvůli snímku. Hráč, který
+nic nedělá (učí se), byl napadený do 20 s a **umřel (hp 0/87)**; `sim.death`
+mu vzal celý batoh do těla (`batoh=1`, zlato 0), takže smyčka nebyla dosažitelná.
+Přesun monster mimo `AGGRO_RANGE` (10 dlaždic) **nepomohl** - zabloudila zpět.
+**Doklad:** sonda `p58` (dva běhy: `hp 0/87`, `You are dead.`); po změně na
+**jedno slabé monstrum** (krysa: 6 hp, damage 1-2 z `data/monsters.json`) hráč
+smyčku došel s **hp 87/87** a monstrem si vydělal loot (`Q`: zlato 60 → 64).
+**Ponaučení:** „je to vidět na snímku“ a „dá se to hrát“ jsou dvě různé
+podmínky. Když se demo staví kvůli screenshotu, patří k tomu **měření
+přežitelnosti** (kolik hp hráč ztratí, než něco stihne).
+
+### 2026-10-11 — Vlastní test byl slepý: „hits you“ NEBO „swings at you“ v jedné podmínce (chyba)
+**Co se stalo:** nový test hlášek souboje měl dvě kontroly, každá spojovala
+variantu „zasah“ a „minutí“ (`contains("hits you") or contains("swings at you")`).
+Když jsem vrátil vadu do větve **zásahu**, test zůstal **zelený** - minuti
+hlásilo svou verzi dál a podmínku splnilo.
+**Doklad:** běh mutací: `NECHYCENA sim.combat | zurnal hlasi uder monstra jako
+'You hit it'`; po rozdělení na **čtyři** kontroly (`You hit`, `You swing at`,
+`... hits you`, `... swings at you`) je táž mutace **CHYCENA**.
+**Ponaučení:** podmínka typu „A nebo B“ je pro mutační test **jedna kontrola** -
+a slabá. Každou variantu měř zvlášť.
+
+### 2026-10-11 — Mutační kotva zastarala, když se změnil design (past-nástroje)
+**Co se stalo:** první verze opravy posílala u bytosti cíl `{kind:"mobile"}`
+z **klienta**; po naměření (monstrum přes rudu vzalo hráči těžbu) jsem
+rozhodování přesunul do **simulace**. Mutační vzor z první verze pak hlásil
+`PATRANA VETA SE VE ZDROJI NENASLA` - a to je správně: **kotva, která nemá co
+mutovat, není důkaz**.
+**Doklad:** `_analyza/p57-mutace-session-d.py` (`MUTACE SE NEPROVEDLA: app.input`),
+po přepsání na novou větev (`mob_na = 0`) → **CHYCENA**.
+**Ponaučení:** když se změní rozhodovací místo, musí se přepsat i mutační
+kotva. Hlášení „vzor nenalezen“ není šum - je to nález.
+
+### 2026-10-11 — PowerShell `Set-Content` rozbil zdrojový soubor (past-nástroje)
+**Co se stalo:** chtěl jsem v sondě přejmenovat konstantu a použil
+`(Get-Content) -replace ... | Set-Content -Encoding utf8 -NoNewline`. Soubor
+skončil **na jediném řádku**, s **BOM** a s 5 výskyty hledaného jména místo 18
+(`(Get-Item).Length` 11 616 B, `splitlines()` = 1). Vypadalo to jako chyba
+sondy.
+**Doklad:** kontrola bajtů: `bajtu 11616 radku 1 BOM True` (před: 311 řádků).
+**Ponaučení:** zdrojové soubory se upravují **`edit`/`write`** toolem, ne
+PowerShellem. Když už skript, tak **Python s `newline='\n'` a bez BOM** - a po
+zápisu zkontrolovat **první tři bajty** a počet řádků.
+
+### 2026-10-11 — `Nonexistent function 'je_otvoreny'` byla moje pravopisná chyba, ne vada hry (past-nástroje)
+**Co se stalo:** sonda volala `ui/craft_gump.gd:je_otvoreny()`, ale soubor má
+`je_otevreny()`. Chybová hláška zněla „Nonexistent function 'je_otvoreny' in
+base 'Control (craft_gump.gd)'“ - tedy jako by metoda ve skriptu chyběla.
+Hledal jsem proto **vadu ve hře** (a zkusil i `--import`), místo abych si jméno
+ověřil proti disku.
+**Doklad:** `count('je_otvoreny') == 0` a `count('je_otevreny') == 1` ve všech
+`ui/*.gd`; po opravě přepisu sonda prošla (a chyba se už neobjevila).
+**Ponaučení:** jméno z **výpisu** se dá přečíst špatně (o-e-v vs o-t-v je na
+jeden znak). Když Godot řekne „metoda neexistuje“ a v souboru ji vidím,
+**spočítám výskyty** - ne že půjdu hledat cache.
+
+### 2026-10-11 — Během mutačního běhu se NESMÍ editovat zdroj (past-nástroje)
+**Co se stalo:** upravil jsem `app/main.gd`, zatímco běžel `_analyza/p57-mutace-*.py`
+(celá sada testů ~8×). Harness si dělá **bajtovou zálohu** a po mutaci ji vrací -
+kdybych editoval dřív, jeho `restore` by moji změnu **tiše přepsal**. Tentokrát
+jsem měl štěstí (edit přišel až po jeho čtení), ale je to přesně past, před
+kterou varuje i `tools/gates/mutace-tests.py` („brány se NESMÍ pouštět souběžně
+se zápisem“).
+**Doklad:** `_analyza/p57-mutace-session-d.py` (sekce s `puvodni = read_bytes()`
+a `finally: soubor.write_bytes(puvodni)`).
+**Ponaučení:** než začne dlouhý měřicí běh, **dokončit všechny zápisy** - nebo
+měřit nad kopií stromu. Po běhu zkontrolovat `git diff` (co se vrátilo).
+
+### 2026-10-11 — Snímek našel dvě vady nápovědy, které testy nemohly (postup)
+**Co se stalo:** první verze okna nápovědy měla (a) **žádné pozadí** - text ležel
+přímo na mapě (stejná vada, jakou mělo okno batohu), a (b) obsah **přetekl** okno
+o 45 px a poslední řádky spadly na stavový pruh. Testy měřily text v uzlech
+a prošly; našel to až `read_image` nad snímkem.
+**Doklad:** `.cache/dukaz-onboarding/po.png` (před), `PanelContainer` + změřené
+`obsah=(440,515) min=(424,515)` a nové okno 440×540 v `ui/hotkeys.gd`.
+**Ponaučení:** u okna se **velikost obsahu měří** (`get_combined_minimum_size()`)
+a porovnává s rámem; pozadí je u textu na mapě **povinné**, ne kosmetika.
+
+---
+
 # 2026-10-11 (třetí část) — ART v3: STÍN BYL V POSTPROCESSU, KONTRAST VE SVĚTLE
 
 ### 2026-10-11 — „Předmět nemá stín“ nebylo v renderu, ale v ubytku od kotvy (chyba)
