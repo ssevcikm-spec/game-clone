@@ -29,6 +29,7 @@
 | G5 | `check-content.py` | **obsah**: schémata `data/*.json`, existence art ID v manifestu, křížové odkazy (recept → materiál → předmět), počty C1–C10 | každý PR | chybí art, neplatný odkaz, nesplněný minimální počet |
 | G6 | `check-assets.py` | **assety**: manifest vs. stránky atlasu, nulové/průhledné sprity, offsety zarovnání, shoda siluet framů animace; **od 2026-10-11 i VLASTNÍ art** (`assets/own-art.json`): stránky, prázdné sprity a invariant „nahrazení, ne přidání“ (každé vlastní id je i v UO manifestu) | každý PR s assety | nekonzistence manifestu nebo prázdný sprite |
 | **G16** | `check-style.py` (**přidáno 2026-10-11**) | **vlastní art je PIXEL ART, ne rozmazaný render**: měří se na **spritech** (ne v reportu), že silueta je **0/255** (kontaktní stín se neposuzuje — jeho měkkost je záměr) a že paleta těla je pod stropem (80 barev; naměřeno 36–39 po stylu proti 472 před ním). Měří i **animace z anim listu** (jdou mimo atlas, takže by je jinak minula). Ostrost hrany se **hlásí, ale nehlídá** — naměřeno: ruda má po stylu 19,4 a je čitelnější; metrika, která trestá žádoucí vlastnost, není brána | každý PR s vlastním artem | silueta má poloprůhledné pixely (rozmazaný obrys) nebo se paleta vrátila k tisícům barev |
+| **G17** | `check-land-variants.py` (**přidáno 2026-10-11**) | **jedno `land` id = N dlaždic podle souřadnic buňky** (`groups` ve vrstvě): měří se na **kreslicím seznamu** (`render.chunk`, ze kterého bere i dávka) podíl dlaždic shodných se sousedem — **bez `groups` musí vyjít přesně 100 %** (kalibrace na dnešní chování) a **s 16 variantami < 20 %**; dále že se vzor **neopakuje s periodou zarovnanou s mřížkou** (naivní `x*HASH_X ^ y*HASH_Y` dalo 100 %, naměřeno), že **dva nezávislé běhy dají stejný sha256** (determinismus), že **textura i offset jdou ze stejného záznamu** (fixture má u každé varianty jiný offset), že **dávka `render/chunk_mesh` má stejné varianty** (16 slotů vs. 1) a že konfigurace na disku má `groups` konzistentní s `sprites` | každý PR | varianty se nevybírají (nebo se vybírají pořád stejně / s periodou), textura a offset se rozejdou, dávka bere původní id, nebo je `groups` v konfiguraci nekonzistentní |
 | **G15** | `check-own-art.py` (**přidáno 2026-10-11**) | **vlastní art se přepíná PO KUSECH**: každé `(kind, id)` z `assets/own-art.json` má texturu **i offset** z vlastního manifestu; id bez vlastního artu je **přesně totéž** jako s vypnutým vlastním artem; animace se přepíná po klíči (vlastní chůze vyhrává, co sada nemá, zůstává z UO); a **přepínač opravdu přepíná** (tentýž dotaz s vrstvami a bez nich dá jinou stránku). Měří se **voláním** `texture()`, `offset()`, `page_path()` a `sheet_file()` přes sondu `tools/gates/own_art_probe.gd`, výsledek se porovnává s manifesty na disku | každý PR | vlastní art se nepoužije (nebo se použije jen jako textura bez offsetu), fallback se změní, nebo přepínač nic nepřepne |
 | G7 | `check-save.py` | **round-trip**: `save → load → state_hash` shodný | každý PR | hashe se liší nebo load selže |
 | G8 | `check-determinism.py` | **determinismus**: dva běhy stejného skriptu příkazů (20 000 ticků) dají stejný hash | každý PR | hash se liší (float, neuspořádaná iterace, čas) |
@@ -51,11 +52,13 @@ nezapomnělo, a do `run-all.py` se zapíše, až vznikne. Když brána nemá co 
 vrací `2` (`NEMĚŘENO`) a **nikdy** se to netváří jako zelená (§8.9).
 
 **Pořadí v CI je závazné** (stav 2026-10-11, shodné s `run-all.py`):
-G1 → **G3** → G5 → G2 → **G14** → G4 → G6 → **G15** → **G16** → G7 → G8 → G9 → **F1** → G11 → G10.
+G1 → **G3** → G5 → G2 → **G14** → G4 → G6 → **G15** → **G16** → **G17** → G7 → G8 → G9 → **F1** → G11 → G10.
 `G13` (vision) je **poradní** a jde mimo pořadí — nikdy neshodí běh, ale nesmí
 být ticho (když není implementovaná, hlásí se to). Schéma je první, protože je
 nejlevnější a rozpor v zadání zneplatňuje všechno ostatní. **`G15` jde hned za
 `G6`**: `G6` měří assety jako soubory, `G15` měří, že je hra **opravdu bere**.
+**`G17` jde za `G15`/`G16`**: `G15` měří, KTERÁ vrstva sprite dodává, `G16`, JAK
+vypadá, a `G17`, že se sprity **střídají podle buňky** (a nepravidelně).
 
 ## 8.3 Tři brány, které mají největší cenu
 

@@ -54,6 +54,10 @@ ORDER = [
     # G16 (vlastni art je PIXEL ART, ne rozmazany render) patri za G15: G15 meri,
     # KTERY sprite se pouzije, G16 meri, JAK vypada. Pridano 2026-10-11.
     ("G16", "check-style.py"),
+    # G17 (jedno `land` id = N variant podle souradnic bunky) patri taky za G15:
+    # G15 meri, KTERA vrstva sprite dodava, G17 meri, ZE SE STŘÍDAJI podle bunky
+    # (a ze se vzor neopakuje s periodou zarovnanou s mrizkou). Pridano 2026-10-11.
+    ("G17", "check-land-variants.py"),
     ("G7", "check-save.py"),
     ("G8", "check-determinism.py"),
     ("G9", "check-replay.py"),

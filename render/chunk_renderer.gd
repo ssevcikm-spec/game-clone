@@ -17,6 +17,14 @@ extends RefCounted
 #   {"kind": "land"|"static", "x": int, "y": int, "z": int,
 #    "art_id": int, "offset": Vector2i}
 # `offset` je posun z manifestu (`ox`,`oy`), ktery se odecte od dlazdice.
+# U LANDU je `art_id` od 2026-10-11 UZ VYBRANA VARIANTA (`groups` v konfiguraci
+# vlastniho artu, viz `_art_land`): kdo chce variantu, dostane ji odtud, ne
+# vlastnim prepoctem - jinak by se kreslici cesty rozezly.
+# `offset` landu zustava `ZERO`: vsechny UO land sprity (4244) i vlastni
+# dlazdice maji `ox = oy = 0` (namEReno 2026-10-11 nad `assets/uo/manifest.json`)
+# a `render.chunk_mesh` offset landu VUBEC nepouziva, takze by jeho vlozeni
+# posunulo jen puvodni cestu. Kdyby nekdy vlastni dlazdice nenulovy offset
+# potrebovala, musi se zmenit OBE cesty zaroven.
 #
 # LAND NAVIC (2026-10-07, svahy): `texmap` (TexID z tiledata) a `z_corners`
 # [horni, pravy, levy, dolni] = vysky rohu dlazdice. Roh pouziva vysku
@@ -594,10 +602,17 @@ func _faze_land() -> void:
 		var land: int = _map.land_at(x, _st_y)
 		if land < 0:
 			continue
+		# VARIANTA DLAZDICE (granule `render.land_variants`): jedno `land` id
+		# muze mit N spritu a vybira se CISTE podle souradnic bunky. Vybira se
+		# TADY - v SEZNAMU, ktery je spolecny pro VSECHNY kreslici cesty
+		# (puvodni cesta v `app/world_view` i davka `render/chunk_mesh`), takze
+		# se nemohou rozejit. `texmap` zustava z PUVODNIHO id: svah je vlastnost
+		# dlazdice v mape, ne spritu.
+		var art_id: int = _art_land(land, x, _st_y)
 		var radek: int = (_st_y - _st_oblast.position.y) * _st_sirka + (x - _st_oblast.position.x)
 		var z: int = _st_zrohy[radek]
 		_st_objects.append({"kind": "land", "x": x, "y": _st_y, "z": z,
-			"art_id": land, "offset": Vector2i.ZERO,
+			"art_id": art_id, "offset": Vector2i.ZERO,
 			"texmap": _tiledata.texture(land) if _tiledata != null else 0,
 			"z_corners": [z, _st_zrohy[radek + 1], _st_zrohy[radek + _st_sirka],
 				_st_zrohy[radek + _st_sirka + 1]]})
@@ -606,6 +621,24 @@ func _faze_land() -> void:
 	if _st_y >= _st_oblast.end.y:
 		_st_faze = FAZE_STATIKY
 		_st_t_land = Time.get_ticks_usec()
+
+
+func _art_land(land: int, x: int, y: int) -> int:
+	# KTERY sprite dlazdice se pro tuhle bunku kresli (granule
+	# `render.land_variants`): cache s `groups` vybere variantu podle souradnic,
+	# cache bez nich vraci VSTUP = presne dnesni chovani (jedno id = jedna
+	# dlazdice).
+	#
+	# ⚠ VSTUP JE DUCK-TYPED (`has_method`), protoze `render.chunk` dostava
+	# textury INJEKOVANE: v produkci je to `render.textures` (varianty zna),
+	# v testech stub s `offset()` (varianty nezna = jedna dlazdice) a v CI
+	# `--no-own-art` je take bez skupin. Kdyby se `variant_id` volalo natvrdo,
+	# spadl by kazdy test se stubem - a to NENI vada testu.
+	# Ticho to neni: kdo varianty ma, ten je dostane; kdo je nema, dostane
+	# vstup (coz je prave to, co se od "bez skupin" ceka).
+	if _textures != null and _textures.has_method("variant_id"):
+		return int(_textures.variant_id(land, x, y))
+	return land
 
 
 func _faze_statiky() -> void:

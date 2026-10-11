@@ -44,6 +44,27 @@ extends RefCounted
 # (vlastni dyka ma jinou kotvu nez UO dyka téhož id - `SEAM.md` §2 bod 2).
 # Kdyz je `own_layers` prazdny, chova se cache PRESNE jako driv (jen UO).
 #
+# ⚠⚠ VARIANTY DLAZDIC PODLE SOURADNIC (2026-10-11, granule `render.land_variants`):
+# vrstva muze mit nepovinny klic `groups`, napr.
+# `"groups": {"land": [[1002, 1003, 1005, 1006]]}` = "tato id jsou JEDEN
+# MATERIAL; pro kterekoli z nich lze kreslit kterekoli" (jedno id prestava
+# znamenat jednu dlazdici, takze se dlazba na velke plose neopakuje a nemusime
+# kvuli rozmanitosti zabirat dalsi a dalsi id). Kdo chce variantu, pta se
+# `texture_variant(art_id, x, y)` / `offset_variant(art_id, x, y)` /
+# `variant_id(art_id, x, y)`; kdo se pta `texture(art_id)`, dostane PRESNE
+# dnesni chovani (jedno id = jedna dlazdice).
+#
+# DVE PRAVIDLA, KTERA SE NESMI ROZBIT:
+#   1) VYBER JE CISTA FUNKCE SOUZADNIC (`variant_index`): zadna nahoda za behu
+#      - rozbila by determinismus, replaye a snimky v CI.
+#   2) TEXTURA I OFFSET JDOU ZE STEJNEHO ZAZNAMU: varianta se vybere JEDNOU
+#      (`variant_id`) a teprve ta se preda do `texture()` i `offset()`. Kdyby
+#      se vybirala zvlast, sedel by sprite vedle (vlastni dlazdice ma jinou
+#      kotvu nez UO - `SEAM.md` §2 bod 2).
+# `groups` je klíč VRSTVY (ne globalni): skupina smi obsahovat jen id z te
+# same vrstvy, takze se NIKDY nemicha vlastni art s UO (presne to by jinak
+# vyrobilo stejnou "diagonalni mrizku" prolozene UO, kterou varianta rusi).
+#
 # Pouziti: `var t = TextureCache.new()`; `t.texture(art_id)`, `t.offset(art_id)`.
 # Druhy argument `_init` je strop v bajtech (vychozi `MAX_BYTES`) - je tam
 # proto, aby sel strop ZMĚŘIT na malé hodnotě (sonda `.cache/analysis/probe-render.gd`).
@@ -63,6 +84,24 @@ const TEXMAP_OFFSET: int = 0x10000
 const MANIFEST_PATH := "res://assets/uo/manifest.json"
 const ATLAS_PREFIX := "res://assets/uo/"
 const MAX_BYTES: int = 402653184   # 384 MB
+# SOUCINITELE HASHU PRO VYBER VARIANTY (granule `render.land_variants`).
+# Jsou to velka prvocisla zname z "spatial hashing" - dulezite je jen to, ze dve
+# sousedni bunky daji RUZNY index; kdyby se pouzilo `(x + y) % n` nebo `x % n`,
+# vratily by se presne ty pravidelne pruhy, kvuli kterym varianta vznikla
+# (namEReno v `ZADANI-26` §2: 4 varianty v rytmu `(cx*3+cy)%4` = svisle pruhy).
+const HASH_X: int = 73856093
+const HASH_Y: int = 19349663
+# ⚠ DOKONCENI HASHU (michaci konstanta a dva posuny) NENI ZDOBNOST.
+# NamEReno 2026-10-11 (`_analyza/lv-mix.py`): samotne `x*HASH_X ^ y*HASH_Y` ma
+# index zarovnany s mrizkou - pro `n`, ktere je mocnina dvou, zavisi `mod n` jen
+# na NIZKYCH bitech, a ty jsou `x mod n` (protoze `HASH_X mod 4 = 1`). Vyslo
+# proto `index(x + n, y) == index(x, y)` ve **100 %** pripadu: vzor se opakuje
+# presne kazdych `n` bunek (u n = 4 je to 176 px), coz je presne ta pravidelnost,
+# kterou ma varianta odstranit. S michanim vyslo u n = 4 ~25 %, u n = 16 ~6 %
+# (tedy 1/n, jak ma nahodny vyber) a hlavne uz ZADNA perioda.
+# Vse je to cista celociselna aritmetika: zadny float, zadny stav, zadny cas.
+const HASH_MIX: int = 0x9E3779B1
+const MASK63: int = 0x7FFFFFFFFFFFFFFF
 
 var _sprites: Dictionary = {}      # art_id -> {page: String, rect: Rect2i, offset: Vector2i}
 var _wrapped: Dictionary = {}      # art_id -> AtlasTexture (hotova "okna" do stranky)
@@ -79,6 +118,10 @@ var _prefix: String = ATLAS_PREFIX # prefix cest ke strankam (viz `_init`)
 var _own_layers: Array = []        # vrstvy z `assets/own-art.json` (poradi = priorita)
 var _own_ids: Dictionary = {}      # art_id -> true (sprite prisel z vlastni vrstvy)
 var _own_indexed: int = 0          # kolik spritu je z vlastnich vrstev
+# --- VARIANTY DLAZDIC (viz hlavicka) ---------------------------------------
+var _group_of: Dictionary = {}     # art_id -> Array[int] (art_id vsech clenu skupiny)
+var _variant_groups: int = 0       # pocet skupin (pocitaji se jen skupiny o >= 2 clenech)
+var _variant_members: int = 0      # kolik art_id je ve skupinach
 var _uo_indexed: int = 0           # kolik spritu je ze zakladniho (UO) manifestu
 # --- ASYNCHRONNI NACITANI STRANEK (18. session) ---------------------------
 # Stranka atlasu je 2048x2048 = 16 MB a jeji nacteni stoji NAMERENE ~58 ms
@@ -111,6 +154,9 @@ func _init(manifest_path: String = MANIFEST_PATH, max_bytes: int = MAX_BYTES,
 		if parsed_own is Dictionary:
 			for sprite in parsed_own.get("sprites", []):
 				_index(sprite, prefix, vyber, true)
+		# SKUPINY VARIANT az po sprity: az tady je jiste, ktera id vrstva opravdu
+		# nabizi (`_build_groups` to kontroluje a hlasi jinak tise preskocenou vadu).
+		_build_groups(vrstva)
 	# Zakladni (UO) manifest az DRUHY - co vlastni nema, zustava z nej.
 	var parsed = _read(manifest_path)
 	if parsed is Dictionary:
@@ -156,6 +202,53 @@ func offset(art_id: int) -> Vector2i:
 	return entry["offset"] if entry != null else Vector2i.ZERO
 
 
+# --- VARIANTY DLAZDIC (granule render.land_variants; viz hlavicka) ---------
+
+func variant_id(art_id: int, x: int, y: int) -> int:
+	# KTERE art id se pro tuhle bunku kresli. Bez skupiny vraci VSTUP (dnesni
+	# chovani); se skupinou vybere clena CISTE podle souradnic. Je to jedine
+	# misto, kde se varianta vybira - textura i offset jdou pak z TOHOTO id.
+	var skupina = _group_of.get(art_id, null)
+	if skupina == null:
+		return art_id
+	return int(skupina[variant_index(x, y, (skupina as Array).size())])
+
+
+static func variant_index(x: int, y: int, n: int) -> int:
+	# Index varianty (0..n-1) z absolutnich souradnic bunky. JE TO CISTA
+	# FUNKCE: zadny stav, zadna nahoda, zadny cas - stejna bunka da vzdy
+	# stejny index (determinismus, replaye a snimky v CI stoji na tom).
+	# `posmod` (ne `%`): v GDScriptu vraci `%` u zaporneho delence zaporny
+	# zbytek, takze by index mohl vyjit mimo rozsah skupiny.
+	if n <= 1:
+		return 0
+	# MASK63 drzi hodnotu v 63 bitech, takze nasobeni nize NEMUZE preteci
+	# znamenkove (a chovani je stejne na vsech platformach).
+	var h: int = ((x * HASH_X) ^ (y * HASH_Y)) & MASK63
+	h = h ^ (h >> 13)
+	h = (h * HASH_MIX) & MASK63
+	h = h ^ (h >> 27)
+	return posmod(h, n)
+
+
+func texture_variant(art_id: int, x: int, y: int) -> Texture2D:
+	# Textura varianty pro bunku (x, y). `null` ma stejny vyznam jako u
+	# `texture()`: art neni / stranka se jeste nacita (`page_pending`).
+	return texture(variant_id(art_id, x, y))
+
+
+func offset_variant(art_id: int, x: int, y: int) -> Vector2i:
+	# Offset varianty pro bunku (x, y) - pocita se z TOHO SAMEHO id jako
+	# `texture_variant`, aby sprite sedel (viz hlavicka, pravidlo 2).
+	return offset(variant_id(art_id, x, y))
+
+
+func variants() -> Dictionary:
+	# Pocet skupin a clenu - pro `stats()` a pro sondu/branu. Kdyz `groups`
+	# v konfiguraci nejsou, vraci nuly (a to je spravne: zadna varianta).
+	return {"groups": _variant_groups, "members": _variant_members}
+
+
 func page_path(art_id: int) -> String:
 	# Cesta ke STRANCE, ze ktere sprite pochazi (`""` = art v manifestu neni).
 	# Je to jediny spolehlivy doklad PUVODU spritu: `AtlasTexture` z `Image.load`
@@ -185,7 +278,8 @@ func stats() -> Dictionary:
 	return {"loaded": _pages.size(), "bytes": _bytes, "limit": _limit,
 		"missing": _missing, "sprites": _sprites.size(), "wrapped": _wrapped.size(),
 		"nacteni_stranek": _nacteni_stranek, "ceka": _cekajici.size(), "verze": _verze,
-		"own": _own_indexed, "uo": _uo_indexed, "own_layers": _own_layers.size()}
+		"own": _own_indexed, "uo": _uo_indexed, "own_layers": _own_layers.size(),
+		"variants": variants()}
 
 
 func is_own(art_id: int) -> bool:
@@ -201,6 +295,62 @@ func own_ids() -> Array:
 	var out: Array = _own_ids.keys()
 	out.sort()
 	return out
+
+
+func _build_groups(vrstva: Dictionary) -> void:
+	# SKUPINY VARIANT z klice `groups` vrstvy (viz hlavicka). Tvar:
+	# `{"land": [[1002, 1003], [1005, 1006]]}` - druhy jako u `sprites`.
+	# Kontrola tvaru je v `render/own_art.gd` (hlasi ji seznamem chyb); tady se
+	# jen stavi mapa art_id -> skupina a vse, co nedava smysl, se PRESKOCI
+	# S HLASENIM (ticha pulka skupiny by znamenala "varianta funguje jen nekde").
+	var groups = vrstva.get("groups", null)
+	if not (groups is Dictionary):
+		return
+	var jmeno := str(vrstva.get("name", "?"))
+	for kind in groups.keys():
+		var offset: int = _kind_offset(str(kind))
+		if offset < 0:
+			push_warning("render.textures: vrstva '%s' ma skupiny pro neznamy druh '%s' - preskakuji se"
+				% [jmeno, str(kind)])
+			continue
+		var seznam = groups[kind]
+		if not (seznam is Array):
+			continue
+		for skupina in seznam:
+			if not (skupina is Array) or (skupina as Array).size() < 2:
+				push_warning("render.textures: vrstva '%s' ma skupinu '%s' o mene nez 2 clenech - preskakuje se"
+					% [jmeno, str(kind)])
+				continue
+			var ids: Array = []
+			var vada := false
+			for id in skupina:
+				var aid: int = int(id) + offset
+				# ID VE DVOU SKUPINACH: druha by tise vyhrala; to je vada
+				# konfigurace a `own_art.gd` ji hlasi - tady se jen nepokracuje.
+				if _group_of.has(aid):
+					push_warning("render.textures: art %d je ve dvou skupinach variant - druha se ignoruje" % aid)
+					vada = true
+					continue
+				ids.append(aid)
+			if vada or ids.size() < 2:
+				continue
+			for aid in ids:
+				_group_of[aid] = ids
+			_variant_groups += 1
+			_variant_members += ids.size()
+
+
+func _kind_offset(kind: String) -> int:
+	# Prostor art id podle druhu - STEJNA mapa jako v `_index` (kdyby se
+	# rozesla, hledaly by se skupiny v jinem prostoru nez sprity).
+	match kind:
+		"land":
+			return 0
+		"item":
+			return ITEM_OFFSET
+		"texmap":
+			return TEXMAP_OFFSET
+	return -1
 
 
 func _index(sprite, prefix: String, pieces, own: bool) -> void:

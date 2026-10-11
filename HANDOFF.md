@@ -1,3 +1,284 @@
+# Předání — game-clone (2026-10-11, SESSION „KAMENNÁ CESTA V BRITAINU“: PBR sada Stone_Path_007 na 4 id cesty místo terakoty)
+
+> **Co je tenhle soubor:** **stav projektu** pro další session agenta. Přepisuje
+> se celý; historie je v `git log`. Nový blok je vždy **nahoře**; starší bloky se
+> needitují (jen doplňují). **Současný stav se bere z tohoto bloku.**
+>
+> **Odkud brát detaily téhle práce:** `assets/stone-path/manifest.json` (co je
+> v atlase), **`tools/artgen/pbr_dlazdice.py`** (nástroj, kterým se to zapeklo —
+> včetně `--seznam` a `--kontrola`), `assets/own-art.json` (která id se berou
+> z vlastního artu), `LESSONS.md` 2026-10-11 (**osmá část**). Sondy jsou
+> v gitignorovaném `_analyza/p53-nabor/`: `s18-mapa-id.py` (která id mapa na
+> cestu používá), `s31-kamena-cesta.py` (první zapek, měření jasu a světla),
+> `s32-mutace-g15.py` a `s34-mutace-g16.py` (mutační důkazy), `s33-ab.py`
+> (montáž snímků). Snímky **nejsou v gitu** (obsahují mapu z instalace UO):
+> `.cache/render/stone-path-po.png` (stav PO), `.cache/render/terakota-on.png`
+> (stav PŘED), montáž `_analyza/p53-nabor/s33-cesta-abc.png`.
+>
+> ⚠ **V tomtéž stromě pracovala PARALELNÍ SESSION na variantách dlaždic**
+> (`ZADANI-26`, `render/*`, nová brána G17) — viz její blok níž a oddíl
+> „Co dělala paralelní session“.
+
+## ✅ CO SE UDĚLALO (a proč právě to)
+
+**Zadání:** „načti aktuální PBR sety z `E:\Workspaces\assets\3d_sample` a zaveď
+do hry stone path místo toho, co je teď jako cesta v Britainu.“
+
+**Nejdřív měření, pak zapečení** — a to rozhodlo o podobě práce: „cesta
+v Britainu“ **není jedno id**. Naměřeno z `assets/uo/world/map0.land` (okno
+120×120 dlaždic kolem hráče): dlažbu tvoří **čtyři id** `1001`–`1004`
+(`cobblestones`), dohromady **27,4 %** dlaždic okna. Naše vrstva do té chvíle
+držela **dvě** z nich → v obraze vznikala **diagonální mřížka** vlastního kamene
+proložená UO (doklad `_analyza/p53-nabor/p53-hra-ab.png`). A protože poslední
+stav v atlase byla **terakota** (ze sondy `s30-vzor.py`), vypadala „cesta“ jako
+cihlová podlaha.
+
+| Věc | Soubor | Naměřeno |
+|---|---|---|
+| **Která id mapa na cestu používá** | `_analyza/p53-nabor/s18-mapa-id.py` | `1001` 1 045×, `1004` 1 028×, `1003` 946×, `1002` 925× dlaždic (z 14 375 v okně); jméno v `tiles.json` = `cobblestones` |
+| **Zapek PBR sady** | `tools/artgen/pbr_dlazdice.py` (`--sada Stone_Path_007`) | 1024² basecolor+normal+AO, `S=560`, zrno 1,4×, světlo `N·L` **zleva**, jas srovnán na `TARGET=58`; 4 dlaždice 44×44 (krok 22, tvrdá kosočtvercová alfa) |
+| **Hotový atlas** | `assets/stone-path/{manifest.json, atlas/land_0.png}` | 4 sprity `land 1001–1004` ve stránce 256×256 (krok 45 px), `ox=oy=0`; sha256 atlasu `894e3fff9ae980d4…` |
+| **Měření dlaždic** | tamtéž (výpis nástroje) | jas **57,0 / 57,4 / 58,4 / 59,3** (UO okolí má 57–59), světlo levá-horní minus pravá-dolní **+2,5 / +2,8 / −1,0 / +4,0** (UO 1003 má +4,4), měkká alfa **0,0 %** u všech čtyř |
+| **Zapojení do hry** | `assets/own-art.json` | nová vrstva `stone-path` s `land [1001, 1002, 1003, 1004]`; `own-lit` už `land 1001` **nemá** (jinak by 1 ze 4 dlaždic zůstala z jeho „road“) |
+| **Nástroj je v repu** | `tools/artgen/pbr_dlazdice.py` | `--seznam` (13 sad), zapečení, `--kontrola` = **reprodukuje committed atlas bajtově** (`SHODNY`, `894e3fff…`); do zdroje ani do tempu se nezapisuje (ZIPy se rozbalují do `.cache/pbr-sady/`) |
+| **Brána G15 po opravě vady** | `tools/gates/own_art_probe.gd`, `check-own-art.py` | `9 vlastních id / 9 zkontrolováno / 9 přepnuto`, fallback `100,116,5,1030,20085` — **odvozený z konfigurace**, ne konstanta |
+| **Brána G16 umí nový materiál** | `check-style.py` | vrstva s `"material": "pbr"` nemá co tvrdit o pixel-art stylu → místo reportu se u ní **měří tvrdá alfa** (13 spritů, 0 vad) |
+
+### 1) Proč se sáhlo na brány (a co to odhalilo)
+
+* **G15 padala na SPRÁVNÉ změně.** `own_art_probe.gd` měl id **natvrdo**
+  (`VLASTNI = [3, 1001, …]`) a `check-own-art.py` fallback id taky
+  (`FALLBACK_IDS = (1004, 0x4E75)`) — jenže `1004` je jedno ze **čtyř id cesty**.
+  Po přidání vrstvy tedy brána hlásila „art 1002 se nenacetl (None)“ a
+  „fallback id 1004 je omylem ve vlastní sadě“. Opraveno **na obou stranách**:
+  sonda bere id z `assets/own-art.json`, brána si fallback id **spočítá sama**
+  (kandidáti mínus vlastní id) a **porovná se seznamem, který hlásí sonda** —
+  dva nezávislé výpočty se musí sejít. Přesně to žádá `ZADANI-26` §2 a §3.6.
+* **G16 padala na nový MATERIÁL.** `check-style.py` chce u každého manifestu
+  report o pixel-art stylu (`styl_tvrda_alfa_prah`) z `tools/artgen/styl.py`.
+  Náš kámen žádný takový krok nemá — a **napsat tam ten klíč by bylo tvrzení
+  o kroku, který neproběhl**. Místo toho manifest říká `"material": "pbr"`
+  a brána u takové sady **měří tvrdou alfu na všech spritch, které dodává**
+  (u dlaždic, které jinak měří G6). Paleta se u `pbr` neměří (fotorealná textura
+  má barev mnoho; strop 80 je o pixel artu).
+
+## 📊 NAMĚŘENO (2026-10-11, tato session)
+
+| Co | Hodnota | Doklad (příkaz / soubor) |
+|---|---|---|
+| **Cesta je souvislá (v záběru)** | `1001:654 1002:640 1003:635 1004:643` dlaždic = **2 572**, **všechny čtyři z `assets/stone-path/`**; `own 9`, `variants {groups 1, members 4}` | `own_art_probe.gd --snimek=… --pole=1500,1630`; `.cache/render/stone-path-po.png` |
+| **Předtím to byly 2 id ze 4** | `1002:569` + `1003:613` z vlastní vrstvy, zbytek UO → diagonální vzor | `_analyza/p53-nabor/p53-hra-ab.png` (A/B z 21:42) |
+| **Změna obrazu (měřená, ne od oka)** | PŘED (terakota) → PO: **47,9 % pixelů**; UO → PO: **52,0 %** (prah 12/765) | `_analyza/p53-nabor/s33-ab.py` → `s33-cesta-abc.png` (tři panely na TÉMŽ místě) |
+| **Reprodukovatelnost zapeku** | `--kontrola` → atlas **SHODNÝ** (`894e3fff9ae980d4`); ruční přezápis taky dal **stejný sha256** | `python tools/artgen/pbr_dlazdice.py --kontrola assets/stone-path --sada Stone_Path_007` |
+| **Testy** | **2 766 kontrol / 0 selhání** | `godot --headless --path . --script res://tests/run_tests.gd` |
+| **Brány** | **16 měřeno / 0 čeká / 0 chyb** (G13 poradní) | `python tools/gates/run-all.py` |
+| **G15 self-test** | **9 případů / 0 chyb** | `python tools/gates/check-own-art.py --self-test` |
+| **G15 mutační důkaz** | **2 vady odhaleny** (sonda mlčí o fallbacku; fallback by zůstal prázdný) | `_analyza/p53-nabor/s32-mutace-g15.py` |
+| **G16 self-test** | **7 případů / 0 chyb** (nově `pbr_tvrda_alfa` OK, `pbr_mekka_alfa` VADA, `pbr_nezmereno` VADA) | `python tools/gates/check-style.py --self-test` |
+| **G16 mutační důkaz NA REÁLNÉM STROMĚ** | 2 vady: (1) 1 pixel s alfou 128 v dlaždici `1001` → `VADA` („land 1001 ma 1 polopruhlednych pixelu“); (2) smazaný `"material": "pbr"` → `VADA`; po každé **hash souboru vrácen** a brána zelená | `_analyza/p53-nabor/s34-mutace-g16.py` |
+
+## ⚠ CO ZŮSTÁVÁ OTEVŘENÉ (pojmenované, ne zamlčené)
+
+1. **Výkon (frame time v chůzi) se NEPŘEMĚŘIL.** V době práce běžel ve stromě
+   **cizí soak** (`.cache/p43.txt`, Godot spuštěný 7:28) a **paralelní session se
+   svým Godotem**, takže číslo by nebylo izolované. Změna je jen výměna textur
+   (4 dlaždice z vlastní stránky místo UO), ale **tvrzení o FPS tu není**.
+2. **`assets/cobble/` zůstává na disku a v konfiguraci už není** (byla to vrstva
+   `cobble-nano-banana`, kterou nahradila `stone-path`). Je to **necommitnutá
+   práce předchozí session** a její `manifest.json` dnes **lže**: comment tvrdí
+   „1002 = AI textura, 1003 = PBR zapek“, ale atlas obsahuje dvě **terakoty**
+   (sonda `s30-vzor.py` z 23:01). Nemazal jsem ji — smazání cizí rozdělané práce
+   patří uživateli (viz „Co čeká na tebe“).
+3. **Cesta je jeden materiál ve čtyřech variantách** (jedna PBR sada). Další
+   dlaždice, které mapa v Britainu používá (`100` = `NoName` hlína 799×,
+   `1030`–`1033` dřevěná podlaha ~1 750×), **zůstávají z UO** — zadání bylo
+   o cestě, ne o celém městě.
+4. **`assets/stone-path/atlas/land_0.png` nemá `.import`** (jako `own-lit/`) →
+   hra ji načítá fallbackem `Image.load` s WARNINGem; v exportu by to
+   nefungovalo. Je to **známé omezení celého vlastního artu**, ne vada téhle
+   práce (v `texture_cache.gd` je popsané i s důvodem, proč WARNING je pravdivý).
+5. **Nástroj `pbr_dlazdice.py` není v `.forge/roadmap.json`** jako granule
+   (stejná situace jako `sim/content.gd` a `render/own_art.gd`); plán mění
+   uživatel (`docs/07` §7.1 bod 5). Nová brána nevznikla — G15/G16 se jen
+   **opravily**, počet bran se nezměnil (G17 přidala paralelní session).
+6. **Sonda `_analyza/p53-nabor/s31-kamena-cesta.py` je předchůdce nástroje**
+   (měří jas a světlo, vypisuje čísla do logu). Až bude potřeba zapečet další
+   sadu, patří to `tools/artgen/pbr_dlazdice.py`, ne s31.
+
+## 🧍 CO ČEKÁ NA TEBE (rozhodnutí, která agent nemá dělat za tebe)
+
+1. **Podívej se na cestu ve hře** (`HRA.cmd`, dojdi na ulici v Britainu): sedí
+   ti kámen `Stone_Path_007`, nebo chceš jinou sadu z těch 13, co v
+   `assets/3d_sample` jsou (`python tools/artgen/pbr_dlazdice.py --seznam`)?
+   Nabízí se `Stone_Floor_005` (S~211), `Rock_Moss_001` (S~136),
+   `Cobblestone_Irregular_Floor_001` (S~215) — výměna je **jeden příkaz + jedno
+   id v konfiguraci**, protože nástroj i vrstva už jsou v repu.
+2. **Co s `assets/cobble/`** (necommitnutá terakota s lživým manifestem):
+   nechat jako alternativní materiál (a opravit comment), nebo smazat?
+   Publikované ani cizí věci agent nemaže.
+3. **Má cesta zůstat jen na `1001`–`1004`**, nebo se má sáhnout i na hlínu
+   `100` / dřevěnou podlahu `1030`–`1033`? (Mění to vzhled celého města, ne jen
+   ulice.)
+4. **Má `tools/artgen/pbr_dlazdice.py` a vrstva `stone-path` být granule
+   v `.forge/roadmap.json`?** (Plán a `docs/` mění uživatel.)
+
+## 🔗 COMMITY TÉTO SESSION (a ověřený push)
+
+`…` — `assets/stone-path/{manifest.json, atlas/land_0.png}` (nová vrstva),
+`assets/own-art.json` (vrstva `stone-path` na `1001–1004`; `own-lit` bez land
+1001), `tools/artgen/pbr_dlazdice.py` (nový nástroj v repu),
+`tools/gates/own_art_probe.gd` + `tools/gates/check-own-art.py` (id
+z konfigurace, fallback odvozený), `tools/gates/check-style.py` (materiál
+`pbr` → měřená tvrdá alfa), `HANDOFF.md`, `LESSONS.md`.
+
+⚠ **Do mého commitu patří i řádek `"groups"` v `assets/own-art.json`** — ten
+přidala **paralelní session** (její `render/*` v tu chvíli nebyly commitnuté).
+Bez jejího kódu je klíč jen ignorovaný záznam, takže nic nerozbije; kdo bude
+commity skládat, ať ví, že tenhle řádek přišel odsud.
+
+---
+
+# Předání — game-clone (2026-10-11, SESSION „VARIANTY DLAŽDIC“: `render.land_variants` — jedno `land` id = N dlaždic podle buňky)
+
+> **Co je tenhle soubor:** **stav projektu** pro další session agenta. Přepisuje
+> se celý; historie je v `git log`. Nový blok je vždy **nahoře**; starší bloky se
+> needitují (jen doplňují). **Současný stav se bere z tohoto bloku.**
+>
+> **Odkud brát detaily téhle práce:** zadání
+> [`ZADANI-26-VARIANTY-DLAZDIC.md`](ZADANI-26-VARIANTY-DLAZDIC.md), brána
+> `tools/gates/check-land-variants.py` (**G17**) + sonda
+> `tools/gates/land_variants_probe.gd`, test `tests/cases/land_variants.gd`,
+> dokumenty `docs/04` §4.2 a `docs/08` §8.2. Sondy jsou v `.gitignore`
+> (`_analyza/`): `lv-vykon.gd` (cena), `lv-mix.py` (výběr mixéru),
+> `lv-sabotaz.py` (mutační důkaz brány), `lv-diag.gd` (izolovaný běh case).
+> ⚠ **V tomtéž stromě pracovala PARALELNÍ SESSION na dlažbě v Britainu**
+> (nová vrstva `stone-path`, `assets/stone-path/`, `assets/own-art.json`,
+> `tools/gates/own_art_probe.gd`, `tools/gates/check-own-art.py`) — viz §„Co
+> dělala paralelní session“.
+
+## ✅ CO SE UDĚLALO (a proč právě to)
+
+**Zadání (`ZADANI-26`): „jedno `land` id → N dlaždic, vybíraných deterministicky
+podle souřadnic buňky“**, aby se dlažba na velké ploše neopakovala a nemusela se
+kupovat další a další id. Body §3 zadání:
+
+| # | Zadání | Stav | Doklad |
+|---|---|---|---|
+| 1 | `assets/own-art.json`: nepovinný klíč vrstvy `groups` | **hotovo** | `render/own_art.gd` (`groups` se validuje **seznamem chyb**); v produkci je `groups` u vrstvy `stone-path` (`[[1001,1002,1003,1004]]`) — **řádek je v necommitnuté práci paralelní session** |
+| 2 | API `texture_variant` / `offset_variant` (+ `variant_id`, `variant_index`) | **hotovo** | `render/texture_cache.gd`; offset jde z **téhož** záznamu jako textura (měří G17 na fixture s **jiným offsetem u každé varianty**) |
+| 3 | výběr = čistá funkce souřadnic, žádná náhoda | **hotovo** | `variant_index(x, y, n)`; dva nezávislé běhy dají **stejný sha256** (K4) |
+| 4 | obě kreslicí cesty totéž | **hotovo** | varianta se vybírá **v seznamu** (`render/chunk_renderer._faze_land`), takže ji vidí i dávka; G17 to měří na **slotech runtime atlasu: 1 (bez skupin) vs 16** |
+| 5 | `stats()` přidá `variants` | **hotovo** | `stats()["variants"] = {groups, members}` |
+| 6 | sonda `own_art_probe.gd` bere id z konfigurace | **udělala paralelní session** (2026-10-11 23:19) — **neopakoval jsem to** | `git diff` v `tools/gates/own_art_probe.gd` a `check-own-art.py`; obojí je zelené |
+
+**Rozhodnutí, která byla potřeba (a proč):**
+
+1. **Naivní hash ze zadání NESTAČIL.** Zadání navrhovalo „např.
+   `abs(x * 73856093 ^ y * 19349663) % N`“. Naměřeno (`_analyza/lv-mix.py`):
+   u tohoto tvaru platí **`index(x + N, y) == index(x, y)` ve 100 %** případů
+   (pro `N` = mocninu dvou závisí `mod N` jen na nízkých bitech a `HASH_X mod 4
+   = 1`) → vzor se opakuje přesně každých `N` buněk. Proto se hash **domíchává**
+   (`h ^= h >> 13; h *= 0x9E3779B1; h ^= h >> 27`, maskováno na 63 bitů) a brána
+   to hlídá jako **K3b** (perioda). S mixem: `n = 4` ~25 %, `n = 16` ~6 % (tedy
+   `1/N` jako náhodný výběr) a **žádná perioda**.
+2. **Skupina smí obsahovat jen id z `sprites` TÉ SAMÉ vrstvy.** Kdyby mohla
+   sáhnout do UO, vyrobila by přesně tu „diagonální mřížku proloženou UO“, kvůli
+   které varianta vzniká; `own_art.gd` to hlásí jako chybu (a G17 to kontroluje
+   i na produkční konfiguraci, K10).
+3. **`render.chunk` volá `variant_id`, jen když ho cache zná (`has_method`)** —
+   `render.chunk` dostává textury **injektované** a testy jsou **spec** (nemění
+   se), takže stub s `offset()` by jinak spadl. Bez metody = jedna dlaždice =
+   dnešní chování.
+4. **Offset landu v seznamu zůstává `ZERO`.** Všechny UO land sprity (4 244)
+   i vlastní dlaždice mají `ox = oy = 0` a `render.chunk_mesh` offset landu
+   **vůbec nepoužívá** — kdyby se vložil, posunul by jen původní cestu. Kdyby
+   někdy vlastní dlaždice nenulový offset potřebovala, musí se změnit **obě**
+   cesty zároveň (napsáno v obou souborech).
+
+## 📊 NAMĚŘENO (2026-10-11, tato session)
+
+| Co | Hodnota | Doklad (příkaz / soubor) |
+|---|---|---|
+| **Opakování zmizelo (A)** | podíl dlaždic shodných se sousedem: **100,00 % → …** (kalibrace bez `groups`) vs **7,63 %** se 16 variantami; **16 z 16 variant použito** | `python tools/gates/check-land-variants.py` (G17) |
+| **Perioda vzoru** | `lag N`: **100,00 % → 3,75 %** (naivní hash by dal 100 %) | tamtéž |
+| **Determinismus (B)** | dva nezávislé běhy = **stejný sha256**; test porovnává hash celé mřížky | G17 (K4), `tests/cases/land_variants.gd` |
+| **Obě cesty (dávka i seznam)** | sloty runtime atlasu: **1** (bez skupin) → **16** (se skupinami), bez přetečení stránky | G17 (K8) |
+| **Textura i offset ze stejného záznamu** | 16 různých offsetů ve fixture, **399** buněk, kde se offset liší od původního id | G17 (K5) |
+| **Výkon (C) — stavba seznamu, A/B na téže scéně** | celkem **77,38 → 84,42 ms** (+9,1 %), fáze land **25,23 → 28,43 ms** (+12,7 %); **6 095 objektů, 3 072 land dlaždic** | `_analyza/lv-vykon.gd` (`godot --headless --script`) |
+| **Výkon (C) — co zaplatí JEDEN frame** | prestavba je dělená po `STAVBA_MS = 8,0 ms`; **median řezu 8,17 → 8,42 ms (+0,25 ms), max 8,50 → 9,05 ms, řezů 10 vs 10** | tamtéž |
+| **Cena jednoho výběru** | `variant_id` ~**1 484 ns** vs `variant_id` bez skupin ~**560 ns** (200 000 volání; zahrnuje i režii smyčky) → ~2,9 ms na celou přestavbu 3 072 dlaždic | tamtéž |
+| **Mutační důkaz brány (G17 umí spadnout)** | M1 (`variant_index` vždy 0) → `exit 1`, chyceno `K3` i `K3b`; M2 (**hash bez mixu**) → `exit 1`, chyceno **`K3b`** (a `K3` přitom svítí 0,00 %!) | `python _analyza/lv-sabotaz.py` → `3 z 3 v poradku`; soubor vrácen **bajtově shodný** |
+| **Self-test G17** | **14 případů, 0 chyb** (známý správný i 8 známých vadných vstupů) | `python tools/gates/check-land-variants.py --self-test` |
+| **Test `land_variants.gd`** | **16 kontrol, 0 selhání** (izolovaně) | `godot --headless --script res://_analyza/lv-diag.gd` |
+
+## ✅ BRÁNY A TESTY (celý strom, 2026-10-11)
+
+* `python tools/gates/run-all.py` → **16 měřeno / 0 čeká / 0 chyb**, `exit 0`
+  (G1, **G3**, G5, G2, G14, G4, G6, **G15**, **G16**, **G17**, G7, G8, G9, F1,
+  G11, G10; G13 je poradní a neimplementovaná). G17 je v pořadí **hned za G16**.
+* `tests/run_tests.gd` → **2767 kontrol / 0 selhání** (nový case
+  `tests/cases/land_variants.gd` = **16 kontrol**).
+* `python tools/check-docs-refs.py` → interní odkazy OK;
+  `python tools/check-zadani.py` → zadávací balíček konzistentní.
+
+## ⚠ CO ZŮSTÁVÁ OTEVŘENÉ (pojmenované, ne zamlčené)
+
+1. **Výkon (C) NENÍ změřen jako „frame time v chůzi“.** Původní baseline
+   (median 34,6 ms) se v této session **nepřeměřila**: ve stromě běžela
+   paralelní session se svým Godotem (v mém logu se objevily **její** řádky
+   `[metrics]`), takže čísla nebyla izolovaná (naměřeno `median 1,53 ms /
+   p90 142,59 ms` — nepoužitelné). Změřeno je místo toho **A/B stavby seznamu
+   a cena jednoho řezu** (viz tabulka): frame platí max `STAVBA_MS = 8 ms` a ten
+   se změnil o **+0,25 ms** (median). Kdo chce číslo z chůze, ať spustí
+   `.cache/analysis/sonda-fps.gd` na **klidném stroji**.
+2. **Křížové skupiny (id z různých vrstev) nejsou podporované.** Dnes je
+   `groups` klíč vrstvy a člen musí být v `sprites` téže vrstvy. Kdyby měla
+   `own-lit` (land 1001) a `stone-path` (1001–1004) tvořit **jeden** materiál,
+   musí se id přesunout do jedné vrstvy — jinak se míchá vlastní art s UO.
+3. **`tools/gates/mutace-tests.py` o novém case neví** (nový `case` soubor se
+   spustí v `run_tests.gd` sám, ale mutační harness pro něj nemá vzory).
+   Důkaz, že brána i test umí selhat, je zatím **boční** (`_analyza/lv-sabotaz.py`
+   + self-test G17); trvalé řešení = přidat vzory do harnessu (patří
+   integrační session, soubor je „zakázaný“).
+4. **`variant_id` se volá per dlaždice** (~1,5 µs s režií volání) → ~2,9 ms na
+   přestavbu 3 072 dlaždic. Kdyby to někdy vadilo, jde sešít do `_faze_land`
+   (hash napočítat inline) — dnes to nemá cenu, protože přestavba je dělená
+   a frame platí pořád max 8 ms.
+5. **`assets/own-art.json` s `groups` u vrstvy `stone-path` je NEOCOMMITOVANÝ**
+   (patří paralelní session, viz níž). Když ho commitne bez toho klíče, G17 to
+   **řekne nahlas** (poznámka „produkce `groups` nemá“) a v produkci se varianty
+   přestanou používat — ale mechanika i brána zůstanou zelené.
+
+## 🧍 CO DĚLALA PARALELNÍ SESSION (a co z toho plyne pro tebe)
+
+Ve stromě souběžně pracovala druhá session na **dlažbě v Britainu**: přidala
+vrstvu `stone-path` (`assets/stone-path/` — **necommitnuto**, `manifest.json` +
+`atlas/land_0.png`), přepsala `assets/own-art.json` (dnes čtyři id `1001–1004`
+v této vrstvě, `own-lit` už land 1001 nemá) a **opravila vadu ze `ZADANI-26` §2**
+(hardcoded id v `tools/gates/own_art_probe.gd` → id z konfigurace; totéž
+v `check-own-art.py`, kde se fallback id odvozují z konfigurace).
+
+**Co z toho plyne:** (a) její soubory jsem **needitoroval** a needitoval bych je
+ani teď — jen jsem do `assets/own-art.json` přidal `groups` (aditivní řádek);
+(b) jeden běh `run-all.py` v průběhu ukázal **G16 `check-style.py` = VADA**
+(„report netvrdí tvrdou alfu“) — to byl **přechodný stav její rozdělané práce**
+(její manifest style report ještě neměl); o pár minut později byla G16 zelená
+**beze změny mého kódu**. Kdo vidí červenou bránu v souběžné session, ať
+**nejdřív zjistí, čí soubor to hlásí**, a nesahá na cizí rozdělanou práci.
+
+## 🔗 COMMITY TÉTO SESSION (a ověřený push)
+
+`…` — `render/texture_cache.gd` (varianta, `groups`, `stats.variants`),
+`render/own_art.gd` (validace `groups`), `render/chunk_renderer.gd` (výběr
+v seznamu), `tests/cases/land_variants.gd` + `.uid` (nový case),
+`tools/gates/check-land-variants.py` + `tools/gates/land_variants_probe.gd` +
+`.uid` (nová brána **G17**), `tools/gates/run-all.py` (registrace G17),
+`docs/04` §4.2 a `docs/08` §8.2 (smlouva), `HANDOFF.md`, `LESSONS.md`.
+**Necommitoval jsem** `assets/own-art.json` ani `assets/stone-path/` (cizí
+rozdělaná práce) — `groups` v konfiguraci proto čeká na commit paralelní session.
+
+---
+
 # Předání — game-clone (2026-10-11, SESSION F: MRTVÉ KOTVY V MUTAČNÍM HARNESSU — 4 kotvy + 1 falešně chycená mutace)
 
 > **Co je tenhle soubor:** **stav projektu** pro další session agenta. Přepisuje

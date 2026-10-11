@@ -37,7 +37,14 @@ const KINDS: Array = ["land", "item", "texmap"]
 
 static func load_config(cesta: String = DEFAULT_PATH) -> Dictionary:
 	# Vraci {"ok": bool, "cesta": String, "errors": Array[String], "layers": Array}
-	# Vrstva: {"name", "manifest", "page_prefix", "anim", "sprites": {"land": [..]}}
+	# Vrstva: {"name", "manifest", "page_prefix", "anim", "sprites": {"land": [..]},
+	#          "groups": {"land": [[id, id, ...]]}}
+	# `groups` je NEPOVINNY (bez nej je chovani presne dnesni: jedno id = jedna
+	# dlazdice) a znamena "tato id tehoz druhu jsou JEDEN MATERIAL" - variantu
+	# z nich pak vybira `render.textures.variant_id(art_id, x, y)` podle
+	# souradnic bunky. Skupina smi obsahovat jen id z `sprites` TE SAME vrstvy
+	# (jinak by se michal vlastni art s UO) a zadne id nesmi byt ve dvou
+	# skupinach - oboji je vada a hlasi se seznamem.
 	var out: Dictionary = {"ok": false, "cesta": cesta, "errors": [], "layers": []}
 	if not FileAccess.file_exists(cesta):
 		out["errors"].append("konfigurace vlastniho artu chybi: " + cesta)
@@ -64,6 +71,7 @@ static func load_config(cesta: String = DEFAULT_PATH) -> Dictionary:
 
 	var jmena: Dictionary = {}
 	var obsazene: Dictionary = {}       # "kind|id" -> jmeno vrstvy (duplikat = vada)
+	var obsazene_skupiny: Dictionary = {}   # "kind|id" -> vrstva, ktera ho ma ve skupine
 	for i in vrstvy.size():
 		var surova = vrstvy[i]
 		var kde := "vrstva %d" % i
@@ -129,6 +137,73 @@ static func load_config(cesta: String = DEFAULT_PATH) -> Dictionary:
 		if not vyber_ok:
 			continue
 
+		# SKUPINY VARIANT (granule `render.land_variants`, viz hlavicka
+		# `render/texture_cache.gd`): nepovinny klic `groups`, napr.
+		# `{"land": [[1002, 1003]]}` = "tato id jsou jeden material".
+		# Kontroluje se TADY a seznamem chyb, protoze konfigurace je zdroj
+		# pravdy: co neni v `sprites`, se z vrstvy nebere, takze skupina pres
+		# neexistujici id by tise michala vlastni art s UO.
+		var skupiny: Dictionary = {}
+		var groups = vrstva.get("groups", null)
+		if groups != null and not (groups is Dictionary):
+			errors.append("%s: 'groups' musi byt slovnik (druh -> seznam skupin)" % kde)
+			continue
+		if groups is Dictionary:
+			var skupiny_ok := true
+			for kind in (groups as Dictionary).keys():
+				var k := str(kind)
+				if not KINDS.has(k):
+					errors.append("%s: 'groups' ma neznamy druh '%s' (povolene: %s)" % [kde, k, str(KINDS)])
+					skupiny_ok = false
+					continue
+				var seznam = (groups as Dictionary)[kind]
+				if not (seznam is Array) or (seznam as Array).is_empty():
+					errors.append("%s: 'groups.%s' musi byt neprazdny seznam skupin" % [kde, k])
+					skupiny_ok = false
+					continue
+				var hotove: Array = []
+				for g in seznam:
+					if not (g is Array):
+						errors.append("%s: 'groups.%s' obsahuje '%s', coz neni seznam id" % [kde, k, str(g)])
+						skupiny_ok = false
+						continue
+					if (g as Array).size() < 2:
+						errors.append("%s: 'groups.%s' ma skupinu o %d id - varianta potrebuje aspon 2"
+							% [kde, k, (g as Array).size()])
+						skupiny_ok = false
+						continue
+					var clenove: Array = []
+					var skupina_ok := true
+					for id in g:
+						if not (id is float or id is int):
+							errors.append("%s: 'groups.%s' obsahuje '%s', coz neni cislo id" % [kde, k, str(id)])
+							skupina_ok = false
+							continue
+						var ident := int(id)
+						if clenove.has(ident):
+							errors.append("%s: 'groups.%s' ma id %d dvakrat v teze skupine" % [kde, k, ident])
+							skupina_ok = false
+							continue
+						if not (vyber.get(k, []) as Array).has(ident):
+							errors.append("%s: 'groups.%s' obsahuje %d, ktere vrstva v 'sprites.%s' nema - skupina smi michat jen id TE SAME vrstvy" % [kde, k, ident, k])
+							skupina_ok = false
+							continue
+						var klicek := "%s|%d" % [k, ident]
+						if obsazene_skupiny.has(klicek):
+							errors.append("%s: %s je uz ve skupine vrstvy '%s' - druha by se tise ignorovala"
+								% [kde, klicek, str(obsazene_skupiny[klicek])])
+							skupina_ok = false
+							continue
+						obsazene_skupiny[klicek] = jmeno
+						clenove.append(ident)
+					if not skupina_ok or clenove.size() < 2:
+						continue
+					hotove.append(clenove)
+				if not hotove.is_empty():
+					skupiny[k] = hotove
+			if not skupiny_ok:
+				continue
+
 		var anim := "" if vrstva.get("anim", null) == null else str(vrstva.get("anim"))
 		if anim != "" and not FileAccess.file_exists(anim):
 			errors.append("%s: animace '%s' neexistuje" % [kde, anim])
@@ -140,6 +215,7 @@ static func load_config(cesta: String = DEFAULT_PATH) -> Dictionary:
 			"page_prefix": manifest.get_base_dir() + "/",
 			"anim": anim,
 			"sprites": vyber,
+			"groups": skupiny,
 		})
 
 	if out["layers"].is_empty() and errors.is_empty():

@@ -24,7 +24,170 @@ Typy: `chyba` (moje vada) · `past-nástroje` (prostředí/nástroj, ne logika) 
 
 ---
 
+# 2026-10-11 (osmá část) — SESSION „KAMENNÁ CESTA“: ARTEFAKT A MANIFEST SE ROZEŠLY, BRÁNA PADALA NA SPRÁVNÉ ZMĚNĚ
+
+> **Zadání:** „načti aktuální PBR sety z `E:\Workspaces\assets\3d_sample` a zaveď
+> do hry stone path místo toho, co je teď jako cesta v Britainu.“ Co je hotové
+> a naměřené, je v `HANDOFF.md` (blok nahoře).
+
+### 2026-10-11 — Atlas a jeho manifest se rozešly (a testy to nemohly vidět) (past-nástroje)
+**Co se stalo:** Poslední zápis do `assets/cobble/atlas/land_0.png` udělala sonda
+`s30-vzor.py` (23:01) — zapekla tam **terakotové dlaždice**. Její `manifest.json`
+ale pořád tvrdil `"comment": "1002 = AI textura (Nano Banana), 1003 = PBR zapek
+z 3d_sample"` a `"generator": "_analyza/p53-nabor/s26-pbr.py"`. Všechny brány
+byly zelené, protože G6 i G15 kontrolují **strukturu** (id, stránka, rect,
+offset) — ne to, jestli popisek v manifestu odpovídá pixelům.
+**Doklad:** `read_image` na `assets/cobble/atlas/land_0.png` (dvě hnědé terakoty)
+vs. `Get-Content assets/cobble/manifest.json`; porovnání se snímkem z 21:42
+(`_analyza/p53-nabor/p53-hra-ab.png`), kde na těchže id byl šedý kámen.
+**Ponaučení:** zapečení dlaždice a zápis manifestu musí být **jeden krok
+jednoho nástroje** (proto `tools/artgen/pbr_dlazdice.py` píše PNG i manifest
+spolu a `--kontrola` umí dokázat, že z nich vyleze totéž). Kdo píše do atlasu
+rukemocnou sondou, musí v tomtéž kroku přepsat i `generator`/`comment` — jinak
+vznikne lež, kterou žádná brána nechytí.
+
+### 2026-10-11 — Brána s natvrdo zapsaným fallback id padá na SPRÁVNÉ změně (chyba)
+**Co se stalo:** `check-own-art.py` měl `FALLBACK_IDS = (1004, 0x4E75)` a sonda
+`own_art_probe.gd` `VLASTNI = [3, 1001, …]`. Jakmile cesta v Britainu převzala
+všechna čtyři id (`1001`–`1004`), brána vyrobila **devět falešných nálezů**
+(„art 3/1001/1002/1003/1004 se nenacetl (None)“, „fallback id 1004 je omylem ve
+vlastní sadě“, „sonda nehlasila animace“). Přitom kód byl správný — vadné bylo
+to, že **vstup brány byl konstanta, kterou změna configu zneplatnila**.
+**Doklad:** výstup G15 před opravou (9 CHYB, `exit 1`); po opravě
+`9 vlastních id / 9 zkontrolováno / 9 přepnuto`, `fallback_id 100,116,5,1030,20085`,
+`exit 0`. Mutační důkaz `_analyza/p53-nabor/s32-mutace-g15.py` (2 vady odhaleny).
+**Ponaučení:** co brána porovnává, musí **odvodit ze stejné konfigurace, kterou
+validuje** — a když se seznam počítá na dvou místech (sonda vs. brána), **musí se
+obě strany sejít** (`hlaseny_fallback != ocekavany_fallback` = vada). Konstanta
+s id v bráně je časovaná bomba: spadne až ve chvíli, kdy se změní produkce,
+a vypadá to jako vada kódu.
+
+### 2026-10-11 — Nová materiálová třída nemá dostat cizí report, ale vlastní MĚŘENÍ (postup)
+**Co se stalo:** G16 (`check-style.py`) chce u každého manifestu vlastního artu
+report `styl_tvrda_alfa_prah` z `tools/artgen/styl.py` (pixel-art styl). Kamenná
+cesta je **zapek PBR sad** — žádný takový krok neproběhl. Dvě špatné cesty:
+(1) napsat do manifestu ten klíč (tvrzení o kroku, který se nestal),
+(2) přidat do brány tichý `continue`. Udělalo se třetí: manifest říká
+`"material": "pbr"` a brána u takové sady **měří tvrdou alfu na všech spritch,
+které dodává** (i na dlaždicích, které jinak patří G6); paleta se u `pbr`
+neměří, protože fotorealná textura má barev mnoho.
+**Doklad:** `python tools/gates/check-style.py --self-test` = **7 případů / 0 chyb**
+(nové: `pbr_tvrda_alfa` OK, `pbr_mekka_alfa` VADA, `pbr_nezmereno` VADA);
+`_analyza/p53-nabor/s34-mutace-g16.py` na **reálném stromě**: 1 pixel s alfou 128
+v dlaždici `1001` → `VADA`, smazaný `"material"` → `VADA`, po každé hash souboru
+vrácen a brána zelená.
+**Ponaučení:** když do vlastního artu přibude materiál, který **není** to, co
+brana dosud hlídala, patří do manifestu **pojmenovaný druh** a brána má u něj
+měřit **vlastnost, která platí i pro něj** (tady tvrdá alfa) — ne převzít cizí
+report ani mlčet. „Přidat klíč, aby to prošlo“ je lež, kterou nikdo nepřečte.
+
+### 2026-10-11 — Dvě session v jednom stromě: rozpůlený soubor vypadá jako rozbitý (past-nástroje)
+**Co se stalo:** Během práce psala do téhož stromu **druhá session**
+(`render/texture_cache.gd` vyrostl z 17 271 B na 23 221 B v 23:20:37). Běh sondy
+G15 v tu chvíli spadl na `Parse Error: Could not preload resource script
+"res://render/texture_cache.gd"` a **vypadal jako rozbitý soubor**; o dvě minuty
+později byl tentýž soubor v pořádku. Zároveň ve stromě běžel **cizí soak**
+(`.cache/p43.txt`, Godot z 7:28), který do logu sype `[metrics]` řádky.
+**Doklad:** `Get-Item render/texture_cache.gd` (`LastWriteTime` 23:20:37) +
+`Get-CimInstance Win32_Process` (běžící Godot s cizí sondou); `--check-only` na
+týž soubor po dokončení zápisu = `exit 0`.
+**Ponaučení:** před každým měřením zkontroluj **mtimes a běžící procesy**; když
+do stromu píše někdo jiný, **číslo je neopakovatelné a musí se to napsat k němu**
+(což je i důvod, proč v předání není žádné FPS). A parse error, který sám zmizí,
+není vada kódu.
+
+### 2026-10-11 — Postup v gitignorovaném `_analyza/` se do repa nedoveze (postup)
+**Co se stalo:** Cesta k dlaždicím (zapeč PBR → manifest → vrstva) byla celá
+v `_analyza/p53-nabor/` a v `_analyza/p53-nabor/JAK-PRIDAT-SADU.md`, tedy
+**v `.gitignore`**. Artefakt by byl v gitu, ale **postup, kterým vznikl, ne** —
+příští session by musela hádat konstanty (zrno 1,4×, `TARGET=58`, světlo zleva,
+krok 22, tvrdá alfa).
+**Doklad:** nový `tools/artgen/pbr_dlazdice.py` (v gitu) + `--kontrola`, které
+vydalo **`SHODNY`** a stejný sha256 atlasu (`894e3fff…`) jako ruční přepis.
+**Ponaučení:** u věcí, které se budou opakovat („přijde další PBR sada“), patří
+**nástroj do repa** — a má umět **dokázat, že vyrobí totéž** (`--kontrola` proti
+tomu, co je commitnuté). Sonda v `_analyza/` je pro měření, ne pro reprodukci.
+
+---
+
+# 2026-10-11 (sedmá část) — SESSION „VARIANTY DLAŽDIC“: VZOR, KTERÝ NAVRHNE ZADÁNÍ, MŮŽE BÝT TA VADA
+
+> **Zadání:** `ZADANI-26-VARIANTY-DLAZDIC.md` — jedno `land` id → N dlaždic
+> vybíraných deterministicky podle souřadnic buňky. Hotové a měřené věci jsou
+> v `HANDOFF.md` (blok nahoře).
+
+### 2026-10-11 — Metrika „shoda se sousedem“ je slepá na PRAVIDELNOU mřížku (past-nástroje)
+**Co se stalo:** Zadání navrhovalo hash `abs(x * 73856093 ^ y * 19349663) % N`
+a za vadu označilo jen „podíl dlaždic shodných se sousedem (lag 1)“. Naměřeno
+(`_analyza/lv-mix.py`): u tohoto tvaru je **`index(x + N, y) == index(x, y)`
+ve 100 % případů** (`N` = mocnina dvou → `mod N` závisí jen na nízkých bitech;
+`HASH_X mod 4 = 1`, `HASH_Y mod 16 = 15`). Vzor se tedy opakuje přesně každých
+`N` buněk — u `N = 4` je to **176 px** — a přitom **lag 1 vyšel 0,00 %**, takže
+by metrika ze zadání takovou „variantu“ **pochválila**.
+**Doklad:** `_analyza/lv-mix.py` (tabulka: naivní `lag1 0,0 % / lagN 100,0 %`,
+s mixem `lag1 ~6 %, lagN ~4 %`); mutační důkaz `_analyza/lv-sabotaz.py` (M2 =
+hash bez mixu → G17 `exit 1` na `K3b`, a `K3` přitom svítí `0,00 %`).
+**Ponaučení:** ke každé metrice „zmizelo opakování“ patří **i měřítko, na kterém
+se opakování může objevit** (tady `lag = N`), ne jen bezprostřední soused.
+A návrh vzorce v zadání je **tvrzení, které se měří** — „např.“ v zadání
+neznamená, že ten vzorec funguje.
+
+### 2026-10-11 — Kalibrace na dnešním chování je to, co dělá z čísla důkaz (postup)
+**Co se stalo:** Než se změřilo „se 16 variantami je podíl < 20 %“, změřilo se
+**totéž bez `groups`, kde musí vyjít přesně 100 %** (dnešní chování: jedno id =
+jedna dlaždice). Kdyby metrika měřila něco jiného (špatná oblast, prázdný
+seznam, jiný `art_id`), spadne už kalibrace — a ne až „podezřele nízké“ číslo.
+**Doklad:** `tools/gates/check-land-variants.py` (K2: `abs(n1_lag1 - 100) > 0.001`
+= vada; měřeno `100,00 %`), self-test G17 (14 případů, 0 chyb) umí spadnout
+i na `n1_lag1 = 92 %`.
+**Ponaučení:** u každé nové metriky napiš **známý správný případ** (čímž se
+kalibruje) i **známý vadný** — jinak zelená znamená jen „číslo vypadá dobře“.
+
+### 2026-10-11 — Injektované rozhraní + testy jako spec = `has_method` místo tvrdého volání (postup)
+**Co se stalo:** `render.chunk` dostává textury **injektované**; v testech je to
+stub s `offset()`, v produkci `render.textures`. Nová metoda `variant_id` by
+tvrdým voláním shodila všechny existující testy — a ty se **nesmí editovat**
+(docs/09 §9.5: testy jsou spec). Volá se proto `has_method("variant_id")`;
+bez metody = jedna dlaždice = **dnešní chování**, což je přesně to, co se od
+„bez skupin“ čeká.
+**Doklad:** `render/chunk_renderer.gd` (`_art_land`), plný běh testů
+`2766 kontrol, 1 selhání` → po opravě case `0` (nový case
+`tests/cases/land_variants.gd`), `tools/gates/run-all.py` G3 zelená.
+**Ponaučení:** nové API do švu, který dostává závislosti injektované, patří
+**podmíněně** (a s komentářem, proč to není tiché obcházení) — alternativa je
+editovat cizí testy, což je zakázané a bylo by to horší.
+
+### 2026-10-11 — Dvě session v jednom stromě: červená brána může být CIZÍ rozdělaná práce (past-nástroje)
+**Co se stalo:** `python tools/gates/run-all.py` ukázal **G16 `check-style.py`
+= VADA** („report netvrdí tvrdou alfu“). Přitom se mého kódu netýkala: ve stromě
+souběžně pracovala druhá session na dlažbě v Britainu a její nový
+`assets/stone-path/manifest.json` ten údaj ještě neměl. O pár minut později
+byla G16 zelená **beze změny mého kódu**. A ve stejném stromě se mi do logu
+měření fps připletly **její** řádky `[metrics]`, takže číslo frame time nebylo
+izolované (`median 1,53 ms / p90 142,59 ms` = nepoužitelné).
+**Doklad:** `HANDOFF.md` (blok nahoře, §„Co dělala paralelní session“);
+`git status` v 23:20 ukazoval `M tools/gates/own_art_probe.gd`,
+`M tools/gates/check-own-art.py`, `?? assets/stone-path/`.
+**Ponaučení:** u červené brány v souběžné session se **nejdřív ptej, čí soubor
+to hlásí** (`git status`, `LastWriteTime`) — a nikdy „neopravuj“ cizí rozdělanou
+práci. A **měření výkonu patří na klidný stroj**; jinak je to NEMĚŘENO, ne zelená.
+
+### 2026-10-11 — Sonda si smí „posunout frame“, když měří cenu jednoho framu (nástroj)
+**Co se stalo:** Přestavba seznamu je dělená po `STAVBA_MS = 8,0 ms` na frame,
+ale v `--headless` skriptu (`SceneTree`) **žádné framy neběží** — `visible(...)`
+má guard na `Engine.get_process_frames()`, takže druhé volání v témže „framu“
+neudělá nic a měřilo by se nula. Sonda proto před každým krokem přepíše
+`chunk._krok_frame = -1`, čímž si frame posune ručně.
+**Doklad:** `_analyza/lv-vykon.gd` (`_rezy()`): 10 řezů, median `8,17 ms` (bez
+skupin) vs `8,42 ms` (se skupinami), max `8,50` vs `9,05 ms`.
+**Ponaučení:** když nástroj měří „cenu jedné jednotky práce, která se v produkci
+děje po framech“, musí měřidlo **umět ten frame posunout** — a musí to být
+napsané v komentáři, protože jinak to vypadá jako obcházení API.
+
+---
+
 # 2026-10-11 (šestá část) — SESSION F: MRTVÉ KOTVY V MUTAČNÍM HARNESSU
+
 
 > **Zadání:** `DALSI-SESSION.md` §F — najít vzory, které se ve zdroji už
 > nenašly (`PATRANA VETA SE VE ZDROJI NENASLA`); taková mutace se tiše
