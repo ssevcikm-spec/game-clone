@@ -176,6 +176,28 @@ a prošly; našel to až `read_image` nad snímkem.
 **Ponaučení:** u okna se **velikost obsahu měří** (`get_combined_minimum_size()`)
 a porovnává s rámem; pozadí je u textu na mapě **povinné**, ne kosmetika.
 
+### 2026-10-11 — Slepý test (agent bez kontextu) našel pět věcí, které testy nemohou (postup)
+**Co se stalo:** jako poslední ověření kriteria („člověk, který hru nezná,
+projde smyčku bez rady") jsem poslal **jediný snímek** agentovi, který
+**neviděl projekt ani kód** a nesměl číst nic jiného než ten obrázek. Cíl
+i postup si **přečetl správně** (nápověda tedy funguje), ale našel pět věcí,
+které neměří žádný test ani sonda: (1) **krok 1 je bez hádání neproveditelný**,
+protože na obrazovce není zvýraznění dlaždice pod kurzorem; (2) **výheň
+a kovadlina nejsou vidět** (předměty na zemi se nekreslí) a log říká jen
+světovou stranu; (3) **jmenovky se překrývají** a hráč nenajde ani sebe;
+(4) nápověda **zakrývá polovinu světa**, na kterou odkazuje; (5) **dvojjazyčnost**
+(log anglicky, cíl česky) mate.
+**Doklad:** `HANDOFF.md` „Nezávislý pohled (slepý test prvního obrazu)"
+(tabulka 5 nálezů + další krok pro každý); snímek `.cache/dukaz-onboarding/po.png`;
+běželo **dvakrát** (první kolo četlo snímek z doby před opravami hlášek souboje —
+proto se nález „útočím já?" v druhém kole změnil na „rat hits you for 2 damage").
+**Ponaučení:** „testy jsou zelené" a „sonda to dojde" **nenahrazují pohled
+člověka** - dej snímek někomu (i agentovi) **bez kontextu** a ptej se „co uděláš
+první a proč". Je to nejlevnější test čitelnosti, jaký v projektu je; a najde
+**jinou třídu vad** než brány: ne „je to rozbité", ale „nevím, co mám dělat".
+Pozor na dvě meze: **kurzor myši na snímku není** (to je vlastnost snímku, ne
+hry) a **jedno kolo nestačí** - snímek zestárne, jakmile se cokoli opraví.
+
 ---
 
 # 2026-10-11 (třetí část) — ART v3: STÍN BYL V POSTPROCESSU, KONTRAST VE SVĚTLE

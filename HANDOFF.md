@@ -143,6 +143,30 @@ vlevo nápověda s klávesami a cílem, vpravo obchod **v režimu prodeje** (dý
 9. **`data/help.json` není v `check-content.py`** (nový datový soubor bez
    granule) — brána G5 ho nevidí; test `ui_hotkeys.gd` ho čte napřímo.
 
+## 🧍 NEZÁVISLÝ POHLED (slepý test prvního obrazu) — co našel on, ne já
+
+**Jak to bylo měřeno:** agent, který **nikdy neviděl projekt ani kód** (žádné
+čtení souborů, jen `read_image`), dostal **jediný snímek** `.cache/dukaz-onboarding/po.png`
+(první obraz ~7 s po startu) a čtyři otázky: co hra říká, co uděláš první/druhé/
+třetí, co chybí, co překáží. Běželo to **dvakrát** (první kolo četlo snímek
+z doby před opravou hlášek souboje a před redukcí monster, druhé kolo už aktuální).
+**Verdikt obou kol:** cíl i postup si z obrazovky **přečetl správně** (těžba →
+tavení → výroba → prodej, včetně kláves), takže nápověda funguje. Našel ale
+pět věcí, které **testy, brány ani sonda najít nemohly**:
+
+| # | Nález | Platí i po opravách? | Další krok |
+|---|---|---|---|
+| 1 | **Krok 1 („namiř na kámen a stiskni E/T") se nedá provést bez hádání** — na obrazovce není vidět, která dlaždice je pod kurzorem a jestli E/T něco trefí | **ANO** (kurzor v produktu vidí hráč; **zvýraznění cílové dlaždice ale neexistuje**) | `ui.target_cursor` (W5) + `world_view`: kreslit obrys/zesvětlení dlaždice pod kurzorem. `input_map` dlaždici už počítá (debug overlay ukazuje `pick=`), takže jde o kreslení |
+| 2 | **Výheň a kovadlina nejsou vidět** („jen obří zeď"); log říká jen světovou stranu, chybí vzdálenost i cesta | **ANO** (předměty na zemi se nekreslí — zapsáno v `app/main._postav_stanice`) | `render`: kreslit předměty na zemi (`parent == 0`); do té doby je pomoc levná — **říct vzdálenost v dlaždicích** („2 dláždice na východ") |
+| 3 | **Jmenovky se překrývají a nedají se přečíst** (`rat` přes `Blacksmith` přes hráče) — hráč nenajde ani sebe | **ANO** (vada z M5, tato session ji neřešila) | `render.name_plates` + `world_view`: odsazovat jmenovky (kolize), zvýraznit hráče |
+| 4 | **Nápověda zakrývá ~polovinu světa** — tedy přesně to, na co odkazuje krok 1 | **ANO** (vědomá daň za „nápověda otevřená od startu") | volby: menší panel / jiný roh / schovat po prvním stisku klávesy; je to **rozhodnutí o vzhledu** |
+| 5 | **Dvojjazyčnost mate** (log anglicky, cíl a nápověda česky) + nejasné barvy žurnálu (červená = co?) | **ANO** | texty, které jsme psali MY (`uvod`, hlášky světa), přeložit do češtiny; hlášky ze `sim` (UO styl) nechat, dokud nebude lokalizace (`docs/01` §1.5 bod 7) |
+
+**Co z toho plyne pro „hotovo":** kritérium („projde smyčku BEZ RADY") je
+**splněné jen na papíře** — sonda i slepý test dojdou k cíli, ale **krok 1 je
+nejistý**, protože hráč nevidí, na co míří. Dokud nebude bod 1 a 2, je to
+„projde, když uhodneš, kterou dlaždici" — a to je přesně to, co zadání odmítá.
+
 ## 🧍 CO ČEKÁ NA TEBE (a je to levné)
 
 1. **Zahraj si to bez čtení kódu** a řekni, kde ses zasekl:
