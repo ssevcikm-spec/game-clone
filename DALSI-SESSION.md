@@ -125,6 +125,24 @@ stabilní ID, pořadí načítání, verzované ukládání, sandbox skriptů.
 
 ---
 
+## F) Úklid: mrtvé kotvy v mutačním harnessu (malá, ale měřitelná)
+
+**Co se stalo 2026-10-10:** při práci se našly **tři mrtvé kotvy** v
+`tools/gates/mutace-tests.py` — vzory, které se ve zdroji už nenajdou, takže se
+mutace **tiše neprovede** a harness ji počítá jako nechycenu (nebo ji přeskočí
+s hláškou `PATRANA VETA SE VE ZDROJI NENASLA`). Dvě vznikly dřívější prací
+(model `never` u staminy), jednu jsem způsobil sám (throttle podle pravidla).
+
+**Úkol:** spustit `python tools/gates/mutace-tests.py` (celý, ~200 vzorů, trvá
+desítky minut) a **vypsat všechny `PATRANA VETA`** + přepsat kotvy na dnešní
+kód. **Nemaže se nic** — vzor, který už nemá co měřit, se buď opraví, nebo se
+odstraní s odůvodněním v komentáři.
+
+**Hotovo, když:** běh nehlásí ani jednu `PATRANA VETA` a souhrn je
+`N z N chyceno; smlouva vstupu: OK`.
+
+---
+
 ## Jak to zadat (zkopíruj do nové session)
 
 ```text
