@@ -3315,3 +3315,73 @@ podezření je **vlastní nástroj**, ne měřený kód.
 | `_analyza/vlna7-drzeni.gd` | **end-to-end** držení: programový stisk → reálná smyčka → počet kroků | držení 2,5 s → **4 kroky**, stisk 100 ms → **1 krok**, držené pravé tlačítko 2 s → **8 kroků, −4 stamina** |
 | `_analyza/vlna8-seda-plocha.py`, `vlna9-teren.gd` | kde je „šedá plocha" (barva 77,77,77) a jak vypadá terén obarvený podle `z` | šedá = **pozadí**, ne chybějící art; pruh ~140 px mezi `z = 20` a `z = -15` |
 | `_analyza/vlna1-snimek.gd`, `vlna4-input-sonda.gd` | snímky hry na zadaných dlaždicích; ověření, že `Input.action_press` funguje v headless | snímky `pred-`/`po-`/`svah-`; `action_press` v headless **funguje** (testy držení na tom stojí) |
+
+
+## 2026-10-11 — M5 (souboj, monstra, smrt, loot): pasti, které stály čas
+
+### `int(null)` v GDScriptu HODÍ výjimku (není to 0 a `get` default nepomůže)
+
+**Co se stalo:** `data/weapons.json` má u všech zbraní `layer: null`
+(`pending-tiledata`, docs/06 §6.4) a `data/monsters.json` má u části monster
+`int_: null`. Kód `int(rec.get("layer", 1))` u `null` **nespadne na default** —
+Godot 4 vyhodí `Invalid call. Nonexistent 'int' constructor` a přeruší volání.
+Projevilo se to jako „hráč má zbraň nasazenou ({1: 7}), ale `weapon_of` vrací
+`{}`“ a „monstra se nepostaví“.
+**Pravidlo:** hodnotu z JSONu nikdy nepretypovávej naslepo. Vezmi ji do
+`Variant`, porovnej s `null` a teprve pak přetypuj.
+**Doklad:** `app/main.gd:_nasad_zbran_hraci`, `_staty`; naměřeno 2026-10-11.
+
+### `X if podmínka else Y` jako ARGUMENT volání předalo cestu místo dat
+
+**Co se stalo:** `sim/world/spawn.gd:_init` volal
+`_load_monsters(monsters if monsters != null else _read_json(monsters_path), path)`.
+Když `monsters` bylo `null`, do `_load_monsters` přišel **řetězec cesty**, ne
+načtená data — a spawn hlásil „neni seznam“ a monstra se nevytvořila (hráč pak
+neměl na co zaútočit).
+**Pravidlo:** víceřádkový ternární výraz nedávej jako argument volání; rozepiš
+na `if`.
+**Doklad:** `[spawn-DBG] path=res://data/monsters.json typ=4
+hodnota=res://data/monsters.json`; opraveno a ověřeno sondou
+`_analyza/p47-spawn-direct.gd` (`types=53 points=1`).
+
+### Smlouva `speed = 50 − speed_raw` byla ŠPATNĚ a odhalila to až data
+
+**Co se stalo:** `CONTRACT-M5.md §3.1` (psal ji lead) tvrdila inverzi
+`50 − speed_raw`. Podle ní mělo 128 ze 133 zbraní `swing_delay_ms` 4–100 s
+(14 zbraní `speed ≤ 0`). Správně je **`speed = AosSpeed`** — ServUO dosadí
+`AosSpeed` přímo do `v = (Stam+100)*Speed` (`BaseWeapon.cs:1598-1615`), takže
+`Speed` JE ta rychlost; výsledek je 1,5–4,5 s (medián 2,5 s) a přijímací číslo
+`speed 30 → 3000 ms` z `docs/04 §4.6.4` sedí.
+**Pravidlo:** číslo ve smlouvě, které vzniklo odvozením (ne měřením), je
+hypotéza — první, kdo na něj narazí s daty, ho musí změřit a smlouvu opravit.
+**Doklad:** `_analyza/p41-gen-m5.txt` (rozdělení `speed_raw`),
+`data/weapons.json: speed_source`.
+
+### Dvě session ve stejném stromu = neopakovatelná čísla
+
+**Co se stalo:** tři běhy `run_tests.gd` daly tři různá čísla (2525/3, 2598/1,
+2629/0) a objevily se „sabotáže“ (decay 10×, loot zlato 1000×). Nebyly to vady
+kódu: běželo se proti **různým stromům**, protože souběžně psala ještě session A
+(art) a jeden teammate nebyl vidět v `list_agents`, i když ještě běžel.
+**Pravidlo:** před každým měřením `git status` + `git log -1`. Když do stromu
+píše někdo jiný, číslo se musí uvést s touhle výhradou — jinak je to tvrzení
+o stavu, který v tu chvíli neexistoval.
+
+### Klíč animace znamená u každé skupiny něco jiného
+
+**Co se stalo:** `anim-sheets.json` měl jeden `actions` slovník; pro lidi je
+`4 = stand` (1 frame), ale ve skupině `High` (monstra, tělo < 200) je
+`4 = Attack1` a `2 = Die1`. Společný slovník by u monster přepsal význam klíčů
+u lidí (a klient by hrál smrt jako běh).
+**Řešení:** export zapisuje **per-tělo mapu `groups`** a `render.anim` má
+`sprite_group_for(body, action)`; stará `ACTION_GROUP` zůstává jako fallback.
+`tests/cases/render_anim.gd` původně tvrdil `sprites.size() == 30` (magické
+číslo) — při prvním legitimním rozšíření (30 → 105) to padlo; kontrola byla
+přepsána na **smlouvu exportu** (každé potřebné tělo má 5 směrů chůze).
+
+### `ui.debug_overlay` má přesný text — nová hodnota se do něj nesmí přidat
+
+**Co se stalo:** do overlaye jsem chtěl přidat stav souboje. Test
+(`tests/cases/debug_overlay.gd`) porovnává **celý text** (`ZNAMY_TEXT`), takže
+každý nový klíč v `text_for` by ho shodil. Hodnoty se proto počítají
+v `app/main._debug_values()` (jsou k dispozici), ale do textu se nepřidaly.

@@ -834,13 +834,23 @@ func _setup_player(view) -> void:
 	if ai.has_method("set_player"):
 		ai.set_player(serial)
 	sim.systems["ai"] = ai
+	# ⚠ DATA SE PREDAVAJI PRIMO (2026-10-11): `sim.spawn` umi i cestu, ale
+	# namEReno: kdyz dostal `null` a cetl si soubor sam, prisla do
+	# `_load_monsters` cesta MISTO dat ("neni seznam") a monstra se nevytvorila.
+	# `app/main` vi, kde data jsou, tak je precte a preda hodnotou.
+	# Kompatibilita: 8. a 9. argument zustavaji cesty (pro pripadne dalsi
+	# volajici), ale rozhoduje predany obsah.
 	var d_spawns = _read_json_file("res://data/spawns.json")
 	var d_monstra = _read_json_file("res://data/monsters.json")
-	print("[main] spawn data: spawns=", (d_spawns is Dictionary), " monsters=",
-		(d_monstra is Array), " (", (d_monstra as Array).size() if d_monstra is Array else -1, ")")
 	spawn = SpawnScript.new(registry, sim, sim.clock(), sim.events(), sim.rng(),
 		d_spawns, d_monstra, "res://data/spawns.json", "res://data/monsters.json")
 	sim.systems["spawn"] = spawn
+	# SPAWN BODY ZE SOUCASTI PREDANYCH DAT: registrace je tady, protoze
+	# `sim.spawn._init` cte data jen jako zaznamy; body zaklada volajici
+	# (`register` vraci index a je jedine misto, kde vznikaji).
+	var bodu: int = _zaregistruj_body(d_spawns)
+	print("[main] spawn: dat monster ", (d_monstra as Array).size() if d_monstra is Array else -1,
+		", typu ", spawn.monster_types().size(), ", bodu ", bodu)
 	# STAVOVE ZDROJE (docs/04 §4.7): kdo ma stav, ktery patri do save a hashe,
 	# se zaregistruje. Bez toho by se smernice boje, duchove, fronta rozpadu,
 	# stavy AI a tabulka spawnu po `save -> load` ztratily (a round-trip by
@@ -850,15 +860,20 @@ func _setup_player(view) -> void:
 	sim.register_state_source("decay", decay)
 	sim.register_state_source("ai", ai)
 	sim.register_state_source("spawn", spawn)
-	var bodu: int = _zapoj_spawn()
 	# MONSTRA VIDET HNED (2026-10-10): hřbitov u Britainu je od hráče 120 dláždic,
 	# takže by hráč na snímku žádné monstrum neměl. Vedle hráče proto stojí
 	# TŘI monstra z téhož bodu (stejná data jako spawn) - je to VĚDOMÝ SEŠITEK
 	# pro demo (stejná třída jako `_postav_stanice` a `_postav_balvany`).
 	# Cesta zpět: smazat volání `_postav_monstra_u_hrace()`.
 	var monster: int = _postav_monstra_u_hrace()
+	# ZBRAN DO RUY (M5, ROZHODNUTI PRO DEMO): hrac dostaval VSECHNY NASTROJE,
+	# ale ZADNOU ZBRAN v ruce - a boj beze zbrane je `damage` 1 (wrestling),
+	# takze kostlivec s 38 hp se nedal zabit (namEReno: 20 swingu = 20 damage).
+	# `_nasad_zbran_hraci()` vezme prvni predmet z batohu, ktery je v
+	# `data/weapons.json`, a nasadi ho na vrstvu 1 (ruka).
+	var zbran: String = _nasad_zbran_hraci()
 	print("[main] M5: loot+decay+death+combat+poison+ai+spawn | spawn bodu ",
-		bodu, ", monster u hrace ", monster)
+		bodu, ", monster u hrace ", monster, ", zbran ", zbran)
 
 	view.set_registry(registry)
 	view.set_player(player)
@@ -1272,26 +1287,76 @@ func _read_json_file(cesta: String):
 	return JSON.parse_string(FileAccess.get_file_as_string(cesta))
 
 
-func _zapoj_spawn() -> int:	# SPAWN BODY Z DAT (M5, `data/spawns.json`). Body se registruji, ale
-	# `sim.world.spawn` je plní sám ve svém ticku (deficit + prodleva) - hráč
-	# tedy monstra nevidí hned na hřbitově 120 dlaždic daleko; proto existuje
-	# `_postav_monstra_u_hrace()` pro demo.
+func _nasad_zbran_hraci() -> String:
+	# NASADI ZBRAN HRACI (M5): prvni predmet z batohu, jehoz ART je v
+	# `data/weapons.json` (art = `tile - 0x4000`, kontrakt M5 §3.1). Vrstva je
+	# z dat zbrane (`layer`); kdyz ji data nemaji (`null`), pouzije se 1 (ruka).
 	#
-	# ⚠ `no_spawn_in_town` se NEVYNUCUJE (spawn to hlásí v `region_check_source`):
-	# `data/regions.json` ještě není, takže "je ten bod ve městě?" nemá kdo
-	# odpovědět. Tichý předpoklad "není" by byl horší než pojmenovaná mezera.
+	# POZOR: primo pres `player.equip[vrstva] = serial` - `entity.equipment.equip`
+	# chce predmet a v tomto miste je `equipment` uz vytvorena, ale volani by
+	# muselo projit hledanim podle artu znovu. Tady jde o JEDNOZNACNY start.
+	if player == null:
+		return "(bez hrace)"
+	if not FileAccess.file_exists("res://data/weapons.json"):
+		push_warning("app.main: chybi data/weapons.json - hrac zustane bez zbrane")
+		return "(bez dat zbrani)"
+	var zbrane = JSON.parse_string(FileAccess.get_file_as_string("res://data/weapons.json"))
+	if not (zbrane is Array):
+		return "(data zbrani nejsou seznam)"
+	var podle_artu: Dictionary = {}
+	for rec in zbrane:
+		if not (rec is Dictionary):
+			continue
+		# ⚠ `int(null)` v Godotu 4 HODI "Nonexistent 'int' constructor" (nemeni
+		# se na 0!) - namEReno 2026-10-11. Proto se hodnota nejdriv prevezme a
+		# `null` se vyradi, teprve pak se pretypuje.
+		var art_h: Variant = rec.get("art")
+		if art_h == null:
+			continue
+		podle_artu[int(art_h)] = rec
+	var nasel: int = 0
+	var diag: Array[String] = []
+	for serial in container.contents(int(player.backpack)):
+		var it = items.get(int(serial))
+		if it == null:
+			continue
+		var tile_predmetu: int = int(it.tile)
+		var art: int = tile_predmetu - ITEM_OFFSET
+		diag.append(str(tile_predmetu) + "->" + str(art) + ("*" if podle_artu.has(art) else ""))
+		if not podle_artu.has(art):
+			continue
+		var rec: Dictionary = podle_artu[art]
+		# ⚠ `layer` je v datech `null` (`pending-tiledata`, docs/06 §6.4) a
+		# `int(null)` HODI chybu - nejdriv se vyradi null, pak se pretypuje.
+		var vrstva_h: Variant = rec.get("layer")
+		var vrstva: int = 1
+		if vrstva_h != null:
+			vrstva = int(vrstva_h)
+		if vrstva <= 0:
+			vrstva = 1
+		player.equip[vrstva] = int(it.serial)
+		it.layer = vrstva
+		it.parent = int(player.serial)
+		return "%s (art %d, vrstva %d, dmg %s-%s)" % [str(rec.get("name", "?")), art,
+			vrstva, str(rec.get("min_damage", "?")), str(rec.get("max_damage", "?"))]
+	push_warning("app.main: v batohu neni zbran z data/weapons.json (art: "
+		+ ", ".join(diag) + ")")
+	return "(zadna zbran v batohu)"
+
+
+func _zaregistruj_body(d) -> int:
+	# SPAWN BODY: kazdy bod z `data/spawns.json` se zaregistruje do `sim.spawn`
+	# (index je jeho identita pro `alive_at`). Data dostava hotova volajici -
+	# viz komentar u `SpawnScript.new` v `_setup_player`.
 	if spawn == null:
-		push_warning("app.main: `sim.spawn` neni - monstra se nebudou obnovovat")
+		push_warning("app.main: `sim.spawn` neni - spawn body se nezaregistruji")
 		return 0
-	if not FileAccess.file_exists("res://data/spawns.json"):
-		push_warning("app.main: chybi data/spawns.json - spawn body se nezaregistruji")
-		return 0
-	var d = JSON.parse_string(FileAccess.get_file_as_string("res://data/spawns.json"))
 	if not (d is Dictionary):
-		push_warning("app.main: data/spawns.json neni objekt")
+		push_warning("app.main: data/spawns.json nema tvar objektu")
 		return 0
 	var body = (d as Dictionary).get("points", [])
 	if not (body is Array):
+		push_warning("app.main: data/spawns.json nema seznam `points`")
 		return 0
 	var zapsano: int = 0
 	for bod in body:
@@ -1357,7 +1422,13 @@ func _monstrum(typ: String, pos: Vector3i):
 	mob.name = str(rec.get("name", typ))
 	mob.hue = int(rec.get("hue", 0))
 	mob.stats = _staty(rec)
-	mob.max_hp = _rozsah(rec.get("hits", [mob.stats.hits_max(), mob.stats.hits_max()]))
+	var hits_zdroj: Variant = rec.get("hits")
+	if hits_zdroj == null:
+		hits_zdroj = [mob.stats.hits_max(), mob.stats.hits_max()]
+	var hp_hodnota: int = _rozsah(hits_zdroj)
+	if hp_hodnota <= 0:
+		hp_hodnota = mob.stats.hits_max()
+	mob.max_hp = hp_hodnota
 	mob.hp = mob.max_hp
 	mob.max_stam = mob.stats.stam_max()
 	mob.stam = mob.max_stam
@@ -1407,10 +1478,16 @@ func _monstrum_data(typ: String) -> Dictionary:
 
 
 func _staty(rec: Dictionary):
-	var st = StatsScript.new(_rozsah(rec.get("str", [10, 10])),
-		_rozsah(rec.get("dex", [10, 10])), _rozsah(rec.get("int_",
-			rec.get("int", [10, 10]))))
-	return st
+	# ⚠ `int_` muze byt `null` (data maji obe jmena a u nekterych monster druhe
+	# chybi) - `int(null)` hodi "Nonexistent 'int' constructor". Proto se bere
+	# prvni NENULL hodnota a rozsah se nikdy nepredava jako `null`.
+	var zdroj: Variant = rec.get("int_")
+	if zdroj == null:
+		zdroj = rec.get("int")
+	if zdroj == null:
+		zdroj = [10, 10]
+	return StatsScript.new(_rozsah(rec.get("str", [10, 10])),
+		_rozsah(rec.get("dex", [10, 10])), _rozsah(zdroj))
 
 
 func _rozsah(v) -> int:

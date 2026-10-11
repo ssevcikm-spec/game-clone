@@ -738,7 +738,13 @@ func _najdi_zbran(item) -> Dictionary:
 	var art: int = int(item.tile) - int(ItemScript.ITEM_OFFSET)
 	for k in _weapons.keys():
 		var rec: Dictionary = _weapons[k]
-		if int(rec.get("art", -1)) == art:
+		# ⚠ `rec.get("art")` je z JSONu FLOAT (3913.0) a `int(art_json)` by
+		# hledal 3913.0 != 3913 - zbran by se NENASLA a hrac by utocil peste
+		# (namEReno 2026-10-11: equip prosel, ale `weapon_of` vratil {}).
+		var art_json: Variant = rec.get("art")
+		if art_json == null:
+			continue
+		if int(art_json) == art:
 			return rec
 	var jmeno: String = str(item.get("type", "")).to_lower()
 	if jmeno != "" and _weapons.has(jmeno):

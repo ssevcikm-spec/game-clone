@@ -1,10 +1,21 @@
 # CONTRACT-M5 — pracovní kontrakt pro milník M5 (souboj, monstra, smrt, loot)
 
-> **Co je tenhle soubor:** PRACOVNÍ dohoda pro paralelní session (dělba souborů a
-> rozhraní). **Není to dokumentace projektu** — po dokončení M5 se smaže
-> (znalost jde do `docs/`, `HANDOFF.md`, `LESSONS.md`). Závazná jsou pravidla
-> z `AGENTS.md`/`docs/09`; tenhle soubor jen říká, KDO píše KTERÝ soubor a
-> JAKÁ je signatura, aby se práce nerozejly.
+> **⛔ TENTO SOUBOR JE MRTVÝ — NEPOUŽÍVEJ HO.** Vznikl 2026-10-11 jako pracovní
+> dohoda pro paralelní session a **byl v průběhu práce dvakrát opraven proti
+> realitě** (níže). Závazná je `docs/04`, `docs/05` a `HANDOFF.md`. Nechává se
+> jen proto, aby bylo vidět, CO se v dohodě rozešlo s měřením — než se smaže.
+
+## Co se v kontraktu rozešlo s měřením (a co platí)
+
+| # | Co tu stálo | Co je naměřeno | Kde to platí |
+|---|---|---|---|
+| 1 | §3.1 `speed = 50 − speed_raw` | **`speed = AosSpeed`** (ServUO `v = (Stam+100)*Speed`, `BaseWeapon.cs:1598-1615`); `50 − raw` dávalo 128/133 zbraní delay 4–100 s | `data/weapons.json: speed_source`, `docs/04 §4.6.4` |
+| 2 | §3.1 příklad `Dagger … swing_delay_ms 250` | Dagger má `speed 56` → **2000 ms**; `speed 30` (→3000 ms) je **přijímací číslo**, ne hodnota v datech | `tests/cases/combat.gd` |
+| 3 | §2 „tick(ms) pro všechny systémy“ | sedí, ale `sim.world_loop` volá `tick(ms)`, jen když ho systém má | `sim/sim_world.gd` |
+| 4 | §2 `death.die()` u hráče | `die()` **odmítne živého** (`reason:"alive"`) — `hp` musí dát 0 volající (combat) | `sim/systems/death.gd` |
+| 5 | §3.4 data monstra na mobilu | `Object.set()` na **nedeklarovanou** vlastnost je v Godotu 4 **tiché no-op** → data monster žijí v `mob.ai["data"]` | `sim/world/spawn.gd`, `sim/systems/combat.gd:_data_of` |
+| 6 | §3.4 `anim.attack/die` | sedí (`high`: attack 4, die 2; `low`: attack 5, die 8) | `tools/uoextract/anim.py` |
+
 
 ## 0. Stav před prací (naměřeno 2026-10-10)
 

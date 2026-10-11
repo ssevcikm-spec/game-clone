@@ -1,3 +1,105 @@
+# Předání — game-clone (2026-10-11, M5: SOUBOJ, MONSTRA, SMRT, LOOT)
+
+> **Co je tenhle soubor:** **stav projektu** pro další session agenta. Přepisuje
+> se celý; historie je v `git log`. Nový blok je vždy **nahoře**; starší bloky se
+> needitují (jen doplňují). **Současný stav se bere z tohoto bloku.**
+>
+> ⚠ **Tenhle blok vznikl v session, která běžela SOUČASNĚ s jinou session na
+> artu (blok A).** Jejich soubory (`assets/own-lit/**`, `tools/artgen/**`,
+> `render/own_art.gd`, `app/world_view.gd`, `render/texture_cache.gd`) se
+> v pracovním stromu MÍCHAJÍ. Druhá session svou práci commitla jako `57eb6a7`
+> („art seam (A) … + souběžná práce M5 (C)“) — **commit obsahuje i moje M5
+> soubory**, které jsem tam nedal já. Před dalším krokem si ověř `git status`.
+
+## ✅ CO JE HOTOVÉ (M5 = souboj, monstra, smrt, loot)
+
+**Naměřeno 2026-10-11 (poslední běh):** testy **2629 kontrol / 0 selhání**
+(`case souborů 81`), replaye **2/2 zelené** (`check-replay.py`, hashe se
+NEMUSELY přepnout — viz níže), brány `run-all.py`: **13 měřeno / 1 chyba**
+(chyba je `G10` z práce na artu, ne z M5).
+
+### 1) Co je nové (a čím je to doložené)
+
+| Věc | Soubor | Naměřené |
+|---|---|---|
+| **Souboj AoS** | `sim/systems/combat.gd` | `swing_delay_ms(stam 100, speed 30) == 3000`; 20 swingů → **≥ 5 zásahů na každém z 10 seedů** (přijímací kritérium `docs/04 §4.6.4`) |
+| **Smrt, duch, tělo** | `sim/systems/death.gd` | `die` → tělo s obsahem, nehráč zmizí z registru; `resurrect` → `hp == 10`; `blessed`/`newbie` zůstávají |
+| **Loot** | `sim/systems/loot.gd` | `poor` = zlato `1d25` (1–25), nikdy `rich`; `roll_magic_item` vrací `{}` a HLÁSÍ to (D4) |
+| **Jed** | `sim/systems/poison.gd` | 5 úrovní, intervaly 2250/3250/4250/5250/5250 ms; `damage = 1 + int(hits×scalar)` s clampem |
+| **AI** | `sim/systems/ai.gd` | 10 seedů: NPC se v idle pohne do 10 s; aggro → **hp hráče 1000 → < 1000**; prodejce se netiká |
+| **Spawn** | `sim/world/spawn.gd` | deficit `max((3−0)/3, 1) = 1`/cyklus; do max 3 za 2 cykly; obnova 5–10 min; `state()/restore()` round-trip sedí |
+| **Rozpad** | `sim/systems/decay.gd` | tělo **420 000 ms** (7 min) i s obsahem; předmět na zemi **3 600 000 ms** (60 min); právo na loot 120 000 ms |
+| **Data M5** | `data/{weapons,armor,item_properties,monsters,spawns}.json` | 134 / 165 / 159 / **53** / 1 bod; `gen-content.py --check` = OK u všech pěti, idempotentní |
+| **Animace monster** | `assets/uo/anim/anim-sheets.json` | 105 spritů (5 těl: 400, 401, **50 = kostlivec, 3 = zombie, 238 = krysa**), 560 framů; `actions` je nyní **per-tělo** mapa `groups` (číslo 4 = u lidí `stand`, u monster `attack1`) |
+| **Jména a HP pruhy** | `render/name_plates.gd` | notoriety → barva; pruh pod 33 %/66 %; počty `mobily_videt` / `tela_videt` |
+| **Monstrum na obrazovce** | `app/world_view.gd` | `set_mobily`, `_draw_mobily`, `_draw_tela`; snímek: **6 mobilů kresleno, 0 bez spritu, 17 068 objektů** |
+
+### 2) Důkaz na snímku
+
+`p20b-obrazky/m5-souboj.png` (1280×720, gitignore) — **co je na něm vidět:**
+hřbitov u Britainu, hráč uprostřed (tělo 400), tři monstra s **jmény a zelenými
+HP pruhy** (`a skeleton`, `a zombie`, `a rat`), v žurnálu útoky
+(`You hit skeleton for 13 damage.`) a **hp hráče 75/87** — monstrum hráče
+opravdu zasáhlo. Sonda: `_analyza/p48-m5-snimek.gd` (běh s oknem, zapisuje PNG).
+
+### 3) Tři vady, které stály čas (a jsou opravené)
+
+1. **`int(null)` v GDScriptu HODÍ chybu** („Nonexistent 'int' constructor“),
+   nemění se na 0 — a `data/weapons.json` má `layer: null` (pending-tiledata).
+   Stejně `data/monsters.json` má u části monster `int_: null`. Kdo píše
+   `int(rec.get("layer", 1))`, dostane u `null` **výjimku**, ne default.
+2. **`speed = 50 − speed_raw` byl v kontraktu špatně** (viz `CONTRACT-M5.md`):
+   platí `speed = AosSpeed`. S inverzí mělo 128 ze 133 zbraní delay 4–100 s.
+3. **`X if podmínka else Y` jako argument volání** předalo do
+   `sim.world.spawn._load_monsters` **cestu místo dat** → „neni seznam“ a žádná
+   monstra. Rozepsáno na `if` a `app/main` předává data **hodnotou**.
+
+### 4) Co zůstává otevřené (NENÍ hotové, nezakrývat)
+
+1. **`entity.mobile` nemá `damage`/`resist`/`loot_pack`/`type`** — `Object.set()`
+   na nedeklarovanou vlastnost je v Godotu 4 tiché no-op (naměřeno), takže data
+   monster žijí v `mob.ai["data"]`. **`mobile.state()` je ale neukládá** → po
+   `save → load` monstra ztratí staty lootu. Oprava patří do `entity.mobile`
+   (deklarovaná pole + `state()/restore()`).
+2. **Replaye rostou jen o `scheduler` + `entities`** — nové stavové zdroje
+   (`combat`, `death`, `decay`, `ai`, `spawn`) se registrují **jen v `app/main`**,
+   takže je `check-replay.py` (běží nad holým `SimWorld`) **neměří**. Hashe se
+   proto nemusely přepínat. Mezera je pojmenovaná, ne tichá.
+3. **`no_spawn_in_town` se nevynucuje** — `data/regions.json` neexistuje
+   (`region_check_source` to hlásí).
+4. **Strop 35 pro direct damage** je načtený, ale neměřený (žádná zbraň tu
+   větev nemá).
+5. **`G10` (vzhled) hlásí chybu** — „0 pixelů vlastní postavy po erozi“. Je to
+   práce souběžné session A (vlastní art), ne M5.
+6. **`app/main` už hráči nasadí zbraň** (`_nasad_zbran_hraci`, první předmět
+   z batohu, který je v `data/weapons.json`) — naměřeno: `weapon=hatchet`,
+   `delay=2000 ms`, zásahy **13 a 16 damage**. Je to rozhodnutí pro demo
+   (bez něj má hráč `damage` 1 a kostlivce s 38 hp nezabije).
+
+### 5) Mutace (důkaz, že testy měří)
+
+`sim` teammate: `ai.MOVE_TIMEOUT`, `ai.HOME_TIMEOUT`, `_je_nepritel → false`,
+`_je_vendor → false`, `spawn._deficit → 0`, `spawn.restore due_ms + 1`,
+`decay.CORPSE 7→6 min`, `decay.GROUND 60→59 min`, `poison L3 interval
+5250→60000`, `swing delay +1 ms`, `chance = HIT_MIN_CHANCE`,
+`obrana = ARMOR_MIN_DAMAGE`, `je_hrac = false`, `loot dice +1000` — **všechny
+kromě jedné chyceny**; jedna (`ai.tick` bez guardu na prodejce) nepadla, protože
+guard je i v `think` (defense-in-depth) a teammate to přiznal.
+
+## ⚠ CO SE V TÉTO SESSION POKAZILO (ať se to neopakuje)
+
+**Dvě session psaly do stejného stromu bez dohody.** Já jsem rozdělil práci
+teammateům po souborech, ale souběžně běžela ještě session A (art) a jeden
+z mých teammateů (97829ab1) **nebyl vidět v `list_agents`**, i když ještě běžel —
+proto jsem mu poslal dvě zprávy, které nedorazily, a on pokračoval v práci.
+Důsledky: tři běhy `run_tests.gd` daly tři různá čísla a chvíli to vypadalo jako
+„sabotáž“ (decay 10×, loot zlato 1000×) — ve skutečnosti šlo o **běhy proti
+různým stromům**, ne o vadu kódu. **Pravidlo pro příště: před každým měřením
+`git status` a `git log -1`; když do stromu píše někdo jiný, číslo je
+neopakovatelné a musí se to napsat k němu.**
+
+---
+
 # Předání — game-clone (2026-10-09, SESSION D: POLITIKA + VYKONAVATEL + LOG ROZHODNUTÍ, `ZADANI-24` — MK 6/9)
 
 > **Co je tenhle soubor:** **stav projektu** pro další session agenta. Přepisuje
