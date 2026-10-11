@@ -176,7 +176,17 @@ func request_step(m: int, dir: int, run: bool) -> Dictionary:
 		use_run = false               # bez staminy se jde (beh se nezkrati potichu)
 	var result: Dictionary = _walk.can_step(mob.pos, dir, Const.PERSON_HEIGHT, m == player_serial)
 	if not result["ok"]:
-		_message("You cannot move there.")
+		# ⚠⚠ SESSION D (2026-10-11) - HLASKA PATRI JEN HRACI. Text je psany
+		# hlasem hrace ("You cannot move there."), takze u kroku MONSTRA to byla
+		# lez - a hlavne SPAM: namEReno v snde `_analyza/p58-smycka-hracem.gd`
+		# **33 240** takovych hlasek za ~2 minuty behu (monstra, ktera se
+		# nedostanou k hraci, zkousi krok kazdy tik). Zurnal ma `MAX_LINES = 200`,
+		# takze hrac nevidel NIC jineho - presne to zabiji "umi rict, co delal".
+		# Kdo nema nastaveny `player_serial` (`0`), dostane hlasku dal - "nevim,
+		# kdo je hrac" NESMI tise vypnout hlasku (testy a hole `SimWorld` se
+		# tim nemeni, takze brany F1/G9 vidi stejny pocet udalosti).
+		if int(player_serial) <= 0 or int(m) == int(player_serial):
+			_message("You cannot move there.")
 		return _no(0, str(result["reason"]))
 	var delay: int = delay_ms_for(use_run)
 	var start: int = _now()

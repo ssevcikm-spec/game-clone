@@ -39,6 +39,21 @@ extends RefCounted
 #     `use_on` vrátí `not_available` (taky s hláškou).
 #   * `interact` NENÍ v tabulce §4.3 (ta má 18 příkazů) - patří do docs/04.
 #
+# ⚠⚠ SESSION D (2026-10-11) - `interact` UMÍ I BYTOST NA DLAŽDICI.
+# Do té chvíle uměl JEN dlaždici; na dlaždici s prodejcem nevyšlo ani `no_item`,
+# ani stanice, takže odpovědí bylo `no_pair` a **hráč se s prodejcem nemohl
+# vybavit** - obchodní okno otevírá jen `Command{t:"use", serial}`, a ten
+# `app.input_map` v produkci NIKDY neposlal (`object_command()` existoval jen
+# pro test; hledáno v celém `app/`). Žurnál přitom hráči tvrdil "A blacksmith
+# is here. (use him to trade)". Cíl `{kind:"tile"}` se proto zkusí převést na
+# TUTÉŽ větev jako dvojklik (`use`) a teprve `describe` + `USE_ROUTES`
+# rozhodnou, co cíl je. Není to nový příkaz a klient se nemění - posílá dál jen
+# to, co má pod kurzorem.
+# **POŘADÍ PRIORIT je změřené:** nejdřív uzel suroviny / stanice, teprve pak
+# bytost. Když cíl `{kind:"mobile"}` vybíral `app.input_map` (podle registru),
+# vzalo monstrum, které se projde přes rudu, hráči možnost těžit - sonda
+# `_analyza/p58-smycka-hracem.gd` dala 0 rudy po 60 pokusech. Patří do docs/04 §4.3.
+#
 # ⚠ CO NEMA PRODUCENTA (pojmenovane, ne zamlcene - HANDOFF, otevrena vec 68):
 #   * PREDMETY: `entity.item` nikdo nedrzi podle serialu (vec 64); modul je bere
 #     VSTUPEM (`items` = `{serial: Item}` nebo objekt s `get_item(serial)`),
@@ -157,18 +172,65 @@ func use(m: int, serial: int) -> Dictionary:
 func interact(m: int, target: Dictionary) -> Dictionary:
 	# OBECNA INTERAKCE (nad ramec §4.3, viz hlavicka): klient posle jen cil.
 	var na: Dictionary = _describe_target(target)
+	# ⚠⚠ SESSION D (2026-10-11) - "POUZIJ" NA BYTOST. Do teto chvile umel
+	# `interact` jen DLAZDICI: klient posilal `{kind:"tile"}` a na dlazdici
+	# s prodejcem nebyl ani uzel suroviny, ani stanice, takze vyslo
+	# `no_pair` - a HRAC SE S PRODEJCEM NEMOHL VUBEC VYBAVIT (obchodni okno
+	# otevira jen `Command{t:"use", serial}`). Zurnal pritom hracovi rikal
+	# "A blacksmith is here. (use him to trade)". NamEReno: `app.input_map`
+	# ma `object_command()` pro `use`, ale NIKDO ho v produkci nevolal
+	# (hledano v celem `app/`), takze prodej byl dosazitelny jen sondou
+	# (`_analyza/p34-smycka.gd`), ne hrou.
+	# Kdo rozhoduje: novy prikaz se neposila - cil se prevede na TUTEZ vetev,
+	# jakou by udelal dvojklik (`use`), a teprve `describe`/USE_ROUTES rozhodnou,
+	# co to je ("prodejce" -> obchod, monstrum -> utok).
+	# ⚠⚠ POKUS "VYBIRE KLIENT" BYL ZMERENY A VRACENY: kdyz cil `{kind:"mobile"}`
+	# vybiral `app.input_map` (podle registru), vzalo monstrum, ktere se projde
+	# pres rudu, hracovi moznost tezit - sonda `_analyza/p58-smycka-hracem.gd`
+	# dala 0 rudy po 60 pokusech. Proto je poradi priorit TADY:
+	#   1. uzel suroviny (`_method_for_tile`) a stanice (`station_role`),
+	#   2. teprve kdyz na dlazdici nic z toho neni, BYTOST (`_mobil_na_dlazdici`).
+	if str(na.get("kind", "")) in ["mobile", "vendor"]:
+		var mob_serial: int = int(na.get("serial", 0))
+		if mob_serial <= 0:
+			return _fail("unknown")
+		return use(m, mob_serial)
 	var pozadovana: String = ""
 	if str(na.get("kind", "")) == "tile":
 		pozadovana = _method_for_tile(int(na.get("x", 0)), int(na.get("y", 0)))
 		if pozadovana == "" and str(na.get("station_role", "")) == "":
 			# ⚠ 20. session: dlazdice muze byt UZEL (hora/strom/voda) nebo
-			# STANICE (kovadlina/vyhen). Kdyz neni ani jedno, nema smysl hledat
-			# nastroj - a hrac to musi VIDET (hlaska, ne ticho).
+			# STANICE (kovadlina/vyhen). Kdyz neni ani jedno, zkusi se BYTOST
+			# (prodejce se tak da "pouzit" i klavesou `E`/`T`); kdyz ani ta
+			# tam neni, hrac to musi VIDET (hlaska, ne ticho).
+			var mob_na: int = _mobil_na_dlazdici(int(na.get("x", 0)), int(na.get("y", 0)), m)
+			if mob_na > 0:
+				return use(m, mob_na)
 			return _fail("no_pair")
 	var serial: int = tool_for(m, na, pozadovana)
 	if serial <= 0:
 		return _fail("no_pair")
 	return use_on(m, serial, target)
+
+
+func _mobil_na_dlazdici(x: int, y: int, hrac: int) -> int:
+	# Nejnizsi serial ZIVE BYTOSTI na dlazdici (`0` = nikdo). Kdo tam stoji, vi
+	# JEN registr (`sim.entity_registry` je jedine misto, kde mobily jsou) -
+	# proto se to rozhoduje tady a ne v klientovi: ten posila jen cil.
+	# Prodejce se NEpreskakuje (na rozdil od utoku, ktery ho chrani).
+	if _registry == null or not _registry.has_method("all"):
+		return 0
+	var kandidati: Array = []
+	for mob in _registry.all():
+		if int(mob.serial) == int(hrac) or int(mob.hp) <= 0:
+			continue
+		if int(mob.pos.x) != int(x) or int(mob.pos.y) != int(y):
+			continue
+		kandidati.append(int(mob.serial))
+	if kandidati.is_empty():
+		return 0
+	kandidati.sort()          # poradi v registru nesmi rozhodovat
+	return int(kandidati[0])
 
 
 func tool_for(m: int, na: Dictionary, pozadovana_metoda: String = "") -> int:

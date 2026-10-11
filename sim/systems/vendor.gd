@@ -340,6 +340,16 @@ func gold_art() -> int:
 	return int(_config.get("gold_art", 0x4EED))
 
 
+func gold_of(mob) -> int:
+	# VEREJNY POCET ZLATA V BATOHU (session D, 2026-10-11). Do teto chvile to
+	# umel jen `_gold()` (soukromy) a `sim.vendor` ho pouzival pro nakup/prodej;
+	# stavovy pruh hry pritom hracovi ukazoval `gold=0` NATVRDO
+	# (`app/main.gd`, komentar tvrdil "hrac dnes nic nema" - a hrac mel 60 zlata
+	# a 16 nastroju). Kdo chce zlato hrace, ptá se TADY: pravidlo "co je zlato"
+	# (`GOLD_TYPE` + art z dat) tak zustava na jednom miste.
+	return _gold(mob) if mob != null else 0
+
+
 func art_of_type(v: int, typ: String) -> int:	# ART predmetu daneho TYPU, ktery vendor prodava nebo vykupuje (0 = nema).
 	# Potrebuje to klient/sonda, aby nemusela vymyslet art ID z hlavy (namEReno
 	# 2026-10-10: `0x0E86` neni krumpac teto instalace - je to 20101).

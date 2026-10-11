@@ -197,12 +197,31 @@ func attack(m: int, target: int) -> Dictionary:
 		push_warning("sim.combat: skill zbrane '%s' neni v data/skills.json"
 			% str(_weapon(mob).get("skill_used", "")))
 		return _fail("skill_unknown")
-	_state[m] = {"war": true, "target": int(target), "due_ms": 0, "delay_ms": 0,
-		"started_ms": _now()}
+	# ⚠⚠ SESSION D (2026-10-11) - OPAKOVANY `attack` NA STEJNY CIL NESMI
+	# RESTARTOVAT SWING. Do teto chvile se `_state[m]` pokazde PREPSAL
+	# (`"due_ms": 0`) a `_planuj` nastavil novy cas - takze hrac, ktery macka
+	# `A` (nebo klika na monstrum) casteji, nez je prodleva zbrane, NIKDY
+	# neuderi. NamEReno sondou `_analyza/p58-smycka-hracem.gd`: 30 prikazu
+	# `attack` za 51 s = **3 swingly** (2 minely, 1 zasah) - krysa s 6 hp
+	# prezila 30 utoku. Reference cil DRZI a cas swingu bezi dal
+	# (ServUO `BaseWeapon.cs` `Swing`/`OnSwing`); preplanuje se jen pri
+	# ZMENE cile, protoze to je novy boj.
+	var st: Dictionary = _st(m)
+	var stejny_cil: bool = int(st.get("target", 0)) == int(target) \
+		and int(st.get("due_ms", 0)) > 0
+	st["war"] = true
+	st["target"] = int(target)
+	st["started_ms"] = _now()
+	if stejny_cil:
+		# Swing uz je naplanovany na tento cil - prikaz jen obnovi "war" a cil.
+		return {"ok": true, "reason": "", "target": int(target), "war": true,
+			"delay_ms": int(st.get("delay_ms", 0)), "planned": false}
+	st["due_ms"] = 0
+	st["delay_ms"] = 0
 	if not _planuj(m):
 		return _fail("no_speed")
 	return {"ok": true, "reason": "", "target": int(target), "war": true,
-		"delay_ms": int(_state[m]["delay_ms"])}
+		"delay_ms": int(st["delay_ms"]), "planned": true}
 
 
 func set_war(m: int, on: bool) -> Dictionary:
@@ -319,7 +338,14 @@ func resolve_swing(m: int, target: int) -> Dictionary:
 	chance = clampf(chance, HIT_MIN_CHANCE, 1.0)
 
 	if not _rng.chance(chance):
-		_message("You swing at %s and miss." % _jmeno(cil))
+		if _je_hrac_utocnik(m):
+			_message("You swing at %s and miss." % _jmeno(cil))
+		else:
+			# ⚠⚠ SESSION D (2026-10-11): do teto chvile se i MINUTI MONSTRA
+			# hlasilo jako "You swing..." - hrac tedy cetl, ze utoci on, i kdyz
+			# dostaval. Vedet, kdo utoci, je zaklad toho, aby clovek umel rict,
+			# co se deje (viz hlavicka `_je_hrac_utocnik`).
+			_message("%s swings at you and misses." % _jmeno(mob))
 		_anim(m)
 		if not _planuj(m):     # dalsi swing i po minutí (reference)
 			_uklid(m)
@@ -335,7 +361,16 @@ func resolve_swing(m: int, target: int) -> Dictionary:
 	cil.hp = maxi(0, int(cil.hp) - poskozeni)
 	var killed: bool = int(cil.hp) <= 0
 
-	_message("You hit %s for %d damage." % [_jmeno(cil), poskozeni])
+	if _je_hrac_utocnik(m):
+		_message("You hit %s for %d damage." % [_jmeno(cil), poskozeni])
+	else:
+		# ⚠⚠ SESSION D (2026-10-11) - ZURNAL LHAL O TOM, KDO UDERE DOSTAL.
+		# `_jmeno(cil)` vraci pro hrace (nema `name`) "it", takze kdyz udeřilo
+		# MONSTRUM, hrac cetl "You hit it for 9 damage." - presne v tu chvili,
+		# kdy mu padaly hp (namEReno: hp 87 -> 65 a v zurnalu ctyri "You hit
+		# it..."). Clovek, ktery hru nezna, z toho nemohl poznat, ze je
+		# napadeny - a "umi rict, co delal a proc" je zadani teto session.
+		_message("%s hits you for %d damage." % [_jmeno(mob), poskozeni])
 	_anim(m)
 	_sound(m, "hit")
 	_events_push("stats_changed", {"serial": int(cil.serial), "hp": int(cil.hp),
@@ -360,7 +395,12 @@ func resolve_swing(m: int, target: int) -> Dictionary:
 			_death.die(int(cil.serial))
 		else:
 			# Bez `sim.death` se smrt NESMI tvarit jako hotova - hlasime ji.
-			_message("%s is dead." % _jmeno(cil))
+			# ⚠ SESSION D: smrt HRACE se musi rict PRIMO ("You are dead."),
+			# ne pres `_jmeno` - hrac nema jmeno, takze vychazelo "it is dead."
+			if _je_hrac_cil(target):
+				_message("You are dead.")
+			else:
+				_message("%s is dead." % _jmeno(cil))
 		_uklid(m)
 		return out
 	if not _planuj(m):
@@ -911,6 +951,31 @@ func _scale(v: int, percent: int) -> int:
 func _jmeno(mob) -> String:
 	var n: String = str(mob.get("name"))
 	return n if n != "" else "it"
+
+
+# -- kdo je hrac (session D, 2026-10-11) ------------------------------------
+#
+# PROC TO TU JE: do teto session modul VUBEC nevedel, kdo je hrac - a proto
+# vsechny hlasky zneli z pohledu hrace ("You hit it..."), i kdyz udeřilo
+# monstrum. Hrac nema `name`, takze `_jmeno` o nem vratilo "it" a zprava
+# vypadala jako jeho vlastni zasah. Serial hrace predava `app/main`
+# (`combat.set_player(serial)`, stejne jako `sim.ai.set_player`) - modul si ho
+# NEDOMYSLI: kdyz nastaveny neni (`0`), chova se jako predtim (testy, sonda
+# nad holym `SimWorld`), takze se nic nerozbiji.
+var _player: int = 0
+
+
+func set_player(serial: int) -> void:
+	_player = int(serial)
+
+
+func _je_hrac_utocnik(m: int) -> bool:
+	# Neznamy hrac (`0`) = "nevim" -> zustava stara hlaska z pohledu hrace.
+	return _player <= 0 or int(m) == _player
+
+
+func _je_hrac_cil(serial: int) -> bool:
+	return _player > 0 and int(serial) == _player
 
 
 func _anim(m: int) -> void:

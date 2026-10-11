@@ -20,6 +20,12 @@ const SIRKA: float = 240.0
 const VYSKA: float = 300.0
 const RADEK_VYSKA: float = 22.0
 
+# Text přepínače směru (session D): hráč musí z okna poznat, že se dá i prodávat.
+# Text je ZDE (ne v datech), protože je to popis TÉTO komponenty, ne obsah hry;
+# kdyby se měnil, mění se s `nastav_smer`, na kterém visí.
+const PREPINAC_BUY := "Buy  -  klikni = prodej (Sell)"
+const PREPINAC_SELL := "Sell  -  klikni = nakup (Buy)"
+
 var _buy: Array[Dictionary] = []
 var _sell: Array[Dictionary] = []
 var _vyber: Dictionary = {"buy": {}, "sell": {}}   # smer -> {art: mnozstvi}
@@ -181,6 +187,12 @@ func odeber_pozadavek() -> Dictionary:
 	return out
 
 
+func _on_smer_pressed() -> void:
+	# Klik na přepínač = druhý směr. UI tím NEMĚNÍ stav `sim` (docs/04 §4.1) -
+	# jen si přepne, který seznam zobrazuje; příkaz vznikne až potvrzením.
+	nastav_smer("sell" if _smer == "buy" else "buy")
+
+
 func flush() -> bool:
 	if not _dirty:
 		return false
@@ -193,8 +205,19 @@ func flush() -> bool:
 		if child is Button or child is Label:
 			box.remove_child(child)
 			child.free()
-	var popis := Label.new()
-	popis.text = "Buy" if _smer == "buy" else "Sell"
+	var popis := Button.new()
+	popis.name = "Smer"
+	# ⚠⚠ PŘEPÍNAČ NAKUP/PRODEJ (session D, 2026-10-11). Do této chvíle tu byl
+	# jen `Label` "Buy"/"Sell" a `nastav_smer("sell")` volal POUZE test
+	# (`tests/cases/vendor_gump.gd`) - **hráč se k prodeji nemohl dostat**:
+	# okno umělo jen nakupovat, přepínač v UI nebyl. Přijímací kritérium
+	# dema ("těžba -> výroba -> prodej") tím bylo splněné jen v sondě.
+	# Je to `Button` na MÍSTĚ původního popisu (ne nové dítě): počet uzlů
+	# v boxu zůstává 3 (popis + řádek + potvrzení) a `tests/cases/vendor_gump.gd`
+	# to měří (`get_child_count() == 3`).
+	popis.text = PREPINAC_BUY if _smer == "buy" else PREPINAC_SELL
+	popis.custom_minimum_size = Vector2(SIRKA, RADEK_VYSKA)
+	popis.pressed.connect(_on_smer_pressed)
 	box.add_child(popis)
 	var seznam: Array[Dictionary] = radky(_smer)
 	if seznam.is_empty():

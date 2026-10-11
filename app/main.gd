@@ -65,6 +65,12 @@ const PolicyPanelScript = preload("res://ui/policy_panel.gd")
 # 2026-10-10 (`ui.skill_list`, D10 - "herni zaklady"): okno se seznamem skillu.
 # Bez nej neni videt, ze tezba a vyroba neco rostou - a to je pro demo klicove.
 const SkillListScript = preload("res://ui/skill_list.gd")
+# SESSION D (2026-10-11, `ui.hotkeys`): NAPOVEDA - klavesy a co delat. Okno je
+# TENKY KLIENT; obsah se sklada TADY z `data/help.json` (text, poradi, skupiny)
+# a z REALNYCH vazeb v `InputMap` (klavesy se do dat NEPISUJI - dve pravdy
+# o klavesach by znamenaly, ze hrac maze klavesu, ktera nic nedela).
+const HotkeysScript = preload("res://ui/hotkeys.gd")
+const HELP_DATA := "res://data/help.json"
 # 2026-10-10 (`ui.vendor_gump`, D10): obchodni okno. Otevre ho udalost
 # `gump_open{gump:"vendor"}` (stejne jako okno vyroby) - a `sim.vendor` ji
 # posle, kdyz hrac pouzije vendora (`Command{t:"use"}` -> `interaction`).
@@ -160,6 +166,19 @@ var policy_panel = null          # `ui.policy_panel` (2026-10-09, D3 jako HUD)
 var skill_list = null            # `ui.skill_list` (2026-10-10, D10)
 var vendor_gump = null           # `ui.vendor_gump` (2026-10-10, D10)
 var vendor = null                # `sim.vendor` (2026-10-10, D10)
+var hotkeys = null               # `ui.hotkeys` (session D) - napoveda pro hrace
+# NAPOVEDA Z DAT (`data/help.json`, session D): nacte se JEDNOU, aby se JSON
+# neparsoval pri kazdem otevreni okna. Prazdny slovnik = data se neprecetla
+# a kazdy, kdo se na ne ptá, to MUSI nahlasit (zadna ticha prazdna napoveda).
+var _help_data: Dictionary = {}
+# VADY NAPOVEDY z posledniho skladani (akce, ktera v `InputMap` neni, vadny
+# radek dat). Pocitaji se do vystupu a `_osvezi_napovedu()` je VYPISE - vada
+# napovedy se nesmi tvarit jako "napoveda je kratka".
+var _napoveda_chyby: Array[String] = []
+# Dlazdice s cilem interakce -> co na ni je ("ruda", "forge", ...). Plni
+# `_zkontroluj_cile_interakce()`; slouzi k tomu, aby se prekryv nasel pri
+# startu a ne az tim, ze "se nic nedeje".
+var _cile_interakce: Dictionary = {}
 # M5 (2026-10-10): systemy souboje a smrti. Drzi se TADY (ne jen v
 # `sim.systems`), aby na ne mohl `_postav_monstra_u_hrace` a debug overlay
 # sahat - `sim.systems` je slovnik pro routing, ne misto pro klienta.
@@ -233,6 +252,13 @@ func _ready() -> void:
 	loop.input_map = InputMapScript.new({}, sim.registry, sim)
 	add_child(loop)
 	_setup_ui()
+	# ⚠ VAZBY KLAVES MUSI BYT V `InputMap` DRIV, NEZ SE STAVI SVET (session D):
+	# hlasky ve svete berou klavesu odtud ("press E or T to mine") - kdyby se
+	# svet stavěl prvni, vyslo by v kazde hlasce "(?)" (namEReno sondou
+	# `_analyza/p56-start-pozorovani.gd`). `controller.setup()` je zaklada
+	# ZNOVU a je idempotentni (`register_actions` podruhe vraci 0), takze se
+	# nic nezdvojuje.
+	_klavesy_do_inputmap()
 	_setup_world()
 	# POLITIKA JE OD 2026-10-10 ZAMERNE VYPNUTA (pokyn uzivatele: „vypnul bych
 	# ve hře automatizaci, spamuje to hru“). Nenacita se uz AUTOMATICKY z
@@ -341,19 +367,31 @@ func _process(_delta: float) -> void:
 	# Stavovy pruh se aktualizuje JEN kdyz se text zmeni (ne kazdy frame).
 	# Hodnoty jdou z `entity.mobile` - `max_hp`/`max_stam`/`max_mana` plni
 	# `Mobile._init` ze statu (`entity.stats`), takze nejsou opsane cisla.
-	# Vaha a zlato jsou 0, dokud neni batoh s predmety (M3) - je to pravda,
-	# ne "nevim": hrac dnes nic nema.
+	# ⚠⚠ SESSION D (2026-10-11) - VAHA A ZLATO BYLY NATVRDO NULA. Komentar tu
+	# tvrdil "hrac dnes nic nema" (byla to pravda v M3), ale od `D10` dostava
+	# hrac 16 nastroju a 60 zlata: stavovy pruh tedy hracovi UKAZOVAL `weight=0,
+	# gold=0`, i kdyz mel 60 zlata. NamEReno sondou `_analyza/p56-start-pozorovani.gd`
+	# (status bar rikal gold=0, `_starting_kit` hlasil zlata 60). Hrac, ktery
+	# nezna hru, pak nepozna, jestli prodej neco vydelal.
+	#   * VAHA je `container.weight_of(batoh)` - pocita se z `tiles.json`
+	#     (jedina instance kontejneru, zadne druhe scitani tady),
+	#   * ZLATO je `sim.vendor.gold_of(hrac)`: pravidlo "co je zlato"
+	#     (`gold_coin` + art z dat) je v `sim.vendor`, ne tady.
+	#   * `weight_max` se ZAMERNE neposila: hranice nese je ze statu (UO:
+	#     40 + STR/3.5) a vymyslet ji tady by bylo pravidlo v klientovi.
 	if status_bar == null or player == null:
 		return
 	_batoh()
 	_recept()
 	_prodejce_pozadavek()
+	var vaha: int = container.weight_of(int(player.backpack)) if container != null else 0
+	var zlato: int = vendor.gold_of(player) if vendor != null else 0
 	var values: Dictionary = {
 		"name": player.name,
 		"hp": player.hp, "hp_max": player.max_hp, "max_hp": player.max_hp,
 		"stam": player.stam, "stam_max": player.max_stam,
 		"mana": player.mana, "mana_max": player.max_mana,
-		"weight": 0, "gold": 0,
+		"weight": vaha, "gold": zlato,
 	}
 	var text: String = status_bar.text_for(values)
 	if text == _last_status_text:
@@ -538,6 +576,22 @@ func _setup_ui() -> void:
 	# `["CraftGump", "null"]`).
 	if loop != null:
 		loop.gump_okna.append(vendor_gump)
+	# NAPOVEDA (session D, 2026-10-11, granule `ui.hotkeys`): okno s klavesami
+	# a s tim, co ve hre delat. JE OTEVRENE OD STARTU - kdo hru nezna, se jinak
+	# nedozvi, co zmacknout ani co je cilem (zadani §D: "projde kratkou smycku
+	# BEZ RADY"). Zavrit/otevrit ji jde klavesou `H` (nebo `F1`); obsah plni
+	# `_osvezi_napovedu()` az PO registraci vazeb (`controller.setup`), protoze
+	# se klavesy berou z `InputMap`.
+	hotkeys = HotkeysScript.new()
+	hotkeys.name = "Hotkeys"
+	hud.add_child(hotkeys)
+	if not hud.register_window("hotkeys", hotkeys, Vector2(8.0, 8.0)):
+		push_warning("app.main: okno napovedy se nepodarilo zaregistrovat v HUD")
+	hotkeys.otevri()
+	# ⚠ VELIKOST JE POVINNA (stejna past jako u `ui.journal` a `ui.skill_list`):
+	# Control s vychozi velikosti (0,0) text NEKRESLI, i kdyz data ma.
+	hotkeys.custom_minimum_size = Vector2(440.0, 540.0)
+	hotkeys.size = Vector2(440.0, 540.0)
 	# DEBUG OVERLAY: neni to okno (nema titul ani se neposouva) - je to vrstva
 	# textu v levem hornim rohu, VIDITELNA od startu, aby ji zachytil screenshot.
 	# `F3` ji prepina (`app/player_controller`). Hodnoty plni `_debug_values()`.
@@ -545,7 +599,15 @@ func _setup_ui() -> void:
 	debug_overlay.name = "DebugOverlay"
 	debug_overlay.position = Vector2(8.0, 8.0)
 	hud.add_child(debug_overlay)
-	print("[main] debug overlay: viditelny (F3 prepina, hodnoty kazdych ",
+	# ⚠⚠ SESSION D (2026-10-11) - OVERLAY JE OD STARTU VYPNUTY. Byl videt vzdy
+	# (rozhodnuti 2026-10-09: "aby se info zachytilo se screenshotem"), ale hra
+	# je od `M4` pro LIDI: prvni obraz hry pak nesl `loc/state/gf/c fps/holes`
+	# pres pulku sveta a hrac hru neznajici nevi, co z toho je pro nej.
+	# Schopnost NEZMIZELA - `F3` ho zapne (a je to v napovede), takze
+	# "zachytit se screenshotem" jde dal. Cesta zpet: jeden radek
+	# `debug_overlay.visible = true` tady.
+	debug_overlay.visible = false
+	print("[main] debug overlay: VYPNUTY (F3 zapina, hodnoty kazdych ",
 		int(DEBUG_OVERLAY_S), " s)")
 	# GEOMETRIE (2026-10-09, bod 5.2): prvni prepocet - a od te doby se dela
 	# PRI KAZDE ZMENE VELIKOSTI OKNA. Do tohoto dne se pocitala jen tady
@@ -837,6 +899,12 @@ func _setup_player(view) -> void:
 	if ai.has_method("set_player"):
 		ai.set_player(serial)
 	sim.systems["ai"] = ai
+	# KDO JE HRAC v souboji (session D): bez toho hlasky zneli vzdy z pohledu
+	# hrace ("You hit it for 9 damage."), i kdyz udeřilo monstrum - hrac nemohl
+	# poznat, ze je napadeny (namEReno: hp 87 -> 65 a v zurnalu ctyri "You hit
+	# it..."). `sim.ai` dostava stejnou informaci uz od M5.
+	if combat.has_method("set_player"):
+		combat.set_player(serial)
 	# ⚠ DATA SE PREDAVAJI PRIMO (2026-10-11): `sim.spawn` umi i cestu, ale
 	# namEReno: kdyz dostal `null` a cetl si soubor sam, prisla do
 	# `_load_monsters` cesta MISTO dat ("neni seznam") a monstra se nevytvorila.
@@ -877,6 +945,15 @@ func _setup_player(view) -> void:
 	var zbran: String = _nasad_zbran_hraci()
 	print("[main] M5: loot+decay+death+combat+poison+ai+spawn | spawn bodu ",
 		bodu, ", monster u hrace ", monster, ", zbran ", zbran)
+	# ⚠ CILE INTERAKCE SE NESMI PREKRYVAT (session D): kdyz je na jedne
+	# dlazdici uzel suroviny, stanice i bytost, klient posle jen cil a SIM
+	# vybere "co se hodi" podle jedne role - zbytek je TICHY (`no_pair`).
+	# NamEReno: balvan na dlazdici vyhne = 0 rudy po 60 pokusech. Kontrola je
+	# proto VIDITELNA pri startu (a sonda `_analyza/p58-smycka-hracem.gd` ji
+	# meri nezavisle).
+	var kolize: Array = _zkontroluj_cile_interakce()
+	print("[main] cile interakce: ", _cile_interakce.size(), " dlazdic, kolizi ",
+		kolize.size(), ("" if kolize.is_empty() else " -> " + str(kolize)))
 
 	view.set_registry(registry)
 	view.set_player(player)
@@ -908,8 +985,17 @@ func _setup_player(view) -> void:
 	controller.backpack = backpack      # klavesa `B` prepina okno batohu
 	controller.policy_panel = policy_panel   # klavesa `P` ukaze okno pravidel
 	controller.skill_list = skill_list   # klavesa `K` ukaze seznam skillu (D10)
+	controller.hotkeys = hotkeys         # klavesa `H`/`F1` ukaze napovedu (D)
 	controller.debug_overlay = debug_overlay   # klavesa `F3` prepina overlay
 	controller.okno = self              # klavesa `F2` prepina fullsize (bod 5.2)
+	# NAPOVEDA A UVOD DO ZURNALU (session D): az TEDY, po `controller.setup()`,
+	# protoze se klavesy berou z `InputMap` (registruje je `register_actions()`)
+	# a z toho, co hra OPRAVDU umi. Kdyby se skladaly driv, byla by v napovede
+	# prazdna mista - a to je presne "napoveda, ktera lze".
+	var napoveda_radku: int = _osvezi_napovedu()
+	var uvod_radku: int = _hlaseni_uvod()
+	print("[main] napoveda: ", napoveda_radku, " radku (data/help.json), uvod ",
+		uvod_radku, " zprav do zurnalu")
 	print("[main] hrac: serial ", serial, " na ", player.pos, " (", map.land_at(player.pos.x, player.pos.y),
 		" land), hue ", player.hue, " (0 = bez barvy), barvy: ", view.hue_stats(),
 		", nastroju v batohu ", nastroju, ", pocatecnich skillu ", skillu,
@@ -1232,7 +1318,8 @@ func _postav_stanice() -> int:
 			int(player.pos.z))
 		items[int(predmet.serial)] = predmet
 		postaveno += 1
-		_hlaseni_do_zurnalu("A " + role + " stands to the " + str(stanice["smer"]) + ".")
+		_hlaseni_do_zurnalu("A " + role + " stands to the " + str(stanice["smer"])
+			+ ". (press " + _kody_akce("interact", " or ") + " on it)")
 		print("[main] stanice: ", role, " (art ", art, ") na ", predmet.pos)
 	return postaveno
 
@@ -1260,7 +1347,17 @@ func _postav_vendora(reg) -> int:
 		return 0
 	if player == null or reg == null:
 		return 0
-	var pos := Vector3i(int(player.pos.x) + 1, int(player.pos.y), int(player.pos.z))
+	# ⚠⚠ SESSION D (2026-10-11) - KOVAR NESMI STAT NA DLAZDICI VYHNĚ.
+	# Do teto chvile byl na `player.pos + (1, 0)`, tedy NA STEJNE DLAZDICI jako
+	# vyhen (`_postav_stanice`: forge na +1,0). Jenze "pouzij, co je pod
+	# kurzorem" u bytosti posila cil `{kind:"mobile"}` - a hrac tim padem
+	# nemohl vytavit rudu (vyhen na te dlazdici se uz nikdy nevybral).
+	# NamEReno: `[main] stanice: forge ... na (1496, 1630, 10)` a
+	# `[main] prodejce: ... na (1496, 1630, 10)` ve stejnem behu.
+	# Kovar je proto o dlazdici dal (dosah `VENDOR_RANGE` = 2, takze na nej
+	# hrac porad dosahne) a sonda `_analyza/p58-smycka-hracem.gd` meri, ze se
+	# cile interakce na jedne dlazdici NEPREKRYVAJI.
+	var pos := Vector3i(int(player.pos.x) + 2, int(player.pos.y), int(player.pos.z))
 	var kovar = MobileScript.new(sim.next_serial(), PLAYER_BODY, pos)
 	kovar.name = "Blacksmith"
 	kovar.ai = {"state": "vendor"}
@@ -1271,8 +1368,12 @@ func _postav_vendora(reg) -> int:
 		push_warning("app.main: pozici vendora se nepodarilo nastavit")
 	if not vendor.zaregistruj_serial(prodejce, v):
 		push_warning("app.main: serial vendora se nepodarilo zaregistrovat")
-	# Otevreny obchod pri startu? NE - hrac si ho otevre sam (`use` na vendora).
-	_hlaseni_do_zurnalu("A blacksmith is here. (use him to trade)")
+	# Otevreny obchod pri startu? NE - hrac si ho otevre sam (pouzij na vendora).
+	# ⚠ SESSION D: do teto chvile tu stalo "use him to trade", ale `use` na
+	# bytost se z klienta NEDALO poslat (`object_command` nikdo nevolal) - rada
+	# byla nesplnitelna. Ted ji plni `interact` na bytost a hlaska rika cim.
+	_hlaseni_do_zurnalu("A blacksmith is here. (press "
+		+ _kody_akce("interact", " or ") + " on him to trade)")
 	print("[main] prodejce: serial ", prodejce, " (", str(vendor.vendor_ids()[v]),
 		") na ", pos, " | k dohledani pres `use`")
 	return 1
@@ -1424,8 +1525,22 @@ func _postav_monstra_u_hrace() -> int:
 	# prvni verze stavela vsechna tri monstra na `+1..+2` dlazdice od hrace,
 	# takze se v izometrii prekryla ("hromada") a na snimku nebylo poznat, co
 	# je co. Jsou proto dal a vic do stran - hrac je vidi, ale nesplynou.
-	var pozice: Array = [Vector3i(3, 1, 0), Vector3i(4, 2, 0), Vector3i(2, 4, 0)]
-	var typy: Array = ["skeleton", "zombie", "rat"]
+	#
+	# ⚠⚠ SESSION D (2026-10-11) - TROJICE BYLA SMRTICI PRO HRAC, KTERY HRU NEZNA.
+	# NamEReno sondou `_analyza/p58-smycka-hracem.gd` (hrac nic nedela, jen se
+	# uci): monstra se do 20 s dostala na dosah a zabila ho - v zurnalu
+	# 7x "skeleton hits you for 8 damage.", 7x "zombie hits you for 6 damage."
+	# a "You are dead. You are a ghost."; **hp 0/87, batoh z 16 predmetu na 1
+	# (vsechno zustalo v tele), zlato 0**. Hrac se tak k zadne smycce nedostane.
+	# Zustava proto JEDNO slabe monstrum (krysa: 6 hp, damage 1-2 z
+	# `data/monsters.json`): dost na to, aby se hrac NAUCIL utocit (`A`) a mel
+	# co prodat, ale ne dost na to, aby ho zabilo - a kdyz ji zabije, dostane
+	# loot (pack `poor`, 1d25 zlata), tedy presne to, co smycka potrebuje.
+	# Skelet a zombie zustavaji ve svete tam, kam patri: spawn bod
+	# `graveyard_britain` je zaklada sam (`sim.world.spawn`), ne tenhle sesitek.
+	# Cesta zpet: puvodni trojice (3,1), (4,2), (2,4).
+	var pozice: Array = [Vector3i(4, 2, 0)]
+	var typy: Array = ["rat"]
 	for i in mini(pozice.size(), typy.size()):
 		var mob = _monstrum(str(typy[i]), player.pos + (pozice[i] as Vector3i))
 		if mob == null:
@@ -1440,7 +1555,18 @@ func _postav_monstra_u_hrace() -> int:
 		print("[main] monstrum: ", mob.name, " (", str(typy[i]), ", telo ",
 			int(mob.body), ") na ", mob.pos, " hp ", int(mob.hp))
 	if postaveno > 0:
-		_hlaseni_do_zurnalu("A skeleton, a zombie and a rat are nearby. (click one to attack)")
+		# ⚠ SESSION D: hlaseni musi odpovidat TOMU, co je postavene (drive
+		# trojice, dnes jedno monstrum) - jinak by zurnal lhal o svete.
+		# Klavesa se bere z `InputMap` (`_kody_akce`), aby se nerozesla s hrou.
+		var jmena: Array[String] = []
+		for i in mini(pozice.size(), typy.size()):
+			var rec: Dictionary = _monstrum_data(str(typy[i]))
+			var jmeno: String = str(rec.get("name", str(typy[i])))
+			if not (jmeno in jmena):
+				jmena.append(jmeno)
+		_hlaseni_do_zurnalu("A " + ", a ".join(PackedStringArray(jmena))
+			+ " is nearby. (press " + _kody_akce("attack", " or ")
+			+ " to attack, or click one)")
 	return postaveno
 
 
@@ -1583,7 +1709,17 @@ func _postav_balvany() -> int:
 	# v komentáři u volání v `_setup_world`; tady jen stavba.
 	# Art je z `sim.harvest.MINE_STATIC` (0x453B–0x454F) - kdyby se seznam
 	# rozešel, `sim.harvest` by balvany netěžil a sonda by to ukázala.
-	var pozice: Array = [Vector2i(1, 0), Vector2i(2, 0), Vector2i(1, 1), Vector2i(0, 2)]
+	#
+	# ⚠⚠ SESSION D (2026-10-11) - BALVAN NESMI LEZET NA STANICI ANI NA
+	# PRODEJCI. Do teto chvile byly pozice (1,0), (2,0), (1,1), (0,2), jenze
+	# vyhen stoji na (1,0) a prodejce na (2,0) - a dlazdice, kde je UZEL
+	# I STANICE, se neda pouzit VUBEC: klient posle jen cil a `sim.interaction`
+	# hleda "co se hodi" podle JEDNE role (`station_role` prebiji "tile"), takze
+	# na rudu u vyhne vyslo `no_pair` a hrac dostal jen ticho.
+	# NamEReno sondou `_analyza/p58-smycka-hracem.gd`: 0 rudy po 60 pokusech,
+	# kolize "forge + balvan na (1496,1630)" a "balvan + kovar na (1497,1630)".
+	# Nove pozice jsou volne; kontrolu hlida `_zkontroluj_cile_interakce()`.
+	var pozice: Array = [Vector2i(1, 1), Vector2i(2, 1), Vector2i(2, 2), Vector2i(0, 2)]
 	var art: int = 0x453B
 	var postaveno: int = 0
 	balvany = []
@@ -1596,15 +1732,233 @@ func _postav_balvany() -> int:
 		balvany.append(Vector2i(balvan.pos.x, balvan.pos.y))
 		postaveno += 1
 		if postaveno == 1:
-			_hlaseni_do_zurnalu("There are rocks to the east. (use them to mine)")
+			# ⚠ SESSION D: "use them to mine" hracovi NEREKLO CIM. Klavesa se
+			# bere z `InputMap` (`_kody_akce`), takze se nemuze rozejit s tim,
+			# co hra opravdu poslouchá.
+			_hlaseni_do_zurnalu("There are rocks to the east. (press "
+				+ _kody_akce("interact", " or ") + " to mine)")
 	print("[main] balvany: ", postaveno, " kusu (art ", art, ") u hrace na ", player.pos)
 	return postaveno
+
+
+func _zkontroluj_cile_interakce() -> Array:
+	# Dlazdice -> co na ni hrac muze "pouzit". Vsechno, co se do sveta stavi
+	# RUKOU (stanice, balvany, prodejce - vsechno jsou to sesitky pro demo),
+	# se sejde tady: kde jsou dve veci na jedne dlazdici, jedna z nich je
+	# mrtva a hrac to nema jak poznat.
+	# Vraci seznam KOLIZI (a kazdou hlasi `push_warning`) - "nula kolizi" je
+	# merena nula, ne prazdny seznam, ktery se tise proiteroval.
+	_cile_interakce = {}
+	var zdroje: Array = []
+	for serial in items.keys():
+		var it = items[serial]
+		if it != null and int(it.parent) == 0:
+			var role: String = ItemScript.role_of(int(it.tile))
+			if role in ["forge", "anvil"]:
+				zdroje.append({"nazev": role, "tile": Vector2i(int(it.pos.x), int(it.pos.y))})
+	for b in balvany:
+		zdroje.append({"nazev": "ruda", "tile": Vector2i(int(b.x), int(b.y))})
+	if prodejce > 0 and registry != null:
+		var mob = registry.get_mobile(int(prodejce))
+		if mob != null:
+			zdroje.append({"nazev": "prodejce", "tile": Vector2i(int(mob.pos.x), int(mob.pos.y))})
+	var kolize: Array = []
+	for z in zdroje:
+		var klic: String = "%d,%d" % [int((z["tile"] as Vector2i).x), int((z["tile"] as Vector2i).y)]
+		if _cile_interakce.has(klic):
+			var text: String = str(_cile_interakce[klic]) + " + " + str(z["nazev"]) + " na " + klic
+			kolize.append(text)
+			push_warning("app.main: cile interakce se prekryvaji: " + text)
+		else:
+			_cile_interakce[klic] = str(z["nazev"])
+	return kolize
 
 
 func _hlaseni_do_zurnalu(text: String) -> void:
 	# Hlaseni hraci pri startu. sim ho posila jako udalost (UI je tenky klient).
 	if sim != null and sim.has_method("push_event"):
 		sim.push_event("message", {"text": text, "kind": "system"})
+
+
+# --- NAPOVEDA PRO HRACE (session D, 2026-10-11, granule `ui.hotkeys`) -------
+#
+# PROC TO TU JE: "hotovo" je, ze clovek, ktery hru NEZNA, projde kratkou smycku
+# BEZ RADY. Text je v `data/help.json` (ladi se bez zasahu do kodu), ale KLAVESY
+# se do dat NEPISUJI - berou se z `InputMap`, tedy z toho, co hra opravdu umi.
+# Dve pravdy o klavesach znamenaji, ze hrac maze klavesu, ktera nic nedela.
+
+func _load_help() -> Dictionary:
+	# Nacte `data/help.json` JEDNOU; chybejici/rozbitý soubor se HLASI a vrati
+	# prazdny slovnik (napoveda pak rekne, ze neni - nikdy tise prazdno).
+	if not _help_data.is_empty():
+		return _help_data
+	if not FileAccess.file_exists(HELP_DATA):
+		push_warning("app.main: chybi " + HELP_DATA + " - napoveda bude prazdna")
+		return {}
+	var parsed = JSON.parse_string(FileAccess.get_file_as_string(HELP_DATA))
+	if not (parsed is Dictionary):
+		push_warning("app.main: " + HELP_DATA + " neni slovnik - napoveda bude prazdna")
+		return {}
+	_help_data = parsed
+	return _help_data
+
+
+func _klavesy_do_inputmap() -> int:
+	# Zaregistruje vazby klaves do `InputMap` PŘED stavbou světa. Vlastní je
+	# `app.player_controller` (granule `app.player_controller`; presna sada
+	# patri `ui.hotkeys`, ale ta klavesy NEDRZI - jen je zobrazuje). Kdyz
+	# soubor chybi nebo funkci nema, rekne se to: ticha napoveda bez klaves
+	# by vypadala jako hotova vec.
+	var skript = load("res://app/player_controller.gd")
+	if skript == null or not skript.has_method("register_actions"):
+		push_warning("app.main: app/player_controller.gd nema `register_actions` - "
+			+ "napoveda a hlášky světa zůstanou bez kláves")
+		return 0
+	return int(skript.register_actions())
+
+
+func _klavesy_akce(akce: Array) -> String:
+	# Lidsky text klaves pro seznam akci z `InputMap`. Poradi = poradi akci
+	# v datech (hra ho nemeni), duplikaty se vypusti (numpad 1-9 je jedna
+	# klavesa osmkrat). Prazdny seznam nebo nezname akce = "-" (videt, ne tise
+	# prazdno); `_napoveda_chyby` to pocita, aby to nebylo jen v textu.
+	var nazvy: Dictionary = _load_help().get("nazvy_klaves", {})
+	var out: Array[String] = []
+	for a in akce:
+		var jmeno: String = str(a)
+		if not InputMap.has_action(jmeno):
+			_napoveda_chyby.append("akce '" + jmeno + "' v InputMap neni")
+			continue
+		for udalost in InputMap.action_get_events(jmeno):
+			var popis: String = _popis_klavesy(udalost)
+			if popis == "":
+				continue
+			popis = str(nazvy.get(popis, popis))
+			if not (popis in out):
+				out.append(popis)
+	if out.is_empty():
+		return "-"
+	return ", ".join(PackedStringArray(out))
+
+
+func _popis_klavesy(udalost) -> String:
+	# Nazev udalosti z `InputMap` JEDNIM mistem: klavesa svym jmenem (stejne
+	# jmeno, jake vraci `OS.get_keycode_string`), mys tlacitkem. Neznama
+	# udalost vraci "" (radsi nic nez vymyslene jmeno).
+	if udalost is InputEventKey:
+		return OS.get_keycode_string((udalost as InputEventKey).keycode)
+	if udalost is InputEventMouseButton:
+		var tlacitko: int = int((udalost as InputEventMouseButton).button_index)
+		if tlacitko == MOUSE_BUTTON_LEFT:
+			return "LMB"
+		if tlacitko == MOUSE_BUTTON_RIGHT:
+			return "RMB"
+	return ""
+
+
+func _kody_akce(akce: String, spojka: String) -> String:
+	# Klavesy akce pro ANGLICKE hlasky ve svete ("press E or T to mine") jako
+	# holé kódy - ceske nazvy z dat by do anglicke vety nepatrily. Mys se
+	# vynechava: "(press levé tlačítko myši)" by byla otrava.
+	var out: Array[String] = []
+	if InputMap.has_action(akce):
+		for udalost in InputMap.action_get_events(akce):
+			if udalost is InputEventKey:
+				var kod: String = OS.get_keycode_string((udalost as InputEventKey).keycode)
+				if not (kod in out):
+					out.append(kod)
+	if out.is_empty():
+		return "(?)"           # klavesa se nenasla - VIDET, ne tise prazdno
+	return spojka.join(PackedStringArray(out))
+
+
+func _uvod_text(text: String) -> String:
+	# Nahradi {akce} skutecnou klavesou. Neznama znacka se NAHLASI a text se
+	# vrati PRAZDNY - napoveda s "{...}" v texte by byla vada, ne napoveda.
+	# Bere se KOD klavesy ("E", "H"), ne lokalizovany nazev: veta ma znit
+	# "stiskni E nebo T", ne "stiskni levé tlačítko myši, A".
+	var out: String = text
+	var chyby: Array[String] = []
+	for i in range(text.count("{")):
+		var od: int = out.find("{")
+		var do_: int = out.find("}", od + 1)
+		if od < 0 or do_ < 0:
+			break
+		var znacka: String = out.substr(od + 1, do_ - od - 1)
+		var nahrada: String = _kody_akce(znacka, " nebo ")
+		if nahrada == "(?)":
+			chyby.append(znacka)
+			nahrada = ""
+		out = out.substr(0, od) + nahrada + out.substr(do_ + 1)
+	if not chyby.is_empty():
+		push_warning("app.main: uvodni napoveda zna neznamou akci " + str(chyby))
+		return ""
+	return out
+
+
+func _napoveda_radky() -> Array:
+	# Radky z DAT prelozene na to, co kresli okno: `{sekce, klavesy, popis}`.
+	# Poradi: skupina (`skupiny[].poradi`) a v ni radek (`radky[].poradi`) -
+	# trida se tady, aby si okno nemuselo vymyslet pravidlo (tenky klient).
+	var data: Dictionary = _load_help()
+	var nazvy_sekci: Dictionary = {}
+	var poradi_sekci: Dictionary = {}
+	for s in data.get("skupiny", []):
+		if s is Dictionary:
+			nazvy_sekci[str(s.get("id", ""))] = str(s.get("nazev", ""))
+			poradi_sekci[str(s.get("id", ""))] = int(s.get("poradi", 0))
+	var out: Array = []
+	for r in data.get("radky", []):
+		if not (r is Dictionary):
+			_napoveda_chyby.append("radek neni slovnik: " + str(r))
+			continue
+		var skupina: String = str(r.get("skupina", ""))
+		var klavesy: String = _klavesy_akce(r.get("akce", []))
+		out.append({
+			"sekce": str(nazvy_sekci.get(skupina, skupina)),
+			"klavesy": klavesy,
+			"popis": str(r.get("popis", "")),
+			"poradi": int(poradi_sekci.get(skupina, 0)) * 1000 + int(r.get("poradi", 0)),
+		})
+	out.sort_custom(func(a, b): return int(a["poradi"]) < int(b["poradi"]))
+	for radek in out:
+		radek.erase("poradi")
+	return out
+
+
+func _osvezi_napovedu() -> int:
+	# Naplni okno napovedi z dat a z REALNYCH vazeb. Vraci pocet radku.
+	# Chyby (`_napoveda_chyby`) se VYPISUJI - jinak by se "radek chybi" tvarilo
+	# jako "napoveda je kratka".
+	if hotkeys == null:
+		push_warning("app.main: okno napovedy neni - `ui.hotkeys` se nezaregistrovalo")
+		return 0
+	_napoveda_chyby.clear()
+	var data: Dictionary = _load_help()
+	var radky: Array = _napoveda_radky()
+	hotkeys.nastav(str(data.get("titulek", "")), radky,
+		str(data.get("prazdno", "")))
+	if not _napoveda_chyby.is_empty():
+		push_warning("app.main: napoveda ma " + str(_napoveda_chyby.size())
+			+ " vad: " + str(_napoveda_chyby))
+	return int(hotkeys.count())
+
+
+func _hlaseni_uvod() -> int:
+	# UVODNI ZPRAVY DO ZURNALU: "co je cilem a jak". Do session D dostal hrac
+	# jen to, co vidi ("There are rocks to the east"), ale NE jak to udelat -
+	# a u prodeje dokonce radu, ktera se nedala splnit (`use` na prodejce).
+	# Text je z `data/help.json` (`uvod`), klavesy se doplnuji z `InputMap`.
+	var poslano: int = 0
+	for radek in _load_help().get("uvod", []):
+		if not (radek is Dictionary):
+			continue
+		var text: String = _uvod_text(str((radek as Dictionary).get("text", "")))
+		if text == "":
+			continue
+		_hlaseni_do_zurnalu(text)
+		poslano += 1
+	return poslano
 
 
 func _start_stats() -> Dictionary:

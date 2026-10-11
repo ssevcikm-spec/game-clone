@@ -339,9 +339,15 @@ func interact_command(screen: Vector2, camera_offset: Vector2, z: int = 0) -> Di
 	# (`sim.interaction.interact`). Tady se ZADNE pravidlo nevybira: kdyby
 	# klient vybiral nastroj, byla by to herni logika v UI (docs/05 §5.3).
 	#
-	# Cilem je zatim DLAZDICE: predmety a bytosti ve svete jeste nejsou (jsou
-	# jen v kontejneru), takze by je nebylo na co kliknout. Az pribudnou,
-	# pribude sem `kind: "item"`/`"mobile"` - smlouva §4.3 je zna.
+	# ⚠⚠ SESSION D (2026-10-11) - ZKOUSENO A VRACENO: klient tu chvili posilal
+	# u BYTOSTI cil `{kind:"mobile"}` (aby se hrac dostal k prodejci). Jenze
+	# tim si klient vybiral "co je na dlazdici" - a monstrum, ktere se projde
+	# pres rudu, vzalo hracovi moznost tezit (namEReno sondou
+	# `_analyza/p58-smycka-hracem.gd`: 0 rudy po 60 pokusech, cil
+	# `{kind:"mobile"}` na dlazdici balvanu). Rozhoduje proto SIM: dostane
+	# dlazdici a sama zkusi uzel/stanici, a teprve kdyz tam nic neni, bytost
+	# (`sim.interaction._mobil_na_dlazdici`). Klient zustava hloupý - posila
+	# jen to, co je pod kurzorem.
 	var world: Vector2 = _na_svet(screen, camera_offset)
 	var tile: Vector2i = _iso.to_tile(world.x, world.y, z)
 	return {"t": "interact",
@@ -362,7 +368,9 @@ func interact_command(screen: Vector2, camera_offset: Vector2, z: int = 0) -> Di
 
 func area_mobile(tile: Vector2i, player: int = 0) -> int:
 	# Nejnizsi serial NEPRATELSKEHO mobila na dlazdici (`0` = nikdo). Hleda se
-	# podle poradi serialu, aby volba nezavisela na poradi v registru.
+	# podle poradi serialu, aby volba nezavisela na poradi v registru; prodejce
+	# se PRESKAKUJE (utok na nej nema smysl, UO ho chrani) - na rozdil od
+	# "pouzij", ktere resi SIM (`sim.interaction`).
 	if _registry == null or not _registry.has_method("all"):
 		return 0
 	var kandidati: Array = []

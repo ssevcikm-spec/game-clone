@@ -170,6 +170,13 @@ const UI_KEYS := {
 	# SEZNAM SKILLU (2026-10-10, D10 "herni zaklady"): `K` jako "skilly". Okno
 	# je JEN CTENI - hodnoty plni `app.main` ze `player.skills`.
 	"skill_list_toggle": [KEY_K],
+	# NAPOVEDA (session D, 2026-10-11, granule `ui.hotkeys`): `H` jako "help",
+	# `F1` je v hrach klasika. Dve vazby na jednu akci nikomu nevadi (stejne
+	# jako sipky + numpad u pohybu) a `H` je blizko WASD-ovym rukam.
+	# ⚠ Okno je od startu OTEVRENE (`app.main`): kdo hru nezna, se jinak
+	# nedozvi, ze existuje - a "napoveda, kterou je potreba najit" je presne
+	# to, co zadani (DALSI-SESSION §D) odmitalo.
+	"hotkeys_toggle": [KEY_H, KEY_F1],
 }
 
 # Doba jednoho animacniho framu (docs/05 §5.1.1 = `core/const.gd` TURN_MS).
@@ -189,6 +196,7 @@ var camera: Camera2D = null
 var backpack = null
 var policy_panel = null            # `ui.policy_panel` - P ho prepina (D3 jako HUD)
 var skill_list = null              # `ui.skill_list` - K ho prepina (D10)
+var hotkeys = null                 # `ui.hotkeys` - H/F1 ho prepina (session D)
 var debug_overlay = null           # `ui.debug_overlay` - F3 ho prepina
 var okno = null                    # `app.main` - F2 prepina fullsize (bod 5.2)
 
@@ -341,7 +349,8 @@ func setup(player_mobile, sim_world, input_mapper, movement_system, world_view, 
 	var added: int = register_actions()
 	if input_map != null:
 		input_map.bindings = default_bindings()
-	print("[controller] klavesy: ", added, " novych vazeb, smeru ",
+	print("[controller] klavesy: ", added,
+		" novych vazeb (0 = uz byly v InputMap), smeru ",
 		default_bindings().size(), ", hrac serial ", player.serial if player != null else -1)
 	_follow()
 
@@ -411,6 +420,15 @@ func _process(_delta: float) -> void:
 			and input_map.akce_just_pressed("skill_list_toggle"):
 		var skilly_videt: bool = bool(skill_list.toggle())
 		print("[controller] seznam skillu: ", "OTEVREL" if skilly_videt else "ZAVREL")
+	# NAPOVEDA (session D, 2026-10-11, `ui.hotkeys`): `H`/`F1` ji ukaze/schova.
+	# Je OTEVRENA uz od startu (rozhodnuti `app.main`) - hrac, ktery hru nezna,
+	# se jinak nedozvi, co zmacknout. Obsah plni `app.main._osvezi_napovedu()`
+	# z `data/help.json` a z REALNYCH vazeb v `InputMap`; okno samo o klavesach
+	# nic nevi (tenky klient, docs/04 §4.1).
+	if hotkeys != null and input_map != null \
+			and input_map.akce_just_pressed("hotkeys_toggle"):
+		var napoveda_videt: bool = bool(hotkeys.toggle())
+		print("[controller] napoveda: ", "OTEVREL" if napoveda_videt else "ZAVREL")
 	# DEBUG OVERLAY (2026-10-09): `F3` ho schova/zapne. Stav se hlasi do
 	# konzole - ticho by znamenalo, ze hrac nevi, jestli neco zmackl.
 	# Overlay je jen pro cloveka; kdyz neni (test), klavesa nic nedeje.
