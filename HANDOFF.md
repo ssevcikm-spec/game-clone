@@ -98,7 +98,7 @@ s UO mapou v gitu, chybějící `data/regions.json`).
 
 `31956c4` (krok S1: `sim/content.gd` + `data/content-layers.json` + zapojení do
 `app/main` + testy) → `946fbe2` (návrh S1–S6 + kontrakt `docs/04 §4.9`) →
-`bedaa1f` (LESSONS + toto předání) → `…` (doplnění commitů do předání).
+`bedaa1f` (LESSONS + toto předání) → `e4074f4` (doplnění commitů do předání).
 **Ověřeno živě:** `git rev-list --count origin/main..HEAD` → **0**,
 `origin/main` = `HEAD`.
 
