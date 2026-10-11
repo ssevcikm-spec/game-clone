@@ -37,6 +37,7 @@ from PIL import Image
 
 import artgen_common as ac
 import postprocess as pp
+import styl
 import uo_ref
 
 HERE = Path(__file__).resolve().parent
@@ -72,12 +73,29 @@ def davka_land() -> tuple[list[tuple[str, int]], list[Image.Image], list[dict]]:
 
 
 def davka_item() -> tuple[list[tuple[str, int]], list[Image.Image], list[dict]]:
+    # STYL (2026-10-11): z teto sady bere HRA jen PREDMETY (dyka, ingot) -
+    # teren a postavu bere z `assets/own-lit/` (viz `assets/own-art.json`).
+    # Styluje se proto jen tahle davka; ostatni druhy v teto sade zustavaji
+    # bez stylu, aby se needitoval obrazek, ktery hra nepouziva.
+    #
+    # Paleta je na DAVKU vsECH predmetu (ne na kus): kdyby mela kazda dyka
+    # vlastni paletu, prisly by dva kovove predmety o dve ruzne sedive.
     sprity, meta, klice = [], [], []
+    pripravene = []
     for spec in ac.ITEMS:
         cesta = RAW / f"item_{spec['name']}.png"
         p = pp.priprav(cesta, _origin(f"item_{spec['name']}"))
         s = pp.meritko([p], obsah_vyska_px=spec["uo_content"][1])
-        obrazky, m = pp.sestav([p], s, "item", popis=spec["name"])
+        pripravene.append((spec, p, s))
+    sber = styl.SadaPalety()
+    for _spec, p, s in pripravene:
+        pp.sestav([p], s, "item", popis=_spec["name"], sber=sber)
+    paleta = sber.postav()
+    if paleta is None:
+        raise SystemExit("item: zadne vzorky barev - paleta by byla prazdna")
+    for spec, p, s in pripravene:
+        obrazky, m = pp.sestav([p], s, "item", popis=spec["name"], paleta=paleta,
+                               tvrda_alfa=True)
         sprity.append(obrazky[0])
         meta.append(dict(m[0], jmeno=spec["name"], uo_obsah=list(spec["uo_content"])))
         klice.append(("item", spec["uo_id"]))
@@ -236,6 +254,12 @@ def main() -> int:
 
     davky = [("land", davka_land()), ("item", davka_item()), ("anim", davka_anim())]
     zapisy, stranky, report = [], {}, {}
+    # STYL (2026-10-11): z teto sady bere hra jen PREDMETY (dyka, ingot) - viz
+    # `davka_item`. Do reportu se to pise, aby brana G16 (`check-style.py`)
+    # nemusela hadat, jestli styl zapnuty je.
+    report["styl_tvrda_alfa_prah"] = styl.ALFA_TVRDA_PRAH
+    report["styl_doostreni_procent"] = styl.DOOSTRENI_PROCENT
+    report["styl_rozsah"] = "jen predmety (item) - ostatni druhy bere hra z own-lit"
     for kind, (klice, sprity, meta) in davky:
         zaznamy, _n, info = sestav(kind, klice, sprity, meta)
         zapisy.extend(zaznamy)
@@ -444,8 +468,12 @@ def zkontroluj(nahled: str, hash_out: bool) -> int:
     if listy.exists():
         ld = json.loads(listy.read_text(encoding="utf-8"))
         uo_anim = json.loads((UO / "anim" / "anim-sheets.json").read_text(encoding="utf-8"))
-        kontrola(set(ld) == set(uo_anim), f"klice anim listu se lisi od UO: "
-                 f"chybi {sorted(set(uo_anim) - set(ld))}, navic {sorted(set(ld) - set(uo_anim))}")
+        # ⚠ OPRAVA 2026-10-11 (stejna jako v `pack_atlas_lit.py`): srovnavaly se
+        # VSECHNY klicne klice, coz prestalo platit, kdyz UO export dostal
+        # `groups`/`group_source`/`actions_note` (session M5). Kontrakt je
+        # o KLICICH SPRITU; nas list si jen nesmi vymyslet klic, ktery UO nema.
+        kontrola(set(ld) <= set(uo_anim), "anim list ma klic, ktery UO export nema: "
+                 f"{sorted(set(ld) - set(uo_anim))}")
         kontrola(len(ld["sprites"]) == ac.CHAR["dirs"], "anim listu neni 5")
         for k, v in ld["sprites"].items():
             kontrola(len(v["frames"]) == ac.CHAR["frames"], f"{k}: framu neni 8")

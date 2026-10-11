@@ -101,7 +101,10 @@
    "alfa"
   ],
   "land_pozadovano": 2,
-  "land_vyrobeno": 2
+  "land_vyrobeno": 2,
+  "styl_doostreni_procent": 0,
+  "styl_rozsah": "jen predmety (item) - ostatni druhy bere hra z own-lit",
+  "styl_tvrda_alfa_prah": 128
  },
  "source": {
   "blender": "5.2.1 LTS (BLENDER_EEVEE, film_transparent)",

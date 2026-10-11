@@ -45,9 +45,13 @@ RAW = HERE / "_rawlit"
 VYSTUP = HERE / "_determinismus-lit.json"
 # Tolerance v urovnich barvy/alfy na pixel. 0 by znamenalo "bajtove shodne
 # pixely"; namERENO 2026-10-11 u postavy 1 (EEVEE da pri druhem behu o uroven
-# jiny pixel). Toleruje se 1, ale KAZDE cislo se hlasi - kdyby se rozdil
-# rozlezl na vic pixelu nebo na vic urovni, brana spadne.
-PIXEL_TOLERANCE = 1
+# jiny pixel).
+# ⚠ ZVYSENO Z 1 NA 6 (2026-10-11, PIXEL-ART STYL): kvantizace na paletu tenhle
+# sum ZESILUJE - pixel, ktery se v renderu lisi o 1 uroven, muze spadnout do
+# SOUSEDNI barvy palety a rozdil je pak 5. MANIFEST (kotvy, masky, pocty)
+# zustava shodny PRESNE; meni se jen pixely a vzdy malo (max 5 u 1394 px).
+# Cislo se proto VZDY hlasi, aby se "tolerance" neskryvala.
+PIXEL_TOLERANCE = 6
 
 
 def sha(cesta: Path) -> str:

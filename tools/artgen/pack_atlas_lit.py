@@ -43,6 +43,7 @@ import artgen_common as ac1
 import artgen_common_lit as acl
 import postprocess as pp
 import postprocess_lit as ppl
+import styl
 
 HERE = Path(__file__).resolve().parent
 RAW = HERE / "_rawlit"
@@ -77,16 +78,46 @@ def _origin(davka: str) -> tuple[float, float]:
     return (o["origin_x"], o["origin_y"])
 
 
+def _dva_pruchody(pripravene: list, s: float, druh: str, popis: str):
+    """STYL po davkach: 1. pruchod sbere vzorky, 2. pruchod kvantizuje.
+
+    ⚠ PALETA NA DAVKU, NE NA CELOU SADU (namEReno 2026-10-11): paleta z cele
+    sady je prevazena tim, co ma nejvic pixelu - postava ma 40 framu, takze
+    drobne predmety (krumpac 28x36) v ni dostanou 1-2 barvy a ztrati material
+    (hnedá rukojet zsedivela). Paleta z jednoho modelu da kazdemu kusu plnou
+    skalu; jednotu drzi stejny render a svetlo, ne sdilena paleta.
+    """
+    sber = styl.SadaPalety()
+    ppl.sestav(pripravene, s, druh, popis=popis, sber=sber)
+    paleta = sber.postav()
+    if paleta is None:
+        raise SystemExit(f"{popis}: zadne vzorky barev - paleta by byla prazdna")
+    obrazky, meta = ppl.sestav(pripravene, s, druh, popis=popis, paleta=paleta,
+                               tvrda_alfa=True)
+    return obrazky, meta, len(styl.barvy_palety(paleta)), sber.pocet_vzorku()
+
+
 def davka_land():
     sprity, meta, klice = [], [], []
+    pripravene = []
     for spec in acl.LAND:
         cesta = RAW / f"tile_{spec['name']}.png"
         p = ppl.priprav(cesta, _origin(f"tile_{spec['name']}"))
         s = ppl.meritko([p], obsah_vyska_px=acl.TILE)
-        obrazky, m = ppl.sestav([p], s, "land", popis=spec["name"])
+        pripravene.append((spec["name"], p, s))
+    # ⚠ Paleta pro VŠECHNY dlaždice se stavi z OBOU (davka je jeden model):
+    # kdyz se postavila jen z prvni, dostala druha (hlinena) barvy travnate
+    # a zmenila odstin - namEReno POHLEDEM 2026-10-11.
+    sber = styl.SadaPalety()
+    for jmeno, p, s in pripravene:
+        ppl.sestav([p], s, "land", popis=jmeno, sber=sber)
+    paleta = sber.postav()
+    for jmeno, p, s in pripravene:
+        obrazky, m = ppl.sestav([p], s, "land", popis=jmeno, paleta=paleta,
+                                tvrda_alfa=True)
         sprity.append(obrazky[0])
-        meta.append(dict(m[0], jmeno=spec["name"]))
-        klice.append(("land", spec["uo_id"]))
+        meta.append(dict(m[0], jmeno=jmeno))
+        klice.append(("land", next(t["uo_id"] for t in acl.LAND if t["name"] == jmeno)))
     return klice, sprity, meta
 
 
@@ -98,7 +129,7 @@ def davka_item():
                         stin=RAW / f"_stin_item_{jmeno}.png",
                         ref=RAW / f"_ref_item_{jmeno}.png")
         s = ppl.meritko([p], obsah_vyska_px=spec["uo_content"][1])
-        obrazky, m = ppl.sestav([p], s, "item", popis=jmeno)
+        obrazky, m, _pal, _vz = _dva_pruchody([p], s, "item", jmeno)
         sprity.append(obrazky[0])
         meta.append(dict(m[0], jmeno=jmeno, uo_obsah=list(spec["uo_content"])))
         klice.append(("item", spec["uo_id"]))
@@ -117,7 +148,7 @@ def davka_anim():
                                       ref=ref if ref.exists() else None))
         klice.append(("anim", acl.anim_id(d, f)))
     s = ppl.meritko(pripravene, obsah_vyska_px=acl.CHAR["cil_obsah_px"])
-    obrazky, meta = ppl.sestav(pripravene, s, "anim", popis="character")
+    obrazky, meta, _pal, _vz = _dva_pruchody(pripravene, s, "anim", "character")
     for i, (d, f) in enumerate(kazdy):
         meta[i]["jmeno"] = f"char_d{d}_f{f}"
         meta[i]["smer"] = d
@@ -247,8 +278,14 @@ def main() -> int:
     if a.check or a.hash:
         return zkontroluj(a.nahled, a.hash)
 
+    # STYL (2026-10-11): paleta se stavi po DAVKACH (jeden model = jedna paleta) -
+    # viz `_dva_pruchody`. Duvod je namEReny: paleta z cele sady je prevazena
+    # postavou (40 framu) a drobne predmety v ni ztrati material.
     davky = [("land", davka_land()), ("item", davka_item()), ("anim", davka_anim())]
     zapisy, stranky, report = [], {}, {}
+    report["styl_doostreni_procent"] = styl.DOOSTRENI_PROCENT
+    report["styl_tvrda_alfa_prah"] = styl.ALFA_TVRDA_PRAH
+    report["styl_paleta_po_davkach"] = "kazdy model ma vlastni paletu (viz _dva_pruchody)"
     for kind, (klice, sprity, meta) in davky:
         zaznamy, _n, info = sestav(kind, klice, sprity, meta)
         zapisy.extend(zaznamy)
@@ -262,6 +299,11 @@ def main() -> int:
         report[f"{kind}_barva_pozadi_px"] = sum(m["barva_pozadi_px"] for m in meta)
         report[f"{kind}_meritko_min"] = round(min(m["meritko"] for m in meta), 6)
         report[f"{kind}_meritko_max"] = round(max(m["meritko"] for m in meta), 6)
+        # STYL (2026-10-11): meri se na TELE (ne na stinu), aby `--check` mohl
+        # overit, ze silueta je tvrda a paleta dodrzena.
+        report[f"{kind}_styl_barvy_max"] = max(m.get("styl_barvy", 0) for m in meta)
+        report[f"{kind}_styl_polopruhle_px_max"] = max(
+            m.get("styl_polopruhle_px", 0) for m in meta)
         report[f"{kind}_box_px"] = {str(i): [m["w"], m["h"]]
                                     for (_k, i), m in zip(klice, meta)}
         report[f"{kind}_obsah_sirka_px"] = {str(i): m["obsah_sirka_px"]
@@ -424,6 +466,23 @@ def zkontroluj(nahled: str, hash_out: bool) -> int:
     kontrola(lit.get("tile_px") == acl.TILE and lit.get("tile_px") == ac1.TILE
              and lit.get("render_px") == ac1.RENDER,
              f"manifest netvrdi 1x rozliseni ({acl.TILE} px / render {ac1.RENDER}): {lit}")
+
+    # --- STYL (2026-10-11): silueta tvrda, paleta dodrzena -------------------
+    # Bez techhle kontrol by "styl je zapnuty" bylo jen tvrzeni v komentari -
+    # a presne na to uzivatel ukazoval ("rozmazany, chybi detaily").
+    rep = data.get("report", {})
+    kontrola(int(rep.get("styl_tvrda_alfa_prah", 0)) == styl.ALFA_TVRDA_PRAH,
+             f"manifest netvrdi tvrdou alfu (prah {rep.get('styl_tvrda_alfa_prah')!r}, "
+             f"cekame {styl.ALFA_TVRDA_PRAH}) - styl se nezapnul")
+    for kind in ("land", "item", "anim"):
+        polopruhle = int(rep.get(f"{kind}_styl_polopruhle_px_max", -1))
+        kontrola(polopruhle == 0,
+                 f"{kind}: silueta ma {polopruhle} polopruhlednych pixelu "
+                 "(pixel-art silueta ma byt 0/255; kontaktni stin se do toho nepocita)")
+        barvy = int(rep.get(f"{kind}_styl_barvy_max", -1))
+        kontrola(0 < barvy <= styl.PALETA_BAREV,
+                 f"{kind}: {barvy} barev v tele, paleta ma nejvyse {styl.PALETA_BAREV} "
+                 "- nula by znamenala, ze styl NEMERIL")
 
     ocekavane = {("land", t["uo_id"]) for t in acl.LAND} | \
                 {("item", i["uo_id"]) for i in acl.ITEMS} | \
@@ -668,8 +727,16 @@ def zkontroluj(nahled: str, hash_out: bool) -> int:
     if listy.exists():
         ld = json.loads(listy.read_text(encoding="utf-8"))
         uo_anim = json.loads((UO / "anim" / "anim-sheets.json").read_text(encoding="utf-8"))
-        kontrola(set(ld) == set(uo_anim), "klice anim listu se lisi od UO: chybi "
-                 f"{sorted(set(uo_anim) - set(ld))}, navic {sorted(set(ld) - set(uo_anim))}")
+        # ⚠ OPRAVA 2026-10-11: kontrola srovnavala VSECHNY klicne klice obou
+        # listu. To prestalo platit, kdyz `tools/uoextract/anim.py` (session M5)
+        # pridal do UO exportu `groups`, `group_source` a `actions_note` - a
+        # cervena byla z duvodu, ktery se SEAMU NETYKA (kontrakt je o KLICICH
+        # SPRITU, ne o metadatech exportu). Srovnava se proto to, co plati:
+        # (a) nas list si nesmi vymyslet klic, ktery UO nema, (b) kazdy nas
+        # klic spritu musi v UO byt (to uz dela smycka nize).
+        kontrola(set(ld) <= set(uo_anim),
+                 "anim list ma klic, ktery UO export nema: "
+                 f"{sorted(set(ld) - set(uo_anim))}")
         kontrola(len(ld["sprites"]) == acl.CHAR["dirs"],
                  f"anim listu {len(ld['sprites'])} != {acl.CHAR['dirs']}")
         for k, v in ld["sprites"].items():

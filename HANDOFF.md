@@ -11,6 +11,35 @@
 > („art seam (A) … + souběžná práce M5 (C)“) — **commit obsahuje i moje M5
 > soubory**, které jsem tam nedal já. Před dalším krokem si ověř `git status`.
 
+## ✅ CO JE NOVÉHO (2026-10-11, PIXEL-ART STYL — novější než blok M5 níž)
+
+> ⚠ Blok níž (M5) vznikl v souběžné session; tenhle blok je **novější** a týká se
+> **způsobu výroby vlastního artu** (odpověď na „own art se rozmazaný“).
+
+**Co se udělalo:** V1 — do pipeline `tools/artgen/` přibyl **stylový krok**
+(`styl.py`: tvrdá alfa na siluetě + paleta na model; doostření **vypnuté**), sady
+`assets/own-lit/` a `assets/own/` (předměty) jsou přegenerované, nová brána **G16**
+`check-style.py`.
+
+**Naměřeno na spritech (před → po):** postava **472 → 39 barev**, poloprůhledné
+**148 → 0**, ostrost 26,3 → 31,5; krumpáč 58 → 33 / 56 → 0; ruda 237 → 36 / 150 → 0;
+dlaždice 169 → 15; dýka 57 → 20 / 66 → 0. `pack_atlas*.py --check`:
+**476/0 · 900/0 · 123/0**. Brány: **G16 OK**, G10 po přerenderu snímku OK
+(`vlastni_pixelu_po_erozi 265`).
+
+**Co je na tom ŠPATNĚ (přiznané):** (1) **detail to nepřidá** — tvar je stejný,
+jen čitelný; ostrost je u postavy 31,5 proti UO 41,4, u rudy 19,4 proti 48,5 →
+víc detailu je **V2 (modelování)**, ne další styl; (2) **doostření je vypnuté**,
+protože na tenké diagonále rukojeti krumpáče dělalo tečkovanou čáru (bylo to
+kroužkování Lanczosu, ne díra v alfe); (3) u krumpáče zůstává **schodovitá
+diagonála**; (4) **tolerance determinismu atlasu je 6** (kvantizace zesiluje šum
+EEVEE ±1 → ±5; manifest zůstává přesně shodný).
+
+**Otevřeno:** V2 modelování (detaily, silnější rukojeť); stín placatých předmětů
+(dýka 7 px, ingot 11 px); `assets/own2x/` styl nemá (hra ji nepoužívá).
+
+---
+
 ## ✅ CO JE HOTOVÉ (M5 = souboj, monstra, smrt, loot)
 
 **Naměřeno 2026-10-11 (poslední běh):** testy **2629 kontrol / 0 selhání**

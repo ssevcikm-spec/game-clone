@@ -455,7 +455,13 @@ def zkontroluj(hash_out: bool) -> int:
     if listy.exists():
         ld = json.loads(listy.read_text(encoding="utf-8"))
         uo_anim = json.loads((UO / "anim" / "anim-sheets.json").read_text(encoding="utf-8"))
-        kontrola(set(ld) == set(uo_anim), "klice anim listu se lisi od UO")
+        # ⚠ OPRAVA 2026-10-11 (stejna jako v `pack_atlas_lit.py`): srovnavaly se
+        # VSECHNY klicne klice, coz prestalo platit, kdyz UO export dostal
+        # `groups`/`group_source`/`actions_note` (session M5). Kontrakt je
+        # o KLICICH SPRITU; nas list si jen nesmi vymyslet klic, ktery UO nema.
+        kontrola(set(ld) <= set(uo_anim),
+                 "anim list ma klic, ktery UO export nema: "
+                 f"{sorted(set(ld) - set(uo_anim))}")
         kontrola(len(ld["sprites"]) == ac2.CHAR["dirs"],
                  f"anim listu {len(ld['sprites'])} != {ac2.CHAR['dirs']}")
         for k, v in ld["sprites"].items():

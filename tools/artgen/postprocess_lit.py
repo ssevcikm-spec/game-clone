@@ -39,6 +39,7 @@ from scipy import ndimage
 
 import artgen_common_lit as acl
 import postprocess as pp
+import styl
 
 ALFA_PRAH = pp.ALFA_PRAH
 
@@ -176,7 +177,8 @@ def viditelny_stin(img: Image.Image) -> int:
 
 
 def sestav(pripravene: list[dict], s: float, druh: str,
-           popis: str = "") -> tuple[list[Image.Image], list[dict]]:
+           popis: str = "", paleta: Image.Image = None, sber=None,
+           tvrda_alfa: bool = False) -> tuple[list[Image.Image], list[dict]]:
     """Zmensi a vlozi sprity tak, aby kontakt sedel na (w//2, h-22).
 
     Stejna logika jako 1x `postprocess.sestav` (vcetne vetve pro dlazdici);
@@ -239,8 +241,26 @@ def sestav(pripravene: list[dict], s: float, druh: str,
         maska = Image.fromarray((sirsi * 255).astype(np.uint8)).resize((nw, nh), Image.NEAREST)
         gate = np.array(maska) > 127
         alfa = np.array(maly.split()[3])
-        alfa = np.where(gate & (alfa >= ALFA_PRAH), alfa, 0).astype(np.uint8)
-        rgb = np.array(maly)[:, :, :3]
+        if tvrda_alfa:
+            # PIXEL-ART STYL (2026-10-11): silueta je 0/255, ne antialiasovana.
+            # ⚠ GATE SE RESIZUJE BILINEARNE, NE `NEAREST`: pri `NEAREST` vypadavaji
+            # z masky pixely na TENKYCH diagonalach - namEReno POHLEDEM: rukojet
+            # krumpace se rozpadla na tecky (zmereno 103 px misto 262 puvodnich).
+            # Bilinear + prah > 0 drzi tenky prvek cely; obal daleko od tvaru
+            # odstrani az prah alfy (`ALFA_TVRDA_PRAH`).
+            jemna = Image.fromarray((sirsi * 255).astype(np.uint8)).resize(
+                (nw, nh), Image.BILINEAR)
+            alfa = styl.tvrda_alfa(alfa, np.array(jemna) > 0)
+        else:
+            alfa = np.where(gate & (alfa >= ALFA_PRAH), alfa, 0).astype(np.uint8)
+        if paleta is not None or sber is not None:
+            rgb = np.asarray(styl.doostri(maly))
+        else:
+            rgb = np.array(maly)[:, :, :3]
+        if sber is not None:
+            sber.pridej(rgb, alfa)
+        if paleta is not None:
+            rgb = styl.na_paletu(rgb, paleta)
         telo = Image.fromarray(np.dstack([rgb, alfa]), "RGBA")
         platno = Image.new("RGBA", (w, h), (0, 0, 0, 0))
         stat = {"px": 0, "max_alfa": 0, "faktor_min": 1.0, "rovina_px": 0,
@@ -249,7 +269,8 @@ def sestav(pripravene: list[dict], s: float, druh: str,
         if druh == "land":
             # ⚠ U dlazdice se BARVA bere BEZ OHLEDU NA ALFU (jako v 1x): tvar je
             # dany presnou maskou, ale barva musi byt vsude, kam maska saha.
-            platno.paste(maly.convert("RGB"), (vloz_x, vloz_y))
+            # Barva je od 2026-10-11 DOOSTRENA a KVANTIZOVANA (styl sady).
+            platno.paste(Image.fromarray(rgb, "RGB"), (vloz_x, vloz_y))
         else:
             if "stin" in p:
                 stin_img, stat = vrstva_stinu(p, s, nw, nh, w, h, vloz_x, vloz_y,
@@ -267,6 +288,7 @@ def sestav(pripravene: list[dict], s: float, druh: str,
                 raise RuntimeError(f"maska kosoctverce ma {int(m.sum())} px, "
                                    f"ocekavano {pp.KOSOCTVEREC_PX}")
         sprity.append(platno)
+        videt = alfa >= 128
         meta.append({"w": w, "h": h, "obsah_pod_kontaktem_px": round(pod, 2),
                      "obsah_vyska_px": int(round(b - t + 1)),
                      "obsah_sirka_px": int(round(r - l + 1)),
@@ -279,7 +301,12 @@ def sestav(pripravene: list[dict], s: float, druh: str,
                      "rovina_sirka_px": stat["rovina_sirka_px"],
                      "rovina_vyska_px": stat["rovina_vyska_px"],
                      "px_na_jednotku": stat["px_na_jednotku"],
-                     "px_na_jednotku_merene": stat["px_na_jednotku_merene"]})
+                     "px_na_jednotku_merene": stat["px_na_jednotku_merene"],
+                     # STYL (2026-10-11): meri se na TELE spritu (ne na stinu).
+                     "styl_tvrda_alfa": 1 if tvrda_alfa else 0,
+                     "styl_barvy": int(len(np.unique(rgb[videt].reshape(-1, 3), axis=0)))
+                     if videt.any() else 0,
+                     "styl_polopruhle_px": int(((alfa > 0) & (alfa < 255)).sum())})
     return sprity, meta
 
 

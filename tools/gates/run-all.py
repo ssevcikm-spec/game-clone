@@ -51,6 +51,9 @@ ORDER = [
     # jako soubory, G15 meri, ze je hra OPRAVDU bere (a ze zbytek zustal z UO).
     # Pridano 2026-10-11 (integrace `assets/own-lit/` + `assets/own/`).
     ("G15", "check-own-art.py"),
+    # G16 (vlastni art je PIXEL ART, ne rozmazany render) patri za G15: G15 meri,
+    # KTERY sprite se pouzije, G16 meri, JAK vypada. Pridano 2026-10-11.
+    ("G16", "check-style.py"),
     ("G7", "check-save.py"),
     ("G8", "check-determinism.py"),
     ("G9", "check-replay.py"),

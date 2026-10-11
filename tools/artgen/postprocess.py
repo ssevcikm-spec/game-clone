@@ -37,6 +37,7 @@ from PIL import Image
 from scipy import ndimage
 
 import artgen_common as ac
+import styl
 
 PRUHLEDNE = 0
 # Prah alfy pro "tohle je jeste sprite". Lanczos pri zmenseni 512 -> ~15 px
@@ -191,7 +192,8 @@ def meritko(pripravene: list[dict], obsah_vyska_px: float = None,
 
 
 def sestav(pripravene: list[dict], s: float, druh: str,
-           popis: str = "") -> tuple[list[Image.Image], list[dict]]:
+           popis: str = "", paleta: Image.Image = None, sber=None,
+           tvrda_alfa: bool = False) -> tuple[list[Image.Image], list[dict]]:
     """Zmensi a vlozi sprity tak, aby kontakt sedel na (w//2, h-22).
 
     Vsechny framy davky dostanou STEJNY rozmer i kotvu (proto se hleda maximum
@@ -239,8 +241,27 @@ def sestav(pripravene: list[dict], s: float, druh: str,
         maska = Image.fromarray((sirsi * 255).astype(np.uint8)).resize((nw, nh), Image.NEAREST)
         gate = np.array(maska) > 127
         alfa = np.array(maly.split()[3])
-        alfa = np.where(gate & (alfa >= ALFA_PRAH), alfa, 0).astype(np.uint8)
-        rgb = np.array(maly)[:, :, :3]
+        if tvrda_alfa:
+            # PIXEL-ART STYL (2026-10-11): silueta je 0/255, ne antialiasovana.
+            # ⚠ GATE BILINEARNE, NE `NEAREST`: pri `NEAREST` vypadavaji z masky
+            # pixely na TENKYCH diagonalach (namEReno POHLEDEM: rukojet krumpace
+            # se rozpadla na tecky). Bilinear + prah > 0 drzi tenky prvek cely;
+            # obal daleko od tvaru odstrani az prah alfy.
+            jemna = Image.fromarray((sirsi * 255).astype(np.uint8)).resize(
+                (nw, nh), Image.BILINEAR)
+            alfa = styl.tvrda_alfa(alfa, np.array(jemna) > 0)
+        else:
+            alfa = np.where(gate & (alfa >= ALFA_PRAH), alfa, 0).astype(np.uint8)
+        # STYL SE ZAPINA JEN KDY JE CO POUZIT: sonda bez `paleta`/`sber` dostane
+        # PRESNE to, co dostavala predtim (jinak by se rozesla drivejsi mereni).
+        if paleta is not None or sber is not None:
+            rgb = np.asarray(styl.doostri(maly))
+        else:
+            rgb = np.array(maly)[:, :, :3]
+        if sber is not None:
+            sber.pridej(rgb, alfa)
+        if paleta is not None:
+            rgb = styl.na_paletu(rgb, paleta)
         telo = Image.fromarray(np.dstack([rgb, alfa]), "RGBA")
         platno = Image.new("RGBA", (w, h), (0, 0, 0, 0))
         if druh == "land":
@@ -249,8 +270,9 @@ def sestav(pripravene: list[dict], s: float, druh: str,
             # kam maska saha. Kdyz se slozila pruhlednostnim `alpha_composite`,
             # zustaly v rozich kosoctverce pixely (0,0,0,0) a maska z nich
             # udelala ALFA 255 -> v mape byly CERNE LINKY na stycich
-            # (namEReno 2026-10-10).
-            platno.paste(maly.convert("RGB"), (vloz_x, vloz_y))
+            # (namEReno 2026-10-10). Barva je od 2026-10-11 DOOSTRENA a
+            # KVANTIZOVANA (stejny styl jako zbytek sady).
+            platno.paste(Image.fromarray(rgb, "RGB"), (vloz_x, vloz_y))
         else:
             platno.alpha_composite(telo, (vloz_x, vloz_y))
         if druh == "land":
@@ -268,11 +290,18 @@ def sestav(pripravene: list[dict], s: float, druh: str,
                 raise RuntimeError(f"maska kosoctverce ma {int(m.sum())} px, "
                                    f"ocekavano {KOSOCTVEREC_PX}")
         sprity.append(platno)
+        videt = alfa >= 128
         meta.append({"w": w, "h": h, "obsah_pod_kontaktem_px": round(pod, 2),
                      "obsah_vyska_px": int(round(b - t + 1)),
                      "obsah_sirka_px": int(round(r - l + 1)),
                      "pozadi": p["pozadi"], "barva_pozadi_px": p["pocet_barva"],
-                     "meritko": s})
+                     "meritko": s,
+                     # STYL (2026-10-11): meri se na TELE spritu, aby brana
+                     # nemusela hadat, co je silueta a co stin.
+                     "styl_tvrda_alfa": 1 if tvrda_alfa else 0,
+                     "styl_barvy": int(len(np.unique(rgb[videt].reshape(-1, 3), axis=0)))
+                     if videt.any() else 0,
+                     "styl_polopruhle_px": int(((alfa > 0) & (alfa < 255)).sum())})
     return sprity, meta
 
 

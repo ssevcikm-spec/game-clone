@@ -24,7 +24,89 @@ Typy: `chyba` (moje vada) · `past-nástroje` (prostředí/nástroj, ne logika) 
 
 ---
 
-# 2026-10-11 — VLASTNÍ ART VE HŘE: SEAM PO KUSECH, DVĚ PŘEKVAPENÍ A JEDNO PŘIZNÁNÍ
+# 2026-10-11 (druhá část) — PIXEL-ART STYL: „ROZMAZANÝ“ NEBYLO ROZLIŠENÍ
+
+### 2026-10-11 — Rozmazaný art nebyl rozlišení ani model, ale CHYBĚJÍCÍ KROK (postup)
+**Co se stalo:** uživatel viděl vlastní art jako „rozmazaný, chybí mu detaily“.
+Naměřeno na vlastní postavě: **473 různých barev v 556 pixelech a 197
+poloprůhledných pixelů**; UO sprite téhož druhu **61 barev a 0 poloprůhledných**.
+Příčina tedy nebyla rozlišení (render 512 px, 8× koncový pixel) ani model, ale to,
+že v pipeline **chyběl stylový krok**: render se zmenšoval Lanczosem a nechal se
+antialiasovaný, s tisíci barev. `grep -E "quantize|palette|dither"` nad
+`tools/artgen/*.py` dával **0 nálezů**.
+**Doklad:** `tools/artgen/styl.py` (nový), `postprocess.py`/`postprocess_lit.py`
+(`paleta`, `sber`, `tvrda_alfa`), `pack_atlas*.py` (dva průchody); po stylu
+postava **39 barev, 0 poloprůhledných**, krumpáč 33/0, ruda 36/0, dlaždice 15/0.
+**Ponaučení:** „je to měkké“ se neřeší větším rozlišením, dokud se nezměří, čím to
+je. A platí obráceně, než intuice říká: **2× sada je ve stejném měřítku měkčí**
+(`MERENI.md` §8.3: antialias hrany 0,79 → 0,53). Kdo hledá ostrost v rozlišení,
+hledá ji na špatném místě.
+
+### 2026-10-11 — Unsharp mask na tenké diagonále = tečkovaná rukojeť (past-nástroje)
+**Co se stalo:** po zapnutí doostření (percent 150) vypadala rukojeť krumpáče jako
+**tečkovaná čára**. První dvě hypotézy byly špatné a měření je vyvrátilo:
+(a) „díry v alfe“ — mřížka alfy ukázala **souvislý pás 4 px** bez děr;
+(b) „`NEAREST` gate vypadává pixely“ — změna na bilinear nepomohla.
+Skutečná příčina: **Lanczos nechává na diagonále kroužkování a UnsharpMask ho
+zesílí**; paleta pak obě hodnoty zpevní na dvě barvy. Po vypnutí doostření
+(percent 0) je rukojeť souvislá a ostrost pořád vyšší než před stylem.
+**Doklad:** `_atlas-lit-nahled.png` a `.cache/artgen/styl/krumpac-zoom.png`
+(14× zvětšení) ve třech iteracích; mřížka alfy vypsaná jako text.
+**Ponaučení:** artefakt, který vypadá jako geometrická vada, může být **filtr**.
+Než začneš „opravovat masku“, vypiš si hodnoty (tady mřížku alfy) — vizuální
+kontrola na 8–14× zvětšení je levnější než tři slepé opravy.
+
+### 2026-10-11 — Paleta z celé sady je převážená tím, co má nejvíc framů (chyba)
+**Co se stalo:** první verze stavěla **jednu paletu pro všech 46 spritů**. Postava
+má 40 framů, takže v paletě dominovala; drobný krumpáč (28×36) v ní dostal 1–2
+barvy a **ztratil materiál** (hnědá rukojeť zešedivěla). Druhá chyba téhož druhu:
+paleta dlaždic se stavěla **jen z první dlaždice**, takže hliněná dlaždice dostala
+barvy trávy a **změnila odstín**.
+**Doklad:** `item_styl_barvy_max` 20 (jedna paleta) → **36** (paleta na model);
+náhled `pred-po.png` před/po opravě dlaždic.
+**Ponaučení:** u kvantizace **rozhoduje, z čeho se paleta staví** — „z celé sady“
+znamená „z toho, co je v sadě nejčastější“, ne „spravedlivě pro každý kus“. Paleta
+patří na **model** a když je kusů víc, musí se do ní dostat **všechny**.
+
+### 2026-10-11 — Kvantizace ZESILUJE šum rendereru: tolerance determinismu 1 → 6 (past-nástroje)
+**Co se stalo:** `probe_determinismus_lit.py` (stav na disku vs. nový běh včetně
+renderu) hlásil u atlasu rozdíl až **5 úrovní u 1394 px**, i když **SHA manifestu
+bylo shodné**. Příčina není nedeterminismus pipeline (tři ruční běhy daly stejný
+manifest i atlas), ale to, že EEVEE dá při druhém běhu u pixelu o úroveň jinou
+barvu — a **kvantizace tenhle rozdíl zesílí**: pixel se přepne do sousední barvy
+palety. Tolerance 1 (nastavená před stylem) na to nestačí.
+**Doklad:** `PIXEL_TOLERANCE = 6` s odůvodněním v `probe_determinismus_lit.py`;
+`max|rozdil| pixelu stranek = 5 (tolerance 6)`, manifest SHA shodné, vše zelené.
+**Ponaučení:** nový krok, který data „zpevňuje“ (kvantizace, prahování), **mění
+citlivost na šum** — tolerance se musí přeměřit, ne zdědit. A hlásí se vždy obě
+čísla (max rozdíl i tolerance), aby zvýšení tolerance nebylo tiché.
+
+### 2026-10-11 — Kontrola, která srovnává VŠECHNY klíče anim listu, je křehká (vada kontroly)
+**Co se stalo:** `pack_atlas*.py --check` srovnával `set(ld) == set(uo_anim)` —
+všechny klíčové klíče obou anim listů. Když souběžná session M5 přidala do UO
+exportu `groups`, `group_source` a `actions_note`, byly **tři brány červené**
+(476/1, 900/1, 123/1) z důvodu, **který se seamu netýká**. Kontrakt je o klíčích
+**spritů** (a ty se kontrolují zvlášť), ne o metadatech exportu.
+**Doklad:** změna na `set(ld) <= set(uo_anim)` ve třech skriptech → 476/0, 900/0, 123/0.
+**Ponaučení:** kontrola, která tvrdí víc, než plyne z invariantu, **dřív nebo
+později zčervená na správné změně** — a pak se „opravuje“ funkční věc. Ptej se,
+který invariant má měřit, a měř jen jeho.
+
+### 2026-10-11 — Brána na styl NESMÍ stát na ostrosti: ruda je po stylu čitelnější a má ji nižší (past-nástroje)
+**Co se stalo:** první verze `check-style.py` vyžadovala ostrost hrany ≥ 28 (mezi
+naměřenými 26,3 před a 31,5 po stylu). Ruda má po stylu **19,4** — a je
+**čitelnější** než před ním (14,5): je to hladký kámen s malou paletou, gradient
+jasu u něj nemá co měřit. Brána by hlásila vadu o správném obrázku.
+**Doklad:** `check-style.py` — ostrost se jen **hlásí** (`nejmensi_ostrost`,
+`nejvetsi_ostrost`), nehlídá; hlídané je `styl_tvrda_alfa_prah`, 0 poloprůhledných
+na siluetě a strop palety.
+**Ponaučení:** platí znovu pravidlo ze skillu `game-assets`: **metrika, která
+trestá žádoucí vlastnost, je past, ne metrika.** Hlídej to, co je invariant
+(silueta 0/255, malá paleta), a čísla, která závisí na obsahu, jen reportuj.
+
+---
+
+
 
 ### 2026-10-11 — Dvě session ve stejném stromě se rozešly s tím, co o sobě tvrdí rozcestník (postup)
 **Co se stalo:** `DALSI-SESSION.md` §„Paralelně, nebo sériově?" tvrdí, že **A (art) a C (M5
