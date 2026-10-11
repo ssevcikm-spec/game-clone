@@ -145,21 +145,163 @@ odstraní s odůvodněním v komentáři.
 
 ## Jak to zadat (zkopíruj do nové session)
 
+**Postup, který funguje (ověřeno z druhé strany — z session vidím jen workspace):**
+
+1. Otevři **novou session** v tomtéž okně, ve kterém mluvíš se mnou
+   (`http://127.0.0.1:19387`) — nebo z terminálu zkus `dsh --help` (na stanici
+   je zkratka `dsh` v `%LOCALAPPDATA%\Programs\nodejs\dsh.cmd`; **její přepínače
+   jsem zevnitř session nedokázal ověřit**, instalace DSH je mimo workspace).
+2. **Dej jí plný přístup k souborům.** V režimu `workspace-write` nejde zapsat
+   do `.cache` a brány/testy kvůli tomu hlásí **falešné vady** (naměřeno dřív:
+   24 selhání v `workspace-write`, 12 po přesměrování `APPDATA`, **0 s plným
+   přístupem**). Než začneš řešit „něco je rozbité", zkontroluj tenhle režim.
+3. Vlož **jeden blok** níž (A–F) jako první zprávu. Blok je samostatný — nová
+   session nemá žádný kontext z téhle.
+4. Nech ji dojít k „hotovo, commitnuto"; na konci se zeptej, co zůstalo
+   otevřené (má to být v `HANDOFF.md`).
+
+### Blok A — vlastní art do hry (integrace)
+
 ```text
 Pracovní složka: E:\Workspaces\game-clone
-NEJDŘÍV si přečti DALSI-SESSION.md (co dělat), HANDOFF.md (stav) a
-ROZHODNUTI-2026-10-10-MODERNI-UO.md (M1–M10, směr).
-Tvoje session je [A/B/C/D/E]. Přečti sekci, kterou jsi dostal, a drž její
-"Co přečíst" a "Rozsah zápisu".
-Pravidla: piš jen do souborů z "owns" své granule; tests/, tools/gates/,
-project.godot, docs/ a .forge/ se needitují (mění je člověk nebo integrační
-session). "Hotovo" = soubor v main A brána zavolala jeho funkci A přijímací
-kritérium proběhlo s konkrétní hodnotou. Neověřenou věc napiš jako UNVERIFIED.
-UO je vzor POCITEM, ne tělesně (docs/01 §1.2.1) - "neshoduje se s UO" není vada,
-vada je jen rozbitý kontrakt (kotva, id prostor, geometrie bez koordinované
-změny) nebo něco, co se nedá přečíst.
-Na konci: přidej záznamy do LESSONS.md a přepiš HANDOFF.md, pak commitni.
+
+Než začneš: přečti DALSI-SESSION.md (sekce A), HANDOFF.md (stav) a
+ROZHODNUTI-2026-10-10-MODERNI-UO.md (M1–M10, směr). Pak tools/artgen/SEAM.md
+(návrh napojení), docs/02 §2.4, docs/04 §4.2 (render.textures) a docs/08 (G6, G10).
+
+Úkol: zapoj vlastní art do hry tak, aby se přepínal PO KUSECH — pro (kind, id),
+které vlastní sada obsahuje, se použije vlastní sprite, jinak zůstane UO art.
+Vlastní sada je v assets/own/ (a assets/own-lit/, až doběhne session se světlem);
+kontrakt manifestu je stejný jako assets/uo/.
+
+Hotovo, když: 1) ve hře je vidět vlastní dýka/krumpáč/ruda/ingot, postava
+a 2 dlaždice; 2) id bez vlastního artu se beze změny použije z UO; 3) brány G6
+a G10 projdou PO VĚDOMÉ re-baseline s dokladem (snímek + číslo, ne "někdo to
+spravil"); 4) testy a replaye beze změny hashů; 5) přiložíš snímek a napíšeš,
+co je na něm vidět špatně.
+
+Pravidla: geometrii (44×44, Z_SCALE 4) ani bránu G1 neměň; assets/uo/ zůstává
+jako fallback; UO je vzor POCITEM, ne tělesně (docs/01 §1.2.1) — "neshoduje se
+s UO" není vada. Na konci přidej záznamy do LESSONS.md, přepiš HANDOFF.md
+a commitni + pushni.
 ```
+
+### Blok B — kvalita artu (obrys, kontrast, čitelnost)
+
+```text
+Pracovní složka: E:\Workspaces\game-clone
+
+Než začneš: přečti DALSI-SESSION.md (sekce B), tools/artgen/MERENI.md
+(co je změřeno a co jsou pasti), ZADANI-25 §10 (co dalo 2× a co vzalo)
+a LESSONS.md – záznamy z 2026-10-10 o artu.
+
+Úkol: vlastní art přestane být "3D hladký" proti UO pixel artu. Naměřeno v
+pilotu: předměty mají menší kontrast a chybí tmavý obrys (UO ho má), ingot čte
+jako kostka, krumpáč jako tyč, chůze se při zoomu skoro nerozezná.
+
+Hotovo, když: existuje srovnávací list UO | náš starý | náš nový pro dýku,
+terén a postavu; read_image potvrdí, že se to zlepšilo JAKO ČITELNOST; je
+změřený čas navíc; a co se nezlepšilo, je pojmenované.
+
+Pravidla: zapisuj jen do tools/artgen/ a nového jmenného prostoru artu;
+rozlišení neměň (měřeno: ve stejném měřítku je 2× měkčí, ne ostřejší);
+nehonit pixel art 1:1 (nejsme kopie, docs/01 §1.2.1). Na konci LESSONS.md +
+HANDOFF.md + commit a push.
+```
+
+### Blok C — M5: souboj, monstra, smrt
+
+```text
+Pracovní složka: E:\Workspaces\game-clone
+
+Než začneš: přečti DALSI-SESSION.md (sekce C), HANDOFF.md, docs/05 §5.5
+(vzorce AoS + rozhodnutí M2: let projektilu je VIZUÁLNÍ, zásah se počítá při
+akci), docs/04 §4.6.4 (smlouva souboje + přijímací kritérium), ZADANI-20
+a .forge/roadmap.json (milník M5 = 11 granulí, 0 hotových).
+
+Úkol: udělej M5 — souboj, monstra, smrt, loot. Dnes příkaz `attack` routuje do
+neregistrovaného systému, takže hráč dostane "Not available yet".
+
+Hotovo, když: hráč zabije monstrum (a monstrum hráče), loot jde sebrat
+a prodat, replaye zůstanou zelené (nebo se přepnou S DOKLADEM), a je to vidět
+na snímku.
+
+Pravidla: hotové moduly neměň bez zápisu ve docs/; `attack` do slovníku
+politiky (ACTION_KINDS) patří SEM, ne dřív — jinak vznikne mrtvá slovní
+zásoba, kterou hlásí G4. tests/run_tests.gd se needituje (nové case soubory
+jsou v pořádku). Na konci LESSONS.md + HANDOFF.md + commit a push.
+```
+
+### Blok D — obsah a čitelnost pro hráče
+
+```text
+Pracovní složka: E:\Workspaces\game-clone
+
+Než začneš: přečti DALSI-SESSION.md (sekce D), HANDOFF.md, docs/07 (milníky M7)
+a ROZHODNUTI-2026-10-10-MODERNI-UO.md (M4: hra je pro lidi).
+
+Úkol: vyber a udělej to, co potřebuje člověk, který hru nezná — kandidáti:
+tvorba postavy + profese, světlo (render.light), zvuk (assets.sounds,
+audio.playback), makra/hotkeys, tooltipy. Ne všechny: vyber podle ceny
+a napiš, proč.
+
+Hotovo, když: člověk, který hru nezná, projde krátkou smyčku BEZ RADY a umí
+říct, co dělal a proč (k tomu snímek + pár vět od tebe jako pozorovatele).
+
+Pravidla: co jde ladit za běhu (čísla, vzhled), patří do dat, ne do kódu;
+na konci LESSONS.md + HANDOFF.md + commit a push.
+```
+
+### Blok E — modding (až po A–C)
+
+```text
+Pracovní složka: E:\Workspaces\game-clone
+
+Než začneš: přečti DALSI-SESSION.md (sekce E), HANDOFF.md a
+ROZHODNUTI-2026-10-09-SMER.md §3 (modifikovatelnost dnes CHYBÍ).
+
+Úkol: navrhni a udělej první krok k "modifikovatelné a rozšiřitelné" hře:
+švy, stabilní ID, pořadí načítání, verzované ukládání, sandbox skriptů.
+Nejdřív NÁVRH (co je potřeba a v jakém pořadí), pak jeden konkrétní krok.
+
+Hotovo, když: existuje dokument s návrhem A jeden funkční krok s testem
+(např. verzované ukládání nebo stabilní ID), ne jen plán.
+
+Pravidla: neměň hotové smlouvy bez zápisu v docs/; na konci LESSONS.md +
+HANDOFF.md + commit a push.
+```
+
+### Blok F — úklid mrtvých kotev v mutačním harnessu
+
+```text
+Pracovní složka: E:\Workspaces\game-clone
+
+Než začneš: přečti DALSI-SESSION.md (sekce F) a tools/gates/mutace-tests.py
+(hlavička s pravidly pro ten soubor).
+
+Úkol: spusť `python tools/gates/mutace-tests.py` (celý, trvá desítky minut)
+a najdi všechny vzory, které hlásí "PATRANA VETA SE VE ZDROJI NENASLA" —
+to jsou mrtvé kotvy: mutace se tiše neprovede a harness ji počítá jako
+nechycenou. Dnes se takhle našly tři (dvě z dřívější práce, jedna z mé).
+
+Hotovo, když: běh nehlásí ani jednu "PATRANA VETA" a souhrn je
+"N z N chyceno; smlouva vstupu: OK". Každou opravenou kotvu ověř tím, že
+mutace je skutečně "PROVEDENA" a "CHYCENA".
+
+Pravidla: nic nemaž bez odůvodnění v komentáři; vzor, který už nemá co měřit,
+se odstraní s vysvětlením. Na konci LESSONS.md + HANDOFF.md + commit a push.
+```
+
+### Blok „nevím co dál" (když chceš jen pokračovat)
+
+```text
+Pracovní složka: E:\Workspaces\game-clone
+Přečti HANDOFF.md (stav), DALSI-SESSION.md (co je hotové a co dál) a
+ROZHODNUTI-2026-10-10-MODERNI-UO.md (M1–M10). Pak mi řekni, co je podle tebe
+nejbližší krok, proč, a co to bude stát — a teprve pak to dělej.
+```
+
+---
 
 ## Paralelně, nebo sériově?
 
