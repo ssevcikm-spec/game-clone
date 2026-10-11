@@ -1,3 +1,103 @@
+# Předání — game-clone (2026-10-11, SESSION E: MODDING — NÁVRH + KROK S1 „VRSTVY OBSAHU")
+
+> **Co je tenhle soubor:** **stav projektu** pro další session agenta. Přepisuje
+> se celý; historie je v `git log`. Nový blok je vždy **nahoře**; starší bloky se
+> needitují (jen doplňují). **Současný stav se bere z tohoto bloku.**
+>
+> **Odkud brát detaily téhle práce:**
+> [`NAVRH-MODDING-2026-10-11.md`](NAVRH-MODDING-2026-10-11.md) (návrh: pět
+> vlastností, pořadí S1–S6, co je hotové a co ne, **co potřebuje tvoje
+> rozhodnutí**), `docs/04` **§4.9** (kontrakt vrstev obsahu) a §4.2 (`sim.content`),
+> `LESSONS.md` 2026-10-11 (pátá část — 6 ponaučení).
+> `sim/content.gd`, `data/content-layers.json`, `app/main.gd` (`_nacti_obsah`,
+> `_cesta`, `--no-mods`), `tests/cases/content.gd`.
+
+## ✅ CO SE UDĚLALO (a proč právě to)
+
+**Zadání (§E): „navrhni a udělej první krok k modifikovatelné a rozšiřitelné
+hře… Nejdřív NÁVRH, pak jeden konkrétní krok.“**
+
+**Nejdřív měření, pak návrh** (bez něj by návrh byl dohad): cesty k datům jsou
+dnes zapečené — **18 produkčních `.gd`** má literál `res://data/*.json`, z toho
+**27 modulových konstant** a **17 literálů v `app/main`**; a „verzované ukládání“
+**není nula** (`SAVE_VERSION = 2` + migrace 1→2 existují) — chybí **identita
+obsahu**, ne obálka. Proto je krok S1 = **vrstvy obsahu** (šev + stabilní ID
+zdroje + pořadí načítání) a **ne** savec: savec stojí na manifestu, který S1
+teprve vytváří.
+
+| Věc | Soubor | Naměřeno |
+|---|---|---|
+| **Vrstvy obsahu** (šev) | `sim/content.gd` (nový) | stabilní ID `[a-z0-9_.-]`, **povinný `order`** (vyšší vyhrává, při shodě `id` vzestupně), `path_for`/`path_or_default`, `providers` (kdo co přebil), `missing_files`, `manifest` + `manifest_hash`, chyby **seznamem** |
+| **Deklarace základu** | `data/content-layers.json` (nový) | vrstva `base`, `order 0`, `required`, **18 souborů**; seznam se **generuje z disku** a test měří, že se shoduje s `data/` |
+| **Mod je adresář** | `user://mods/<jmeno>/mod.json` | `{id, version, order, files}`; neznámý klíč = **chyba**, chybějící `order` = **chyba**, vlastní `root` mod mít **nesmí**, rozbitý mod se přeskočí a **ohlásí jménem** |
+| **Hra to OPRAVDU používá** | `app/main.gd` | `_nacti_obsah()` **před** `_load_data()`; **16 literálů** → `_cesta(...)` + **3 konstanty** (`items_data`/`skills_data`/`help_data`); `--no-mods` = vypínač |
+| **Test modulu** | `tests/cases/content.gd` (nový) | **55 kontrol / 0 selhání** |
+| **Mutační důkaz testu** | `_analyza/p62-mutace-content.py` | **8 z 8 chyceno** (po každé mutaci ověřeno, že vznikla, a po navrácení že sedí hash) |
+| **E2E: hra bere soubor z modu** | `_analyza/p63-mod-e2e.py` | **3 běhy hry**: A `vrstev 1 (base), uvod 7` → B `vrstev 2 (base, e2e-test), překrytí 1, uvod 8` → C (`--no-mods`) `1, uvod 7`; **0 vad** |
+| **E2E umí selhat** | `_analyza/p64-mutace-e2e.py` | s vadou „mod se zaregistruje, ale soubor se nečte“ E2E **exit 1** a vadu pojmenovalo |
+
+## 📊 NAMĚŘENO (2026-10-11, tato session)
+
+| Co | Hodnota | Doklad |
+|---|---|---|
+| Testy | **2751 kontrol / 0 selhání** (87 case souborů; před: 2696/0, 86) | `godot --headless --path . --script res://tests/run_tests.gd` |
+| Brány | **15 měřeno / 0 chyb** (G13 poradní) | `python tools/gates/run-all.py` |
+| Replaye | **2/2 zelené, hashe se NEMUSELY přepnout** | tamtéž (`G9`) |
+| Smoke (G11) | exit 0, **0 script / 0 parse error** | tamtéž |
+| Kontrola dokumentů | interní odkazy OK, zadávací balíček OK | `tools/check-docs-refs.py`, `tools/check-zadani.py` |
+| Cesty k datům (před S1) | 27 modulových konstant, 17 literálů v `app/main`, 18 souborů | `_analyza/p59-kotvy-dat.py` (v `.gitignore`; metoda je v návrhu §1) |
+| Konstanta = parametr, nebo přímé čtení | **17 parametrem / 11 přímo** (z toho 2 v `app/main` = vědomý fallback) | `_analyza/p65-konstanty-param.py` |
+
+**Přepínače hry (dnes):** `--policy[=cesta]` (automatizace, opt-in),
+`--no-own-art` (A/B), **`--no-mods`** (jen základní vrstva obsahu).
+
+## ⚠ CO ZŮSTÁVÁ OTEVŘENÉ (pojmenované, ne zamlčené)
+
+1. **9 modulových konstant se čte přímo** → mod tam **zatím nefunguje**:
+   `sim/entity/item.gd`, `sim/entity/skills.gd`, `sim/systems/craft.gd` (2×),
+   `sim/systems/interaction.gd`, `sim/systems/skill_gain.gd`,
+   `sim/world/doors.gd`, `sim/world/stairs.gd`, `sim/world/tiledata.gd`
+   (krok **S1b** v návrhu §4). **Dokud to není hotové, mod funguje jen
+   částečně** — a to je přesně varianta, která vypadá jako vada modu.
+2. **Manifest není v save** — `manifest_hash()` se počítá, ale nepoužívá
+   (krok **S2**). Save dnes zůstává „všechno, nebo nic“ (`data_version`).
+3. **Mod umí jen PŘEBÍT celý soubor**, ne přidat záznam (krok **S3**).
+4. **`sim.content` nespouští žádný skript** (krok **S5**) a **GDScript v Godotu
+   sandbox nemá** — „spustit cizí `.gd` bezpečně“ není konfigurace.
+5. **`sim/content.gd` a `data/content-layers.json` nejsou v `.forge/roadmap.json`**
+   jako granule → `G4` o nich nic netvrdí (stejná situace jako
+   `render/own_art.gd`). Plán mění uživatel (`docs/07` §7.1 bod 5).
+6. **Nevznikla žádná nová brána** (počet bran je součást smlouvy, `docs/08`) —
+   S1 má **testy** a sondy, ne bránu. Kdyby brána být měla, je to rozhodnutí
+   uživatele.
+7. **Sondy `p59`–`p65` jsou v `.gitignore`** (`_analyza/`) — čísla z nich jsou
+   v návrhu §1 **s postupem**, aby šla přeměřit i bez nich.
+8. **`research/REJSTRIK-REFERENCI.md` se přegeneroval** při `tools/refs-index.py`
+   (nástroj ho přepisuje sám; v commitu je, jen když se obsah změnil).
+
+**Otevřené body z bloku SESSION D (9 bodů) a z bloků níž tento blok
+NEUZAVÍRÁ** — platí dál (mj. lidská zkouška hry, `p20b-obrazky/m5-souboj.png`
+s UO mapou v gitu, chybějící `data/regions.json`).
+
+## 🧍 CO ČEKÁ NA TEBE (rozhodnutí, která agent nemá dělat za tebe)
+
+1. **S2 — co má `load()` udělat, když obsah nesedí?** Návrh: `required`
+   vrstvy odmítnout **jmenovitě**, přidané mody povolit s hlášením. Je to
+   **zeslabení dnešní záruky** („data se nezměnila“) → tvoje rozhodnutí.
+2. **S3 — mají mody PŘIDÁVAT záznamy a jak vypadá ID záznamu?** Dnes je
+   identita předmětu `tile` = art z instalace UO; jako naše ID to použít nelze.
+   Největší krok (mění datové smlouvy).
+3. **S5 — smí mod obsahovat SKRIPT?** (data-only / whitelist DSL / externí
+   proces). Doporučení: **nejdřív data-only**; GDScript sandbox není.
+4. **Smí vzniknout nová brána a granule v roadmapě?** (S1 záměrně nepřidal ani
+   jedno.)
+5. **Licence:** mod s artem z instalace UO se distribuovat nesmí — má to být
+   **vynucené** (kontrola), nebo stačí pravidlo v dokumentaci pro moddery?
+
+---
+
+
+
 # Předání — game-clone (2026-10-11, SESSION D: HRA PRO ČLOVĚKA — NÁPOVĚDA A CESTA HRÁČE)
 
 > **Co je tenhle soubor:** **stav projektu** pro další session agenta. Přepisuje

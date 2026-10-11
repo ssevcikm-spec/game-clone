@@ -24,6 +24,86 @@ Typy: `chyba` (moje vada) · `past-nástroje` (prostředí/nástroj, ne logika) 
 
 ---
 
+# 2026-10-11 (pátá část) — SESSION E: MODDING, KROK S1 (vrstvy obsahu)
+
+> **Zadání:** `DALSI-SESSION.md` §E. Návrh (co je potřeba a v jakém pořadí) je
+> v [`NAVRH-MODDING-2026-10-11.md`](NAVRH-MODDING-2026-10-11.md); tady jsou jen
+> ponaučení, každé s naměřeným dokladem.
+
+### 2026-10-11 — `write_text()` bez `newline` vyrobí CRLF i v `.json` a srovnání „beze změny“ to schová (past-nástroje)
+**Co se stalo:** generátor `data/content-layers.json` psal soubor přes
+`Path.write_text()` (bez `newline=`) → na Windows vznikl **CRLF** soubor
+(naměřeno: **32 znaků CR**, zbytek repa je LF). Horší je druhá polovina: ten
+generátor měl idempotentní kontrolu „beze změny“, ale stav četl přes
+`read_text()`, který **překládá konce řádků** → soubor s CRLF vypadal jako
+beze změny, takže se **nikdy nepřepsal** a CRLF zůstalo. Mutace, která na to
+měla spadnout, hlásila `vzor je ve zdroji 0x`.
+**Doklad:** `_analyza/p60-content-layers.py` (opraveno na `newline="\n"` a na
+srovnání **bajtů**: `read_bytes()` vs. `text.encode("utf-8")`); měřeno
+`[System.IO.File]::ReadAllBytes` → `CR count=0`.
+**Ponaučení:** u generovaného souboru **srovnávej bajty, ne text** —
+`read_text`/`Get-Content` tiší právě tu vadu, kterou hledáš. Nový `.json`
+v repu piš s `newline="\n"`.
+
+### 2026-10-11 — Plošná náhrada textu přepsala i JMÉNO PARAMETRU (chyba)
+**Co se stalo:** cesty v `app/main.gd` jsem překládal skriptem (20 náhrad
+`ITEMS_DATA`/`SKILLS_DATA`/`HELP_DATA` → proměnné). Jedna z nich sedla na
+`static func start_skills(balance_skills: Dictionary, skills_data)`, kde
+`skills_data` **už byl parametr** — hláška od té chvíle tiskla **data** místo
+cesty k souboru. Skript to nemohl poznat: textově to byla správná náhrada.
+**Doklad:** `_analyza/p61-preklad-cest.py` (16 literálů + 20 konstant, assertnuté
+počty) a `git diff app/main.gd`, kde je kolize vidět; opraveno
+(`start_skills(..., cesta: String = SKILLS_DATA)`).
+**Ponaučení:** po každé plošné náhradě **čti celý `git diff`** a u každého
+nového jména se ptej „**není to už jméno parametru v tom souboru?**“ (stačí
+jeden `grep` na nové jméno). Assertnutý počet náhrad chrání proti tiché mutaci,
+ale **ne proti kolizi jmen**.
+
+### 2026-10-11 — Statická metrika hledala na jednom řádku a hlásila falešný pozitiv (past-nástroje)
+**Co se stalo:** měřil jsem, kolik zapečených cest je **default parametru**
+(přebitelné) a kolik se čte přímo. První verze hledala konstantu na **jednom
+řádku** s `(` — a u pěti modulů (combat, death, loot, spawn, movement) hlásila
+„čte se přímo“, i když šlo o `_init(... weapons_path: String = WEAPONS_PATH ...)`
+rozepsané **přes více řádků**. Číslo by skončilo v návrhu jako fakt.
+**Doklad:** `_analyza/p65-konstanty-param.py`; po opravě (hledání v celé
+signatuře přes `re.S`) vyšlo **17 parametrem / 11 přímo** místo **13 / 15**.
+**Ponaučení:** statická metrika, která nic nespustí, potřebuje **kalibraci na
+známém správném případu** a u víc než jednoho řádku se vzor nesmí ptát po
+řádku. Rozdíl jsou 4 moduly — v kódu vypadá obojí stejně, takže by to nikdo
+neodhalil.
+
+### 2026-10-11 — Test modulu NENÍ důkaz, že hra modul používá (postup)
+**Co se stalo:** nový case `tests/cases/content.gd` (**55 kontrol / 0 selhání**)
+a **8 z 8** chycených mutací dokazovaly, že `sim.content` **umí** rozlišit
+vrstvy. Ne že je hra **bere**: kdyby `app/main` četl `data/help.json` dál
+z konstanty, všechny ty testy by zůstaly zelené. Proto vznikl E2E, který spustí
+**hru** třikrát: bez modu `vrstev 1 (base), uvod 7` → s modem
+`vrstev 2 (base, e2e-test), překrytí 1, uvod 8` → s `--no-mods` zpět `1 / 7`.
+A ten E2E má **vlastní mutaci** (`p64`): s vrácenou vadou „mod se zaregistruje,
+ale soubor se nečte“ skončil **exit 1** a vadu pojmenoval.
+**Doklad:** `_analyza/p63-mod-e2e.py` (0 vad), `_analyza/p64-mutace-e2e.py`.
+**Ponaučení:** u tvrzení „**hra** umí X“ je potřeba **běh hry**, ne test
+modulu — a i ten E2E musí mít mutaci, jinak je to jen další zelená.
+
+### 2026-10-11 — Obsah není stav: nový šev nerozhodil replaye (postup)
+**Co se stalo:** přidal jsem do produkce nový modul, nový datový soubor a
+přeložil 19 cest v `app/main`. Replaye i `state_hash()` zůstaly **beze změny**
+(`G9`: 2/2 shodné hashe) — protože vrstvy obsahu **do stavu světa nevstupují**.
+**Doklad:** `run-all.py` po změně: **15 měřeno / 0 chyb**, testy **2751/0**.
+**Ponaučení:** když se po přidání seamu rozsype `state_hash`, je to **nález
+o návrhu** (obsah se dostal do stavu), ne o testu — a je levnější to opravit
+hned, dokud je změna malá.
+
+### 2026-10-11 — Každý nový šev dostane VYPÍNAČ, ne jen „jde to revertovat“ (postup)
+**Co se stalo:** součástí kroku je přepínač `--no-mods`, který bere jen
+základní vrstvu. Díky tomu existuje A/B **za běhu** (běh C v E2E) a důkaz, že
+rozdíl v běhu B dělá **mod**, ne něco jiného ve stromu.
+**Doklad:** `_analyza/p63-mod-e2e.py`, běh C; `app/main._parsuj_prepinace`.
+**Ponaučení:** „cesta zpět = `git revert`“ je slabá; vypínač je **měřitelný**
+a při ladění se hodí víc než revert (a je vidět v logu: `mody VYPNUTY`).
+
+---
+
 # 2026-10-11 (čtvrtá část) — SESSION D: CO POTŘEBUJE ČLOVĚK, KTERÝ HRU NEZNÁ
 
 > **Zadání:** `DALSI-SESSION.md` §D. Které kandidáty jsem vybral a proč (a co
