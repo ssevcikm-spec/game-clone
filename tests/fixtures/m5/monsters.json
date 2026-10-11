@@ -1,0 +1,21 @@
+[
+  {"type": "skeleton", "name": "a skeleton", "body": 50, "anim_group": "high",
+   "anim": {"walk": 0, "attack": 4, "die": 2},
+   "str": [56, 80], "dex": [56, 75], "int": [16, 40], "hits": [40, 40],
+   "mana": [0, 0], "damage": [3, 7], "virtual_armor": 16,
+   "resist": {"physical": 0, "fire": 0, "cold": 0, "poison": 0, "energy": 0},
+   "skills": {"MagicResist": [451, 600], "Tactics": [451, 600],
+              "Wrestling": [500, 500]},
+   "fame": 450, "karma": -450, "loot_pack": "poor", "ai": "melee",
+   "flags": ["undead"], "notoriety": 4,
+   "source": "tests/fixtures/m5/monsters.json (fixture; kontrakt M5 §3.4 priklad)"},
+  {"type": "rat", "name": "a rat", "body": 238, "anim_group": "low",
+   "anim": {"walk": 0, "attack": 4, "die": 2},
+   "str": [6, 10], "dex": [15, 40], "int": [6, 10], "hits": [3, 4],
+   "mana": [0, 0], "damage": [1, 2],
+   "resist": {"physical": 0, "fire": 0, "cold": 0, "poison": 0, "energy": 0},
+   "skills": {"Wrestling": [200, 300]},
+   "fame": 150, "karma": 0, "loot_pack": "poor", "ai": "melee",
+   "flags": [], "notoriety": 4,
+   "source": "tests/fixtures/m5/monsters.json (fixture)"}
+]

@@ -43,6 +43,14 @@ připravené**, **placaté předměty (dýka, ingot) ještě ne** — jejich st�
 
 ## A) Vlastní art do hry (integrace) — **největší viditelný krok**
 
+> **✅ HOTOVO 2026-10-11** (session „A“): seam je v `render/own_art.gd` +
+> `assets/own-art.json`, brány `G6` a `G10` po vědomé re-base line, nová brána `G15`,
+> testy **2629 / 0** (sloučený strom s M5), snímky v `.cache/render/dukaz/` (ne v gitu —
+> obsahují UO mapu). **Zadání níž zůstává jako záznam**, needituje se.
+> ⚠ **Zjištění, které se týká plánování:** tvrzení „A a C jsou disjunktní“ v §„Paralelně,
+> nebo sériově?“ **neplatí** — souběžná session M5 psala do `render/anim_player.gd`,
+> `app/main.gd` a `app/world_view.gd`.
+
 **Cíl:** hra kreslí vlastní art pro id, která vlastní sada obsahuje; zbytek
 zůstává z UO. Přepíná se **po kusech**, nic se nerozbíjí.
 

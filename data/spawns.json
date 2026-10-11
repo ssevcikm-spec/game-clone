@@ -1,0 +1,38 @@
+{
+ "config": {
+  "no_spawn_in_town": true,
+  "refill_rule": "max((max - spawned) / 3, 1)",
+  "source": "docs/04 §4.6.7 + research/06 §4.8 F (hřbitov; region 1333,1441 82x82)",
+  "tick_ms": 10000
+ },
+ "points": [
+  {
+   "delay_ms": [
+    300000,
+    600000
+   ],
+   "delay_source": "docs/04 §4.6.7 (prodleva 5-10 min; Spawner.cs:41, SpawnEntry.cs:536)",
+   "id": "graveyard_britain",
+   "max": 3,
+   "monster_source": "rozhodnuti D2 (PLAN-NPC-A-SOUBOJ-2026-10-08.md:178) — skeleton/zombie/rat; vaha dle research/06 §4.8 F (Skeleton 30, Zombie 24, Rat z téhož hřbitova)",
+   "monsters": [
+    "skeleton",
+    "zombie",
+    "rat"
+   ],
+   "position_source": "research/06:4362,4692 — region Britain Graveyard 1333,1441 82x82; střed regionu (1374,1482). NENÍ z `Spawns/felucca.xml` (to je M7)",
+   "radius": 6,
+   "refill": "max((max - spawned) / 3, 1)",
+   "region": "Britain Graveyard",
+   "source": "docs/04 §4.6.7 + research/06 §4.8 F (hřbitov; region 1333,1441 82x82)",
+   "weights": {
+    "rat": 18,
+    "skeleton": 30,
+    "zombie": 24
+   },
+   "x": 1374,
+   "y": 1482,
+   "z": 0
+  }
+ ]
+}

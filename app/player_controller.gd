@@ -129,6 +129,19 @@ const INTERACT_KEYS := {
 # a levy klik bude potrebovat i UI (vyber predmetu).
 const MOUSE := {
 	"walk_to_cursor": MOUSE_BUTTON_RIGHT,
+	# M5 (2026-10-10): LEVY KLIK = UTOCIT. Do M5 tu levy klik ZAMERNE nebyl
+	# ("klik-to-move patri `sim.pathfind`") - ale bez nej se neda dat prikaz
+	# `attack` mysi a hrac monstrum nezabije (`ZADANI-20`: "monstrum musí být
+	# vidět a jít na něj zaútočit"). Neni to klik-to-move: klik na dlazdici bez
+	# monstra jen rekne "nic tu neni", krok zadny neposila.
+	"attack": MOUSE_BUTTON_LEFT,
+}
+
+# ⚠ M5: UTOCNA KLAVESA. `A` je v UO klasicka ("attack last"), tady je to
+# "utoc na nejblizsi monstrum" - hrac tim ma cestu i bez mysi (a test/sonda
+# se na to muze zeptat). Presna sada patri granuli `ui.hotkeys`.
+const ATTACK_KEYS := {
+	"attack": [KEY_A],
 }
 
 # ⚠ UI KLAVESY (20. session): nejsou to prikazy pro sim, takze NEJSOU
@@ -272,6 +285,16 @@ static func register_actions() -> int:
 			inter.keycode = code
 			if not InputMap.action_has_event(action, inter):
 				InputMap.action_add_event(action, inter)
+				added += 1
+	# UTOCNA KLAVESA (M5): `A` = utoc na nejblizsi monstrum (viz `ATTACK_KEYS`).
+	for action in ATTACK_KEYS.keys():
+		if not InputMap.has_action(action):
+			InputMap.add_action(action)
+		for code in ATTACK_KEYS[action]:
+			var utok := InputEventKey.new()
+			utok.keycode = code
+			if not InputMap.action_has_event(action, utok):
+				InputMap.action_add_event(action, utok)
 				added += 1
 	# UI KLAVESY (20. session): batoh. Neni to prikaz pro sim (viz hlavicka).
 	for action in UI_KEYS.keys():

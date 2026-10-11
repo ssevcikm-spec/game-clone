@@ -35,6 +35,15 @@ extends RefCounted
 # draw callu a 11 534 primitiv za frame - to je prace pro M9 (`render.chunk_mesh`),
 # ne vada teto granule.
 #
+# ⚠⚠ VLASTNI ART SE ZAPINA PO KUSECH (2026-10-11, granule `render.own_art`):
+# `_init` bere ctvrty (nepovinny) argument `own_layers` - seznam vrstev z
+# `assets/own-art.json` (`render/own_art.gd`). Vrstvy se indexuji PRED zakladnim
+# (UO) manifestem a `_index` preskoci art_id, ktere uz ve `_sprites` je, takze
+# **vlastni vyhrava, kde je; co tam neni, zustane z UO**. Je to ZAMERNE v INDEXU,
+# ne az pri kresleni: `offset()` musi jit ze STEJNEHO zaznamu jako textura
+# (vlastni dyka ma jinou kotvu nez UO dyka téhož id - `SEAM.md` §2 bod 2).
+# Kdyz je `own_layers` prazdny, chova se cache PRESNE jako driv (jen UO).
+#
 # Pouziti: `var t = TextureCache.new()`; `t.texture(art_id)`, `t.offset(art_id)`.
 # Druhy argument `_init` je strop v bajtech (vychozi `MAX_BYTES`) - je tam
 # proto, aby sel strop ZMĚŘIT na malé hodnotě (sonda `.cache/analysis/probe-render.gd`).
@@ -42,6 +51,9 @@ extends RefCounted
 # `ATLAS_PREFIX`) - je tam proto, aby test mohl postavit VLASTNI atlas mimo
 # `assets/uo/` (ta jsou v gitignore, takze v CI nejsou) a nemusel prepisovat
 # realny manifest. `null`/prazdny znaci "cesty z manifestu jsou uz kompletni".
+# Ctvrty argument `own_layers` je seznam vrstev vlastniho artu (viz vyse); kazda
+# vrstva ma VLASTNI `page_prefix`, proto se cesta ke strance sklada v `_index`
+# a ne jednou pro celou cache.
 
 const ITEM_OFFSET: int = 0x4000
 # TEXMAPY (textury terenu pro SVAHY) jsou treti prostor v manifestu: kind
@@ -63,6 +75,11 @@ var _missing: int = 0
 var _warned: bool = false
 var _nacteni_stranek: int = 0      # POCITADLO pro mereni: kolikrat se stranka nacetla z disku
 var _prefix: String = ATLAS_PREFIX # prefix cest ke strankam (viz `_init`)
+# --- VLASTNI ART (viz hlavicka) -------------------------------------------
+var _own_layers: Array = []        # vrstvy z `assets/own-art.json` (poradi = priorita)
+var _own_ids: Dictionary = {}      # art_id -> true (sprite prisel z vlastni vrstvy)
+var _own_indexed: int = 0          # kolik spritu je z vlastnich vrstev
+var _uo_indexed: int = 0           # kolik spritu je ze zakladniho (UO) manifestu
 # --- ASYNCHRONNI NACITANI STRANEK (18. session) ---------------------------
 # Stranka atlasu je 2048x2048 = 16 MB a jeji nacteni stoji NAMERENE ~58 ms
 # (`_analyza/p21-atlas-cena.gd`: 34 stranek = 1982 ms). Kdyz se nacetla uvnitr
@@ -77,13 +94,28 @@ var _verze: int = 0                # kolik stranek uz dotecelo (volajici podle n
 
 
 func _init(manifest_path: String = MANIFEST_PATH, max_bytes: int = MAX_BYTES,
-		page_prefix: String = ATLAS_PREFIX) -> void:
+		page_prefix: String = ATLAS_PREFIX, own_layers: Array = []) -> void:
 	_limit = max_bytes
 	_prefix = page_prefix
+	_own_layers = own_layers
+	# VLASTNI VRSTVY PRVNI: `_index` preskoci art_id, ktere uz ve `_sprites` je,
+	# takze prvni vrstva, ktera id obsahuje, vyhrava. Vybirani "po kusech" dela
+	# `sprites` ve vrstve (ktere (kind, id) z ni vubec brat) - viz `render/own_art.gd`.
+	for vrstva in own_layers:
+		if not (vrstva is Dictionary):
+			continue
+		var prefix := str(vrstva.get("page_prefix", ATLAS_PREFIX))
+		var vyber = vrstva.get("sprites", null)
+		var cesta := str(vrstva.get("manifest", ""))
+		var parsed_own = _read(cesta)
+		if parsed_own is Dictionary:
+			for sprite in parsed_own.get("sprites", []):
+				_index(sprite, prefix, vyber, true)
+	# Zakladni (UO) manifest az DRUHY - co vlastni nema, zustava z nej.
 	var parsed = _read(manifest_path)
 	if parsed is Dictionary:
 		for sprite in parsed.get("sprites", []):
-			_index(sprite)
+			_index(sprite, _prefix, null, false)
 	if _sprites.is_empty():
 		# Prazdna cache neni uspech: kdo pak kresli, dostane jen `null`.
 		push_warning("render.textures: %s nedal zadny pouzitelny sprite" % manifest_path)
@@ -124,6 +156,15 @@ func offset(art_id: int) -> Vector2i:
 	return entry["offset"] if entry != null else Vector2i.ZERO
 
 
+func page_path(art_id: int) -> String:
+	# Cesta ke STRANCE, ze ktere sprite pochazi (`""` = art v manifestu neni).
+	# Je to jediny spolehlivy doklad PUVODU spritu: `AtlasTexture` z `Image.load`
+	# ma prazdny `resource_path`, takze na nem by se "vlastni vs. UO" dokazat
+	# nedalo. Pouziva to brana G15 a sonda pro srovnani A/B.
+	var entry = _sprites.get(art_id)
+	return str(entry["page"]) if entry != null else ""
+
+
 func texmap(texmap_id: int) -> Texture2D:
 	# Textura terenu pro SVAH (ClassicUO `TexmapsLoader.GetTexmap`). Vraci null,
 	# kdyz zaznam neni - kresleni pak zustane u land artu (ClassicUO `Land.cs:98`).
@@ -139,12 +180,30 @@ func stats() -> Dictionary:
 	# `nacteni_stranek` je POCITADLO naciteni z disku za cely beh - je tu proto,
 	# ze se jím dokazuje, že cache netrhá (27 načtení za běh vs. tisíce při
 	# thrashingu); používá to test `tests/cases/render_textures.gd`.
+	# `own` / `uo` deli `sprites` podle PUVODU: bez toho by se "vlastni art je
+	# zapnuty" nedalo ve hre overit jinak nez okem (SEAM.md §2 bod 3).
 	return {"loaded": _pages.size(), "bytes": _bytes, "limit": _limit,
 		"missing": _missing, "sprites": _sprites.size(), "wrapped": _wrapped.size(),
-		"nacteni_stranek": _nacteni_stranek, "ceka": _cekajici.size(), "verze": _verze}
+		"nacteni_stranek": _nacteni_stranek, "ceka": _cekajici.size(), "verze": _verze,
+		"own": _own_indexed, "uo": _uo_indexed, "own_layers": _own_layers.size()}
 
 
-func _index(sprite) -> void:
+func is_own(art_id: int) -> bool:
+	# Prisel tenhle sprite z vlastni vrstvy? (Kdo potrebuje rozhodnout jinak nez
+	# barvou - napr. `app.world_view` preskakuje UO hue u vlastni postavy.)
+	return _own_ids.has(art_id)
+
+
+func own_ids() -> Array:
+	# Serazeny seznam art_id z vlastnich vrstev - pro branu a pro srovnani A/B
+	# ("ktere kusy se preply"). Poradi je dane cislem, ne poradim vlozeni, aby
+	# se dva behy daly porovnat.
+	var out: Array = _own_ids.keys()
+	out.sort()
+	return out
+
+
+func _index(sprite, prefix: String, pieces, own: bool) -> void:
 	var kind := str(sprite.get("kind", ""))
 	var id := int(sprite.get("id", -1))
 	var art_id: int = id if kind == "land" else (id + ITEM_OFFSET if kind == "item"
@@ -153,11 +212,24 @@ func _index(sprite) -> void:
 	var height := int(sprite.get("h", 0))
 	if art_id < 0 or width <= 0 or height <= 0 or _sprites.has(art_id):
 		return
+	# VYBER PO KUSECH: vrstva smi rict, ktere (kind, id) z ni brat. Co v seznamu
+	# neni, se zahodi - a zahodi se TADY, ne az pri kresleni (jinak by textura
+	# byla z vlastni vrstvy a `offset` z UO).
+	if pieces is Dictionary:
+		if not pieces.has(kind):
+			return
+		if not (pieces[kind] as Array).has(id):
+			return
 	_sprites[art_id] = {
-		"page": _prefix + str(sprite.get("page", "")),
+		"page": prefix + str(sprite.get("page", "")),
 		"rect": Rect2i(int(sprite.get("x", 0)), int(sprite.get("y", 0)), width, height),
 		"offset": Vector2i(int(sprite.get("ox", 0)), int(sprite.get("oy", 0))),
 	}
+	if own:
+		_own_ids[art_id] = true
+		_own_indexed += 1
+	else:
+		_uo_indexed += 1
 
 
 func _page(path: String) -> Texture2D:

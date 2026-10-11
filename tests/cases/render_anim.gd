@@ -71,9 +71,37 @@ func run(t) -> void:
 
 	# 1) export je k dispozici a player ho vidi
 	t._check(player.available(), "render.anim: available() nad exportem")
-	t._check(player.sprite_count() == sprites.size() and sprites.size() == 30,
-		"render.anim: sprite_count() = %d, v JSON je %d spritu (ocekavano 30)"
+	# ⚠⚠ PUVODNI KONTROLA BYLA `sprites.size() == 30` - MAGICKE CISLO, ktere
+	# padlo pri prvnim LEGITIMNIM rozsireni exportu (M5, 2026-10-10: pribyly
+	# tela monster 3/50/238 s akcemi utoku a smrti; 30 -> 105). Misto poctu
+	# se overuje SMLOUVA exportu: (a) player vidi presne to, co je v JSONu,
+	# (b) kazde telo, ktere hra potrebuje (dve lidska + tri monstranska z
+	# `data/monsters.json`), ma VSECH 5 smeru akce `walk`. Chybejici telo je
+	# vada, ne "jiny pocet" - a cislo se tim neopisuje z hlavy.
+	var tela_s_vybavou: Array = [50, 3, 238]     # kostlivec, zombie, krysa
+	t._check(player.sprite_count() == sprites.size(),
+		"render.anim: sprite_count() = %d, v JSON je %d"
 		% [player.sprite_count(), sprites.size()])
+	var tela_ok := true
+	var tela_detail := ""
+	for telo in [400, 401] + tela_s_vybavou:
+		var ma: int = 0
+		for smer in 5:
+			if sprites.has("%d/0/%d" % [telo, smer]):
+				ma += 1
+		if ma != 5:
+			tela_ok = false
+			tela_detail += " telo %d ma %d/5 smeru chuze;" % [telo, ma]
+	t._check(tela_ok,
+		"render.anim: kazde potrebne telo ma 5 smeru chuze (vadne:%s)" % tela_detail)
+	# Framy se CTou z JSONu pro kazde telo - rozlisi "telo je" od "telo nefunguje".
+	var framu_ok := true
+	for telo in tela_s_vybavou:
+		var ocekavano: int = int((sprites["%d/0/0" % telo] as Dictionary)["frames"].size())
+		if player.frame_count(int(telo), 0, 0) != ocekavano or ocekavano <= 0:
+			framu_ok = false
+	t._check(framu_ok,
+		"render.anim: monstranska tela maji framy chuze podle JSONu (ne nula)")
 
 	# 2) framy z manifestu: walk muze (telo 400, akce 0) ma 10 framu; smer hry 0 (E)
 	#    pouzije sprite 1, takze se pocet cte z JSONu, ne opsanim cislem
@@ -123,6 +151,55 @@ func run(t) -> void:
 	t._check(velikost == Vector2i(int(fr["w"]), int(fr["h"])),
 		"render.anim: textura framu 0 ma region %s, v JSON %s"
 		% [str(velikost), str(Vector2i(int(fr["w"]), int(fr["h"])))])
+
+	# 6b) ⚠⚠ M5 (2026-10-10): CISLO AKCE ZNAMENA U KAZDE SKUPINY NECO JINEHO.
+	#     U cloveka je 4 = stand; u monster je 4 = Attack1 a 2 = Die1. Kdyby
+	#     klient bral cislo akce jako cislo skupiny (stare chovani), prehral by
+	#     kostlivci pri utoku jeho 1-framovou "stand" pozu a pri smrti chuzi.
+	#     Kontrola se opira o `groups` v manifestu (namERENA mapa z exportu),
+	#     cisla se NEOPISUJI.
+	var gr = data.get("groups", {})
+	var skupiny_ok: bool = gr is Dictionary and not (gr as Dictionary).is_empty()
+	var skupiny_detail := ""
+	if skupiny_ok:
+		for telo in [50, 3, 238]:
+			var mapa = (gr as Dictionary).get(str(telo), {})
+			if not (mapa is Dictionary) or not mapa.has("attack") or not mapa.has("die"):
+				skupiny_ok = false
+				skupiny_detail += " telo %d nema attack/die v groups;" % telo
+				continue
+			# 1) `sprite_group_for` se musi shodovat s mapou z manifestu
+			if player.sprite_group_for(int(telo), 2) != int(mapa["attack"]) \
+					or player.sprite_group_for(int(telo), 3) != int(mapa["die"]):
+				skupiny_ok = false
+				skupiny_detail += " telo %d: utok/smrt mimo groups;" % telo
+			# 2) a hlavne: `play` musi najit LIST s framy (ne 1-framovou pozu)
+			var u: Dictionary = player.play(int(telo), 2, 0, 0)
+			var s: Dictionary = player.play(int(telo), 3, 0, 0)
+			if not bool(u["ok"]) or not bool(s["ok"]) \
+					or int(u["count"]) < 2 or int(s["count"]) < 2:
+				skupiny_ok = false
+				skupiny_detail += " telo %d: utok %s/%d, smrt %s/%d;" % [telo,
+					str(u["ok"]), int(u["count"]), str(s["ok"]), int(s["count"])]
+	# 3) IDLE musi zustat to, co ma v groups (idle), ne skupina 4 z lidi
+	if skupiny_ok:
+		var idle_mapa = (gr as Dictionary).get("50", {})
+		if int(player.sprite_group_for(50, 4)) != int(idle_mapa.get("idle", -1)):
+			skupiny_ok = false
+			skupiny_detail += " telo 50: idle neni skupina z groups;"
+	t._check(skupiny_ok,
+		"render.anim: monstra maji skupiny z `groups` manifestu (utok/smrt/idle; vadne:%s)"
+		% skupiny_detail)
+	# Lide se NESMI zmenit: `groups` u tela 400 musi dat to, co dela stara tabulka.
+	# POZOR: `walk` i `run` se u lidi mapuji na klic `walk` (beh ma vlastni art
+	# jen kdyz ho export obsahuje; `groups` je jedna skupina na abstraktni vyznam).
+	var lide_ok: bool = true
+	if gr is Dictionary and (gr as Dictionary).has("400"):
+		var m400 = (gr as Dictionary)["400"]
+		lide_ok = player.sprite_group_for(400, 0) == int(m400.get("walk", -1)) \
+			and player.sprite_group_for(400, 1) == int(m400.get("walk", -2)) \
+			and player.sprite_group_for(400, 4) == int(m400.get("idle", -1))
+	t._check(lide_ok, "render.anim: u lidi zustava chuze/beh/idle podle `groups`")
 
 	# 7) mapovani 8 smeru hry na 5 spritu anim.mul + zrcadleni (merena tabulka)
 	var mapa_ok := true

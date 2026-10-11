@@ -44,6 +44,23 @@ ASSET_INPUTS = ("manifest.json", "world/map0.meta.json", "world/map0.land",
 # nižší a pochází z postavy).
 KUZE_MIN = 500
 HUE_SKIN_DEFAULT = 1002      # pouzije se, jen kdyz se neda precist z granule
+# --- VLASTNI ART (rebaseline 2026-10-11) ----------------------------------
+# Do teto chvile G10 pozadovala, aby mel stred snimku pixely z UO palety kuze -
+# to je kontrola tonovani hue. Vlastni postava se hue NETONUJE (barvu ma
+# z Blenderu, `app.world_view` ji preskakuje), takze by ta kontrola hlasila
+# vadu o SPRAVNEM obrazu. Rebaseline proto pridal DRUHOU, rovnocennou moznost:
+# pocet pixelu, ktere presne odpovidaji barvam VLASTNIHO spritu postavy.
+#
+# Cisla jsou namERena na dvojici snimku TEHOZ mista (Britain 1495,1630,
+# 1280x720, chuze), `own-art.png` vs `snapshot-uo.png`:
+#   stred 1/3, surova shoda:  vlastni 748 / UO 235  (mapa a dalsi art se do
+#                             "surove" shody pletou - pomer jen 3,2x)
+#   stred 1/3, PO EROZI:      vlastni 138 / UO   0  (eroze 3x3 zahodi
+#                             roztrousene pixely mapy; oddeleni je ciste)
+# Hranice je proto 60 pixelu po erozi - mezi znamym spravnym (138) a znamym
+# chybnym (0) pripadem. Kontrola vypsuje OBE cisla, aby byl videt odstup.
+VLASTNI_MIN = 60
+OWN_CONFIG = "assets/own-art.json"
 
 
 def hue_skin(root: Path) -> int:
@@ -93,6 +110,80 @@ def kuzne_pixely(array, paleta: list[tuple[int, int, int]],
     return pocet, prumer
 
 
+def vlastni_paleta(root: Path) -> list[tuple[int, int, int]]:
+    """Barvy VLASTNI postavy z anim listu vrstvy z `assets/own-art.json`.
+
+    Bere se z PNG, ktera hra opravdu kresli (ne z konstanty): kdyby se sada
+    pregenerovala, kontrola se stane sama. Kdyz vlastni animace nejsou, vraci
+    prazdno a G10 se chova jako pred rebaselinem (vyzaduje UO paletu kuze).
+    """
+    cesta = root / OWN_CONFIG
+    if not cesta.exists():
+        return []
+    try:
+        import numpy as np
+        from PIL import Image
+    except Exception:
+        return []
+    try:
+        cfg = json.loads(cesta.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+    barvy: set[tuple[int, int, int]] = set()
+    for vrstva in cfg.get("layers", []):
+        if not isinstance(vrstva, dict):
+            continue
+        anim = str(vrstva.get("anim") or "")
+        if anim == "":
+            continue
+        anim_cesta = root / anim.replace("res://", "")
+        if not anim_cesta.exists():
+            continue
+        try:
+            data = json.loads(anim_cesta.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        zaklad = anim_cesta.parent
+        for zaznam in data.get("sprites", {}).values():
+            subor = str(zaznam.get("file", ""))
+            if subor == "":
+                continue
+            png = zaklad / subor
+            if not png.exists():
+                continue
+            with Image.open(png) as img:
+                px = np.asarray(img.convert("RGBA"))
+            mask = px[:, :, 3] > 200      # polopruhledne okraje se nepocitaji
+            for r, g, b in zip(px[:, :, 0][mask], px[:, :, 1][mask], px[:, :, 2][mask]):
+                barvy.add((int(r), int(g), int(b)))
+    return sorted(barvy)
+
+
+def vlastni_pixely(array, paleta: list[tuple[int, int, int]]) -> tuple[int, int]:
+    """(surove, po erozi) pixely presne ve barve vlastni postavy.
+
+    Eroze 3x3 je tu proto, ze roztrousene pixely mapy se do surove shody pletou
+    (namEReno: 235 px na snimku bez vlastniho artu); souvisla silueta postavy
+    erozi prezije a rozptyl zmizi (0 px).
+    """
+    import numpy as np
+
+    mask = np.zeros(array.shape[:2], dtype=bool)
+    for (r, g, b) in paleta:
+        mask |= ((array[:, :, 0] == r) & (array[:, :, 1] == g) & (array[:, :, 2] == b))
+    surove = int(mask.sum())
+    if surove == 0:
+        return 0, 0
+    eroze = (mask & np.roll(mask, 1, 0) & np.roll(mask, -1, 0)
+             & np.roll(mask, 1, 1) & np.roll(mask, -1, 1))
+    # `np.roll` obalí i okraje - ty se po erozi nesmi pocitat.
+    eroze[0, :] = False
+    eroze[-1, :] = False
+    eroze[:, 0] = False
+    eroze[:, -1] = False
+    return surove, int(eroze.sum())
+
+
 def missing_assets(root: Path) -> list[str]:
     base = root / "assets" / "uo"
     return [name for name in ASSET_INPUTS if not (base / name).exists()]
@@ -105,7 +196,9 @@ def render_sources(root: Path) -> list[Path]:
 
 def measure_image(path: Path, focus: tuple[int, int, int, int] | None, gate: Gate,
                   paleta: list[tuple[int, int, int]] | None = None,
-                  vyzaduj_kuzi: bool = False) -> None:
+                  vyzaduj_kuzi: bool = False,
+                  vlastni: list[tuple[int, int, int]] | None = None,
+                  vyzaduj_vlastni: bool = False) -> None:
     try:
         import numpy as np
         from PIL import Image
@@ -162,6 +255,19 @@ def measure_image(path: Path, focus: tuple[int, int, int, int] | None, gate: Gat
             f"{KUZE_MIN}) - postava je SEDA, tonovani hue se neprojevilo (docs/08 G10)"
         )
 
+    # VLASTNI POSTAVA (rebaseline 2026-10-11): kdyz je vlastni art zapnuty,
+    # meri se misto UO palety kuze shoda s barvami vlastniho spritu.
+    if vlastni:
+        surove, eroze = vlastni_pixely(array[y:y + h, x:x + w], vlastni)
+        gate.measure("vlastni_pixelu", surove)
+        gate.measure("vlastni_pixelu_po_erozi", eroze)
+        if vyzaduj_vlastni and eroze < VLASTNI_MIN:
+            gate.error(
+                f"ve stredni oblasti je {eroze} pixelu vlastni postavy po erozi "
+                f"(ocekavano aspon {VLASTNI_MIN}; surove {surove}) - vlastni sprite "
+                "postavy se nekresli (nebo se kresli UO art)"
+            )
+
 
 def check(root: Path, gate: Gate, snapshot: Path | None = None,
           focus: tuple[int, int, int, int] | None = None) -> None:
@@ -197,7 +303,18 @@ def check(root: Path, gate: Gate, snapshot: Path | None = None,
     if not paleta:
         gate.skip(f"paleta barvy kuze (hues.json, sada {hue}) neni - barvu NEMERIM")
         return
-    measure_image(path, focus, gate, paleta, vyzaduj_kuzi=(snapshot is None))
+    # VLASTNI ART: kdyz je zapnuty, postava se hue NETONUJE, takze se misto
+    # UO palety kuze vyzaduje shoda s barvami VLASTNIHO spritu. Obě cisla se
+    # vzdy vypisuji, aby byl videt odstup (rebaseline s dokladem, ne "spraveno").
+    vlastni = vlastni_paleta(root)
+    gate.measure("vlastni_paleta_barev", len(vlastni))
+    gate.measure("kuze_paleta_barev", len(paleta))
+    if snapshot is None:
+        measure_image(path, focus, gate, paleta, vyzaduj_kuzi=not vlastni,
+                      vlastni=vlastni or None, vyzaduj_vlastni=bool(vlastni))
+    else:
+        # Cizi snimek: brana o nem nesmi tvrdit vadu (nema hrace hry).
+        measure_image(path, focus, gate, paleta, vlastni=vlastni or None)
 
 
 def selftest() -> int:
@@ -267,6 +384,30 @@ def selftest() -> int:
     # nemohla "projit" s barvou, ktera v palate neni.
     c = barvy_5bit[2]
     kuze_barva = (tabulka[(c >> 10) & 0x1F], tabulka[(c >> 5) & 0x1F], tabulka[c & 0x1F])
+    # VLASTNI POSTAVA: barva, ktera v UO palate kuze NENI (jinak by se nedalo
+    # rozlisit, ktera kontrola vlastne prosla).
+    vlastni_barva = (200, 30, 200)
+
+    def own_fixture(label: str, barva: tuple[int, int, int]) -> Path:
+        root = fixture(label, "blob_center", barva=barva)
+        own_dir = root / "assets" / "own-lit" / "anim"
+        own_dir.mkdir(parents=True, exist_ok=True)
+        img = Image.new("RGBA", (8, 16), (0, 0, 0, 0))
+        for px in range(8):
+            for py in range(16):
+                img.putpixel((px, py), (*vlastni_barva, 255))
+        img.save(own_dir / "a.png")
+        (own_dir / "anim-sheets.json").write_text(json.dumps({"sprites": {
+            "400/0/0": {"file": "a.png", "frames": [
+                {"cx": 4, "cy": -2, "w": 8, "h": 16, "rect": [0, 0, 8, 16]}]},
+        }}), encoding="utf-8")
+        (root / OWN_CONFIG).write_text(json.dumps({
+            "version": 1,
+            "layers": [{"name": "x", "manifest": "res://assets/own-lit/manifest.json",
+                        "anim": "res://assets/own-lit/anim/anim-sheets.json",
+                        "sprites": {"land": [1]}}],
+        }), encoding="utf-8")
+        return root
 
     cases = [
         # "dobry" ma na stredove dlazdici barvu KUZE (ne jen nejakou barvu) -
@@ -287,6 +428,11 @@ def selftest() -> int:
         ("bez_assetu", fixture("bez_assetu", "blank", with_assets=False), NEMERENO),
         # bez `hues.json` neni paleta -> NEMERENO (ne ticha zelena)
         ("bez_palety", fixture("bez_palety", "blob_center", with_hues=False), NEMERENO),
+        # VLASTNI ART (rebaseline 2026-10-11): se zapnutym vlastnim artem se
+        # misto UO palety kuze vyzaduje shoda s barvami vlastniho spritu.
+        # Znamy spravny (blob v barve vlastni postavy) i znamy chybny (sedivy).
+        ("vlastni_ok", own_fixture("vlastni_ok", vlastni_barva), OK),
+        ("vlastni_sedy", own_fixture("vlastni_sedy", (123, 123, 123)), VADA),
     ]
     # KUZE se meri ZVLAST: `kuzne_pixely` MUSI rozlisit barvu z palety od
     # sedive postavy. Oba pripady jsou ZNAME (spravny i chybny).

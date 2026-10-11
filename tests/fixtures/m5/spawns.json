@@ -1,0 +1,8 @@
+{
+  "points": [
+    {"id": "graveyard_fixture", "x": 1495, "y": 1630, "radius": 6,
+     "max": 3, "delay_ms": [300000, 600000],
+     "monsters": ["skeleton", "zombie", "rat"],
+     "source": "tests/fixtures/m5/spawns.json (fixture; kontrakt M5 §3.5 priklad)"}
+  ]
+}

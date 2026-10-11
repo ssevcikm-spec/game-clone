@@ -28,6 +28,11 @@ from gate_common import (  # noqa: E402
 
 NAME = "check-assets"
 MANIFEST_CANDIDATES = ("assets/atlas/manifest.json", "assets/uo/manifest.json")
+# Vlastni art (2026-10-11, granule `render.own_art`): G6 se do teto chvile
+# divala JEN na `assets/uo/` - a ta jsou v .gitignore, takze v CI byla vzdycky
+# NEMERENO. Vlastni sada je v gitu, takze se od teto chvile meri VZDY: stranky,
+# prazdne sprity a invariant "je to NAHRAZENI, ne pridani" (SEAM.md §3 bod 1).
+OWN_CONFIG = "assets/own-art.json"
 
 
 def find_manifest(root: Path) -> Path | None:
@@ -115,6 +120,157 @@ def check_extraction_outputs(root: Path, gate: Gate) -> int:
     if checked:
         gate.note("assety z instalace UO (lokálně vyextrahované) - měřeno, viz measured")
     return checked
+
+
+def _own_klic(entry: dict) -> tuple[str, int] | None:
+    kind = str(entry.get("kind", ""))
+    if kind not in ("land", "item", "texmap"):
+        return None
+    return (kind, int(entry.get("id", -1)))
+
+
+def check_own_art(root: Path, gate: Gate) -> int:
+    """Vlastni art: manifest vs. stranky, prazdne sprity, a hlavne to, ze je to
+    NAHRAZENI (kazde nase id je i v UO manifestu - SEAM.md §3 bod 1).
+
+    Proc v G6: dokud se vlastni sada nemerila, slo do gitu neplatny atlas a
+    nikdo to nepoznal. Vlastni sada je na rozdil od `assets/uo/` V GITU, takze
+    se tim G6 konecne stava merenou i v CI.
+    """
+    cesta = root / OWN_CONFIG
+    if not cesta.exists():
+        gate.note(f"{OWN_CONFIG} není - vlastni art se NEMEŘIL")
+        return 0
+    try:
+        data = load_json(cesta)
+    except Exception as exc:
+        gate.error(f"{OWN_CONFIG} se neda precist ({exc})")
+        return 1
+    vrstvy = data.get("layers", [])
+    if not isinstance(vrstvy, list) or not vrstvy:
+        gate.error(f"{OWN_CONFIG} nema zadnou vrstvu (prazdny seznam neni uspech)")
+        return 1
+    gate.measure("own_vrstev", len(vrstvy))
+
+    uo_entries: dict[tuple[str, int], dict] = {}
+    uo_manifest = root / "assets" / "uo" / "manifest.json"
+    if uo_manifest.exists():
+        try:
+            for entry in collect_entries(load_json(uo_manifest))[0]:
+                klic = _own_klic(entry)
+                if klic is not None:
+                    uo_entries[klic] = entry
+        except Exception as exc:
+            gate.note(f"UO manifest se neda precist ({exc}) - nahrazeni NEMEŘENO")
+
+    vlastni: dict[tuple[str, int], str] = {}
+    spritu = 0
+    stranek: set[str] = set()
+    prazdnych = 0
+    seam_ok = 0
+    seam_chybi = 0
+    for i, vrstva in enumerate(vrstvy):
+        if not isinstance(vrstva, dict):
+            gate.error(f"{OWN_CONFIG}: vrstva {i} neni slovnik")
+            continue
+        jmeno = str(vrstva.get("name", ""))
+        # Cesty jsou `res://...` (cte je Godot); na disk se prekladaji bez prefixu.
+        mrel = str(vrstva.get("manifest", "")).replace("res://", "")
+        man = root / mrel
+        if not man.exists():
+            gate.error(f"{OWN_CONFIG}: vrstva '{jmeno}' - manifest {mrel} neexistuje")
+            continue
+        base = man.parent
+        try:
+            entries = collect_entries(load_json(man))[0]
+        except Exception as exc:
+            gate.error(f"{mrel}: JSON se neda precist ({exc})")
+            continue
+        sprites = vrstva.get("sprites", {})
+        if not isinstance(sprites, dict) or not sprites:
+            gate.error(f"{OWN_CONFIG}: vrstva '{jmeno}' nema 'sprites' - nic z ni nejde vzit")
+            continue
+        vybrane = 0
+        for entry in entries:
+            klic = _own_klic(entry)
+            if klic is None:
+                continue
+            kind, ident = klic
+            if kind not in sprites or ident not in [int(v) for v in sprites.get(kind, [])]:
+                continue  # tahle vrstva tenhle kus nedodava (vyber po kusech)
+            vybrane += 1
+            spritu += 1
+            if klic in vlastni:
+                gate.error(f"{OWN_CONFIG}: {kind} {ident} je ve vrstvach "
+                           f"'{vlastni[klic]}' i '{jmeno}' - druha by se tise ignorovala")
+            vlastni[klic] = jmeno
+            page = entry.get("page")
+            if isinstance(page, str) and page:
+                stranek.add(page)
+            if uo_entries:
+                if klic in uo_entries:
+                    seam_ok += 1
+                else:
+                    seam_chybi += 1
+                    gate.error(f"seam: {kind} {ident} (vrstva '{jmeno}') NENI v UO manifestu "
+                               "- bylo by to PRIDANI, ne nahrazeni (SEAM.md §3 bod 1)")
+        if vybrane == 0 and sprites:
+            gate.error(f"{OWN_CONFIG}: vrstva '{jmeno}' uvadi {sprites}, ale v manifestu "
+                       "se naslo 0 takovych spritu - vyber po kusech nic nevybral")
+        # Stranky atlasu musi existovat (jinak se kresli dira).
+        for page in sorted({str(e.get("page", "")) for e in entries if e.get("page")}):
+            if not (base / page).exists() and not (root / page).exists():
+                gate.error(f"{mrel}: stranka atlasu chybi: {page}")
+
+    gate.measure("own_spritu", spritu)
+    gate.measure("own_stranek", len(stranek))
+    gate.measure("own_seam_id", seam_ok)
+    gate.measure("own_seam_chybi", seam_chybi)
+    if not vlastni:
+        gate.error(f"{OWN_CONFIG} nedal ani jedno pouzitelne id (prazdno neni uspech)")
+        return 1
+
+    # Prazdne (cele pruhledne) sprity - vada (docs/08 G6), meri se jen s Pillow.
+    try:
+        from PIL import Image  # noqa: F401
+    except Exception:
+        gate.note("Pillow neni k dispozici - prazdne sprity VLASTNIHO artu NEMEŘENY")
+        return 1
+    for i, vrstva in enumerate(vrstvy):
+        if not isinstance(vrstva, dict):
+            continue
+        mrel = str(vrstva.get("manifest", "")).replace("res://", "")
+        man = root / mrel
+        if not man.exists():
+            continue
+        entries = collect_entries(load_json(man))[0]
+        sprites = vrstva.get("sprites", {})
+        base = man.parent
+        for entry in entries:
+            klic = _own_klic(entry)
+            if klic is None:
+                continue
+            kind, ident = klic
+            if kind not in sprites or ident not in [int(v) for v in sprites.get(kind, [])]:
+                continue
+            page = entry.get("page")
+            rect = entry.get("rect") or entry.get("src")
+            if not isinstance(page, str) or not isinstance(rect, (list, tuple)) or len(rect) != 4:
+                continue
+            obrazek = base / page
+            if not obrazek.exists():
+                continue
+            try:
+                with Image.open(obrazek) as img:
+                    region = img.convert("RGBA").crop(tuple(int(v) for v in rect))
+                    if region.getbbox() is None:
+                        prazdnych += 1
+                        gate.error(f"prazdny sprite (vlastni art): {mrel} {page} {tuple(rect)}")
+            except Exception as exc:
+                gate.error(f"{mrel}: {page} nelze zmerit ({exc})")
+    gate.measure("own_spritu_prazdnych", prazdnych)
+    gate.note("vlastni art: vyber po kusech i invariant 'nahrazeni, ne pridani' jsou MERENE")
+    return 1
 
 
 def _posledni_radek(vystup: str) -> str:
@@ -220,6 +376,8 @@ def check_anim_manifest(root: Path, gate: Gate) -> int:
 def check(root: Path, gate: Gate) -> None:
     measured_outputs = check_extraction_outputs(root, gate)
     measured_outputs += check_anim_manifest(root, gate)
+    # Vlastni art je V GITU, takze se meri i v CI (kde `assets/uo/` neni).
+    measured_outputs += check_own_art(root, gate)
     manifest = find_manifest(root)
     if manifest is None:
         if measured_outputs:
@@ -352,6 +510,38 @@ def selftest() -> int:
         return root
 
     good = {"sprites": [{"tile": 1, "page": "atlas0.png", "rect": [0, 0, 44, 44]}]}
+
+    def own_fixture(label: str, rect=(0, 0, 44, 44), uo_id=1, dve_vrstvy=False,
+                    stranka_chybi=False) -> Path:
+        """Fixture pro VLASTNI art: konfigurace + vlastni manifest + stranka + UO
+        manifest (kvuli invariantu "nahrazeni, ne pridani")."""
+        root = fixture(label, good, ["atlas0.png"])
+        own_dir = root / "assets" / "own-lit"
+        (own_dir / "atlas").mkdir(parents=True, exist_ok=True)
+        img = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
+        for px in range(0, 44):
+            for py in range(0, 44):
+                img.putpixel((px, py), (200, 120, 40, 255))
+        if not stranka_chybi:
+            img.save(own_dir / "atlas" / "land_0.png")
+        (own_dir / "manifest.json").write_text(json.dumps({"sprites": [
+            {"kind": "land", "id": 1, "page": "atlas/land_0.png",
+             "x": rect[0], "y": rect[1], "w": rect[2], "h": rect[3],
+             "rect": list(rect), "ox": 0, "oy": 0},
+        ]}, ensure_ascii=False), encoding="utf-8")
+        uo_dir = root / "assets" / "uo"
+        uo_dir.mkdir(parents=True, exist_ok=True)
+        (uo_dir / "manifest.json").write_text(json.dumps({"sprites": [
+            {"kind": "land", "id": uo_id, "page": "atlas/land_0.png",
+             "x": 0, "y": 0, "w": 44, "h": 44, "ox": 0, "oy": 0},
+        ]}, ensure_ascii=False), encoding="utf-8")
+        vrstva = {"name": "lit", "manifest": "res://assets/own-lit/manifest.json",
+                  "anim": None, "sprites": {"land": [1]}}
+        vrstvy = [vrstva, dict(vrstva, name="lit2")] if dve_vrstvy else [vrstva]
+        (root / OWN_CONFIG).write_text(json.dumps(
+            {"version": 1, "layers": vrstvy}, ensure_ascii=False), encoding="utf-8")
+        return root
+
     # Minimální anim manifest, který projde kontrolou těl: 400/401 z MUL,
     # 334 z UOP (přesně to, co měří check_anim_manifest).
     anim_ok = {
@@ -379,6 +569,13 @@ def selftest() -> int:
                                      anim_bez_receptu), VADA),
         ("anim_vadny_dekoder", fixture("anim_vadny_dekoder", good, ["atlas0.png"],
                                          anim_ok, rozbity_dekoder=True), VADA),
+        # VLASTNI ART (2026-10-11): znamy spravny i znamy chybny pripad pro kazdou
+        # novou kontrolu - jinak by to byla brana, ktera nemuze selhat.
+        ("own_ok", own_fixture("own_ok"), OK),
+        ("own_prazdny_sprite", own_fixture("own_prazdny_sprite", rect=(50, 50, 8, 8)), VADA),
+        ("own_chybi_stranka", own_fixture("own_chybi_stranka", stranka_chybi=True), VADA),
+        ("own_neni_v_uo", own_fixture("own_neni_v_uo", uo_id=999), VADA),
+        ("own_duplicitni_id", own_fixture("own_duplicitni_id", dve_vrstvy=True), VADA),
     ]
     return selftest_cli(NAME, check, [(l, e) for l, _, e in cases],
                         fixtures=[(l, f) for l, f, _ in cases])

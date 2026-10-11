@@ -95,6 +95,61 @@ MAX_ACTIONS = 80            # UOP: "gargoyle is like 78" (ClassicUO MAX_ACTIONS)
 HIGH_ACTIONS = 22           # monstra (telo < 200)
 LOW_ACTIONS = 13            # zvirata (200..399)
 PEOPLE_ACTIONS = 35         # lide (400+)
+
+# ⚠⚠ CISLO AKCE ZNAMENA U KAZDE SKUPINY NECO JINEHO (M5, 2026-10-10).
+# `--actions` je proto NUTNE per-telo a do exportu se zapisuje MAPA, ne jeden
+# spolecny seznam. Duvod je namEReny, ne precteny: pro lidi je `4` = stand
+# (1 frame), ale ve skupine `High` je `4` = Attack1 (4 framy) a `2` = Die1;
+# dokud byl v `anim-sheets.json` jeden `actions` slovnik, export monster by
+# prepsal vyznam klicu u lidi (a naopak) - a klient by hral smrt jako beh.
+#
+# Hodnoty jsou PREPSANE z `_src/classicuo/src/ClassicUO.Assets/AnimationsLoader.cs`
+# (BSD-2), enumy: `HighAnimationGroup` (r. 1694-1719), `LowAnimationGroup`
+# (r. 1761-1777), `PeopleAnimationGroup` (r. 1721-1759). Skupina se vybira
+# v `mul_slot` (telo < 200 = High, 200..399 = Low, 400+ = People).
+HIGH_GROUP_ACTIONS = {0: "walk", 1: "stand", 2: "die1", 3: "die2",
+                      4: "attack1", 5: "attack2", 6: "attack3", 7: "misc1",
+                      8: "misc2", 9: "misc3", 10: "stumble", 11: "slapground",
+                      12: "cast", 13: "gethit1", 14: "misc4", 15: "gethit2",
+                      16: "gethit3", 17: "fidget1", 18: "fidget2", 19: "fly",
+                      20: "land", 21: "dieinflight"}
+LOW_GROUP_ACTIONS = {0: "walk", 1: "run", 2: "stand", 3: "eat", 4: "unknown",
+                     5: "attack1", 6: "attack2", 7: "attack3", 8: "die1",
+                     9: "fidget1", 10: "fidget2", 11: "liedown", 12: "die2"}
+# PEOPLE maji `die1`/`die2` az na 21/22 a `stand` na 4 - proto se lisi od High.
+PEOPLE_GROUP_ACTIONS = {0: "walk", 1: "walkarmed", 2: "run", 3: "runarmed",
+                        4: "stand", 5: "fidget1", 6: "fidget2",
+                        21: "die1", 22: "die2"}
+# ABSTRAKTNI AKCE KLIENTA (jmena, ktera pouziva `render.anim` z `mobile_anim`):
+# 0 = walk, 1 = attack, 2 = die, 4 = idle. Export zapisuje `groups`, aby si
+# klient nemusel cislo skupiny domyslet z tela.
+ABSTRACT_GROUPS = {
+    "high": {"walk": 0, "idle": 1, "attack": 4, "die": 2},
+    "low": {"walk": 0, "idle": 2, "attack": 5, "die": 8},
+    "people": {"walk": 0, "idle": 4, "attack": 9, "die": 21},
+}
+# Cislo -> nazev pro kazdou skupinu (jen pro kontrolu, ze slot existuje).
+POLOZKY_AKCI = {
+    "high": HIGH_GROUP_ACTIONS,
+    "low": LOW_GROUP_ACTIONS,
+    "people": PEOPLE_GROUP_ACTIONS,
+}
+
+
+def _je_cislo(hodnota) -> bool:
+    """Je hodnota cislo (i jako text)? Pro rozliseni tvaru `--actions`."""
+    return str(hodnota).lstrip("-").isdigit()
+
+
+def group_kind(body: int) -> str:
+    """Ktera skupina animaci pro telo plati (viz `mul_slot`)."""
+    if body < 200:
+        return "high"
+    if body < 400:
+        return "low"
+    return "people"
+
+
 UOP_NAME = "build/animationlegacyframe/{0:06d}/{1:02d}.bin"
 MUL_TERMINATOR = 0x7FFF7FFF
 FRAME_TABLE_OFFSET = 512    # [u32 pocet framu] hned za prvnimi 512 B bloku
@@ -662,7 +717,8 @@ ANIM_SMERY = 5                      # anim.mul ma 5 smeru (8 smeru hry se z nich
 
 
 def export_sheets(install: str | Path, out_dir: str | Path, bodies: list[int],
-                  akce: dict[int, str], smery: int = ANIM_SMERY) -> dict:
+                  akce: dict[int, str], smery: int = ANIM_SMERY,
+                  groups: dict | None = None) -> dict:
     """Zapise animace jako PNG (framy v jedne rade) + JSON s metadaty.
 
     Kazda (telo, akce, smer) je jeden PNG a jeden zaznam v `anim-sheets.json`.
@@ -670,6 +726,11 @@ def export_sheets(install: str | Path, out_dir: str | Path, bodies: list[int],
     `assets.atlas` (`tools/uoextract/atlas.py`), aby se to nepletlo.
     `cx`, `cy` jsou posuny z hlavicky framu: obrazek se kresli na
     `(tile_x - cx, tile_y - (cy + h))`, tedy `cy + h` je linka zeme.
+
+    `groups` (M5) je MAPA `{telo: {"walk": 0, "attack": 4, "die": 2, ...}}` -
+    cislo akce znamena u kazde skupiny neco jineho (viz `HIGH_GROUP_ACTIONS`),
+    takze jeden spolecny `actions` slovnik nestaci. Klient (`render.anim`) z ni
+    bere skupinu pro (telo, abstraktni akce) a NEDOMYSLuje si ji.
 
     Vysledek je REPRODUKOVATELNY z instalace UO (`--export`), do gitu nepatri.
     """
@@ -679,14 +740,46 @@ def export_sheets(install: str | Path, out_dir: str | Path, bodies: list[int],
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     m = MulAnim(install)
+    # ⚠ AKCE JSOU PER-TELO (M5): jeden spolecny seznam cisel by u tela, ktere
+    # slot nema, hlasil falesnou chybu ("blok v anim.mul neni") - namEReno:
+    # `--bodies 400,401,50,3,238` se sjednocenym seznamem vyrobilo 25 chyb,
+    # protoze lide maji smrt na 21 a monstra na 2. Prijmi i stary tvar
+    # (`{cislo: nazev}`) a rozkopirovej ho na vsechna tela.
+    # ⚠ TVAR `akce` SE ROZHODUJE PODLE HODNOT, NE PODLE KLICU: klic muze byt
+    # TEXT ("50") i cislo a old-format `{0:'walk'}` ma klice taky "ciselne".
+    # NamEReno 2026-10-10: rozhodovani podle klicu vzalo `{50: {...}}` jako
+    # stary tvar a vyrobilo `{50: {50: "{0: 'walk', ...}"}}` - 10 falesnych chyb.
+    if akce and not any(isinstance(v, dict) for v in akce.values()):
+        # STARY TVAR: `{cislo_akce: nazev}` - plati pro VSECHNA tela, rozkopiruj.
+        akce_pro_telo: dict[int, dict[int, str]] = {}
+        for telo in bodies:
+            akce_pro_telo[int(telo)] = {int(k): str(v) for k, v in akce.items()}
+    else:
+        # NOVY TVAR (M5): `{telo: {cislo_akce: nazev}}`. Klic muze prijit
+        # z JSONu jako TEXT - `MulAnim.block` chce int.
+        akce_pro_telo = {}
+        for k, v in akce.items():
+            if not isinstance(v, dict):
+                # Smiseny vstup (cislo -> nazev i telo -> slovnik) je vada
+                # volani, ne tiche preskoceni.
+                raise TypeError(
+                    "export_sheets: 'akce' je mix tvaru; bud {cislo: nazev},"
+                    f" nebo {{telo: {{cislo: nazev}}}} (u klice {k!r} je {type(v).__name__})")
+            akce_pro_telo[int(k)] = {int(a): str(n) for a, n in v.items()}
     zaznamy: dict[str, dict] = {}
     chyby: list[str] = []
-    for body in bodies:
-        for cislo, nazev in sorted(akce.items()):
+    # POZOR na jmena smycek: `telo` a `cislo` se NESMI prekryt s klici slovniku
+    # (`telo` je prvek `bodies`, `cislo` je klic `akce_pro_telo[telo]`).
+    for telo in list(bodies):
+        # ⚠ POZOR NA PREKRYTI PROMENNE: `body` se tu NESMI pouzit jako jmeno
+        # smycky (namEReno 2026-10-10: `for body in bodies` + `for body, ...`
+        # ve vnitrni smycce vyrobilo klice "400/50/0" a 100 falesnych chyb).
+        for cislo in sorted(akce_pro_telo.get(telo, {}).keys()):
+            nazev = str(akce_pro_telo[telo][cislo])
             for smer in range(smery):
-                info = m.block(body, cislo, smer)
+                info = m.block(telo, cislo, smer)
                 if info is None:
-                    chyby.append(f"{body}/{cislo}/{smer}: blok v anim.mul neni")
+                    chyby.append(f"{telo}/{cislo}/{smer}: blok v anim.mul neni")
                     continue
                 blok = m._blok(info["offset"], info["size"])
                 if blok is None:
@@ -707,9 +800,9 @@ def export_sheets(install: str | Path, out_dir: str | Path, bodies: list[int],
                                   "cx": f["cx"], "cy": f["cy"], "w": f["w"], "h": f["h"],
                                   "pixely_mimo": f["pixely_mimo"]})
                     x += f["w"]
-                jmeno = f"anim-{body}-{cislo}-{smer}.png"
+                jmeno = f"anim-{telo}-{cislo}-{smer}.png"
                 plocha.save(out_dir / jmeno)
-                zaznamy[f"{body}/{cislo}/{smer}"] = {
+                zaznamy[f"{telo}/{cislo}/{smer}"] = {
                     "file": jmeno, "action": nazev, "frames": popis,
                     "source": f"{info['source']}+{info['source'].replace('.mul', '.idx')}",
                 }
@@ -721,7 +814,18 @@ def export_sheets(install: str | Path, out_dir: str | Path, bodies: list[int],
                     "[run:12][y:10 signed][x:10 signed], pixel = bajt indexu do "
                     "512B palety v bloku, terminátor 0x7FFF7FFF"),
         "anchor": "obrazek se kresli na (tile_x - cx, tile_y - (cy + h)); rect je [levy, horni, pravy, dolni]",
-        "actions": {str(k): v for k, v in sorted(akce.items())},
+        # `actions` = PRUNIK cisel, ktera maji VSECHNA tela (u nas 0:walk) - je
+        # to jedine, co se da tvrdit spolecne. Vyznam cisla pro konkretni telo
+        # je v `groups[telo]`; co nejde tvrdit spolecne, se sem NEPISE.
+        "actions": {str(k): v for k, v in sorted(_spolecne_akce(akce_pro_telo).items())},
+        "actions_note": ("⚠ `actions` je SPOLEČNÝ seznam cisel, ktera se v exportu"
+                         " vyskytuji - jeho nazev NENI vyznam pro kazde telo."
+                         " Vyznam je v `groups[telo]`: cislo 4 znamena u lidi"
+                         " `stand` a u monster `attack1` (HighAnimationGroup)."),
+        "groups": {str(k): v for k, v in sorted((groups or {}).items())},
+        "group_source": ("_src/classicuo/src/ClassicUO.Assets/AnimationsLoader.cs:"
+                         "1694-1777 (HighAnimationGroup, LowAnimationGroup,"
+                         " PeopleAnimationGroup; BSD-2)"),
         "sprites": zaznamy,
         "chyby": chyby,
     }
@@ -820,6 +924,53 @@ def zapis_manifest(install: str | Path, out: str | Path) -> dict:
     return data
 
 
+def _akce_pro_tela(tela: list[int], zaklad: dict[int, str]) -> tuple[dict, dict, list[str]]:
+    """(akce_pro_telo, groups, poznamky) - akce zvlast pro KAZDE telo.
+
+    `zaklad` je to, co prislo z `--actions` (u lidi 0:walk, 2:run, 4:idle).
+    K nemu se pro KAZDE telo pribereji akce, ktere potrebuje boj (idle/attack/die
+    podle `ABSTRACT_GROUPS`) - a **jen kdyz slot ve skupine toho tela existuje**
+    (`POLOZKY_AKCI`), aby se do exportu nedostaly falesne chyby.
+
+    ⚠ Vysledek je KLICOVANY TELA, ne cislem akce: cislo 2 znamena u lidi `run`
+    a u monster `die1`, takze sjednoceny seznam by exportoval smrt monster i pro
+    lidi (a ohlasil chyby). Presne to se stalo 2026-10-10 (25 chyb).
+    """
+    akce_pro_telo: dict[int, dict[int, str]] = {}
+    groups: dict[int, dict] = {}
+    poznamky: list[str] = []
+    for body in tela:
+        druh = group_kind(body)
+        mapa = ABSTRACT_GROUPS[druh]
+        cisla = dict(POLOZKY_AKCI[druh])
+        akce: dict[int, str] = dict(zaklad)
+        for nazev, cislo in sorted(mapa.items(), key=lambda kv: kv[1]):
+            if cislo not in cisla:
+                poznamky.append(
+                    f"telo {body} ({druh}): akce '{nazev}' (slot {cislo}) ve skupine"
+                    f" {druh} neexistuje - preskoceno")
+                continue
+            if cislo not in akce:
+                akce[cislo] = cisla[cislo]
+        akce_pro_telo[body] = akce
+        groups[body] = dict(mapa)
+    return akce_pro_telo, groups, poznamky
+
+
+def _spolecne_akce(akce_pro_telo: dict) -> dict:
+    """Cisla akci, ktera maji VSECHNA tela stejna (prunik) - jen ta se da
+    zapsat do `actions` bez tvrzeni, ktere pro nektera tela neplati."""
+    if not akce_pro_telo:
+        return {}
+    telo = sorted(akce_pro_telo)[0]
+    out = dict(akce_pro_telo[telo])
+    for b in sorted(akce_pro_telo):
+        for cislo in list(out.keys()):
+            if cislo not in akce_pro_telo[b]:
+                out.pop(cislo)
+    return out
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="animace tela (granule assets.anim)")
     ap.add_argument("--install", default=DEFAULT_INSTALL)
@@ -858,7 +1009,11 @@ def main() -> int:
             cislo, _, nazev = cast.partition(":")
             akce[int(cislo)] = nazev or f"akce{cislo}"
         tela = [int(x) for x in args.bodies.split(",") if x.strip()]
-        data = export_sheets(args.install, args.export, tela, akce, args.dirs)
+        akce, groups, poznamky = _akce_pro_tela(tela, akce)
+        for p in poznamky:
+            print(f"[anim] POZOR: {p}")
+        print("[anim] skupiny: " + ", ".join(f"{b}={groups[b]}" for b in sorted(groups)))
+        data = export_sheets(args.install, args.export, tela, akce, args.dirs, groups)
         print(f"[anim] export: {len(data['sprites'])} spritu do {args.export}"
               f" ({sum(len(z['frames']) for z in data['sprites'].values())} framu)")
         for e in data["chyby"]:

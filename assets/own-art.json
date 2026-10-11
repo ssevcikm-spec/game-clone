@@ -1,0 +1,23 @@
+{
+ "version": 1,
+ "comment": "Ktere (kind, id) se berou z vlastniho artu. Poradi vrstev je poradi priority: prvni vrstva, ktera id obsahuje, vyhrava; co tu neni, zustava z assets/uo/ (fallback). Konfiguraci cte render/own_art.gd, ktery take hlasi kazdou vadu seznamem.",
+ "layers": [
+  {
+   "name": "own-lit",
+   "manifest": "res://assets/own-lit/manifest.json",
+   "anim": "res://assets/own-lit/anim/anim-sheets.json",
+   "sprites": {
+    "land": [3, 1001],
+    "item": [3717, 6583]
+   }
+  },
+  {
+   "name": "own",
+   "manifest": "res://assets/own/manifest.json",
+   "anim": null,
+   "sprites": {
+    "item": [3921, 7151]
+   }
+  }
+ ]
+}

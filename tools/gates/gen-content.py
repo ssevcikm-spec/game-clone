@@ -45,12 +45,12 @@ from gate_common import NEMERENO, OK, VADA, ROOT  # noqa: E402  (sjednocene vyst
 POZADAVKY: dict[str, tuple[bool, str]] = {
     "items.json": (True, "assets/uo/tiles.json (vlastnosti) + research/05 (flagy)"),
     "recipes.json": (True, "research/04-craft-data.json + Cliloc.enu (nazvy)"),
-    "weapons.json": (False, "research/03 (weapons3.json)"),
-    "armor.json": (False, "research/03 (armor_raw.json)"),
+    "weapons.json": (True, "research/_src/weapons3.json"),
+    "armor.json": (True, "research/_src/armor_raw.json"),
     "spells.json": (False, "research/03 (spells_raw.json)"),
-    "item_properties.json": (False, "research/03 (itemprops_table.tsv)"),
-    "monsters.json": (False, "research/06 (tabulky monst)"),
-    "spawns.json": (False, "research/06 (regiony)"),
+    "item_properties.json": (True, "research/_src/itemprops_table.tsv"),
+    "monsters.json": (True, "research/06 §3.1 tabulky (Tier 1 + Tier 2)"),
+    "spawns.json": (True, "rozhodnuti D2 + research/06 §4.8 F (hřbitov)"),
     "vendors.json": (True, "research/06 §2.2.1 + §2.4.1 (NPC/shopy)"),
     "regions.json": (False, "research/06"),
     "moongates.json": (False, "research/06"),
@@ -839,10 +839,930 @@ def gen_vendors(root: Path) -> tuple[bytes, list[dict]]:
 
 
 # =============================================================================
+# weapons.json — 134 zbrani (granule data.weapons, CONTRACT-M5 §3.1)
+# =============================================================================
+# ZDROJ: `research/_src/weapons3.json` (parsovano z `_src/servuo/.../Weapons/*.cs`
+# skriptem `research/_src/parse_weapons3.py`). Je to EXTRAKT, ne instalace UO —
+# `--check` proto projde i bez UO (docs/03 §3.7).
+#
+# ⚠⚠ ROZPOR `speed`, KTERY BYL ROZHODNUT (2026-10-10, `_analyza/p41-gen-m5.py`):
+#   * `speed_raw` = `AosSpeed` ze zdroje. V datech je 22..56, median 37.
+#   * CONTRACT-M5 §3.1 puvodne predepisoval `speed = 50 - speed_raw`. To byla
+#     CHYBA MAPOVANI: `AosSpeed` JE uz ta rychlost, kterou ServUO dosadi do
+#     `GetDelay` (`_src/servuo/.../BaseWeapon.cs:1541-1616`, `v = (Stam+100)*Speed`).
+#     Po inverzi vyslo 128 ze 133 zbrani `speed <= 25` (14 i `<= 0`) a delay
+#     4-100 s (median 8 s) — hra by se nedala hrat. `speed = speed_raw` dava
+#     1,5-4,5 s (median 2,5 s).
+#   * Prijimaci vzorec `max(floor(40000/((100+100)*speed))*500, 1250)` je
+#     v poradku a beze zmeny: `speed=30 -> 3000 ms` (docs/04 §4.6.4).
+# ROZHODNUTI: zapisuje se `speed = speed_raw` (`speed_source` to rika u kazdeho
+# zaznamu). Inverze se NEZAPISUJE — data, ktera tvrdi nehratelne hodnoty, nejsou
+# "obě varianty", jsou to hodnoty, ktere nikdo nepouzije.
+# ⚠ Pozor: CONTRACT-M5 §3.1 ma k datu 2026-10-10 jeste PORAD text `50 - speed_raw`
+# a priklad s `Dagger … speed_raw: 40, swing_delay_ms: 250` (coz neodpovida ani
+# jednomu mapovani). Smlouva je vlastnictvi leada (`docs/**`, CONTRACT-M5) —
+# opravit ji musi on; tenhle komentar je jen to, ze se to vi.
+# ⚠ `speed <= 0` (Fukiya 0, PaladinSword 0) -> `swing_delay_ms: null` a zaznam
+# `speed`/`swing_delay_ms` v `content-report.json`. To je vada ZDROJE, ne ticha
+# nahrada: `GetDelay` by pro `speed = 0` vratil `TimeSpan.FromHours(1)`.
+WEAPONS_SRC = "research/_src/weapons3.json"
+WEAPONS_SOURCE = WEAPONS_SRC + " (parse _src/servuo Scripts/Items/Equipment/Weapons/*.cs)"
+WEAPON_ERA = "aos"
+# Kdo mapuje jmeno skillu, overi ho proti `data/skills.json` (`skill_source`).
+# ServUO `DefSkill` nema stejna jmena jako klasicky klient: `Swords` (50 zbrani)
+# je v `skills.json` `Swordsmanship`, `Macing` (41) je `Mace Fighting`.
+WEAPON_SKILL_MAP = {
+    "Swords": "Swordsmanship",
+    "Macing": "Mace Fighting",
+    "Fencing": "Fencing",
+    "Archery": "Archery",
+    "Wrestling": "Wrestling",
+    "Throwing": "Throwing",
+}
+SPEED_DELAY_MS = 1250            # dolni mez swing delay (`BaseWeapon.cs:1613`)
+TILEDATA_MASK = 0x3FFF           # `ItemID & 0x3FFF` = TILEDATA ID (docs/04 §4.5)
+
+
+def slug_type(nazev: str) -> str:
+    """`LeatherCap` -> `leather_cap` (typ = IDENTITA predmetu, jako v items.json)."""
+    text = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", nazev)
+    text = re.sub(r"(?<=[A-Z])(?=[A-Z][a-z])", "_", text)
+    return text.lower()
+
+
+def swing_delay_ms(speed: int, stam: int = 100) -> int | None:
+    """AoS swing delay (`_src/servuo/.../BaseWeapon.cs:1598-1615`).
+
+    `v = (Stam + 100) * Speed`; `delay = floor(40000/v) * 500 ms`, dolni mez
+    1250 ms. Pro `speed <= 0` vraci None: `GetDelay` by delil nulou nebo vysel
+    zaporny — to neni "pomaly swing", to je nepouzitelny vstup."""
+    if speed <= 0:
+        return None
+    return max(int(40000.0 // ((stam + 100) * speed)) * 500, SPEED_DELAY_MS)
+
+
+def gen_weapons(root: Path) -> tuple[bytes, list[dict]]:
+    """Vraci (bajty `data/weapons.json`, seznam nevyresenych veci)."""
+    cesta = root / WEAPONS_SRC
+    if not cesta.exists():
+        raise ValueError(f"{WEAPONS_SRC} chybi - bez nej zbrane nelze vygenerovat")
+    zdroj = json.loads(cesta.read_text(encoding="utf-8"))
+    if not zdroj:
+        raise ValueError(f"{WEAPONS_SRC}: prazdny seznam")
+    # Skilly over proti `data/skills.json` (smlouva to pozaduje).
+    skills_cesta = root / "data/skills.json"
+    if not skills_cesta.exists():
+        raise ValueError("data/skills.json chybi - spust `--only skills` "
+                         "(mapovani skill_used se musi overit, ne uhodnout)")
+    jmena_skillu = {r["name"] for r in json.loads(skills_cesta.read_text(encoding="utf-8"))}
+
+    zaznamy: list[dict] = []
+    nevyresene: list[dict] = []
+    for rec in zdroj:
+        cls = rec["class"]
+        raw = rec.get("AosSpeed")
+        if not isinstance(raw, (int, float)):
+            nevyresene.append({"soubor": "weapons.json", "kind": "speed", "nazev": cls,
+                               "duvod": "AosSpeed ve zdroji chybi -> speed nelze urcit"})
+            raw = None
+        # ⚠⚠ ROZHODNUTI 2026-10-10 (M5, po namERENI): `speed = AosSpeed`, NE
+        # `50 - AosSpeed`. CONTRACT-M5 §3.1 mel inverzi a byla to CHYBA: ServUO
+        # dosadi `AosSpeed` primo do `v = (Stam + 100) * Speed`
+        # (`_src/servuo/Scripts/Items/Equipment/Weapons/BaseWeapon.cs:1598-1615`),
+        # takze `Speed` JE ta rychlost. NamEReno: `50 - raw` dalo 128 ze 133
+        # zbrani `speed <= 25` (14 dokonce `<= 0`) a `swing_delay_ms` 4-100 s,
+        # zatimco `speed = raw` dava 1,5-4,5 s (median 2,5 s) - tedy hratelne
+        # hodnoty a kriterium `speed=30 -> 3000 ms` z docs/04 §4.6.4 sedi.
+        speed = int(raw) if raw is not None else None
+        art = rec.get("itemid")
+        art_src = "constructor"
+        if not isinstance(art, int):
+            kandidati = [a for a in (rec.get("art") or []) if isinstance(a, int)]
+            art = kandidati[0] if kandidati else None
+            art_src = "flipable" if art is not None else "pending-source"
+        if art is None:
+            nevyresene.append({"soubor": "weapons.json", "kind": "art", "nazev": cls,
+                               "duvod": "art v konstruktoru ani [Flipable] neni"})
+        # `itemid` je ART ID prostor (0x4000 = item); `art` v nasich datech je
+        # TILEDATA ID (`ItemID & 0x3FFF`, docs/04 §4.5).
+        tile = (art & TILEDATA_MASK) if isinstance(art, int) else None
+        def_skill = rec.get("DefSkill")
+        skill = WEAPON_SKILL_MAP.get(def_skill)
+        skill_source = "DefSkill+" + WEAPONS_SRC
+        if def_skill is None:
+            skill_source = "pending-source"
+            nevyresene.append({"soubor": "weapons.json", "kind": "skill", "nazev": cls,
+                               "duvod": "DefSkill ve zdroji chybi"})
+        elif skill is None:
+            skill = def_skill
+            skill_source = "DefSkill-unmapped+" + WEAPONS_SRC
+            nevyresene.append({"soubor": "weapons.json", "kind": "skill", "nazev": cls,
+                               "duvod": f"DefSkill {def_skill} neni v mape ani v skills.json"})
+        elif skill not in jmena_skillu:
+            nevyresene.append({"soubor": "weapons.json", "kind": "skill", "nazev": cls,
+                               "duvod": f"mapovany skill {skill} v data/skills.json neni"})
+        weight = rec.get("weight")
+        zaznamy.append({
+            "name": camel_jmeno(cls),
+            "class": cls,
+            "art": tile,
+            "art_source": art_src if tile is not None else "pending-source",
+            "skill_used": skill,
+            "skill_source": skill_source,
+            # `skill` a `damage` jsou TYTÉŽ hodnoty pod jmenem, ktere pozaduje
+            # `check-content.py` (`REQUIRED_FIELDS` pro weapons.json: skill,
+            # damage, speed, weight). CONTRACT-M5 §3.1 je pojmenovava
+            # `skill_used`/`min_damage`/`max_damage`. Aby prosly obe brany a
+            # nevznikly DVE pravdy, zapisuji se obe jmena se stejnou hodnotou.
+            "skill": skill,
+            "damage": [rec.get("AosMinDamage"), rec.get("AosMaxDamage")],
+            "hands": 1 if (rec.get("DefMaxRange") == 1 or rec.get("DefMaxRange") is None)
+                     else None,
+            "min_damage": rec.get("AosMinDamage"),
+            "max_damage": rec.get("AosMaxDamage"),
+            "speed": speed,
+            "speed_raw": int(raw) if raw is not None else None,
+            "speed_source": ("AosSpeed+" + WEAPONS_SRC + "; `speed = AosSpeed` "
+                             "(ServUO BaseWeapon.cs:1598-1615: `v = (Stam+100)*Speed`); "
+                             "kriteria: speed 30 / stam 100 -> 3000 ms (docs/04 §4.6.4)"),
+            "swing_delay_ms": swing_delay_ms(speed) if speed is not None else None,
+            "swing_delay_source": "floor(40000/((stam+100)*speed))*500, min 1250 ms, "
+                                  "stam=100 (_src/servuo .../BaseWeapon.cs:1598-1615)",
+            "strength_req": rec.get("AosStrengthReq"),
+            "weight": int(weight) if isinstance(weight, float) and weight == int(weight)
+                      else weight,
+            "durability": rec.get("InitMinHits"),
+            "durability_max": rec.get("InitMaxHits"),
+            "layer": None,
+            "layer_source": "pending-tiledata",
+            "special_move": rec.get("PrimaryAbility"),
+            "special_move_secondary": rec.get("SecondaryAbility"),
+            "anim": rec.get("DefAnimation"),
+            "damage_type": rec.get("DefType"),
+            "range": rec.get("DefMaxRange"),
+            "material": None,
+            "material_source": "pending-source",
+            "era": WEAPON_ERA,
+            "type": slug_type(cls),
+            "source": WEAPONS_SOURCE,
+        })
+    zaznamy.sort(key=lambda r: (r["name"], r["class"]))     # deterministicke poradi
+    # Souhrn rozporu `speed` (jeden zaznam, ne 134krat) - viz POZOR v hlavicce.
+    male = [r["class"] for r in zaznamy if r["speed"] is not None and r["speed"] <= 0]
+    if male:
+        nevyresene.append({
+            "soubor": "weapons.json", "kind": "speed-mapping",
+            "nazev": f"{len(male)} zbrani se speed <= 0",
+            "duvod": ("`AosSpeed` ve zdroji je 0 nebo zaporne - to je vada DAT, ne"
+                      " mapovani (`speed = AosSpeed` je spravne, viz `speed_source`). "
+                      "Priklady: " + ", ".join(sorted(male)[:8])),
+        })
+    return bajty(zaznamy), nevyresene
+
+
+# =============================================================================
+# armor.json — 165 zbroji (granule data.armor, CONTRACT-M5 §3.2)
+# =============================================================================
+# ZDROJ: `research/_src/armor_raw.json` (parse `Scripts/Items/Equipment/Armor/*.cs`).
+#
+# ⚠ `layer` a `slot` v serverovych zdrojich NEJSOU: ServUO bere vrstvu
+# z tiledata (`Layer = (Layer)ItemData.Quality`), a `parse_armor.py` ji proto ma
+# u vsech 165 zaznamu `null`. Do teto chvile plati `layer: null` +
+# `layer_source: "pending-tiledata"` (docs/06 §6.4) — NIKDY nehadat.
+# `slot` je ODVOZENY z nazvu tridy jen jako pojmenovani, ne jako vrstva:
+# kazdy zaznam ma `slot_source`, aby bylo videt, ze to neni z tiledata.
+ARMOR_SRC = "research/_src/armor_raw.json"
+ARMOR_SOURCE = ARMOR_SRC + " (parse _src/servuo Scripts/Items/Equipment/Armor/*.cs)"
+ARMOR_ERA = "aos"
+# Poradi je dulezite: 'platelegs' musi byt pred 'legs' a 'plate' pred 'chest'.
+ARMOR_SLOT_PRAVIDLA = (
+    ("shield", ("shield", "buckler")),
+    ("head", ("helm", "coif", "cap", "hat", "hood", "cowl", "circlet", "kabuto",
+              "mask", "collar", "bonnet", "bandana")),
+    ("neck", ("gorget", "collar")),
+    ("chest", ("chest", "tunic", "torso", "hauberk", "breastplate", "plate", "robe",
+               "surcoat", "dress")),
+    ("arms", ("arms", "sleeves", "arm")),
+    ("hands", ("gloves", "gauntlets")),
+    ("legs", ("legs", "skirt", "kilt", "pants", "leggings", "leg")),
+    ("feet", ("boots", "shoes", "sandals", "thigh")),
+    ("waist", ("belt", "apron", "sash")),
+    ("back", ("cloak", "cape", "quiver")),
+)
+
+
+def armor_slot(cls: str) -> tuple[str | None, str]:
+    """`(slot, slot_source)` — ODVOZENO z nazvu tridy, nikdy z tiledata."""
+    maly = slug_type(cls)
+    if "shield" in maly or maly.endswith("buckler"):
+        return "shield", "derived-classname"
+    for slot, klice in ARMOR_SLOT_PRAVIDLA:
+        if slot == "shield":
+            continue
+        if any(k in maly for k in klice):
+            return slot, "derived-classname"
+    return None, "pending-source"
+
+
+def gen_armor(root: Path) -> tuple[bytes, list[dict]]:
+    """Vraci (bajty `data/armor.json`, seznam nevyresenych veci)."""
+    cesta = root / ARMOR_SRC
+    if not cesta.exists():
+        raise ValueError(f"{ARMOR_SRC} chybi - bez nej zbroje nelze vygenerovat")
+    zdroj = json.loads(cesta.read_text(encoding="utf-8"))
+    if not zdroj:
+        raise ValueError(f"{ARMOR_SRC}: prazdny seznam")
+
+    zaznamy: list[dict] = []
+    nevyresene: list[dict] = []
+    for rec in zdroj:
+        cls = rec["class"]
+        arts = [a for a in (rec.get("art_ids") or []) if isinstance(a, int)]
+        tile = (arts[0] & TILEDATA_MASK) if arts else None
+        if tile is None:
+            nevyresene.append({"soubor": "armor.json", "kind": "art", "nazev": cls,
+                               "duvod": "art_ids je prazdne (v .cs neni [Flipable] ani ctor ID)"})
+        material = rec.get("material")
+        material = material.split(".")[-1].lower() if isinstance(material, str) else None
+        slot, slot_source = armor_slot(cls)
+        ar = rec.get("armor_base")
+        if ar is None:
+            nevyresene.append({"soubor": "armor.json", "kind": "ar", "nazev": cls,
+                               "duvod": "ArmorBase ve zdroji chybi -> ar: null"})
+        if slot is None:
+            nevyresene.append({"soubor": "armor.json", "kind": "slot", "nazev": cls,
+                               "duvod": "slot se z nazvu tridy neodvodil -> null"})
+        weight = rec.get("weight")
+        str_req = rec.get("aos_str")
+        zaznamy.append({
+            "name": camel_jmeno(cls),
+            "class": cls,
+            "art": tile,
+            "art_source": "art_ids+" + ARMOR_SRC if tile is not None else "pending-source",
+            "slot": slot,
+            "slot_source": slot_source,
+            "layer": None,
+            "layer_source": "pending-tiledata",
+            "ar": ar,
+            "ar_era": "aos",
+            "resist": {
+                "physical": rec.get("phys"), "fire": rec.get("fire"),
+                "cold": rec.get("cold"), "poison": rec.get("pois"),
+                "energy": rec.get("ener"),
+            },
+            "str_req": str_req,
+            "str_req_source": "AosStrReq+" + ARMOR_SRC if str_req is not None
+                              else "pending-source",
+            "str_req_old": rec.get("old_str"),
+            "weight": int(weight) if isinstance(weight, float) and weight == int(weight)
+                      else weight,
+            "durability": rec.get("init_min_hits"),
+            "durability_max": rec.get("init_max_hits"),
+            "material": material,
+            "material_source": "MaterialType+" + ARMOR_SRC if material else "pending-source",
+            "default_resource": (rec.get("def_resource") or "").split(".")[-1] or None,
+            "meditation": (rec.get("med_allow") or "").split(".")[-1] or None,
+            "era": ARMOR_ERA,
+            "type": slug_type(cls),
+            "source": ARMOR_SOURCE,
+        })
+    zaznamy.sort(key=lambda r: (r["name"], r["class"]))
+    return bajty(zaznamy), nevyresene
+
+
+# =============================================================================
+# item_properties.json — 159 vlastnosti (granule data.item_properties, §3.3)
+# =============================================================================
+# ZDROJ: `research/_src/itemprops_table.tsv` (159 radku bez hlavicky, 6 sloupcu:
+# id, enum, w, scale, start, max, per-slot stropy).
+ITEMPROPS_SRC = "research/_src/itemprops_table.tsv"
+ITEMPROPS_SOURCE = ITEMPROPS_SRC + " (parse _src/servuo Scripts/Misc/ItemProperty.cs)"
+# Cisla jsou desetinna jen v `scale`/`max`; `id`/`start` jsou cela.
+ITEMPROPS_SCOPE = re.compile(r"(?P<scope>[A-Za-z]+)\[scale=(?P<scale>-|\d+)"
+                             r"\s+max=(?P<max>\d+)")
+
+
+def gen_item_properties(root: Path) -> tuple[bytes, list[dict]]:
+    """Vraci (bajty `data/item_properties.json`, seznam nevyresenych veci)."""
+    cesta = root / ITEMPROPS_SRC
+    if not cesta.exists():
+        raise ValueError(f"{ITEMPROPS_SRC} chybi - bez nej vlastnosti nelze vygenerovat")
+    radky = [x for x in cesta.read_text(encoding="utf-8").splitlines() if x.strip()]
+    if not radky:
+        raise ValueError(f"{ITEMPROPS_SRC}: zadne radky")
+
+    zaznamy: list[dict] = []
+    nevyresene: list[dict] = []
+    for radek in radky:
+        bunky = radek.split("\t")
+        if len(bunky) < 6:
+            nevyresene.append({"soubor": "item_properties.json", "kind": "radek",
+                               "nazev": radek[:40],
+                               "duvod": f"ocekavano 6 sloupcu, je {len(bunky)}"})
+            continue
+        cislo, enum, w, scale, start, maximum = (b.strip() for b in bunky[:6])
+        m = re.fullmatch(r"w=(\d+)", w)
+        ms = re.fullmatch(r"scale=(-?\d+)", scale)
+        mst = re.fullmatch(r"start=(-?\d+)", start)
+        mmax = re.fullmatch(r"max=(-?\d+)", maximum)
+        if not (m and ms and mmax):
+            nevyresene.append({"soubor": "item_properties.json", "kind": "sloupec",
+                               "nazev": enum,
+                               "duvod": f"sloupce se nectou: w='{w}' scale='{scale}' "
+                                        f"max='{maximum}'"})
+            continue
+        scope = {}
+        for shoda in ITEMPROPS_SCOPE.finditer(bunky[6] if len(bunky) > 6 else ""):
+            scope[shoda.group("scope")] = {
+                "max": int(shoda.group("max")),
+                # `scale=-` znamena "v tomto scope se scale neuvadi" -> None,
+                # NIKDY 0 (0 by tvrdilo "skaluje se nulou").
+                "scale": (int(shoda.group("scale"))
+                          if shoda.group("scale") != "-" else None)}
+        nazev = enum.split(".")[-1]
+        min_hodnota = int(mst.group(1)) if mst else 0
+        max_hodnota = int(mmax.group(1))
+        zaznamy.append({
+            "id": int(cislo), "name": nazev, "enum": enum,
+            "type": "int", "range": [min_hodnota, max_hodnota],
+            "min": min_hodnota, "max": max_hodnota,
+            "scale": int(ms.group(1)) != 0,
+            "scales": int(ms.group(1)) != 0,
+            "weight": int(m.group(1)),
+            "scope": scope,
+            "scope_source": ITEMPROPS_SRC,
+            "source": ITEMPROPS_SOURCE,
+        })
+    zaznamy.sort(key=lambda r: r["id"])
+    if len(zaznamy) != len(radky):
+        nevyresene.append({"soubor": "item_properties.json", "kind": "pocet",
+                           "nazev": f"{len(zaznamy)}/{len(radky)}",
+                           "duvod": "ne vsechny radky se prevedly na zaznam"})
+    return bajty(zaznamy), nevyresene
+
+
+# =============================================================================
+# monsters.json — monstra z `research/06` §3.1 (granule data.monsters, §3.4)
+# =============================================================================
+# ZDROJ: `research/06-world-content-npcs.md` §3.1 (tabulky Tier 1 + Tier 2;
+# Tier 3/4 se berou tez, protoze tabulky jsou strojove a zdarma — rozhodnuti D2).
+# Tabulky jsou 【C】 parsovane ze `Scripts/Mobiles/Normal/*.cs`.
+#
+# ⚠ `loot_pack` je PER MONSTRUM (sloupec Loot), NIKDY z fame — fame vybira loot
+# jen paragonum (`_src/servuo/Scripts/Mobiles/Normal/BaseCreature.cs:5386-5408`,
+# P18 v `PLAN-NPC-A-SOUBOJ-2026-10-08.md`).
+# ⚠ `anim.walk/attack/die` = CISLO AKCE v `anim.mul`, ne poradi v abstraktni
+# akci klienta (0=walk/1=run/2=attack/3=death/4=idle z CONTRACT-M5 §2).
+#   `high` (tělo < 200) = `HighAnimationGroup`: Walk=0 (AnimationsLoader.cs:1696),
+#                           Attack1=4 (:1700), Die1=2 (:1698)
+#   `low`  (200..399)     = `LowAnimationGroup`:  Walk=0 (:1763), Attack1=5 (:1768),
+#                           Die1=8 (:1771)
+# Cisla jsou i v `tools/uoextract/anim.py:110-118` (`HIGH_GROUP_ACTIONS`,
+# `LOW_GROUP_ACTIONS`); generator je cte odtamtud, aby existoval JEDEN zdroj.
+MONSTERS_SRC = "research/06-world-content-npcs.md"
+MONSTERS_SOURCE = (MONSTERS_SRC + " §3.1 (ServUO Scripts/Mobiles/Normal/*.cs); "
+                   "anim = AnimationsLoader.cs:1694-1777")
+ANIM_PY = "tools/uoextract/anim.py"
+TIER_NAZEV = re.compile(r"^#### (Tier \d+)")
+TIER_ANCHOR = "### 3.1"
+MONSTERS_SKILLS_ANCHOR = "Skills:"
+NOTORIETY_CAN_BE_ATTACKED = 3     # `_src/servuo/Server/Notoriety.cs:8` (výčet v research/06 §4.5)
+LOOT_PACK_NAZVY = {
+    "poor": "poor", "meager": "meager", "average": "average", "rich": "rich",
+    "filthyrich": "filthy_rich", "ultrarich": "ultra_rich", "superboss": "super_boss",
+    "gems": "gems", "potions": "potions", "lowscrolls": "low_scrolls",
+    "medscrolls": "med_scrolls", "highscrolls": "high_scrolls",
+}
+# Zlato v pre-AoS pacich (`Old*`) — kostky PRIMO z `_src/servuo/Scripts/Misc/
+# LootPack.cs`. Hodnoty se overuji CTENIM toho souboru (`over_loot_pack`):
+# kdyby je zdroj zmenil, generator to hlasi, nez aby tise napsal stara cisla.
+LOOTPACK_CS = "_src/servuo/Scripts/Misc/LootPack.cs"
+LOOT_GOLD = {
+    "poor": ("1d25", 422), "meager": ("5d10+25", 428), "average": ("10d10+50", 437),
+    "rich": ("10d10+250", 447), "filthy_rich": ("2d125+400", 457),
+    "ultra_rich": ("5d100+500", 468), "super_boss": ("5d100+500", 481),
+}
+
+
+def over_loot_pack(root: Path) -> list[dict]:
+    """Overi zlato v `Old*` pacich proti zdroji `LootPack.cs` (jen cteni)."""
+    cesta = root / LOOTPACK_CS
+    if not cesta.exists():
+        return [{"soubor": "monsters.json", "kind": "loot-pack",
+                 "nazev": LOOTPACK_CS,
+                 "duvod": "zdroj loot packu chybi — kostky zlata nelze overit"}]
+    radky = cesta.read_text(encoding="utf-8").splitlines()
+    vady: list[dict] = []
+    for pack, (kostky, radek) in LOOT_GOLD.items():
+        if radek - 1 >= len(radky):
+            vady.append({"soubor": "monsters.json", "kind": "loot-pack", "nazev": pack,
+                         "duvod": f"{LOOTPACK_CS} ma jen {len(radky)} radku, odkaz na {radek}"})
+            continue
+        if f'"{kostky}"' not in radky[radek - 1]:
+            vady.append({"soubor": "monsters.json", "kind": "loot-pack", "nazev": pack,
+                         "duvod": f"{LOOTPACK_CS}:{radek} neobsahuje \"{kostky}\" — "
+                                  f"kostky zlata se rozešly se zdrojem"})
+    return vady
+# Skilly se v tabulkach pisi ZKRATKOU tridy (`MagicResist`), ale `data/skills.json`
+# ma klasicka jmena (`Resisting Spells`). Kdo mapuje, overi to proti souboru;
+# co v mape neni, se hlasi jako nevyresene (nikdy ticha nahrada).
+MONSTER_SKILL_MAP = {
+    "magicresist": "Resisting Spells", "evalint": "Evaluating Intelligence",
+    "spiritspeak": "Spirit Speak", "detecthidden": "Detecting Hidden",
+    "swords": "Swordsmanship", "macing": "Mace Fighting", "parry": "Parrying",
+}
+AI_MAPA = {"AI_Melee": "melee", "AI_Animal": "animal", "AI_Mage": "mage",
+           "AI_NecroMage": "necro_mage", "AI_Berserk": "berserk", "AI_Healer": "healer"}
+# Flagy z prozy §3.1 (kdo je undead, kdo ma jed).
+UNDEAD = {"skeleton", "zombie", "ghoul", "bone_magi", "wraith", "spectre", "lich",
+          "mummy", "shade", "skeletal_knight"}
+POISON_HIT = {"slime": "lesser", "snake": "lesser", "giant_spider": "regular",
+              "frost_spider": "regular", "scorpion": "greater", "giant_serpent": "greater",
+              "dread_spider": "lethal"}
+TAMABLE = {"rat": 0.1, "slime": 231, "snake": 591, "giant_spider": 591, "scorpion": 591}
+# ⚠ NEUPLNOST ZDROJE (namEReno 2026-10-10): proza §3.1 VYPISUJE skilly jen
+# u casti monster — chybi Scorpion a Harpy (Tier 2) a Wisp (Tier 3), ktere
+# tabulka naopak ma. Rok 2026-10-10: `research/06` §3.1 tabulka uvadi
+# "Wisp EvalInt/Magery/MagicResist/Tactics/Wrestling all 80.0" jednou vetou,
+# ktera se neda precist strojove jako ostatni. Pro tato monstra (a pro
+# OgreLord/ArcticOgreLord, kde je proza jen u Tier 4 jmen) se skilly berou
+# z `SetSkill(SkillName.X, lo, hi)` v extraktu `.cache/analysis/monsters.tsv`
+# (vystup `extract-monsters.ps1`, stejny zdroj jako tabulky §3.1). Kazdy
+# takovy zaznam ma `skills_source` s tou cestou — nic se netvrdi jako z tabulky.
+MONSTERS_TSV = ".cache/analysis/monsters.tsv"
+SETSKILL = re.compile(r"SetSkill\(\s*SkillName\.(?P<skill>\w+)\s*,\s*"
+                      r"(?P<lo>\d+(?:\.\d+)?)\s*(?:,\s*(?P<hi>\d+(?:\.\d+)?)\s*)?\)")
+
+
+def skilly_z_tsv(root: Path, jmena_skillu: dict[str, str]) -> dict[str, dict]:
+    """{typ monstra: {skill: [lo, hi]}} z extraktu `monsters.tsv` (fallback).
+
+    Bere se JEN pro monstra, ktera v proze §3.1 skilly nemaji — a kazdy zaznam
+    to priznava pres `skills_source`. Kdyz soubor chybi, vraci se prazdny
+    slovnik (a monstrum zustane bez skillu, coz se hlasi — nikdy ticha nula)."""
+    cesta = root / MONSTERS_TSV
+    if not cesta.exists():
+        return {}
+    import csv
+    import io
+    out: dict[str, dict] = {}
+    with io.open(cesta, encoding="utf-8-sig", newline="") as f:
+        for radek in csv.DictReader(f, delimiter="\t"):
+            cls = (radek.get("Class") or "").strip()
+            if not cls:
+                continue
+            skilly: dict[str, list[int]] = {}
+            for m in SETSKILL.finditer(radek.get("Skills") or ""):
+                jmeno = jmena_skillu.get(m.group("skill").lower())
+                if jmeno is None:
+                    continue
+                lo = desetiny(m.group("lo"))
+                hi = desetiny(m.group("hi")) if m.group("hi") else lo
+                skilly[jmeno] = [lo, hi]
+            if skilly:
+                out[MONSTER_ALIASY.get(cls, slug_type(cls))] = skilly
+    return out
+# ⚠ 13. rada tabulky §3.1 ma prvni bunku `**Bird** ("a crow")` — kdyby se
+# `cls` bral z cele bunky, vyjde typ `birdacrow` a monstrum se nespari se svym
+# radkem v tabulce skillu (namEReno). Bere se proto jen tucne jmeno.
+MONSTER_CLS = re.compile(r"\*\*(?P<cls>[A-Za-z0-9]+)\*\*")
+# Jmena trid, ktera se v tabulkach pisou jinak nez trida v ServUO.
+MONSTER_ALIASY = {"BoneMagi": "bone_mage", "SewerRat": "sewer_rat"}
+
+
+def monstrum_typ(bunka: str) -> str | None:
+    """`'**Bird** ("a crow")'` -> `'bird'`; `'**GiantSerpent**'` -> `'giant_serpent'`."""
+    m = MONSTER_CLS.search(bunka)
+    if not m:
+        return None
+    cls = m.group("cls")
+    return MONSTER_ALIASY.get(cls, slug_type(cls))
+SNIPPET = re.compile(r"^\s*(?P<stat>STR|DEX|INT|Hits|Mana|Damage|"
+                     r"BasePhysicalResistance|BaseFireResistance|BaseColdResistance|"
+                     r"BasePoisonResistance|BaseEnergyResistance|VirtualArmor|"
+                     r"SetDamage|AddLoot)\s*[=:(]")
+
+
+def anim_groups() -> dict:
+    """Mapa `{'high': {...}, 'low': {...}}` PRECTENA z `tools/uoextract/anim.py`.
+
+    Cte se TEXT, ne import: `anim.py` importuje `uop.py` a pri importu saha na
+    instalaci UO, ktera v CI neni (docs/03 §3.7). Kdyz se cisla v `anim.py`
+    zmeni, generator to pozna jako rozpor — ticha kopie by byla horsi."""
+    cesta = ROOT / ANIM_PY
+    if not cesta.exists():
+        raise ValueError(f"{ANIM_PY} chybi - cisla akci animaci nelze overit")
+    text = cesta.read_text(encoding="utf-8")
+    out: dict[str, dict[str, int]] = {}
+    m = re.search(r"ABSTRACT_GROUPS\s*=\s*\{(.*?)\n\}", text, re.S)
+    if not m:
+        raise ValueError(f"{ANIM_PY}: ABSTRACT_GROUPS se necte")
+    for nazev_skupiny, telo in re.findall(r'"(high|low|people)"\s*:\s*\{([^}]*)\}', m.group(1)):
+        if nazev_skupiny == "people":
+            continue
+        polozky = dict(re.findall(r'"(\w+)"\s*:\s*(\d+)', telo))
+        out[nazev_skupiny] = {k: int(v) for k, v in polozky.items()}
+    if set(out) != {"high", "low"}:
+        raise ValueError(f"{ANIM_PY}: ABSTRACT_GROUPS nema high/low ({sorted(out)})")
+    return out
+
+
+def anim_group(body: int) -> str:
+    """`tools/uoextract/anim.py:group_kind` — tělo < 200 high, 200..399 low."""
+    if body < 200:
+        return "high"
+    if body < 400:
+        return "low"
+    return "people"
+
+
+def rozsah(bunka: str) -> list[int] | None:
+    """`'56, 80'` -> `[56, 80]`; `'9'` -> `[9, 9]`; chybejici -> None."""
+    cisla = [int(x) for x in re.findall(r"-?\d+", bunka)]
+    if not cisla:
+        return None
+    return [cisla[0], cisla[-1]] if len(cisla) > 1 else [cisla[0], cisla[0]]
+
+
+def prvni_cislo(bunka: str) -> int | None:
+    """`'50 or 56 (random)'` -> 50; `'0x15'` -> 21; `'-450'` -> -450.
+
+    ⚠ Znamenko se nesmi zahodit: `karma` je zaporna (namEReno — bez `-?` vyslo
+    `karma: 450`, tedy monstrum "hodne")."""
+    text = bunka.strip().replace("\u2212", "-")
+    hexa = re.search(r"0x([0-9A-Fa-f]+)", text)
+    m = re.search(r"-?\d+", text)
+    if hexa and (m is None or hexa.start() <= m.start()):
+        return int(hexa.group(1), 16)
+    return int(m.group(0)) if m else None
+
+
+def desetiny(text: str) -> int:
+    """`'45.1'` -> 451; `'80'` -> 800 (skilly v `entity.skills` jsou desetiny)."""
+    return int(round(float(text) * 10))
+
+
+def parsuj_skilly(blok: str, jmena_skillu: dict[str, str]) -> dict[str, list[int]]:
+    """`'MagicResist 4, Tactics 4, Wrestling 4'` -> `{'Resisting Spells':[40,40], ...}`.
+
+    Jmena skillu se matchuji pres `MONSTER_SKILL_MAP` + normalizovane jmeno z
+    `data/skills.json` (bez mezer, case-insensitive), takze slovo z prozy
+    (`Wisp ... Wrestling all 80.0` -> `all`) se nikdy nevyrobi jako skill.
+    Co se nenajde, se zahodi a hlasi vyssi."""
+    out: dict[str, list[int]] = {}
+    for m in re.finditer(r"(?P<jmeno>[A-Za-z][A-Za-z]*)\s+"
+                         r"(?P<lo>\d+(?:\.\d+)?)\s*(?:[–\-]\s*(?P<hi>\d+(?:\.\d+)?))?",
+                         blok):
+        jmeno = m.group("jmeno").lower()
+        klic = (MONSTER_SKILL_MAP.get(jmeno)
+                or jmena_skillu.get(jmeno))
+        if klic is None:
+            continue
+        lo = desetiny(m.group("lo"))
+        hi = desetiny(m.group("hi")) if m.group("hi") else lo
+        out[klic] = [lo, hi]
+    return out
+
+
+def monstrum_jmeno(cells: list[str], cls: str) -> str:
+    """`'**BoneMagi** ("a bone mage")'` -> `'a bone mage'`."""
+    bunka = cells[0]
+    m = re.search(r'\(([^)]*)\)', bunka)
+    if m:
+        return m.group(1).strip().strip('"')
+    return cls.lower()
+
+
+def parsuj_monstra(root: Path) -> tuple[list[dict], list[dict]]:
+    """Vraci (zaznamy, nevyresene). Cte tabulky z `research/06` §3.1."""
+    cesta = root / MONSTERS_SRC
+    if not cesta.exists():
+        raise ValueError(f"{MONSTERS_SRC} chybi - bez nej monstra nelze vygenerovat")
+    radky = cesta.read_text(encoding="utf-8").splitlines()
+    text = (root / MONSTERS_SRC).read_text(encoding="utf-8")
+    skills_cesta = root / "data/skills.json"
+    if not skills_cesta.exists():
+        raise ValueError("data/skills.json chybi - spust `--only skills` "
+                         "(skilly monster se musi overit, ne uhodnout)")
+    jmena_skillu = {r["name"].lower().replace(" ", ""): r["name"]
+                    for r in json.loads(skills_cesta.read_text(encoding="utf-8"))}
+    # Klic = jmeno, jak je v tabulce (`magicresist`), hodnota = jmeno z
+    # `data/skills.json`. Mapa je lokalni kopie, aby se globalni konstanta
+    # nemenila podle toho, co je na disku.
+    mapa_skillu = dict(MONSTER_SKILL_MAP)
+    for klic, jmeno in jmena_skillu.items():
+        mapa_skillu.setdefault(klic, jmeno)
+    jmena_skillu = mapa_skillu        # jedina mapa, se kterou se v tomto bloku pracuje
+
+    zaznamy: list[dict] = []
+    nevyresene: list[dict] = []
+    v_oddilu, tier = False, None
+    hlavicky: list[str] = []
+    for i, radek in enumerate(radky):
+        if radek.startswith("### "):
+            v_oddilu = radek.startswith(TIER_ANCHOR)
+            tier = None
+            continue
+        if not v_oddilu:
+            continue
+        m = TIER_NAZEV.match(radek)
+        if m:
+            tier = m.group(1)
+            continue
+        if radek.startswith("#### ") or not radek.startswith("|"):
+            if radek.startswith("#### "):
+                tier = None
+            continue
+        bunky = [b.strip() for b in radek.strip().strip("|").split("|")]
+        if not any(bunky):
+            continue
+        if set("".join(bunky)) <= set("-: "):
+            continue                       # oddelovac tabulky
+        if tier is None:
+            continue
+        if bunky[0] == "Monster":
+            # ⚠ V §3.1 jsou DVE tabulky se sloupcem "Monster": hlavni (Body, STR…)
+            # a hned pod ni uzka "Monster | Skills" pro Tier 1. Kdyby se hlavicka
+            # prepsala, `bunka["Body"]` spadne (namEReno) — hlavickou hlavni
+            # tabulky proto pozna a uzka tabulka se ignoruje (skilly Tier 1 se
+            # berou zvlast nize).
+            if "Body" in bunky:
+                hlavicky = bunky
+            else:
+                hlavicky, tier = [], None
+            continue
+        if not hlavicky or len(bunky) != len(hlavicky):
+            nevyresene.append({"soubor": "monsters.json", "kind": "radek",
+                               "nazev": radek[:50],
+                               "duvod": f"sloupcu {len(bunky)} != hlavicka {len(hlavicky)}"})
+            continue
+        bunka = dict(zip(hlavicky, bunky))
+        typ = monstrum_typ(bunky[0])
+        if typ is None:
+            nevyresene.append({"soubor": "monsters.json", "kind": "radek",
+                               "nazev": radek[:50], "duvod": "jmeno monstra neni tucne"})
+            continue
+        cls = re.sub(r"[^A-Za-z0-9]", "", MONSTER_CLS.search(bunky[0]).group("cls"))
+        body = prvni_cislo(bunka["Body"])
+        if body is None:
+            nevyresene.append({"soubor": "monsters.json", "kind": "body", "nazev": cls,
+                               "duvod": f"body se necte z '{bunka['Body']}'"})
+            continue
+        skupina = anim_group(body)
+        if skupina not in ("high", "low"):
+            nevyresene.append({"soubor": "monsters.json", "kind": "anim_group",
+                               "nazev": f"{cls} (body {body})",
+                               "duvod": "body 400+ = People (lidska skupina) - "
+                                        "`anim` z High/Low enumu by lhal"})
+            continue
+        va = rozsah(bunka.get("VA", ""))
+        zaznamy.append({
+            "type": typ, "id": typ, "class": cls,
+            "name": monstrum_jmeno(bunky, cls),
+            "body": body,
+            "body_source": f"research/06 §3.1 {tier}, sloupec Body: '{bunka['Body']}'",
+            "anim_group": skupina,
+            "anim_group_source": "tools/uoextract/anim.py:group_kind (tělo < 200 high, "
+                                 "200..399 low)",
+            "tier": int(tier.split()[1]),
+            "ai": AI_MAPA.get("AI_" + bunka.get("AI / FightMode", "").split("/")[0].strip()),
+            "ai_raw": bunka.get("AI / FightMode"),
+            "fight_mode": (bunka.get("AI / FightMode", "").split("/") + [""])[1].strip() or None,
+            "str": rozsah(bunka["STR"]), "dex": rozsah(bunka["DEX"]),
+            "int": rozsah(bunka["INT"]), "int_": rozsah(bunka["INT"]),
+            "hits": rozsah(bunka["Hits"]),
+            "mana": rozsah(bunka.get("Mana", "")),
+            "damage": rozsah(bunka["Damage"]),
+            "virtual_armor": va[0] if va else None,
+            "virtual_armor_source": f"research/06 §3.1 {tier}, sloupec VA",
+            "resist": None,
+            "resist_source": "pending-source (tabulky §3.1 resisty nemaji; "
+                             "docs/05 §5.16 = pre-AoS pouziva VirtualArmor)",
+            "fame": prvni_cislo(bunka["Fame"]),
+            "karma": prvni_cislo(bunka["Karma"]),
+            "loot_pack": LOOT_PACK_NAZVY.get(
+                re.sub(r"[^a-z]", "", bunka.get("Loot", "").split("+")[0].lower()), None),
+            "loot_raw": bunka.get("Loot") or None,
+            "loot": None,                      # doplni se nize (kostky z LootPack.cs)
+            "loot_source": f"research/06 §3.1 {tier}, sloupec Loot (per monstrum, NIKDY z fame)",
+            "notoriety": NOTORIETY_CAN_BE_ATTACKED,
+            "notoriety_source": "research/06 §4.5 `Server/Notoriety.cs:8` — "
+                                "CanBeAttacked = 3 (nepritele, ne zlocinec)",
+            "flags": [], "taming_difficulty": TAMABLE.get(typ),
+            "source": MONSTERS_SOURCE,
+        })
+    if not zaznamy:
+        raise ValueError(f"{MONSTERS_SRC} §3.1: necte se zadna tabulka (Tier 1/2)")
+
+    # --- skilly: tabulka Tier 1 + proza Tier 2 (viz hlavicka bloku) ---
+    podle_typu = {r["type"]: r for r in zaznamy}
+    # 1) Tier 1 ma vlastni tabulku `| Monster | Skills |`
+    m = re.search(r"Skills for tier 1.*?\n(.*?)\n\n", text, re.S)
+    if not m:
+        raise ValueError(f"{MONSTERS_SRC}: tabulka 'Skills for tier 1' se necte")
+    for radek in m.group(1).splitlines():
+        if not radek.startswith("|") or set(radek.strip().strip("|")) <= set("-: |"):
+            continue
+        bunky = [b.strip() for b in radek.strip().strip("|").split("|")]
+        if len(bunky) != 2 or bunky[0] == "Monster":
+            continue
+        typ = slug_type(re.sub(r"[^A-Za-z0-9]", "", bunky[0]))
+        rec = podle_typu.get(typ)
+        if rec is None:
+            nevyresene.append({"soubor": "monsters.json", "kind": "skill",
+                               "nazev": bunky[0], "duvod": "monstrum neni v tabulce §3.1"})
+            continue
+        rec["skills"] = parsuj_skilly(bunky[1], jmena_skillu)
+        rec["skills_source"] = f"research/06 §3.1 tabulka 'Skills for tier 1'"
+    # 2) Tier >= 2 ma skilly v proze ZA tabulkou (segmenty oddelene '·').
+    # ⚠⚠ Blok NESMI zacinat hned za nadpisem: mezi tabulkou a radkem `Skills:`
+    # stoji jeste nadpis druhe tabulky téhož tieru (`| **Lizardman** |`), ktery
+    # je TAKY `**Jmeno**` — bez tohoto filtru se Lizardmanovi priradily skilly
+    # OrcCaptaina (namEReno). Bere se proto az text od radku `Skills:`.
+    # A hranice NESMI byt `^### ` — vnorene nadpisy `#### Tier N` maji taky 3+
+    # `#`, takze by se do bloku Tier 2 nacetl i text Tier 3.
+    for tier in (2, 3, 4):
+        m = re.search(r"^#### Tier " + str(tier) + r"\b.*?$(.*?)(?=^#{3,} )",
+                      text, re.S | re.M)
+        if not m:
+            raise ValueError(f"{MONSTERS_SRC}: blok 'Tier {tier}' se necte "
+                             f"(hranice prozy se rozbila)")
+        proza = m.group(1).split(MONSTERS_SKILLS_ANCHOR, 1)[-1]
+        for segment in proza.split("·"):
+            casti = segment.split()
+            if not casti:
+                continue
+            typ = monstrum_typ(f"**{casti[0]}**")
+            rec = podle_typu.get(typ) if typ else None
+            if rec is None:
+                continue
+            # Zapisuje se JEN neprazdny vysledek: segment muze byt i z tabulky
+            # taming (`Drake 84.3 (2)`) nebo z prozy o immunite — kdyby se
+            # zapsal prazdny, PREPSAL by spravne skilly z tabulky Tier 3.
+            skilly = parsuj_skilly(segment, jmena_skillu)
+            if not skilly:
+                continue
+            rec["skills"] = skilly
+            rec["skills_source"] = f"research/06 §3.1 proza za tabulkou Tier {tier}"
+    # 3) fallback pro monstra, ktera proza §3.1 NEVYPISUJE (Scorpion, Harpy,
+    # Wisp, OgreLord…): skilly z `SetSkill(...)` v `.cache/analysis/monsters.tsv`.
+    tsv = skilly_z_tsv(root, jmena_skillu)
+    for rec in zaznamy:
+        if rec.get("skills") or rec["type"] not in tsv:
+            continue
+        rec["skills"] = tsv[rec["type"]]
+        rec["skills_source"] = (f"{MONSTERS_TSV} (extract-monsters.ps1) — proza "
+                                f"§3.1 skilly u tohoto monstra nevypisuje")
+        nevyresene.append({"soubor": "monsters.json", "kind": "skills-fallback",
+                           "nazev": rec["class"],
+                           "duvod": "skilly vzaty z SetSkill v .cache/analysis/monsters.tsv "
+                                    "(proza §3.1 je u tohoto monstra nevypisuje)"})
+    # 4) kdo skilly nema ani po fallbacku, to se NESMI zamlcet
+    for rec in zaznamy:
+        if not rec.get("skills"):
+            nevyresene.append({"soubor": "monsters.json", "kind": "skills",
+                               "nazev": rec["class"],
+                               "duvod": "skilly se z §3.1 ani z " + MONSTERS_TSV + " nacetly"})
+        else:
+            for jmeno, hodnoty in rec["skills"].items():
+                if jmeno.lower().replace(" ", "") not in jmena_skillu:
+                    nevyresene.append({"soubor": "monsters.json", "kind": "skill",
+                                       "nazev": f"{rec['class']}/{jmeno}",
+                                       "duvod": "skill neni v data/skills.json"})
+        if rec["fame"] is None or rec["karma"] is None:
+            nevyresene.append({"soubor": "monsters.json", "kind": "fame/karma",
+                               "nazev": rec["class"], "duvod": "fame nebo karma se necte"})
+        if rec["loot_pack"] is None and rec["loot_raw"]:
+            nevyresene.append({"soubor": "monsters.json", "kind": "loot",
+                               "nazev": f"{rec['class']}: {rec['loot_raw']}",
+                               "duvod": "loot pack neni v LOOT_PACK_NAZVY"})
+    # 5b) `loot` pro `check-content` (`REQUIRED_FIELDS`, docs/04 §4.5) — kostky
+    # zlata z `LootPack.cs`, overene ctenim zdroje. Pre-AoS `Old*` (docs/05 §5.16).
+    nevyresene.extend(over_loot_pack(root))
+    for rec in zaznamy:
+        pack = rec["loot_pack"]
+        if pack is None:
+            continue
+        if pack in LOOT_GOLD:
+            kostky, radek = LOOT_GOLD[pack]
+            rec["loot"] = {"pack": pack, "gold_dice": kostky,
+                           "gold_source": f"{LOOTPACK_CS}:{radek}",
+                           "era": "pre-aos", "source": rec["loot_source"]}
+        else:
+            # Utility packy (gems, potions, scrolls) zlato NEMAJI.
+            rec["loot"] = {"pack": pack, "gold_dice": None, "era": "pre-aos",
+                           "source": rec["loot_source"],
+                           "note": "utility pack (LootPack.Gems/Potions/…): zlato nema"}
+    # 5) flagy z prozy §3.5 (undead / poison hit) — s ODKAZEM na odstavec,
+    # ktery to tvrdi. Kdo si hodnotu overuje, ma ji odkud precist.
+    for rec in zaznamy:
+        if rec["type"] in UNDEAD:
+            rec["flags"].append("undead")
+            rec["flags_source"] = ("research/06 §3.5 (proza 'Undead flag': Skeleton, "
+                                   "Zombie, Ghoul, Lich, BoneMagi, Wraith, Spectre, "
+                                   "Mummy, Shade, SkeletalKnight)")
+        if rec["type"] in POISON_HIT:
+            rec["flags"].append("poisonous")
+            rec["hit_poison"] = POISON_HIT[rec["type"]]
+            rec["hit_poison_source"] = ("research/06 §3.5 (proza 'Poisoning (HitPoison)': "
+                                        "Slime/Snake Lesser, GiantSpider Regular, "
+                                        "Scorpion/GiantSerpent Greater, DreadSpider Lethal)")
+    if not UNDEAD or not POISON_HIT:
+        nevyresene.append({"soubor": "monsters.json", "kind": "flags", "nazev": "undead/poison",
+                           "duvod": "tabulka flagu je prazdna - flagy by chybely vsem"})
+    # 5) animace: cisla z `anim.py` (overeny zdroj), s uvedenim radku enumerace
+    skupiny = anim_groups()
+    radky_a = {"high": {"walk": 1696, "attack": 1700, "die": 1698},
+               "low": {"walk": 1763, "attack": 1768, "die": 1771}}
+    zdroj_enum = "_src/classicuo/src/ClassicUO.Assets/AnimationsLoader.cs"
+    for rec in zaznamy:
+        cisla = skupiny[rec["anim_group"]]
+        rec["anim"] = {"walk": cisla["walk"], "attack": cisla["attack"], "die": cisla["die"]}
+        rec["anim_source"] = (
+            f"{zdroj_enum}:{min(radky_a[rec['anim_group']].values())}-"
+            f"{max(radky_a[rec['anim_group']].values())} "
+            f"({'High' if rec['anim_group'] == 'high' else 'Low'}AnimationGroup) "
+            f"+ {ANIM_PY}:ABSTRACT_GROUPS")
+    zaznamy.sort(key=lambda r: r["type"])
+    return zaznamy, nevyresene
+
+
+def gen_monsters(root: Path) -> tuple[bytes, list[dict]]:
+    """Vraci (bajty `data/monsters.json`, seznam nevyresenych veci)."""
+    zaznamy, nevyresene = parsuj_monstra(root)
+    return bajty(zaznamy), nevyresene
+
+
+# =============================================================================
+# spawns.json — spawn tabulky (granule data.spawns, CONTRACT-M5 §3.5)
+# =============================================================================
+# ROZSAH M5 (rozhodnuti D2 v `PLAN-NPC-A-SOUBOJ-2026-10-08.md:178`): JEDNA
+# tabulka — hrbitov u Britainu, monstra skeleton/zombie/rat. Souradnice jsou
+# STRED HRBITOVA, ne "prvni tabulka, ktera se nasla":
+#   * `docs/04 §4.6.7` (prodleva 5-10 min, refill `max((max-spawned)/3, 1)`),
+#   * `research/06` §4.4/§4.8 F (Hrbitov: Skeleton 30, Zombie 24, ... respawn 6-12 min;
+#     v M5 se berou tri monstra z D2, proto `monsters` obsahuje prave je),
+#   * `research/06`:4362/4692 — Britain Graveyard je region `1333,1441 82x82`.
+# Souradnice stredu regionu je odvozena z 82x82 boxu a je oznacena
+# `position_source`, aby bylo videt, ze neni z `Spawns/felucca.xml`.
+SPAWNS_SRC = "docs/04 §4.6.7 + research/06 §4.8 F (hřbitov; region 1333,1441 82x82)"
+SPAWNS_SOURCE = SPAWNS_SRC
+SPAWN_GRAVEYARD = {
+    "id": "graveyard_britain",
+    "region": "Britain Graveyard",
+    "x": 1374, "y": 1482, "z": 0, "radius": 6,
+    "max": 3,
+    "delay_ms": [300000, 600000],
+    "refill": "max((max - spawned) / 3, 1)",
+    "monsters": ["skeleton", "zombie", "rat"],
+    "monster_source": "rozhodnuti D2 (PLAN-NPC-A-SOUBOJ-2026-10-08.md:178) — "
+                      "skeleton/zombie/rat; vaha dle research/06 §4.8 F "
+                      "(Skeleton 30, Zombie 24, Rat z téhož hřbitova)",
+    "weights": {"skeleton": 30, "zombie": 24, "rat": 18},
+    "delay_source": "docs/04 §4.6.7 (prodleva 5-10 min; Spawner.cs:41, SpawnEntry.cs:536)",
+    "position_source": "research/06:4362,4692 — region Britain Graveyard "
+                       "1333,1441 82x82; střed regionu (1374,1482). "
+                       "NENÍ z `Spawns/felucca.xml` (to je M7)",
+    "source": SPAWNS_SOURCE,
+}
+
+
+def gen_spawns(root: Path) -> tuple[bytes, list[dict]]:
+    """Vraci (bajty `data/spawns.json`, seznam nevyresenych veci)."""
+    nevyresene: list[dict] = []
+    # Monstra musi opravdu existovat v `data/monsters.json` - jinak spawn
+    # odkazuje na monstrum, ktere hra nezna (a `check-content` to nezmeri).
+    cesta = root / "data/monsters.json"
+    if not cesta.exists():
+        raise ValueError("data/monsters.json chybi - spust `--only monsters` "
+                         "(spawn tabulka se musi overit proti datum monster)")
+    typy = {r["type"] for r in json.loads(cesta.read_text(encoding="utf-8"))}
+    for typ in SPAWN_GRAVEYARD["monsters"]:
+        if typ not in typy:
+            nevyresene.append({"soubor": "spawns.json", "kind": "monster", "nazev": typ,
+                               "duvod": "monstrum neni v data/monsters.json"})
+    if not SPAWN_GRAVEYARD["monsters"]:
+        raise ValueError("spawns.json: zadna monstra v tabulce")
+    data = {
+        "config": {
+            "tick_ms": 10000,
+            "refill_rule": "max((max - spawned) / 3, 1)",
+            "no_spawn_in_town": True,
+            "source": SPAWNS_SOURCE,
+        },
+        "points": [SPAWN_GRAVEYARD],
+    }
+    return bajty(data), nevyresene
+
+
+# =============================================================================
 # rozdeleni prace: generatory, report, zapis
 # =============================================================================
 GENERATORY = {"items.json": gen_items, "recipes.json": gen_recipes,
-              "skills.json": gen_skills, "vendors.json": gen_vendors}
+              "skills.json": gen_skills, "vendors.json": gen_vendors,
+              "weapons.json": gen_weapons, "armor.json": gen_armor,
+              "item_properties.json": gen_item_properties,
+              "monsters.json": gen_monsters, "spawns.json": gen_spawns}
 
 
 def bajty(json_obj) -> bytes:

@@ -115,10 +115,15 @@ var _pravy_minule: bool = false
 var _seq: int = 0
 var _iso
 var _krok_ms: Dictionary = {}       # nazev akce -> cas posledniho VYDANEHO kroku
+# M5 (2026-10-10): `sim.entity_registry` pro UTOCENI MYSI (`area_mobile`).
+# Vstup ho dostava od `app/main` (jedina instance registru je ve `SimWorld`) -
+# kdyz ho nema, klik na svet proste nic neposle (`area_mobile` vraci 0).
+var _registry = null
 
 
-func _init(binding_table: Dictionary = {}) -> void:
+func _init(binding_table: Dictionary = {}, registry = null) -> void:
 	bindings = binding_table
+	_registry = registry
 	_iso = Iso.new()
 
 
@@ -333,6 +338,52 @@ func interact_command(screen: Vector2, camera_offset: Vector2, z: int = 0) -> Di
 		"target": {"kind": "tile", "x": tile.x, "y": tile.y, "z": z}}
 
 
+# -- UTOCENI MYSI (M5, 2026-10-10) -----------------------------------------
+#
+# PROC: do M5 se `attack` nedal poslat VUBEC - `app/input_map` znal jen krok,
+# interakci a klavesy a `sim.combat` v `sim.systems` nebyl, takze hrac dostal
+# "Not available yet". Tenhle blok je JEDINO misto, kde se levy klik preklada
+# na `Command{t:"attack", serial}`:
+#   * klik na dlazdici s NEPRATELSKYM mobilem = utok (`area_mobile`),
+#   * klik na prazdnou dlazdici = `{}` (ZADNY prikaz) - neni to klik-to-move;
+#     ten patri `sim.pathfind` a je jina vec,
+#   * `registry` je `sim.entity_registry` (jedine misto, kde se mobil hleda
+#     podle serialu) - dostava ho `_init`, aby vstup nevlastnil druhy seznam.
+
+func area_mobile(tile: Vector2i, player: int = 0) -> int:
+	# Nejnizsi serial NEPRATELSKEHO mobila na dlazdici (`0` = nikdo). Hleda se
+	# podle poradi serialu, aby volba nezavisela na poradi v registru.
+	if _registry == null or not _registry.has_method("all"):
+		return 0
+	var kandidati: Array = []
+	for mob in _registry.all():
+		if int(mob.serial) == int(player):
+			continue
+		if int(mob.pos.x) != int(tile.x) or int(mob.pos.y) != int(tile.y):
+			continue
+		if int(mob.hp) <= 0:
+			continue
+		if str(mob.ai.get("state", "")) == "vendor":
+			continue
+		kandidati.append(int(mob.serial))
+	if kandidati.is_empty():
+		return 0
+	kandidati.sort()
+	return int(kandidati[0])
+
+
+func attack_command(player: Vector2i, screen: Vector2, camera_offset: Vector2,
+		z: int = 0) -> Dictionary:
+	# Klik mysi na svet -> utok, kdyz je tam nepritel. Jinak prazdny slovnik
+	# (zadny prikaz, zadny krok) - "nic tu neni" neni chyba vstupu.
+	var world: Vector2 = _na_svet(screen, camera_offset)
+	var tile: Vector2i = _iso.to_tile(world.x, world.y, z)
+	var cil: int = area_mobile(tile, 0)
+	if cil <= 0:
+		return {}
+	return {"t": "attack", "serial": cil}
+
+
 func is_over_gui(screen: Vector2) -> bool:
 	# Je kurzor v CERNEM PASU s GUI (zurnal vpravo, stavovy pruh dole)? Tam se
 	# svet nekresli, takze interakce by sahala na dlazdici POD panelem.
@@ -430,6 +481,19 @@ func poll(player: Vector2i, camera_offset: Vector2, z: int = 0,
 			# V cernem pasu GUI se nespousti: tam svet neni, jen urnal.
 			if Input.is_action_just_pressed(input_action) and not is_over_gui(mouse_position):
 				out.append(interact_command(mouse_position, camera_offset, z))
+			continue
+		if str(action) == "attack":
+			# UTOCENI MYSI (M5): jedno zmacknuti leveho tlacitka = utok na
+			# nepritele pod kurzorem. NEOPAKUJE SE pri drzeni (drzene tlacitko
+			# by poslalo desitky prikazu za sekundu; opakovani swingů ridi
+			# `sim.combat` svym `due_ms`). V cernem pasu GUI se nespousti -
+			# tam svet neni, jen zurnal.
+			if Input.is_action_just_pressed(input_action) \
+					and not is_over_gui(mouse_position):
+				var utok: Dictionary = attack_command(player, mouse_position,
+					camera_offset, z)
+				if not utok.is_empty():
+					out.append(utok)
 			continue
 		if str(action) == "walk_to":
 			# DRZENE PRAVE TLACITKO = chuze kursoru (ClassicUO

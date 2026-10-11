@@ -1,0 +1,10 @@
+[
+  {"category": "material", "count": 1, "era": "t2a", "flags": 67110913,
+   "layer": 0, "name": "gold coin", "role": "gold coin",
+   "tile": 3821, "type": "gold_coin", "value": 1, "weight": 0,
+   "source": "tests/fixtures/m5/items.json (fixture; kopie zaznamu z data/items.json)"},
+  {"category": "instrument", "count": 1, "era": "pre-aos", "layer": 0,
+   "name": "a drum", "role": "instrument", "tile": 3740, "type": "drum",
+   "value": 25, "weight": 3,
+   "source": "tests/fixtures/m5/items.json (fixture)"}
+]

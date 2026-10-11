@@ -1,0 +1,4252 @@
+[
+ {
+  "enum": "AosAttribute.DefendChance",
+  "id": 1,
+  "max": 15,
+  "min": 1,
+  "name": "DefendChance",
+  "range": [
+   1,
+   15
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Armor": {
+    "max": 5,
+    "scale": null
+   },
+   "Hat": {
+    "max": 5,
+    "scale": null
+   },
+   "Jewel": {
+    "max": 15,
+    "scale": null
+   },
+   "Melee": {
+    "max": 15,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 25,
+    "scale": null
+   },
+   "Shield": {
+    "max": 15,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 110
+ },
+ {
+  "enum": "AosAttribute.AttackChance",
+  "id": 2,
+  "max": 15,
+  "min": 1,
+  "name": "AttackChance",
+  "range": [
+   1,
+   15
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Armor": {
+    "max": 5,
+    "scale": null
+   },
+   "Hat": {
+    "max": 5,
+    "scale": null
+   },
+   "Jewel": {
+    "max": 15,
+    "scale": null
+   },
+   "Melee": {
+    "max": 15,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 25,
+    "scale": null
+   },
+   "Shield": {
+    "max": 15,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 130
+ },
+ {
+  "enum": "AosAttribute.RegenHits",
+  "id": 3,
+  "max": 2,
+  "min": 1,
+  "name": "RegenHits",
+  "range": [
+   1,
+   2
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Armor": {
+    "max": 2,
+    "scale": null
+   },
+   "Hat": {
+    "max": 2,
+    "scale": null
+   },
+   "Melee": {
+    "max": 0,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 0,
+    "scale": null
+   },
+   "Shield": {
+    "max": 2,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 100
+ },
+ {
+  "enum": "AosAttribute.RegenStam",
+  "id": 4,
+  "max": 3,
+  "min": 1,
+  "name": "RegenStam",
+  "range": [
+   1,
+   3
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Armor": {
+    "max": 3,
+    "scale": null
+   },
+   "Hat": {
+    "max": 3,
+    "scale": null
+   },
+   "Melee": {
+    "max": 0,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 0,
+    "scale": null
+   },
+   "Shield": {
+    "max": 3,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 100
+ },
+ {
+  "enum": "AosAttribute.RegenMana",
+  "id": 5,
+  "max": 2,
+  "min": 1,
+  "name": "RegenMana",
+  "range": [
+   1,
+   2
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Armor": {
+    "max": 2,
+    "scale": null
+   },
+   "Hat": {
+    "max": 2,
+    "scale": null
+   },
+   "Jewel": {
+    "max": 2,
+    "scale": null
+   },
+   "Melee": {
+    "max": 0,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 0,
+    "scale": null
+   },
+   "Shield": {
+    "max": 2,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 100
+ },
+ {
+  "enum": "AosAttribute.BonusStr",
+  "id": 6,
+  "max": 8,
+  "min": 1,
+  "name": "BonusStr",
+  "range": [
+   1,
+   8
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Armor": {
+    "max": 5,
+    "scale": null
+   },
+   "Hat": {
+    "max": 5,
+    "scale": null
+   },
+   "Jewel": {
+    "max": 8,
+    "scale": null
+   },
+   "Melee": {
+    "max": 5,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 5,
+    "scale": null
+   },
+   "Shield": {
+    "max": 5,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 110
+ },
+ {
+  "enum": "AosAttribute.BonusDex",
+  "id": 7,
+  "max": 8,
+  "min": 1,
+  "name": "BonusDex",
+  "range": [
+   1,
+   8
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Armor": {
+    "max": 5,
+    "scale": null
+   },
+   "Hat": {
+    "max": 5,
+    "scale": null
+   },
+   "Jewel": {
+    "max": 8,
+    "scale": null
+   },
+   "Melee": {
+    "max": 5,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 5,
+    "scale": null
+   },
+   "Shield": {
+    "max": 5,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 110
+ },
+ {
+  "enum": "AosAttribute.BonusInt",
+  "id": 8,
+  "max": 8,
+  "min": 1,
+  "name": "BonusInt",
+  "range": [
+   1,
+   8
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Armor": {
+    "max": 5,
+    "scale": null
+   },
+   "Hat": {
+    "max": 5,
+    "scale": null
+   },
+   "Jewel": {
+    "max": 8,
+    "scale": null
+   },
+   "Melee": {
+    "max": 5,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 5,
+    "scale": null
+   },
+   "Shield": {
+    "max": 5,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 110
+ },
+ {
+  "enum": "AosAttribute.BonusHits",
+  "id": 9,
+  "max": 5,
+  "min": 1,
+  "name": "BonusHits",
+  "range": [
+   1,
+   5
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Armor": {
+    "max": 5,
+    "scale": null
+   },
+   "Hat": {
+    "max": 5,
+    "scale": null
+   },
+   "Melee": {
+    "max": 5,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 5,
+    "scale": null
+   },
+   "Shield": {
+    "max": 5,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 110
+ },
+ {
+  "enum": "AosAttribute.BonusStam",
+  "id": 10,
+  "max": 8,
+  "min": 1,
+  "name": "BonusStam",
+  "range": [
+   1,
+   8
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Armor": {
+    "max": 8,
+    "scale": null
+   },
+   "Hat": {
+    "max": 8,
+    "scale": null
+   },
+   "Jewel": {
+    "max": 5,
+    "scale": null
+   },
+   "Melee": {
+    "max": 5,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 5,
+    "scale": null
+   },
+   "Shield": {
+    "max": 5,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 110
+ },
+ {
+  "enum": "AosAttribute.BonusMana",
+  "id": 11,
+  "max": 8,
+  "min": 1,
+  "name": "BonusMana",
+  "range": [
+   1,
+   8
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Armor": {
+    "max": 8,
+    "scale": null
+   },
+   "Hat": {
+    "max": 8,
+    "scale": null
+   },
+   "Jewel": {
+    "max": 5,
+    "scale": null
+   },
+   "Melee": {
+    "max": 5,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 5,
+    "scale": null
+   },
+   "Shield": {
+    "max": 5,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 110
+ },
+ {
+  "enum": "AosAttribute.WeaponDamage",
+  "id": 12,
+  "max": 50,
+  "min": 1,
+  "name": "WeaponDamage",
+  "range": [
+   1,
+   50
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Jewel": {
+    "max": 25,
+    "scale": null
+   },
+   "Melee": {
+    "max": 50,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 50,
+    "scale": null
+   },
+   "Shield": {
+    "max": 35,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 100
+ },
+ {
+  "enum": "AosAttribute.WeaponSpeed",
+  "id": 13,
+  "max": 30,
+  "min": 5,
+  "name": "WeaponSpeed",
+  "range": [
+   5,
+   30
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Jewel": {
+    "max": 5,
+    "scale": null
+   },
+   "Melee": {
+    "max": 30,
+    "scale": null
+   },
+   "Shield": {
+    "max": 5,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 110
+ },
+ {
+  "enum": "AosAttribute.SpellDamage",
+  "id": 14,
+  "max": 12,
+  "min": 1,
+  "name": "SpellDamage",
+  "range": [
+   1,
+   12
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Jewel": {
+    "max": 12,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 100
+ },
+ {
+  "enum": "AosAttribute.CastRecovery",
+  "id": 15,
+  "max": 3,
+  "min": 1,
+  "name": "CastRecovery",
+  "range": [
+   1,
+   3
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Jewel": {
+    "max": 3,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 120
+ },
+ {
+  "enum": "AosAttribute.CastSpeed",
+  "id": 16,
+  "max": 1,
+  "min": 1,
+  "name": "CastSpeed",
+  "range": [
+   1,
+   1
+  ],
+  "scale": false,
+  "scales": false,
+  "scope": {
+   "Jewel": {
+    "max": 1,
+    "scale": null
+   },
+   "Melee": {
+    "max": 1,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 1,
+    "scale": null
+   },
+   "Shield": {
+    "max": 1,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 140
+ },
+ {
+  "enum": "AosAttribute.LowerManaCost",
+  "id": 17,
+  "max": 8,
+  "min": 1,
+  "name": "LowerManaCost",
+  "range": [
+   1,
+   8
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Armor": {
+    "max": 8,
+    "scale": null
+   },
+   "Hat": {
+    "max": 8,
+    "scale": null
+   },
+   "Jewel": {
+    "max": 8,
+    "scale": null
+   },
+   "Melee": {
+    "max": 5,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 5,
+    "scale": null
+   },
+   "Shield": {
+    "max": 5,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 110
+ },
+ {
+  "enum": "AosAttribute.LowerRegCost",
+  "id": 18,
+  "max": 20,
+  "min": 1,
+  "name": "LowerRegCost",
+  "range": [
+   1,
+   20
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Armor": {
+    "max": 20,
+    "scale": null
+   },
+   "Hat": {
+    "max": 20,
+    "scale": null
+   },
+   "Jewel": {
+    "max": 20,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 100
+ },
+ {
+  "enum": "AosAttribute.ReflectPhysical",
+  "id": 19,
+  "max": 15,
+  "min": 1,
+  "name": "ReflectPhysical",
+  "range": [
+   1,
+   15
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Armor": {
+    "max": 15,
+    "scale": null
+   },
+   "Hat": {
+    "max": 15,
+    "scale": null
+   },
+   "Melee": {
+    "max": 15,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 15,
+    "scale": null
+   },
+   "Shield": {
+    "max": 15,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 100
+ },
+ {
+  "enum": "AosAttribute.EnhancePotions",
+  "id": 20,
+  "max": 25,
+  "min": 5,
+  "name": "EnhancePotions",
+  "range": [
+   5,
+   25
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Armor": {
+    "max": 5,
+    "scale": null
+   },
+   "Hat": {
+    "max": 5,
+    "scale": null
+   },
+   "Jewel": {
+    "max": 25,
+    "scale": null
+   },
+   "Melee": {
+    "max": 15,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 15,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 100
+ },
+ {
+  "enum": "AosAttribute.Luck",
+  "id": 21,
+  "max": 100,
+  "min": 10,
+  "name": "Luck",
+  "range": [
+   10,
+   100
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Armor": {
+    "max": 100,
+    "scale": null
+   },
+   "Hat": {
+    "max": 100,
+    "scale": null
+   },
+   "Jewel": {
+    "max": 100,
+    "scale": null
+   },
+   "Melee": {
+    "max": 100,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 120,
+    "scale": null
+   },
+   "Shield": {
+    "max": 100,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 100
+ },
+ {
+  "enum": "AosAttribute.SpellChanneling",
+  "id": 22,
+  "max": 1,
+  "min": 1,
+  "name": "SpellChanneling",
+  "range": [
+   1,
+   1
+  ],
+  "scale": false,
+  "scales": false,
+  "scope": {
+   "Melee": {
+    "max": 1,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 1,
+    "scale": null
+   },
+   "Shield": {
+    "max": 1,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 100
+ },
+ {
+  "enum": "AosAttribute.NightSight",
+  "id": 23,
+  "max": 1,
+  "min": 1,
+  "name": "NightSight",
+  "range": [
+   1,
+   1
+  ],
+  "scale": false,
+  "scales": false,
+  "scope": {
+   "Armor": {
+    "max": 1,
+    "scale": null
+   },
+   "Hat": {
+    "max": 1,
+    "scale": null
+   },
+   "Jewel": {
+    "max": 1,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 50
+ },
+ {
+  "enum": "AosWeaponAttribute.HitLeechHits",
+  "id": 25,
+  "max": 50,
+  "min": 2,
+  "name": "HitLeechHits",
+  "range": [
+   2,
+   50
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Melee": {
+    "max": 50,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 50,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 110
+ },
+ {
+  "enum": "AosWeaponAttribute.HitLeechStam",
+  "id": 26,
+  "max": 50,
+  "min": 2,
+  "name": "HitLeechStam",
+  "range": [
+   2,
+   50
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Melee": {
+    "max": 50,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 50,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 100
+ },
+ {
+  "enum": "AosWeaponAttribute.HitLeechMana",
+  "id": 27,
+  "max": 50,
+  "min": 2,
+  "name": "HitLeechMana",
+  "range": [
+   2,
+   50
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Melee": {
+    "max": 50,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 50,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 110
+ },
+ {
+  "enum": "AosWeaponAttribute.HitLowerAttack",
+  "id": 28,
+  "max": 50,
+  "min": 2,
+  "name": "HitLowerAttack",
+  "range": [
+   2,
+   50
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Melee": {
+    "max": 50,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 50,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 110
+ },
+ {
+  "enum": "AosWeaponAttribute.HitLowerDefend",
+  "id": 29,
+  "max": 50,
+  "min": 2,
+  "name": "HitLowerDefend",
+  "range": [
+   2,
+   50
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Melee": {
+    "max": 50,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 50,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 130
+ },
+ {
+  "enum": "AosWeaponAttribute.HitPhysicalArea",
+  "id": 30,
+  "max": 50,
+  "min": 2,
+  "name": "HitPhysicalArea",
+  "range": [
+   2,
+   50
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Melee": {
+    "max": 50,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 50,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 100
+ },
+ {
+  "enum": "AosWeaponAttribute.HitFireArea",
+  "id": 31,
+  "max": 50,
+  "min": 2,
+  "name": "HitFireArea",
+  "range": [
+   2,
+   50
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Melee": {
+    "max": 50,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 50,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 100
+ },
+ {
+  "enum": "AosWeaponAttribute.HitColdArea",
+  "id": 32,
+  "max": 50,
+  "min": 2,
+  "name": "HitColdArea",
+  "range": [
+   2,
+   50
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Melee": {
+    "max": 50,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 50,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 100
+ },
+ {
+  "enum": "AosWeaponAttribute.HitPoisonArea",
+  "id": 33,
+  "max": 50,
+  "min": 2,
+  "name": "HitPoisonArea",
+  "range": [
+   2,
+   50
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Melee": {
+    "max": 50,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 50,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 100
+ },
+ {
+  "enum": "AosWeaponAttribute.HitEnergyArea",
+  "id": 34,
+  "max": 50,
+  "min": 2,
+  "name": "HitEnergyArea",
+  "range": [
+   2,
+   50
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Melee": {
+    "max": 50,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 50,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 100
+ },
+ {
+  "enum": "AosWeaponAttribute.HitMagicArrow",
+  "id": 35,
+  "max": 50,
+  "min": 2,
+  "name": "HitMagicArrow",
+  "range": [
+   2,
+   50
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Melee": {
+    "max": 50,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 50,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 120
+ },
+ {
+  "enum": "AosWeaponAttribute.HitHarm",
+  "id": 36,
+  "max": 50,
+  "min": 2,
+  "name": "HitHarm",
+  "range": [
+   2,
+   50
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Melee": {
+    "max": 50,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 50,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 110
+ },
+ {
+  "enum": "AosWeaponAttribute.HitFireball",
+  "id": 37,
+  "max": 50,
+  "min": 2,
+  "name": "HitFireball",
+  "range": [
+   2,
+   50
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Melee": {
+    "max": 50,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 50,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 140
+ },
+ {
+  "enum": "AosWeaponAttribute.HitLightning",
+  "id": 38,
+  "max": 50,
+  "min": 2,
+  "name": "HitLightning",
+  "range": [
+   2,
+   50
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Melee": {
+    "max": 50,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 50,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 140
+ },
+ {
+  "enum": "AosWeaponAttribute.HitDispel",
+  "id": 39,
+  "max": 50,
+  "min": 2,
+  "name": "HitDispel",
+  "range": [
+   2,
+   50
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Melee": {
+    "max": 50,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 50,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 100
+ },
+ {
+  "enum": "AosWeaponAttribute.UseBestSkill",
+  "id": 40,
+  "max": 1,
+  "min": 1,
+  "name": "UseBestSkill",
+  "range": [
+   1,
+   1
+  ],
+  "scale": false,
+  "scales": false,
+  "scope": {
+   "Melee": {
+    "max": 1,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 150
+ },
+ {
+  "enum": "AosWeaponAttribute.MageWeapon",
+  "id": 41,
+  "max": 10,
+  "min": 1,
+  "name": "MageWeapon",
+  "range": [
+   1,
+   10
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Melee": {
+    "max": 10,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 10,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 100
+ },
+ {
+  "enum": "AosWeaponAttribute.DurabilityBonus",
+  "id": 42,
+  "max": 100,
+  "min": 10,
+  "name": "DurabilityBonus",
+  "range": [
+   10,
+   100
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Melee": {
+    "max": 100,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 100,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 100
+ },
+ {
+  "enum": "AosArmorAttribute.DurabilityBonus",
+  "id": 43,
+  "max": 100,
+  "min": 10,
+  "name": "DurabilityBonus",
+  "range": [
+   10,
+   100
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Armor": {
+    "max": 100,
+    "scale": null
+   },
+   "Hat": {
+    "max": 100,
+    "scale": null
+   },
+   "Shield": {
+    "max": 100,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 100
+ },
+ {
+  "enum": "AosWeaponAttribute.LowerStatReq",
+  "id": 44,
+  "max": 100,
+  "min": 10,
+  "name": "LowerStatReq",
+  "range": [
+   10,
+   100
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Melee": {
+    "max": 100,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 100,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 100
+ },
+ {
+  "enum": "AosArmorAttribute.LowerStatReq",
+  "id": 45,
+  "max": 100,
+  "min": 10,
+  "name": "LowerStatReq",
+  "range": [
+   10,
+   100
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Armor": {
+    "max": 100,
+    "scale": null
+   },
+   "Hat": {
+    "max": 100,
+    "scale": null
+   },
+   "Shield": {
+    "max": 100,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 100
+ },
+ {
+  "enum": "AosArmorAttribute.MageArmor",
+  "id": 49,
+  "max": 1,
+  "min": 1,
+  "name": "MageArmor",
+  "range": [
+   1,
+   1
+  ],
+  "scale": false,
+  "scales": false,
+  "scope": {
+   "Armor": {
+    "max": 1,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 0
+ },
+ {
+  "enum": "AosElementAttribute.Physical",
+  "id": 51,
+  "max": 15,
+  "min": 1,
+  "name": "Physical",
+  "range": [
+   1,
+   15
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Armor": {
+    "max": 15,
+    "scale": null
+   },
+   "Hat": {
+    "max": 15,
+    "scale": null
+   },
+   "Jewel": {
+    "max": 15,
+    "scale": null
+   },
+   "Melee": {
+    "max": 100,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 100,
+    "scale": null
+   },
+   "Shield": {
+    "max": 15,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 100
+ },
+ {
+  "enum": "AosElementAttribute.Fire",
+  "id": 52,
+  "max": 15,
+  "min": 1,
+  "name": "Fire",
+  "range": [
+   1,
+   15
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Armor": {
+    "max": 15,
+    "scale": null
+   },
+   "Hat": {
+    "max": 15,
+    "scale": null
+   },
+   "Jewel": {
+    "max": 15,
+    "scale": null
+   },
+   "Melee": {
+    "max": 100,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 100,
+    "scale": null
+   },
+   "Shield": {
+    "max": 15,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 100
+ },
+ {
+  "enum": "AosElementAttribute.Cold",
+  "id": 53,
+  "max": 15,
+  "min": 1,
+  "name": "Cold",
+  "range": [
+   1,
+   15
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Armor": {
+    "max": 15,
+    "scale": null
+   },
+   "Hat": {
+    "max": 15,
+    "scale": null
+   },
+   "Jewel": {
+    "max": 15,
+    "scale": null
+   },
+   "Melee": {
+    "max": 100,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 100,
+    "scale": null
+   },
+   "Shield": {
+    "max": 15,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 100
+ },
+ {
+  "enum": "AosElementAttribute.Poison",
+  "id": 54,
+  "max": 15,
+  "min": 1,
+  "name": "Poison",
+  "range": [
+   1,
+   15
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Armor": {
+    "max": 15,
+    "scale": null
+   },
+   "Hat": {
+    "max": 15,
+    "scale": null
+   },
+   "Jewel": {
+    "max": 15,
+    "scale": null
+   },
+   "Melee": {
+    "max": 100,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 100,
+    "scale": null
+   },
+   "Shield": {
+    "max": 15,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 100
+ },
+ {
+  "enum": "AosElementAttribute.Energy",
+  "id": 55,
+  "max": 15,
+  "min": 1,
+  "name": "Energy",
+  "range": [
+   1,
+   15
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Armor": {
+    "max": 15,
+    "scale": null
+   },
+   "Hat": {
+    "max": 15,
+    "scale": null
+   },
+   "Jewel": {
+    "max": 15,
+    "scale": null
+   },
+   "Melee": {
+    "max": 100,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 100,
+    "scale": null
+   },
+   "Shield": {
+    "max": 15,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 100
+ },
+ {
+  "enum": "\"WeaponVelocity\"",
+  "id": 60,
+  "max": 50,
+  "min": 2,
+  "name": "\"WeaponVelocity\"",
+  "range": [
+   2,
+   50
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Melee": {
+    "max": 50,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 50,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 130
+ },
+ {
+  "enum": "AosAttribute.BalancedWeapon",
+  "id": 61,
+  "max": 1,
+  "min": 1,
+  "name": "BalancedWeapon",
+  "range": [
+   1,
+   1
+  ],
+  "scale": false,
+  "scales": false,
+  "scope": {
+   "Melee": {
+    "max": 1,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 1,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 150
+ },
+ {
+  "enum": "\"SearingWeapon\"",
+  "id": 62,
+  "max": 1,
+  "min": 1,
+  "name": "\"SearingWeapon\"",
+  "range": [
+   1,
+   1
+  ],
+  "scale": false,
+  "scales": false,
+  "scope": {},
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 150
+ },
+ {
+  "enum": "SlayerName.OrcSlaying",
+  "id": 101,
+  "max": 1,
+  "min": 1,
+  "name": "OrcSlaying",
+  "range": [
+   1,
+   1
+  ],
+  "scale": false,
+  "scales": false,
+  "scope": {
+   "Melee": {
+    "max": 1,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 1,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 100
+ },
+ {
+  "enum": "SlayerName.TrollSlaughter",
+  "id": 102,
+  "max": 1,
+  "min": 1,
+  "name": "TrollSlaughter",
+  "range": [
+   1,
+   1
+  ],
+  "scale": false,
+  "scales": false,
+  "scope": {
+   "Melee": {
+    "max": 1,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 1,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 100
+ },
+ {
+  "enum": "SlayerName.OgreTrashing",
+  "id": 103,
+  "max": 1,
+  "min": 1,
+  "name": "OgreTrashing",
+  "range": [
+   1,
+   1
+  ],
+  "scale": false,
+  "scales": false,
+  "scope": {
+   "Melee": {
+    "max": 1,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 1,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 100
+ },
+ {
+  "enum": "SlayerName.DragonSlaying",
+  "id": 104,
+  "max": 1,
+  "min": 1,
+  "name": "DragonSlaying",
+  "range": [
+   1,
+   1
+  ],
+  "scale": false,
+  "scales": false,
+  "scope": {
+   "Melee": {
+    "max": 1,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 1,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 100
+ },
+ {
+  "enum": "SlayerName.Terathan",
+  "id": 105,
+  "max": 1,
+  "min": 1,
+  "name": "Terathan",
+  "range": [
+   1,
+   1
+  ],
+  "scale": false,
+  "scales": false,
+  "scope": {
+   "Melee": {
+    "max": 1,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 1,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 100
+ },
+ {
+  "enum": "SlayerName.SnakesBane",
+  "id": 106,
+  "max": 1,
+  "min": 1,
+  "name": "SnakesBane",
+  "range": [
+   1,
+   1
+  ],
+  "scale": false,
+  "scales": false,
+  "scope": {
+   "Melee": {
+    "max": 1,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 1,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 100
+ },
+ {
+  "enum": "SlayerName.LizardmanSlaughter",
+  "id": 107,
+  "max": 1,
+  "min": 1,
+  "name": "LizardmanSlaughter",
+  "range": [
+   1,
+   1
+  ],
+  "scale": false,
+  "scales": false,
+  "scope": {
+   "Melee": {
+    "max": 1,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 1,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 100
+ },
+ {
+  "enum": "SlayerName.GargoylesFoe",
+  "id": 108,
+  "max": 1,
+  "min": 1,
+  "name": "GargoylesFoe",
+  "range": [
+   1,
+   1
+  ],
+  "scale": false,
+  "scales": false,
+  "scope": {
+   "Melee": {
+    "max": 1,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 1,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 100
+ },
+ {
+  "enum": "SlayerName.Ophidian",
+  "id": 111,
+  "max": 1,
+  "min": 1,
+  "name": "Ophidian",
+  "range": [
+   1,
+   1
+  ],
+  "scale": false,
+  "scales": false,
+  "scope": {
+   "Melee": {
+    "max": 1,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 1,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 100
+ },
+ {
+  "enum": "SlayerName.SpidersDeath",
+  "id": 112,
+  "max": 1,
+  "min": 1,
+  "name": "SpidersDeath",
+  "range": [
+   1,
+   1
+  ],
+  "scale": false,
+  "scales": false,
+  "scope": {
+   "Melee": {
+    "max": 1,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 1,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 100
+ },
+ {
+  "enum": "SlayerName.ScorpionsBane",
+  "id": 113,
+  "max": 1,
+  "min": 1,
+  "name": "ScorpionsBane",
+  "range": [
+   1,
+   1
+  ],
+  "scale": false,
+  "scales": false,
+  "scope": {
+   "Melee": {
+    "max": 1,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 1,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 100
+ },
+ {
+  "enum": "SlayerName.FlameDousing",
+  "id": 114,
+  "max": 1,
+  "min": 1,
+  "name": "FlameDousing",
+  "range": [
+   1,
+   1
+  ],
+  "scale": false,
+  "scales": false,
+  "scope": {
+   "Melee": {
+    "max": 1,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 1,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 100
+ },
+ {
+  "enum": "SlayerName.WaterDissipation",
+  "id": 115,
+  "max": 1,
+  "min": 1,
+  "name": "WaterDissipation",
+  "range": [
+   1,
+   1
+  ],
+  "scale": false,
+  "scales": false,
+  "scope": {
+   "Melee": {
+    "max": 1,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 1,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 100
+ },
+ {
+  "enum": "SlayerName.Vacuum",
+  "id": 116,
+  "max": 1,
+  "min": 1,
+  "name": "Vacuum",
+  "range": [
+   1,
+   1
+  ],
+  "scale": false,
+  "scales": false,
+  "scope": {
+   "Melee": {
+    "max": 1,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 1,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 100
+ },
+ {
+  "enum": "SlayerName.ElementalHealth",
+  "id": 117,
+  "max": 1,
+  "min": 1,
+  "name": "ElementalHealth",
+  "range": [
+   1,
+   1
+  ],
+  "scale": false,
+  "scales": false,
+  "scope": {
+   "Melee": {
+    "max": 1,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 1,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 100
+ },
+ {
+  "enum": "SlayerName.EarthShatter",
+  "id": 118,
+  "max": 1,
+  "min": 1,
+  "name": "EarthShatter",
+  "range": [
+   1,
+   1
+  ],
+  "scale": false,
+  "scales": false,
+  "scope": {
+   "Melee": {
+    "max": 1,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 1,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 100
+ },
+ {
+  "enum": "SlayerName.BloodDrinking",
+  "id": 119,
+  "max": 1,
+  "min": 1,
+  "name": "BloodDrinking",
+  "range": [
+   1,
+   1
+  ],
+  "scale": false,
+  "scales": false,
+  "scope": {
+   "Melee": {
+    "max": 1,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 1,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 100
+ },
+ {
+  "enum": "SlayerName.SummerWind",
+  "id": 120,
+  "max": 1,
+  "min": 1,
+  "name": "SummerWind",
+  "range": [
+   1,
+   1
+  ],
+  "scale": false,
+  "scales": false,
+  "scope": {
+   "Melee": {
+    "max": 1,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 1,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 100
+ },
+ {
+  "enum": "SlayerName.Silver",
+  "id": 121,
+  "max": 1,
+  "min": 1,
+  "name": "Silver",
+  "range": [
+   1,
+   1
+  ],
+  "scale": false,
+  "scales": false,
+  "scope": {
+   "Melee": {
+    "max": 1,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 1,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 130
+ },
+ {
+  "enum": "SlayerName.Repond",
+  "id": 122,
+  "max": 1,
+  "min": 1,
+  "name": "Repond",
+  "range": [
+   1,
+   1
+  ],
+  "scale": false,
+  "scales": false,
+  "scope": {
+   "Melee": {
+    "max": 1,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 1,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 130
+ },
+ {
+  "enum": "SlayerName.ReptilianDeath",
+  "id": 123,
+  "max": 1,
+  "min": 1,
+  "name": "ReptilianDeath",
+  "range": [
+   1,
+   1
+  ],
+  "scale": false,
+  "scales": false,
+  "scope": {
+   "Melee": {
+    "max": 1,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 1,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 130
+ },
+ {
+  "enum": "SlayerName.Exorcism",
+  "id": 124,
+  "max": 1,
+  "min": 1,
+  "name": "Exorcism",
+  "range": [
+   1,
+   1
+  ],
+  "scale": false,
+  "scales": false,
+  "scope": {
+   "Melee": {
+    "max": 1,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 1,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 130
+ },
+ {
+  "enum": "SlayerName.ArachnidDoom",
+  "id": 125,
+  "max": 1,
+  "min": 1,
+  "name": "ArachnidDoom",
+  "range": [
+   1,
+   1
+  ],
+  "scale": false,
+  "scales": false,
+  "scope": {
+   "Melee": {
+    "max": 1,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 1,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 130
+ },
+ {
+  "enum": "SlayerName.ElementalBan",
+  "id": 126,
+  "max": 1,
+  "min": 1,
+  "name": "ElementalBan",
+  "range": [
+   1,
+   1
+  ],
+  "scale": false,
+  "scales": false,
+  "scope": {
+   "Melee": {
+    "max": 1,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 1,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 130
+ },
+ {
+  "enum": "SlayerName.Fey",
+  "id": 127,
+  "max": 1,
+  "min": 1,
+  "name": "Fey",
+  "range": [
+   1,
+   1
+  ],
+  "scale": false,
+  "scales": false,
+  "scope": {
+   "Melee": {
+    "max": 1,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 1,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 130
+ },
+ {
+  "enum": "SlayerName.Dinosaur",
+  "id": 128,
+  "max": 1,
+  "min": 1,
+  "name": "Dinosaur",
+  "range": [
+   1,
+   1
+  ],
+  "scale": false,
+  "scales": false,
+  "scope": {},
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 130
+ },
+ {
+  "enum": "SlayerName.Myrmidex",
+  "id": 129,
+  "max": 1,
+  "min": 1,
+  "name": "Myrmidex",
+  "range": [
+   1,
+   1
+  ],
+  "scale": false,
+  "scales": false,
+  "scope": {},
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 130
+ },
+ {
+  "enum": "SlayerName.Eodon",
+  "id": 130,
+  "max": 1,
+  "min": 1,
+  "name": "Eodon",
+  "range": [
+   1,
+   1
+  ],
+  "scale": false,
+  "scales": false,
+  "scope": {},
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 130
+ },
+ {
+  "enum": "SlayerName.EodonTribe",
+  "id": 131,
+  "max": 1,
+  "min": 1,
+  "name": "EodonTribe",
+  "range": [
+   1,
+   1
+  ],
+  "scale": false,
+  "scales": false,
+  "scope": {},
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 130
+ },
+ {
+  "enum": "TalismanSlayerName.Bear",
+  "id": 135,
+  "max": 1,
+  "min": 1,
+  "name": "Bear",
+  "range": [
+   1,
+   1
+  ],
+  "scale": false,
+  "scales": false,
+  "scope": {},
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 130
+ },
+ {
+  "enum": "TalismanSlayerName.Vermin",
+  "id": 136,
+  "max": 1,
+  "min": 1,
+  "name": "Vermin",
+  "range": [
+   1,
+   1
+  ],
+  "scale": false,
+  "scales": false,
+  "scope": {},
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 130
+ },
+ {
+  "enum": "TalismanSlayerName.Bat",
+  "id": 137,
+  "max": 1,
+  "min": 1,
+  "name": "Bat",
+  "range": [
+   1,
+   1
+  ],
+  "scale": false,
+  "scales": false,
+  "scope": {},
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 130
+ },
+ {
+  "enum": "TalismanSlayerName.Mage",
+  "id": 138,
+  "max": 1,
+  "min": 1,
+  "name": "Mage",
+  "range": [
+   1,
+   1
+  ],
+  "scale": false,
+  "scales": false,
+  "scope": {},
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 130
+ },
+ {
+  "enum": "TalismanSlayerName.Beetle",
+  "id": 139,
+  "max": 1,
+  "min": 1,
+  "name": "Beetle",
+  "range": [
+   1,
+   1
+  ],
+  "scale": false,
+  "scales": false,
+  "scope": {},
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 130
+ },
+ {
+  "enum": "TalismanSlayerName.Bird",
+  "id": 140,
+  "max": 1,
+  "min": 1,
+  "name": "Bird",
+  "range": [
+   1,
+   1
+  ],
+  "scale": false,
+  "scales": false,
+  "scope": {},
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 130
+ },
+ {
+  "enum": "TalismanSlayerName.Ice",
+  "id": 141,
+  "max": 1,
+  "min": 1,
+  "name": "Ice",
+  "range": [
+   1,
+   1
+  ],
+  "scale": false,
+  "scales": false,
+  "scope": {},
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 130
+ },
+ {
+  "enum": "TalismanSlayerName.Flame",
+  "id": 142,
+  "max": 1,
+  "min": 1,
+  "name": "Flame",
+  "range": [
+   1,
+   1
+  ],
+  "scale": false,
+  "scales": false,
+  "scope": {},
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 130
+ },
+ {
+  "enum": "TalismanSlayerName.Bovine",
+  "id": 143,
+  "max": 1,
+  "min": 1,
+  "name": "Bovine",
+  "range": [
+   1,
+   1
+  ],
+  "scale": false,
+  "scales": false,
+  "scope": {},
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 130
+ },
+ {
+  "enum": "TalismanSlayerName.Wolf",
+  "id": 144,
+  "max": 1,
+  "min": 1,
+  "name": "Wolf",
+  "range": [
+   1,
+   1
+  ],
+  "scale": false,
+  "scales": false,
+  "scope": {},
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 130
+ },
+ {
+  "enum": "TalismanSlayerName.Undead",
+  "id": 145,
+  "max": 1,
+  "min": 1,
+  "name": "Undead",
+  "range": [
+   1,
+   1
+  ],
+  "scale": false,
+  "scales": false,
+  "scope": {},
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 130
+ },
+ {
+  "enum": "TalismanSlayerName.Goblin",
+  "id": 146,
+  "max": 1,
+  "min": 1,
+  "name": "Goblin",
+  "range": [
+   1,
+   1
+  ],
+  "scale": false,
+  "scales": false,
+  "scope": {},
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 130
+ },
+ {
+  "enum": "SkillName.Fencing",
+  "id": 151,
+  "max": 15,
+  "min": 1,
+  "name": "Fencing",
+  "range": [
+   1,
+   15
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Jewel": {
+    "max": 15,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 140
+ },
+ {
+  "enum": "SkillName.Macing",
+  "id": 152,
+  "max": 15,
+  "min": 1,
+  "name": "Macing",
+  "range": [
+   1,
+   15
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Jewel": {
+    "max": 15,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 140
+ },
+ {
+  "enum": "SkillName.Swords",
+  "id": 153,
+  "max": 15,
+  "min": 1,
+  "name": "Swords",
+  "range": [
+   1,
+   15
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Jewel": {
+    "max": 15,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 140
+ },
+ {
+  "enum": "SkillName.Musicianship",
+  "id": 154,
+  "max": 15,
+  "min": 1,
+  "name": "Musicianship",
+  "range": [
+   1,
+   15
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Jewel": {
+    "max": 15,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 140
+ },
+ {
+  "enum": "SkillName.Magery",
+  "id": 155,
+  "max": 15,
+  "min": 1,
+  "name": "Magery",
+  "range": [
+   1,
+   15
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Jewel": {
+    "max": 15,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 140
+ },
+ {
+  "enum": "SkillName.Wrestling",
+  "id": 156,
+  "max": 15,
+  "min": 1,
+  "name": "Wrestling",
+  "range": [
+   1,
+   15
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Jewel": {
+    "max": 15,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 140
+ },
+ {
+  "enum": "SkillName.AnimalTaming",
+  "id": 157,
+  "max": 15,
+  "min": 1,
+  "name": "AnimalTaming",
+  "range": [
+   1,
+   15
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Jewel": {
+    "max": 15,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 140
+ },
+ {
+  "enum": "SkillName.SpiritSpeak",
+  "id": 158,
+  "max": 15,
+  "min": 1,
+  "name": "SpiritSpeak",
+  "range": [
+   1,
+   15
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Jewel": {
+    "max": 15,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 140
+ },
+ {
+  "enum": "SkillName.Tactics",
+  "id": 159,
+  "max": 15,
+  "min": 1,
+  "name": "Tactics",
+  "range": [
+   1,
+   15
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Jewel": {
+    "max": 15,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 140
+ },
+ {
+  "enum": "SkillName.Provocation",
+  "id": 160,
+  "max": 15,
+  "min": 1,
+  "name": "Provocation",
+  "range": [
+   1,
+   15
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Jewel": {
+    "max": 15,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 140
+ },
+ {
+  "enum": "SkillName.Focus",
+  "id": 161,
+  "max": 15,
+  "min": 1,
+  "name": "Focus",
+  "range": [
+   1,
+   15
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Jewel": {
+    "max": 15,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 140
+ },
+ {
+  "enum": "SkillName.Parry",
+  "id": 162,
+  "max": 15,
+  "min": 1,
+  "name": "Parry",
+  "range": [
+   1,
+   15
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Jewel": {
+    "max": 15,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 140
+ },
+ {
+  "enum": "SkillName.Stealth",
+  "id": 163,
+  "max": 15,
+  "min": 1,
+  "name": "Stealth",
+  "range": [
+   1,
+   15
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Jewel": {
+    "max": 15,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 140
+ },
+ {
+  "enum": "SkillName.Meditation",
+  "id": 164,
+  "max": 15,
+  "min": 1,
+  "name": "Meditation",
+  "range": [
+   1,
+   15
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Jewel": {
+    "max": 15,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 140
+ },
+ {
+  "enum": "SkillName.AnimalLore",
+  "id": 165,
+  "max": 15,
+  "min": 1,
+  "name": "AnimalLore",
+  "range": [
+   1,
+   15
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Jewel": {
+    "max": 15,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 140
+ },
+ {
+  "enum": "SkillName.Discordance",
+  "id": 166,
+  "max": 15,
+  "min": 1,
+  "name": "Discordance",
+  "range": [
+   1,
+   15
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Jewel": {
+    "max": 15,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 140
+ },
+ {
+  "enum": "SkillName.Mysticism",
+  "id": 167,
+  "max": 15,
+  "min": 1,
+  "name": "Mysticism",
+  "range": [
+   1,
+   15
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Jewel": {
+    "max": 15,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 140
+ },
+ {
+  "enum": "SkillName.Bushido",
+  "id": 168,
+  "max": 15,
+  "min": 1,
+  "name": "Bushido",
+  "range": [
+   1,
+   15
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Jewel": {
+    "max": 15,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 140
+ },
+ {
+  "enum": "SkillName.Necromancy",
+  "id": 169,
+  "max": 15,
+  "min": 1,
+  "name": "Necromancy",
+  "range": [
+   1,
+   15
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Jewel": {
+    "max": 15,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 140
+ },
+ {
+  "enum": "SkillName.Veterinary",
+  "id": 170,
+  "max": 15,
+  "min": 1,
+  "name": "Veterinary",
+  "range": [
+   1,
+   15
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Jewel": {
+    "max": 15,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 140
+ },
+ {
+  "enum": "SkillName.Stealing",
+  "id": 171,
+  "max": 15,
+  "min": 1,
+  "name": "Stealing",
+  "range": [
+   1,
+   15
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Jewel": {
+    "max": 15,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 140
+ },
+ {
+  "enum": "SkillName.EvalInt",
+  "id": 172,
+  "max": 15,
+  "min": 1,
+  "name": "EvalInt",
+  "range": [
+   1,
+   15
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Jewel": {
+    "max": 15,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 140
+ },
+ {
+  "enum": "SkillName.Anatomy",
+  "id": 173,
+  "max": 15,
+  "min": 1,
+  "name": "Anatomy",
+  "range": [
+   1,
+   15
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Jewel": {
+    "max": 15,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 140
+ },
+ {
+  "enum": "SkillName.Peacemaking",
+  "id": 174,
+  "max": 15,
+  "min": 1,
+  "name": "Peacemaking",
+  "range": [
+   1,
+   15
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Jewel": {
+    "max": 15,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 140
+ },
+ {
+  "enum": "SkillName.Ninjitsu",
+  "id": 175,
+  "max": 15,
+  "min": 1,
+  "name": "Ninjitsu",
+  "range": [
+   1,
+   15
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Jewel": {
+    "max": 15,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 140
+ },
+ {
+  "enum": "SkillName.Chivalry",
+  "id": 176,
+  "max": 15,
+  "min": 1,
+  "name": "Chivalry",
+  "range": [
+   1,
+   15
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Jewel": {
+    "max": 15,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 140
+ },
+ {
+  "enum": "SkillName.Archery",
+  "id": 177,
+  "max": 15,
+  "min": 1,
+  "name": "Archery",
+  "range": [
+   1,
+   15
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Jewel": {
+    "max": 15,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 140
+ },
+ {
+  "enum": "SkillName.MagicResist",
+  "id": 178,
+  "max": 15,
+  "min": 1,
+  "name": "MagicResist",
+  "range": [
+   1,
+   15
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Jewel": {
+    "max": 15,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 140
+ },
+ {
+  "enum": "SkillName.Healing",
+  "id": 179,
+  "max": 15,
+  "min": 1,
+  "name": "Healing",
+  "range": [
+   1,
+   15
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Jewel": {
+    "max": 15,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 140
+ },
+ {
+  "enum": "SkillName.Throwing",
+  "id": 180,
+  "max": 15,
+  "min": 1,
+  "name": "Throwing",
+  "range": [
+   1,
+   15
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Jewel": {
+    "max": 15,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 140
+ },
+ {
+  "enum": "SkillName.Lumberjacking",
+  "id": 181,
+  "max": 15,
+  "min": 1,
+  "name": "Lumberjacking",
+  "range": [
+   1,
+   15
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Jewel": {
+    "max": 15,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 140
+ },
+ {
+  "enum": "SkillName.Snooping",
+  "id": 182,
+  "max": 15,
+  "min": 1,
+  "name": "Snooping",
+  "range": [
+   1,
+   15
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Jewel": {
+    "max": 15,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 140
+ },
+ {
+  "enum": "SkillName.Mining",
+  "id": 183,
+  "max": 15,
+  "min": 1,
+  "name": "Mining",
+  "range": [
+   1,
+   15
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Jewel": {
+    "max": 15,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 140
+ },
+ {
+  "enum": "AosWeaponAttribute.BloodDrinker",
+  "id": 200,
+  "max": 1,
+  "min": 1,
+  "name": "BloodDrinker",
+  "range": [
+   1,
+   1
+  ],
+  "scale": false,
+  "scales": false,
+  "scope": {
+   "Melee": {
+    "max": 1,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 140
+ },
+ {
+  "enum": "AosWeaponAttribute.BattleLust",
+  "id": 201,
+  "max": 1,
+  "min": 1,
+  "name": "BattleLust",
+  "range": [
+   1,
+   1
+  ],
+  "scale": false,
+  "scales": false,
+  "scope": {
+   "Melee": {
+    "max": 1,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 140
+ },
+ {
+  "enum": "AosWeaponAttribute.HitCurse",
+  "id": 202,
+  "max": 50,
+  "min": 2,
+  "name": "HitCurse",
+  "range": [
+   2,
+   50
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {},
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 140
+ },
+ {
+  "enum": "AosWeaponAttribute.HitFatigue",
+  "id": 203,
+  "max": 50,
+  "min": 2,
+  "name": "HitFatigue",
+  "range": [
+   2,
+   50
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Melee": {
+    "max": 70,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 70,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 140
+ },
+ {
+  "enum": "AosWeaponAttribute.HitManaDrain",
+  "id": 204,
+  "max": 50,
+  "min": 2,
+  "name": "HitManaDrain",
+  "range": [
+   2,
+   50
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Melee": {
+    "max": 70,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 70,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 140
+ },
+ {
+  "enum": "AosWeaponAttribute.SplinteringWeapon",
+  "id": 205,
+  "max": 30,
+  "min": 5,
+  "name": "SplinteringWeapon",
+  "range": [
+   5,
+   30
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Melee": {
+    "max": 20,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 140
+ },
+ {
+  "enum": "AosWeaponAttribute.ReactiveParalyze",
+  "id": 206,
+  "max": 1,
+  "min": 1,
+  "name": "ReactiveParalyze",
+  "range": [
+   1,
+   1
+  ],
+  "scale": false,
+  "scales": false,
+  "scope": {
+   "Melee": {
+    "max": 1,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 140
+ },
+ {
+  "enum": "SAAbsorptionAttribute.EaterFire",
+  "id": 208,
+  "max": 15,
+  "min": 1,
+  "name": "EaterFire",
+  "range": [
+   1,
+   15
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Armor": {
+    "max": 15,
+    "scale": null
+   },
+   "Hat": {
+    "max": 15,
+    "scale": null
+   },
+   "Shield": {
+    "max": 15,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 140
+ },
+ {
+  "enum": "SAAbsorptionAttribute.EaterCold",
+  "id": 209,
+  "max": 15,
+  "min": 1,
+  "name": "EaterCold",
+  "range": [
+   1,
+   15
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Armor": {
+    "max": 15,
+    "scale": null
+   },
+   "Hat": {
+    "max": 15,
+    "scale": null
+   },
+   "Shield": {
+    "max": 15,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 140
+ },
+ {
+  "enum": "SAAbsorptionAttribute.EaterPoison",
+  "id": 210,
+  "max": 15,
+  "min": 1,
+  "name": "EaterPoison",
+  "range": [
+   1,
+   15
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Armor": {
+    "max": 15,
+    "scale": null
+   },
+   "Hat": {
+    "max": 15,
+    "scale": null
+   },
+   "Shield": {
+    "max": 15,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 140
+ },
+ {
+  "enum": "SAAbsorptionAttribute.EaterEnergy",
+  "id": 211,
+  "max": 15,
+  "min": 1,
+  "name": "EaterEnergy",
+  "range": [
+   1,
+   15
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Armor": {
+    "max": 15,
+    "scale": null
+   },
+   "Hat": {
+    "max": 15,
+    "scale": null
+   },
+   "Shield": {
+    "max": 15,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 140
+ },
+ {
+  "enum": "SAAbsorptionAttribute.EaterKinetic",
+  "id": 212,
+  "max": 15,
+  "min": 1,
+  "name": "EaterKinetic",
+  "range": [
+   1,
+   15
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Armor": {
+    "max": 15,
+    "scale": null
+   },
+   "Hat": {
+    "max": 15,
+    "scale": null
+   },
+   "Shield": {
+    "max": 15,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 140
+ },
+ {
+  "enum": "SAAbsorptionAttribute.EaterDamage",
+  "id": 213,
+  "max": 15,
+  "min": 1,
+  "name": "EaterDamage",
+  "range": [
+   1,
+   15
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Armor": {
+    "max": 15,
+    "scale": null
+   },
+   "Hat": {
+    "max": 15,
+    "scale": null
+   },
+   "Shield": {
+    "max": 15,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 140
+ },
+ {
+  "enum": "SAAbsorptionAttribute.ResonanceFire",
+  "id": 214,
+  "max": 20,
+  "min": 1,
+  "name": "ResonanceFire",
+  "range": [
+   1,
+   20
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {},
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 140
+ },
+ {
+  "enum": "SAAbsorptionAttribute.ResonanceCold",
+  "id": 215,
+  "max": 20,
+  "min": 1,
+  "name": "ResonanceCold",
+  "range": [
+   1,
+   20
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {},
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 140
+ },
+ {
+  "enum": "SAAbsorptionAttribute.ResonancePoison",
+  "id": 216,
+  "max": 20,
+  "min": 1,
+  "name": "ResonancePoison",
+  "range": [
+   1,
+   20
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {},
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 140
+ },
+ {
+  "enum": "SAAbsorptionAttribute.ResonanceEnergy",
+  "id": 217,
+  "max": 20,
+  "min": 1,
+  "name": "ResonanceEnergy",
+  "range": [
+   1,
+   20
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {},
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 140
+ },
+ {
+  "enum": "SAAbsorptionAttribute.ResonanceKinetic",
+  "id": 218,
+  "max": 20,
+  "min": 1,
+  "name": "ResonanceKinetic",
+  "range": [
+   1,
+   20
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {},
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 140
+ },
+ {
+  "enum": "SAAbsorptionAttribute.CastingFocus",
+  "id": 219,
+  "max": 3,
+  "min": 1,
+  "name": "CastingFocus",
+  "range": [
+   1,
+   3
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Armor": {
+    "max": 3,
+    "scale": null
+   },
+   "Hat": {
+    "max": 3,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 140
+ },
+ {
+  "enum": "AosArmorAttribute.ReactiveParalyze",
+  "id": 220,
+  "max": 1,
+  "min": 1,
+  "name": "ReactiveParalyze",
+  "range": [
+   1,
+   1
+  ],
+  "scale": false,
+  "scales": false,
+  "scope": {
+   "Melee": {
+    "max": 1,
+    "scale": null
+   },
+   "Shield": {
+    "max": 1,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 140
+ },
+ {
+  "enum": "AosArmorAttribute.SoulCharge",
+  "id": 221,
+  "max": 30,
+  "min": 5,
+  "name": "SoulCharge",
+  "range": [
+   5,
+   30
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Shield": {
+    "max": 30,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 140
+ },
+ {
+  "enum": "AosWeaponAttribute.ResistPhysicalBonus",
+  "id": 233,
+  "max": 15,
+  "min": 1,
+  "name": "ResistPhysicalBonus",
+  "range": [
+   1,
+   15
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Melee": {
+    "max": 15,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 15,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 100
+ },
+ {
+  "enum": "AosWeaponAttribute.ResistFireBonus",
+  "id": 234,
+  "max": 15,
+  "min": 1,
+  "name": "ResistFireBonus",
+  "range": [
+   1,
+   15
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Melee": {
+    "max": 15,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 15,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 100
+ },
+ {
+  "enum": "AosWeaponAttribute.ResistColdBonus",
+  "id": 235,
+  "max": 15,
+  "min": 1,
+  "name": "ResistColdBonus",
+  "range": [
+   1,
+   15
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Melee": {
+    "max": 15,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 15,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 100
+ },
+ {
+  "enum": "AosWeaponAttribute.ResistPoisonBonus",
+  "id": 236,
+  "max": 15,
+  "min": 1,
+  "name": "ResistPoisonBonus",
+  "range": [
+   1,
+   15
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Melee": {
+    "max": 15,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 15,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 100
+ },
+ {
+  "enum": "AosWeaponAttribute.ResistEnergyBonus",
+  "id": 237,
+  "max": 15,
+  "min": 1,
+  "name": "ResistEnergyBonus",
+  "range": [
+   1,
+   15
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Melee": {
+    "max": 15,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 15,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 100
+ },
+ {
+  "enum": "AosArmorAttribute.SelfRepair",
+  "id": 500,
+  "max": 5,
+  "min": 1,
+  "name": "SelfRepair",
+  "range": [
+   1,
+   5
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Armor": {
+    "max": 5,
+    "scale": null
+   },
+   "Hat": {
+    "max": 5,
+    "scale": null
+   },
+   "Shield": {
+    "max": 5,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 100
+ },
+ {
+  "enum": "AosWeaponAttribute.SelfRepair",
+  "id": 501,
+  "max": 5,
+  "min": 1,
+  "name": "SelfRepair",
+  "range": [
+   1,
+   5
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {
+   "Melee": {
+    "max": 5,
+    "scale": null
+   },
+   "Ranged": {
+    "max": 5,
+    "scale": null
+   }
+  },
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 100
+ },
+ {
+  "enum": "ExtendedWeaponAttribute.BoneBreaker",
+  "id": 600,
+  "max": 1,
+  "min": 1,
+  "name": "BoneBreaker",
+  "range": [
+   1,
+   1
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {},
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 140
+ },
+ {
+  "enum": "ExtendedWeaponAttribute.HitSwarm",
+  "id": 601,
+  "max": 20,
+  "min": 1,
+  "name": "HitSwarm",
+  "range": [
+   1,
+   20
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {},
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 140
+ },
+ {
+  "enum": "ExtendedWeaponAttribute.HitSparks",
+  "id": 602,
+  "max": 20,
+  "min": 1,
+  "name": "HitSparks",
+  "range": [
+   1,
+   20
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {},
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 140
+ },
+ {
+  "enum": "ExtendedWeaponAttribute.Bane",
+  "id": 603,
+  "max": 1,
+  "min": 1,
+  "name": "Bane",
+  "range": [
+   1,
+   1
+  ],
+  "scale": true,
+  "scales": true,
+  "scope": {},
+  "scope_source": "research/_src/itemprops_table.tsv",
+  "source": "research/_src/itemprops_table.tsv (parse _src/servuo Scripts/Misc/ItemProperty.cs)",
+  "type": "int",
+  "weight": 140
+ }
+]

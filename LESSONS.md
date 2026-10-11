@@ -24,6 +24,136 @@ Typy: `chyba` (moje vada) · `past-nástroje` (prostředí/nástroj, ne logika) 
 
 ---
 
+# 2026-10-11 — VLASTNÍ ART VE HŘE: SEAM PO KUSECH, DVĚ PŘEKVAPENÍ A JEDNO PŘIZNÁNÍ
+
+### 2026-10-11 — Dvě session ve stejném stromě se rozešly s tím, co o sobě tvrdí rozcestník (postup)
+**Co se stalo:** `DALSI-SESSION.md` §„Paralelně, nebo sériově?" tvrdí, že **A (art) a C (M5
+souboj) jsou disjunktní soubory**. Nejsou: souběžná session C zapsala do
+`render/anim_player.gd` (mapa `groups`), `app/main.gd`, `app/world_view.gd`,
+`app/player_controller.gd`, `app/input_map.gd` a `tests/cases/render_anim.gd` — tedy do
+souborů, které potřebuje i integrace vlastního artu. Naměřeno: `git status --short` byl na
+začátku session (06:2x) **prázdný**, v 06:55 už bylo v `git status` **6 nových souborů M5**
+(`sim/systems/combat.gd`, `death.gd`, `decay.gd`, `data/monsters.json`, …) a oba zapisovali
+do `render/anim_player.gd`.
+**Doklad:** `git status --short` na začátku a v 07:48; mtime `render/anim_player.gd` 06:55:07
+(uprostřed mých editací); v souboru je nakonec **obojí** (můj `_prijmi` volá jejich
+`_prijmi_skupiny`).
+**Ponaučení:** „disjunktní" v rozcestníku je **tvrzení o souborech, ne o záměru** — před
+spuštěním paralelní session se musí ověřit **výčtem cest**, ne odstavcem. A kdo v takovém
+stromě commituje, dělá `git add` **po jednom souboru** (ne `-A`): jinak publikuje cizí
+rozpracovanou práci. U souborů, které obě session mění, je poctivé **říct to nahlas**, ne
+tvrdit, že jsou oddělené.
+
+### 2026-10-11 — `str(null)` je `"<null>"`: konfigurace s prázdnou hodnotou se hlásila jako chybějící soubor (past-nástroje)
+**Co se stalo:** `assets/own-art.json` má u jedné vrstvy `"anim": null` (vlastní sada animace
+nemá). Loader psal `str(vrstva.get("anim", ""))`, což u JSON `null` vrátí **řetězec
+`<null>`** — a kontrola pak hlásila „animace `<null>` neexistuje“ a **celou konfiguraci
+zavrhla**, takže se ve hře kreslil jen UO art (`stats own: 0`) a nic nespadlo.
+**Doklad:** `render/own_art.gd` (test `vrstva.get("anim", null) == null`), naměřeno v logu
+`WARNING: app.main: vlastni art: vrstva 1 (own): animace '<null>' neexistuje`; po opravě
+`[main] vlastni art: 2 vrstvy (own-lit, own)` a `textures { …, "own": 6, "uo": 47680 }`.
+**Ponaučení:** `get(key, default)` v GDScriptu **není** „když chybí, dej default“ — `null`
+z JSON je platná hodnota a `str()` z něj udělá nesmysl, který vypadá jako cesta k souboru.
+**Null se testuje vyslovně** (`== null`), ne převodem na řetězec.
+
+### 2026-10-11 — `:=` v GDScriptu neumí odvodit typ z `Dictionary` hodnoty (past-nástroje)
+**Co se stalo:** nový test nešel načíst: `Parse Error: Cannot infer the type of
+"bez_manifestu" variable because the value doesn't have a set type` (a totéž u
+`var stejne := (a == b and …)`). Hodnota z `Dictionary` má typ `Variant`, takže `:=` nemá co
+odvodit — a `run_tests.gd` to vidí jako „case soubor nelze nacist (parse error?)“, tedy
+**jedno selhání a 0 nových kontrol**, ne jako chybu v měřeném kódu.
+**Doklad:** `tests/cases/own_art.gd:138,141,186` (`godot --check-only --script …` vypsal tři
+parse errory); po doplnění `: Dictionary` / `: bool` sada **2629 kontrol / 0 selhání**.
+**Ponaučení:** u hodnot ze slovníku piš typ **vyslovně** (`var x: Dictionary = …`), i když
+`:=` vypadá elegantněji. Rychlá kontrola před plnou sadou:
+`godot --headless --check-only --script res://tests/cases/<soubor>.gd`.
+
+### 2026-10-11 — Brána G10 měřila TONOVÁNÍ HUE, a vlastní postava se netonuje (vada-zadani)
+**Co se stalo:** `check-render.py` vyžadoval ve středu snímku ≥ 500 pixelů z **UO palety
+kůže** — to je kontrola, že se na postavu aplikovala hue sada. Vlastní postava barvu
+**nemá z hue**, ale z Blenderu (`app.world_view` tonování u vlastních spritů přeskakuje), takže
+by brána hlásila **vadu o správném obrazu**. Byl to tedy **rebaseline s dokladem**, ne
+„někdo to spravil“.
+**Doklad (dvojice snímků téhož místa, Britain 1495,1630, 1280×720, chůze):** surová shoda
+s barvami vlastního spritu ve středu 1/3 = **748** (vlastní) vs **235** (UO) — pomer jen 3,2×,
+protože se do ní plete mapa. Po **erozi masky 3×3** = **138** vs **0**. Nová kontrola proto
+vyžaduje ≥ **60** pixelů po erozi a vypisuje obě čísla; známý chybný případ je týž snímek bez
+vlastního artu (`vlastni_pixelu_po_erozi: 0` → `VADA (exit 1)`), známý správný `138` → `OK`.
+**Ponaučení:** „neshoduje se s referencí“ může být **vlastnost nové věci**, ne vada — ale
+rebaseline se nedělá ztišením kontroly: hledej **statistiku, která obojí rozliší**, a dolož ji
+známým správným i známým chybným případem. U obrázků s šumem je **eroze masky** levný způsob,
+jak oddělit souvislou siluetu od roztroušených pixelů mapy.
+
+### 2026-10-11 — Vlastní art se musí indexovat PRVNÍ; jinak se textura a offset rozejdou (postup)
+**Co se stalo:** seam je „vlastní vyhrává, kde je“ **v indexu**, ne až při kreslení. Vlastní
+dýka má jiný box i kotvu než UO dýka téhož id (naměřeno: vlastní `region 79,0,14,28`,
+`offset −15,−16`; UO `region 149,84,22,26`, `offset −11,−18`). Kdyby se textura vzala
+z vlastní vrstvy a `offset()` z UO, sprite by seděl o pár pixelů vedle — a **testy by to
+nemusely chytit**, protože obojí „existuje“.
+**Doklad:** `render/texture_cache.gd` `_index(sprite, prefix, pieces, own)` + `page_path()`;
+brána `G15` porovnává **region i offset** s manifestem vrstvy (6/6 id) a **přepínač**
+(tentýž dotaz s vrstvami a bez nich) dává jinou stránku; self-test 9 případů / 0 chyb.
+**Ponaučení:** u „přepínání zdrojů“ drž **texturu i kotvu v jednom záznamu** a měř to
+dotahem (`page_path()`, `offset()`), ne dojmem ze snímku. A vždy zkus i **vypnutý** stav:
+kdyby vyšel stejně, přepínač nic nepřepíná.
+
+### 2026-10-11 — Snímek s vlastní postavou nešel udělat „nastavením akce“: `_process` kontroleru to přebije (past-nástroje)
+**Co se stalo:** vlastní sada má jen **chůzi** (`400/0/*`). Ve stoje kreslí hra **UO idle**,
+takže na snímku nebyla vlastní postava. Zkoušel jsem (a) `world_view.set_action(0)` každý
+frame, (b) `call_deferred("set_action", 0)`, (c) připojení na signál `draw` — **ani jedno
+neprojilo**: `app.player_controller` nastavuje akci ve svém `_process` a v logu bylo
+`anim=idle`, `player_frames=1` (UO), i když sonda psala opak. Signál `draw` se navíc v Godotu
+emituje při `queue_redraw()`, ne až při kreslení.
+**Doklad:** log sondy `[probe] hrac: action=4 … list=res://assets/uo/anim/anim-400-4-1.png`
+u všech tří pokusů; po **skutečném příkazu** `sim.enqueue({"t":"move", …})` je
+`action=0`, `own=true`, `list=…/ownlit-400-0-1.png`, `frame 0/8`.
+**Ponaučení:** obraz se nemá „nastavovat zvenčí“ — má se **odehrát** (poslat příkaz do
+simulace). Kdo obchází `_process` kontroleru, měří něco jiného, než hra dělá.
+
+### 2026-10-11 — `ui.backpack` postaví řádek JEDNOU; `texture()` při načítání vrátí `null` a ikona už nedorazí (chyba)
+**Co se stalo:** na snímku byly názvy předmětů, ale **žádné ikony**. Diagnostika (`TextureRect=4,
+s_texturou=4`) ukázala, že uzly i textury existují — jen se řádek postavil dřív, než se
+stránka vlastního atlasu donačetla na pozadí (`load_threaded_request`), `texture()` vrátil
+`null`, `TextureRect` se vůbec nevytvořil a `flush()` se znovu nezavolá, dokud se obsah nezmění.
+Sonda to obchází tím, že obsah plní **opakovaně**; v produkci je to **skutečná vada UI**
+(nová stránka = trvale chybějící ikona), kterou je potřeba dořešit.
+**Doklad:** `ui/backpack.gd` `_radek_uzel` (ikona jen když `tex != null`), log
+`[probe] backpack: textury_null=0, uzlu=13, TextureRect=4, s_texturou=4` po opakovaném plnění;
+před ním snímek bez ikon.
+**Ponaučení:** „načítá se“ a „není“ jsou dva různé stavy i v UI — prvek, který se zahodí při
+`null`, se musí umět **dokreslit**, až data dorazí. A u snímku platí: co má být vidět, se
+**měří na pixelech** (porovnání se zdrojovým atlasem dalo průměrný rozdíl RGB 11–37, tedy
+ikony tam opravdu jsou).
+
+### 2026-10-11 — Dva snímky „před/po“ se nedají položit vedle sebe, dokud se srovná kamera (postup)
+**Co se stalo:** první srovnání UO vs. vlastní mělo v obou půlkách **jiný terén i jinou
+kameru** — postava se v každém běhu rozejde jinak daleko a `player_pixel_offset()` závisí na
+framu animace (jiný frame = jiný posun až o 44 px). Snímky pak neporovnávají totéž místo.
+**Doklad:** po `--no-own-art` a po vlastním artu se `pozice_kresleni` lišilo; po vynulování
+`set_player_offset(Vector2.ZERO)` a držení `pos` je v obou bězích **shodné**
+(`pozice_kresleni=(-2948.0, 68732.0)`, `camera=(-2734.667, 68812.0)`) a kreslicí seznam
+obsahuje v obou **totéž** (`land_id_v_zaberu` shodné, včetně `3:291` a `1001:691`).
+**Ponaučení:** A/B snímek je platný jen s **doloženou shodou kamery** — jinak se „rozdíl“
+připíše artu, i když je to posun. A seznam kreslených objektů (`world_view._list()`) je
+levný doklad, **která id jsou v záběru** (nedá se to odhadnout okem).
+
+### 2026-10-11 — `workspace-write` zakázal zápis do `.cache` a 26 testů hlásilo vadu, která neexistuje (past-nástroje)
+**Co se stalo:** v režimu `workspace-write` selhalo **26 kontrol** (user:// fixtures,
+`sim.save`, `render.textures`, `tempo`) a `Out-File` do `.cache` vrátil
+`Access is denied` — i když je `.cache` uvnitř workspace. Nebyla to vada kódu ani ACL:
+`.cache` se v tom režimu **nepodařilo zřídit** (provisioning), takže zápis odmítl sandbox.
+Po přepnutí session na **plný přístup** je sada **1852 kontrol / 0 selhání** (stav před
+integrací) a `run-all` **13 bran OK / 0 chyb**.
+**Doklad:** `[test] 1825 kontrol, 26 selhani` v `workspace-write` vs
+`[test] 1852 kontrol, 0 selhani` s plným přístupem; `Set-Content .cache\acl-test.txt` =
+`Access to the path … is denied`.
+**Ponaučení:** třetí stav („neproběhlo (prostředí)“) se nesmí číst jako červená — ale ani
+jako zelená. **Než začneš opravovat ACL, ověř, že jde o sandbox**: oprava práv by tu byla
+zásah do systému kvůli omezení, které zmizí přepnutím režimu.
+
+---
+
+
 # 2026-10-10 (třetí část) — VLASTNÍ ART: PIPELINE FUNGUJE, TŘI VĚCI ZMĚŘENÉ
 
 ### 2026-10-10 — `PIL.Image.resize` na RGBA rozbije RGB tam, kde je alfa 0 (past-nástroje)

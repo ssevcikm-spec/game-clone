@@ -1,0 +1,4639 @@
+[
+ {
+  "ai": "mage",
+  "ai_raw": "Mage / Closest",
+  "anim": {
+   "attack": 4,
+   "die": 2,
+   "walk": 0
+  },
+  "anim_group": "high",
+  "anim_group_source": "tools/uoextract/anim.py:group_kind (tělo < 200 high, 200..399 low)",
+  "anim_source": "_src/classicuo/src/ClassicUO.Assets/AnimationsLoader.cs:1696-1700 (HighAnimationGroup) + tools/uoextract/anim.py:ABSTRACT_GROUPS",
+  "body": 13,
+  "body_source": "research/06 §3.1 Tier 3, sloupec Body: '13'",
+  "class": "AirElemental",
+  "damage": [
+   8,
+   10
+  ],
+  "dex": [
+   166,
+   185
+  ],
+  "fame": 4500,
+  "fight_mode": "Closest",
+  "flags": [],
+  "hits": [
+   76,
+   93
+  ],
+  "id": "air_elemental",
+  "int": [
+   101,
+   125
+  ],
+  "int_": [
+   101,
+   125
+  ],
+  "karma": -4500,
+  "loot": {
+   "era": "pre-aos",
+   "gold_dice": "10d10+50",
+   "gold_source": "_src/servuo/Scripts/Misc/LootPack.cs:437",
+   "pack": "average",
+   "source": "research/06 §3.1 Tier 3, sloupec Loot (per monstrum, NIKDY z fame)"
+  },
+  "loot_pack": "average",
+  "loot_raw": "Average + Meager + LowScrolls + MedScrolls",
+  "loot_source": "research/06 §3.1 Tier 3, sloupec Loot (per monstrum, NIKDY z fame)",
+  "mana": null,
+  "name": "airelemental",
+  "notoriety": 3,
+  "notoriety_source": "research/06 §4.5 `Server/Notoriety.cs:8` — CanBeAttacked = 3 (nepritele, ne zlocinec)",
+  "resist": null,
+  "resist_source": "pending-source (tabulky §3.1 resisty nemaji; docs/05 §5.16 = pre-AoS pouziva VirtualArmor)",
+  "skills": {
+   "Evaluating Intelligence": [
+    601,
+    750
+   ],
+   "Magery": [
+    601,
+    750
+   ],
+   "Resisting Spells": [
+    601,
+    750
+   ],
+   "Tactics": [
+    601,
+    800
+   ],
+   "Wrestling": [
+    601,
+    800
+   ]
+  },
+  "skills_source": "research/06 §3.1 proza za tabulkou Tier 3",
+  "source": "research/06-world-content-npcs.md §3.1 (ServUO Scripts/Mobiles/Normal/*.cs); anim = AnimationsLoader.cs:1694-1777",
+  "str": [
+   126,
+   155
+  ],
+  "taming_difficulty": null,
+  "tier": 3,
+  "type": "air_elemental",
+  "virtual_armor": 40,
+  "virtual_armor_source": "research/06 §3.1 Tier 3, sloupec VA"
+ },
+ {
+  "ai": "mage",
+  "ai_raw": "Mage / Closest",
+  "anim": {
+   "attack": 4,
+   "die": 2,
+   "walk": 0
+  },
+  "anim_group": "high",
+  "anim_group_source": "tools/uoextract/anim.py:group_kind (tělo < 200 high, 200..399 low)",
+  "anim_source": "_src/classicuo/src/ClassicUO.Assets/AnimationsLoader.cs:1696-1700 (HighAnimationGroup) + tools/uoextract/anim.py:ABSTRACT_GROUPS",
+  "body": 46,
+  "body_source": "research/06 §3.1 Tier 4, sloupec Body: '46'",
+  "class": "AncientWyrm",
+  "damage": [
+   29,
+   35
+  ],
+  "dex": [
+   86,
+   175
+  ],
+  "fame": 22500,
+  "fight_mode": "Closest",
+  "flags": [],
+  "hits": [
+   658,
+   711
+  ],
+  "id": "ancient_wyrm",
+  "int": [
+   686,
+   775
+  ],
+  "int_": [
+   686,
+   775
+  ],
+  "karma": -22500,
+  "loot": {
+   "era": "pre-aos",
+   "gold_dice": "2d125+400",
+   "gold_source": "_src/servuo/Scripts/Misc/LootPack.cs:457",
+   "pack": "filthy_rich",
+   "source": "research/06 §3.1 Tier 4, sloupec Loot (per monstrum, NIKDY z fame)"
+  },
+  "loot_pack": "filthy_rich",
+  "loot_raw": "FilthyRich ×3 + Gems ×5",
+  "loot_source": "research/06 §3.1 Tier 4, sloupec Loot (per monstrum, NIKDY z fame)",
+  "mana": null,
+  "name": "ancientwyrm",
+  "notoriety": 3,
+  "notoriety_source": "research/06 §4.5 `Server/Notoriety.cs:8` — CanBeAttacked = 3 (nepritele, ne zlocinec)",
+  "resist": null,
+  "resist_source": "pending-source (tabulky §3.1 resisty nemaji; docs/05 §5.16 = pre-AoS pouziva VirtualArmor)",
+  "skills": {
+   "Evaluating Intelligence": [
+    801,
+    1000
+   ],
+   "Magery": [
+    801,
+    1000
+   ],
+   "Meditation": [
+    525,
+    750
+   ],
+   "Resisting Spells": [
+    1005,
+    1500
+   ],
+   "Tactics": [
+    976,
+    1000
+   ],
+   "Wrestling": [
+    976,
+    1000
+   ]
+  },
+  "skills_source": "research/06 §3.1 proza za tabulkou Tier 4",
+  "source": "research/06-world-content-npcs.md §3.1 (ServUO Scripts/Mobiles/Normal/*.cs); anim = AnimationsLoader.cs:1694-1777",
+  "str": [
+   1096,
+   1185
+  ],
+  "taming_difficulty": null,
+  "tier": 4,
+  "type": "ancient_wyrm",
+  "virtual_armor": 70,
+  "virtual_armor_source": "research/06 §3.1 Tier 4, sloupec VA"
+ },
+ {
+  "ai": "melee",
+  "ai_raw": "Melee / Closest",
+  "anim": {
+   "attack": 4,
+   "die": 2,
+   "walk": 0
+  },
+  "anim_group": "high",
+  "anim_group_source": "tools/uoextract/anim.py:group_kind (tělo < 200 high, 200..399 low)",
+  "anim_source": "_src/classicuo/src/ClassicUO.Assets/AnimationsLoader.cs:1696-1700 (HighAnimationGroup) + tools/uoextract/anim.py:ABSTRACT_GROUPS",
+  "body": 135,
+  "body_source": "research/06 §3.1 Tier 4, sloupec Body: '135'",
+  "class": "ArcticOgreLord",
+  "damage": [
+   20,
+   25
+  ],
+  "dex": [
+   66,
+   75
+  ],
+  "fame": 15000,
+  "fight_mode": "Closest",
+  "flags": [],
+  "hits": [
+   476,
+   552
+  ],
+  "id": "arctic_ogre_lord",
+  "int": [
+   46,
+   70
+  ],
+  "int_": [
+   46,
+   70
+  ],
+  "karma": -15000,
+  "loot": {
+   "era": "pre-aos",
+   "gold_dice": "2d125+400",
+   "gold_source": "_src/servuo/Scripts/Misc/LootPack.cs:457",
+   "pack": "filthy_rich",
+   "source": "research/06 §3.1 Tier 4, sloupec Loot (per monstrum, NIKDY z fame)"
+  },
+  "loot_pack": "filthy_rich",
+  "loot_raw": "FilthyRich + Rich",
+  "loot_source": "research/06 §3.1 Tier 4, sloupec Loot (per monstrum, NIKDY z fame)",
+  "mana": null,
+  "name": "arcticogrelord",
+  "notoriety": 3,
+  "notoriety_source": "research/06 §4.5 `Server/Notoriety.cs:8` — CanBeAttacked = 3 (nepritele, ne zlocinec)",
+  "resist": null,
+  "resist_source": "pending-source (tabulky §3.1 resisty nemaji; docs/05 §5.16 = pre-AoS pouziva VirtualArmor)",
+  "skills": {
+   "Resisting Spells": [
+    1251,
+    1400
+   ],
+   "Tactics": [
+    901,
+    1000
+   ],
+   "Wrestling": [
+    901,
+    1000
+   ]
+  },
+  "skills_source": ".cache/analysis/monsters.tsv (extract-monsters.ps1) — proza §3.1 skilly u tohoto monstra nevypisuje",
+  "source": "research/06-world-content-npcs.md §3.1 (ServUO Scripts/Mobiles/Normal/*.cs); anim = AnimationsLoader.cs:1694-1777",
+  "str": [
+   767,
+   945
+  ],
+  "taming_difficulty": null,
+  "tier": 4,
+  "type": "arctic_ogre_lord",
+  "virtual_armor": 50,
+  "virtual_armor_source": "research/06 §3.1 Tier 4, sloupec VA"
+ },
+ {
+  "ai": "mage",
+  "ai_raw": "Mage / Closest",
+  "anim": {
+   "attack": 4,
+   "die": 2,
+   "walk": 0
+  },
+  "anim_group": "high",
+  "anim_group_source": "tools/uoextract/anim.py:group_kind (tělo < 200 high, 200..399 low)",
+  "anim_source": "_src/classicuo/src/ClassicUO.Assets/AnimationsLoader.cs:1696-1700 (HighAnimationGroup) + tools/uoextract/anim.py:ABSTRACT_GROUPS",
+  "body": 40,
+  "body_source": "research/06 §3.1 Tier 4, sloupec Body: '40'",
+  "class": "Balron",
+  "damage": [
+   22,
+   29
+  ],
+  "dex": [
+   177,
+   255
+  ],
+  "fame": 24000,
+  "fight_mode": "Closest",
+  "flags": [],
+  "hits": [
+   592,
+   711
+  ],
+  "id": "balron",
+  "int": [
+   151,
+   250
+  ],
+  "int_": [
+   151,
+   250
+  ],
+  "karma": -24000,
+  "loot": {
+   "era": "pre-aos",
+   "gold_dice": "2d125+400",
+   "gold_source": "_src/servuo/Scripts/Misc/LootPack.cs:457",
+   "pack": "filthy_rich",
+   "source": "research/06 §3.1 Tier 4, sloupec Loot (per monstrum, NIKDY z fame)"
+  },
+  "loot_pack": "filthy_rich",
+  "loot_raw": "**FilthyRich ×2** + Rich + MedScrolls ×2",
+  "loot_source": "research/06 §3.1 Tier 4, sloupec Loot (per monstrum, NIKDY z fame)",
+  "mana": null,
+  "name": "balron",
+  "notoriety": 3,
+  "notoriety_source": "research/06 §4.5 `Server/Notoriety.cs:8` — CanBeAttacked = 3 (nepritele, ne zlocinec)",
+  "resist": null,
+  "resist_source": "pending-source (tabulky §3.1 resisty nemaji; docs/05 §5.16 = pre-AoS pouziva VirtualArmor)",
+  "skills": {
+   "Anatomy": [
+    251,
+    500
+   ],
+   "Evaluating Intelligence": [
+    901,
+    1000
+   ],
+   "Magery": [
+    955,
+    1000
+   ],
+   "Meditation": [
+    251,
+    500
+   ],
+   "Resisting Spells": [
+    1005,
+    1500
+   ],
+   "Tactics": [
+    901,
+    1000
+   ],
+   "Wrestling": [
+    901,
+    1000
+   ]
+  },
+  "skills_source": "research/06 §3.1 proza za tabulkou Tier 4",
+  "source": "research/06-world-content-npcs.md §3.1 (ServUO Scripts/Mobiles/Normal/*.cs); anim = AnimationsLoader.cs:1694-1777",
+  "str": [
+   986,
+   1185
+  ],
+  "taming_difficulty": null,
+  "tier": 4,
+  "type": "balron",
+  "virtual_armor": 90,
+  "virtual_armor_source": "research/06 §3.1 Tier 4, sloupec VA"
+ },
+ {
+  "ai": "animal",
+  "ai_raw": "Animal / Aggressor",
+  "anim": {
+   "attack": 4,
+   "die": 2,
+   "walk": 0
+  },
+  "anim_group": "high",
+  "anim_group_source": "tools/uoextract/anim.py:group_kind (tělo < 200 high, 200..399 low)",
+  "anim_source": "_src/classicuo/src/ClassicUO.Assets/AnimationsLoader.cs:1696-1700 (HighAnimationGroup) + tools/uoextract/anim.py:ABSTRACT_GROUPS",
+  "body": 6,
+  "body_source": "research/06 §3.1 Tier 1, sloupec Body: '6'",
+  "class": "Bird",
+  "damage": [
+   0,
+   0
+  ],
+  "dex": [
+   25,
+   35
+  ],
+  "fame": 150,
+  "fight_mode": "Aggressor",
+  "flags": [],
+  "hits": null,
+  "id": "bird",
+  "int": [
+   10,
+   10
+  ],
+  "int_": [
+   10,
+   10
+  ],
+  "karma": 0,
+  "loot": null,
+  "loot_pack": null,
+  "loot_raw": "—",
+  "loot_source": "research/06 §3.1 Tier 1, sloupec Loot (per monstrum, NIKDY z fame)",
+  "mana": null,
+  "name": "a crow",
+  "notoriety": 3,
+  "notoriety_source": "research/06 §4.5 `Server/Notoriety.cs:8` — CanBeAttacked = 3 (nepritele, ne zlocinec)",
+  "resist": null,
+  "resist_source": "pending-source (tabulky §3.1 resisty nemaji; docs/05 §5.16 = pre-AoS pouziva VirtualArmor)",
+  "skills": {
+   "Resisting Spells": [
+    40,
+    50
+   ],
+   "Tactics": [
+    40,
+    60
+   ],
+   "Wrestling": [
+    42,
+    64
+   ]
+  },
+  "skills_source": ".cache/analysis/monsters.tsv (extract-monsters.ps1) — proza §3.1 skilly u tohoto monstra nevypisuje",
+  "source": "research/06-world-content-npcs.md §3.1 (ServUO Scripts/Mobiles/Normal/*.cs); anim = AnimationsLoader.cs:1694-1777",
+  "str": [
+   10,
+   10
+  ],
+  "taming_difficulty": null,
+  "tier": 1,
+  "type": "bird",
+  "virtual_armor": 0,
+  "virtual_armor_source": "research/06 §3.1 Tier 1, sloupec VA"
+ },
+ {
+  "ai": null,
+  "ai_raw": "**NecroMage** / Closest",
+  "anim": {
+   "attack": 4,
+   "die": 2,
+   "walk": 0
+  },
+  "anim_group": "high",
+  "anim_group_source": "tools/uoextract/anim.py:group_kind (tělo < 200 high, 200..399 low)",
+  "anim_source": "_src/classicuo/src/ClassicUO.Assets/AnimationsLoader.cs:1696-1700 (HighAnimationGroup) + tools/uoextract/anim.py:ABSTRACT_GROUPS",
+  "body": 148,
+  "body_source": "research/06 §3.1 Tier 2, sloupec Body: '148'",
+  "class": "BoneMagi",
+  "damage": [
+   3,
+   7
+  ],
+  "dex": [
+   56,
+   75
+  ],
+  "fame": 3000,
+  "fight_mode": "Closest",
+  "flags": [],
+  "hits": [
+   46,
+   60
+  ],
+  "id": "bone_mage",
+  "int": [
+   186,
+   210
+  ],
+  "int_": [
+   186,
+   210
+  ],
+  "karma": -3000,
+  "loot": {
+   "era": "pre-aos",
+   "gold_dice": "10d10+50",
+   "gold_source": "_src/servuo/Scripts/Misc/LootPack.cs:437",
+   "pack": "average",
+   "source": "research/06 §3.1 Tier 2, sloupec Loot (per monstrum, NIKDY z fame)"
+  },
+  "loot_pack": "average",
+  "loot_raw": "Average + LowScrolls + Potions",
+  "loot_source": "research/06 §3.1 Tier 2, sloupec Loot (per monstrum, NIKDY z fame)",
+  "mana": null,
+  "name": "a bone mage",
+  "notoriety": 3,
+  "notoriety_source": "research/06 §4.5 `Server/Notoriety.cs:8` — CanBeAttacked = 3 (nepritele, ne zlocinec)",
+  "resist": null,
+  "resist_source": "pending-source (tabulky §3.1 resisty nemaji; docs/05 §5.16 = pre-AoS pouziva VirtualArmor)",
+  "skills": {
+   "Evaluating Intelligence": [
+    601,
+    700
+   ],
+   "Magery": [
+    601,
+    700
+   ],
+   "Necromancy": [
+    890,
+    991
+   ],
+   "Resisting Spells": [
+    551,
+    700
+   ],
+   "Spirit Speak": [
+    900,
+    990
+   ],
+   "Tactics": [
+    451,
+    600
+   ],
+   "Wrestling": [
+    451,
+    550
+   ]
+  },
+  "skills_source": "research/06 §3.1 proza za tabulkou Tier 2",
+  "source": "research/06-world-content-npcs.md §3.1 (ServUO Scripts/Mobiles/Normal/*.cs); anim = AnimationsLoader.cs:1694-1777",
+  "str": [
+   76,
+   100
+  ],
+  "taming_difficulty": null,
+  "tier": 2,
+  "type": "bone_mage",
+  "virtual_armor": 38,
+  "virtual_armor_source": "research/06 §3.1 Tier 2, sloupec VA"
+ },
+ {
+  "ai": "melee",
+  "ai_raw": "Melee / Closest",
+  "anim": {
+   "attack": 4,
+   "die": 2,
+   "walk": 0
+  },
+  "anim_group": "high",
+  "anim_group_source": "tools/uoextract/anim.py:group_kind (tělo < 200 high, 200..399 low)",
+  "anim_source": "_src/classicuo/src/ClassicUO.Assets/AnimationsLoader.cs:1696-1700 (HighAnimationGroup) + tools/uoextract/anim.py:ABSTRACT_GROUPS",
+  "body": 75,
+  "body_source": "research/06 §3.1 Tier 3, sloupec Body: '75'",
+  "class": "Cyclops",
+  "damage": [
+   7,
+   23
+  ],
+  "dex": [
+   96,
+   115
+  ],
+  "fame": 4500,
+  "fight_mode": "Closest",
+  "flags": [],
+  "hits": [
+   202,
+   231
+  ],
+  "id": "cyclops",
+  "int": [
+   31,
+   55
+  ],
+  "int_": [
+   31,
+   55
+  ],
+  "karma": -4500,
+  "loot": {
+   "era": "pre-aos",
+   "gold_dice": "10d10+250",
+   "gold_source": "_src/servuo/Scripts/Misc/LootPack.cs:447",
+   "pack": "rich",
+   "source": "research/06 §3.1 Tier 3, sloupec Loot (per monstrum, NIKDY z fame)"
+  },
+  "loot_pack": "rich",
+  "loot_raw": "Rich + Average",
+  "loot_source": "research/06 §3.1 Tier 3, sloupec Loot (per monstrum, NIKDY z fame)",
+  "mana": null,
+  "name": "a cyclopean warrior",
+  "notoriety": 3,
+  "notoriety_source": "research/06 §4.5 `Server/Notoriety.cs:8` — CanBeAttacked = 3 (nepritele, ne zlocinec)",
+  "resist": null,
+  "resist_source": "pending-source (tabulky §3.1 resisty nemaji; docs/05 §5.16 = pre-AoS pouziva VirtualArmor)",
+  "skills": {
+   "Resisting Spells": [
+    603,
+    1050
+   ],
+   "Tactics": [
+    801,
+    1000
+   ],
+   "Wrestling": [
+    801,
+    900
+   ]
+  },
+  "skills_source": "research/06 §3.1 proza za tabulkou Tier 3",
+  "source": "research/06-world-content-npcs.md §3.1 (ServUO Scripts/Mobiles/Normal/*.cs); anim = AnimationsLoader.cs:1694-1777",
+  "str": [
+   336,
+   385
+  ],
+  "taming_difficulty": null,
+  "tier": 3,
+  "type": "cyclops",
+  "virtual_armor": 48,
+  "virtual_armor_source": "research/06 §3.1 Tier 3, sloupec VA"
+ },
+ {
+  "ai": "mage",
+  "ai_raw": "Mage / Closest",
+  "anim": {
+   "attack": 4,
+   "die": 2,
+   "walk": 0
+  },
+  "anim_group": "high",
+  "anim_group_source": "tools/uoextract/anim.py:group_kind (tělo < 200 high, 200..399 low)",
+  "anim_source": "_src/classicuo/src/ClassicUO.Assets/AnimationsLoader.cs:1696-1700 (HighAnimationGroup) + tools/uoextract/anim.py:ABSTRACT_GROUPS",
+  "body": 9,
+  "body_source": "research/06 §3.1 Tier 4, sloupec Body: '9'",
+  "class": "Daemon",
+  "damage": [
+   7,
+   14
+  ],
+  "dex": [
+   76,
+   95
+  ],
+  "fame": 15000,
+  "fight_mode": "Closest",
+  "flags": [],
+  "hits": [
+   286,
+   303
+  ],
+  "id": "daemon",
+  "int": [
+   301,
+   325
+  ],
+  "int_": [
+   301,
+   325
+  ],
+  "karma": -15000,
+  "loot": {
+   "era": "pre-aos",
+   "gold_dice": "10d10+250",
+   "gold_source": "_src/servuo/Scripts/Misc/LootPack.cs:447",
+   "pack": "rich",
+   "source": "research/06 §3.1 Tier 4, sloupec Loot (per monstrum, NIKDY z fame)"
+  },
+  "loot_pack": "rich",
+  "loot_raw": "Rich + Average ×2 + MedScrolls ×2",
+  "loot_source": "research/06 §3.1 Tier 4, sloupec Loot (per monstrum, NIKDY z fame)",
+  "mana": null,
+  "name": "daemon",
+  "notoriety": 3,
+  "notoriety_source": "research/06 §4.5 `Server/Notoriety.cs:8` — CanBeAttacked = 3 (nepritele, ne zlocinec)",
+  "resist": null,
+  "resist_source": "pending-source (tabulky §3.1 resisty nemaji; docs/05 §5.16 = pre-AoS pouziva VirtualArmor)",
+  "skills": {
+   "Evaluating Intelligence": [
+    701,
+    800
+   ],
+   "Magery": [
+    701,
+    800
+   ],
+   "Resisting Spells": [
+    851,
+    950
+   ],
+   "Tactics": [
+    701,
+    800
+   ],
+   "Wrestling": [
+    601,
+    800
+   ]
+  },
+  "skills_source": "research/06 §3.1 proza za tabulkou Tier 4",
+  "source": "research/06-world-content-npcs.md §3.1 (ServUO Scripts/Mobiles/Normal/*.cs); anim = AnimationsLoader.cs:1694-1777",
+  "str": [
+   476,
+   505
+  ],
+  "taming_difficulty": null,
+  "tier": 4,
+  "type": "daemon",
+  "virtual_armor": 58,
+  "virtual_armor_source": "research/06 §3.1 Tier 4, sloupec VA"
+ },
+ {
+  "ai": "mage",
+  "ai_raw": "Mage / Closest",
+  "anim": {
+   "attack": 4,
+   "die": 2,
+   "walk": 0
+  },
+  "anim_group": "high",
+  "anim_group_source": "tools/uoextract/anim.py:group_kind (tělo < 200 high, 200..399 low)",
+  "anim_source": "_src/classicuo/src/ClassicUO.Assets/AnimationsLoader.cs:1696-1700 (HighAnimationGroup) + tools/uoextract/anim.py:ABSTRACT_GROUPS",
+  "body": 12,
+  "body_source": "research/06 §3.1 Tier 4, sloupec Body: '12 or 59 (random)'",
+  "class": "Dragon",
+  "damage": [
+   16,
+   22
+  ],
+  "dex": [
+   86,
+   105
+  ],
+  "fame": 15000,
+  "fight_mode": "Closest",
+  "flags": [],
+  "hits": [
+   478,
+   495
+  ],
+  "id": "dragon",
+  "int": [
+   436,
+   475
+  ],
+  "int_": [
+   436,
+   475
+  ],
+  "karma": -15000,
+  "loot": {
+   "era": "pre-aos",
+   "gold_dice": "2d125+400",
+   "gold_source": "_src/servuo/Scripts/Misc/LootPack.cs:457",
+   "pack": "filthy_rich",
+   "source": "research/06 §3.1 Tier 4, sloupec Loot (per monstrum, NIKDY z fame)"
+  },
+  "loot_pack": "filthy_rich",
+  "loot_raw": "**FilthyRich ×2** + Gems ×8",
+  "loot_source": "research/06 §3.1 Tier 4, sloupec Loot (per monstrum, NIKDY z fame)",
+  "mana": null,
+  "name": "dragon",
+  "notoriety": 3,
+  "notoriety_source": "research/06 §4.5 `Server/Notoriety.cs:8` — CanBeAttacked = 3 (nepritele, ne zlocinec)",
+  "resist": null,
+  "resist_source": "pending-source (tabulky §3.1 resisty nemaji; docs/05 §5.16 = pre-AoS pouziva VirtualArmor)",
+  "skills": {
+   "Evaluating Intelligence": [
+    301,
+    400
+   ],
+   "Magery": [
+    301,
+    400
+   ],
+   "Resisting Spells": [
+    991,
+    1000
+   ],
+   "Tactics": [
+    976,
+    1000
+   ],
+   "Wrestling": [
+    901,
+    925
+   ]
+  },
+  "skills_source": "research/06 §3.1 proza za tabulkou Tier 4",
+  "source": "research/06-world-content-npcs.md §3.1 (ServUO Scripts/Mobiles/Normal/*.cs); anim = AnimationsLoader.cs:1694-1777",
+  "str": [
+   796,
+   825
+  ],
+  "taming_difficulty": null,
+  "tier": 4,
+  "type": "dragon",
+  "virtual_armor": 60,
+  "virtual_armor_source": "research/06 §3.1 Tier 4, sloupec VA"
+ },
+ {
+  "ai": "melee",
+  "ai_raw": "Melee / Closest",
+  "anim": {
+   "attack": 4,
+   "die": 2,
+   "walk": 0
+  },
+  "anim_group": "high",
+  "anim_group_source": "tools/uoextract/anim.py:group_kind (tělo < 200 high, 200..399 low)",
+  "anim_source": "_src/classicuo/src/ClassicUO.Assets/AnimationsLoader.cs:1696-1700 (HighAnimationGroup) + tools/uoextract/anim.py:ABSTRACT_GROUPS",
+  "body": 60,
+  "body_source": "research/06 §3.1 Tier 3, sloupec Body: '60 or 61 (random)'",
+  "class": "Drake",
+  "damage": [
+   11,
+   17
+  ],
+  "dex": [
+   133,
+   152
+  ],
+  "fame": 5500,
+  "fight_mode": "Closest",
+  "flags": [],
+  "hits": [
+   241,
+   258
+  ],
+  "id": "drake",
+  "int": [
+   101,
+   140
+  ],
+  "int_": [
+   101,
+   140
+  ],
+  "karma": -5500,
+  "loot": {
+   "era": "pre-aos",
+   "gold_dice": "10d10+250",
+   "gold_source": "_src/servuo/Scripts/Misc/LootPack.cs:447",
+   "pack": "rich",
+   "source": "research/06 §3.1 Tier 3, sloupec Loot (per monstrum, NIKDY z fame)"
+  },
+  "loot_pack": "rich",
+  "loot_raw": "Rich + MedScrolls ×2",
+  "loot_source": "research/06 §3.1 Tier 3, sloupec Loot (per monstrum, NIKDY z fame)",
+  "mana": null,
+  "name": "drake",
+  "notoriety": 3,
+  "notoriety_source": "research/06 §4.5 `Server/Notoriety.cs:8` — CanBeAttacked = 3 (nepritele, ne zlocinec)",
+  "resist": null,
+  "resist_source": "pending-source (tabulky §3.1 resisty nemaji; docs/05 §5.16 = pre-AoS pouziva VirtualArmor)",
+  "skills": {
+   "Resisting Spells": [
+    651,
+    800
+   ],
+   "Tactics": [
+    651,
+    900
+   ],
+   "Wrestling": [
+    651,
+    800
+   ]
+  },
+  "skills_source": "research/06 §3.1 proza za tabulkou Tier 3",
+  "source": "research/06-world-content-npcs.md §3.1 (ServUO Scripts/Mobiles/Normal/*.cs); anim = AnimationsLoader.cs:1694-1777",
+  "str": [
+   401,
+   430
+  ],
+  "taming_difficulty": null,
+  "tier": 3,
+  "type": "drake",
+  "virtual_armor": 46,
+  "virtual_armor_source": "research/06 §3.1 Tier 3, sloupec VA"
+ },
+ {
+  "ai": null,
+  "ai_raw": "**Mage** / Closest",
+  "anim": {
+   "attack": 4,
+   "die": 2,
+   "walk": 0
+  },
+  "anim_group": "high",
+  "anim_group_source": "tools/uoextract/anim.py:group_kind (tělo < 200 high, 200..399 low)",
+  "anim_source": "_src/classicuo/src/ClassicUO.Assets/AnimationsLoader.cs:1696-1700 (HighAnimationGroup) + tools/uoextract/anim.py:ABSTRACT_GROUPS",
+  "body": 11,
+  "body_source": "research/06 §3.1 Tier 3, sloupec Body: '11'",
+  "class": "DreadSpider",
+  "damage": [
+   5,
+   17
+  ],
+  "dex": [
+   126,
+   145
+  ],
+  "fame": 5000,
+  "fight_mode": "Closest",
+  "flags": [
+   "poisonous"
+  ],
+  "hit_poison": "lethal",
+  "hit_poison_source": "research/06 §3.5 (proza 'Poisoning (HitPoison)': Slime/Snake Lesser, GiantSpider Regular, Scorpion/GiantSerpent Greater, DreadSpider Lethal)",
+  "hits": [
+   118,
+   132
+  ],
+  "id": "dread_spider",
+  "int": [
+   286,
+   310
+  ],
+  "int_": [
+   286,
+   310
+  ],
+  "karma": -5000,
+  "loot": {
+   "era": "pre-aos",
+   "gold_dice": "2d125+400",
+   "gold_source": "_src/servuo/Scripts/Misc/LootPack.cs:457",
+   "pack": "filthy_rich",
+   "source": "research/06 §3.1 Tier 3, sloupec Loot (per monstrum, NIKDY z fame)"
+  },
+  "loot_pack": "filthy_rich",
+  "loot_raw": "**FilthyRich**",
+  "loot_source": "research/06 §3.1 Tier 3, sloupec Loot (per monstrum, NIKDY z fame)",
+  "mana": null,
+  "name": "dreadspider",
+  "notoriety": 3,
+  "notoriety_source": "research/06 §4.5 `Server/Notoriety.cs:8` — CanBeAttacked = 3 (nepritele, ne zlocinec)",
+  "resist": null,
+  "resist_source": "pending-source (tabulky §3.1 resisty nemaji; docs/05 §5.16 = pre-AoS pouziva VirtualArmor)",
+  "skills": {
+   "Detecting Hidden": [
+    500,
+    600
+   ],
+   "Evaluating Intelligence": [
+    651,
+    800
+   ],
+   "Magery": [
+    651,
+    800
+   ],
+   "Necromancy": [
+    200,
+    200
+   ],
+   "Poisoning": [
+    800,
+    800
+   ],
+   "Resisting Spells": [
+    451,
+    600
+   ],
+   "Spirit Speak": [
+    200,
+    200
+   ],
+   "Tactics": [
+    551,
+    700
+   ],
+   "Wrestling": [
+    601,
+    750
+   ]
+  },
+  "skills_source": "research/06 §3.1 proza za tabulkou Tier 3",
+  "source": "research/06-world-content-npcs.md §3.1 (ServUO Scripts/Mobiles/Normal/*.cs); anim = AnimationsLoader.cs:1694-1777",
+  "str": [
+   196,
+   220
+  ],
+  "taming_difficulty": null,
+  "tier": 3,
+  "type": "dread_spider",
+  "virtual_armor": 36,
+  "virtual_armor_source": "research/06 §3.1 Tier 3, sloupec VA"
+ },
+ {
+  "ai": "melee",
+  "ai_raw": "Melee / Closest",
+  "anim": {
+   "attack": 4,
+   "die": 2,
+   "walk": 0
+  },
+  "anim_group": "high",
+  "anim_group_source": "tools/uoextract/anim.py:group_kind (tělo < 200 high, 200..399 low)",
+  "anim_source": "_src/classicuo/src/ClassicUO.Assets/AnimationsLoader.cs:1696-1700 (HighAnimationGroup) + tools/uoextract/anim.py:ABSTRACT_GROUPS",
+  "body": 14,
+  "body_source": "research/06 §3.1 Tier 2, sloupec Body: '14'",
+  "class": "EarthElemental",
+  "damage": [
+   9,
+   16
+  ],
+  "dex": [
+   66,
+   85
+  ],
+  "fame": 3500,
+  "fight_mode": "Closest",
+  "flags": [],
+  "hits": [
+   76,
+   93
+  ],
+  "id": "earth_elemental",
+  "int": [
+   71,
+   92
+  ],
+  "int_": [
+   71,
+   92
+  ],
+  "karma": -3500,
+  "loot": {
+   "era": "pre-aos",
+   "gold_dice": "10d10+50",
+   "gold_source": "_src/servuo/Scripts/Misc/LootPack.cs:437",
+   "pack": "average",
+   "source": "research/06 §3.1 Tier 2, sloupec Loot (per monstrum, NIKDY z fame)"
+  },
+  "loot_pack": "average",
+  "loot_raw": "Average + Meager + Gems",
+  "loot_source": "research/06 §3.1 Tier 2, sloupec Loot (per monstrum, NIKDY z fame)",
+  "mana": null,
+  "name": "earthelemental",
+  "notoriety": 3,
+  "notoriety_source": "research/06 §4.5 `Server/Notoriety.cs:8` — CanBeAttacked = 3 (nepritele, ne zlocinec)",
+  "resist": null,
+  "resist_source": "pending-source (tabulky §3.1 resisty nemaji; docs/05 §5.16 = pre-AoS pouziva VirtualArmor)",
+  "skills": {
+   "Resisting Spells": [
+    501,
+    950
+   ],
+   "Tactics": [
+    601,
+    1000
+   ],
+   "Wrestling": [
+    601,
+    1000
+   ]
+  },
+  "skills_source": "research/06 §3.1 proza za tabulkou Tier 2",
+  "source": "research/06-world-content-npcs.md §3.1 (ServUO Scripts/Mobiles/Normal/*.cs); anim = AnimationsLoader.cs:1694-1777",
+  "str": [
+   126,
+   155
+  ],
+  "taming_difficulty": null,
+  "tier": 2,
+  "type": "earth_elemental",
+  "virtual_armor": 34,
+  "virtual_armor_source": "research/06 §3.1 Tier 2, sloupec VA"
+ },
+ {
+  "ai": "mage",
+  "ai_raw": "Mage / Closest",
+  "anim": {
+   "attack": 4,
+   "die": 2,
+   "walk": 0
+  },
+  "anim_group": "high",
+  "anim_group_source": "tools/uoextract/anim.py:group_kind (tělo < 200 high, 200..399 low)",
+  "anim_source": "_src/classicuo/src/ClassicUO.Assets/AnimationsLoader.cs:1696-1700 (HighAnimationGroup) + tools/uoextract/anim.py:ABSTRACT_GROUPS",
+  "body": 131,
+  "body_source": "research/06 §3.1 Tier 3, sloupec Body: '131'",
+  "class": "Efreet",
+  "damage": [
+   11,
+   13
+  ],
+  "dex": [
+   266,
+   285
+  ],
+  "fame": 10000,
+  "fight_mode": "Closest",
+  "flags": [],
+  "hits": [
+   196,
+   213
+  ],
+  "id": "efreet",
+  "int": [
+   171,
+   195
+  ],
+  "int_": [
+   171,
+   195
+  ],
+  "karma": -10000,
+  "loot": {
+   "era": "pre-aos",
+   "gold_dice": "10d10+250",
+   "gold_source": "_src/servuo/Scripts/Misc/LootPack.cs:447",
+   "pack": "rich",
+   "source": "research/06 §3.1 Tier 3, sloupec Loot (per monstrum, NIKDY z fame)"
+  },
+  "loot_pack": "rich",
+  "loot_raw": "Rich + Average + Gems",
+  "loot_source": "research/06 §3.1 Tier 3, sloupec Loot (per monstrum, NIKDY z fame)",
+  "mana": null,
+  "name": "efreet",
+  "notoriety": 3,
+  "notoriety_source": "research/06 §4.5 `Server/Notoriety.cs:8` — CanBeAttacked = 3 (nepritele, ne zlocinec)",
+  "resist": null,
+  "resist_source": "pending-source (tabulky §3.1 resisty nemaji; docs/05 §5.16 = pre-AoS pouziva VirtualArmor)",
+  "skills": {
+   "Evaluating Intelligence": [
+    601,
+    750
+   ],
+   "Magery": [
+    601,
+    750
+   ],
+   "Resisting Spells": [
+    601,
+    750
+   ],
+   "Tactics": [
+    601,
+    800
+   ],
+   "Wrestling": [
+    601,
+    800
+   ]
+  },
+  "skills_source": "research/06 §3.1 proza za tabulkou Tier 3",
+  "source": "research/06-world-content-npcs.md §3.1 (ServUO Scripts/Mobiles/Normal/*.cs); anim = AnimationsLoader.cs:1694-1777",
+  "str": [
+   326,
+   355
+  ],
+  "taming_difficulty": null,
+  "tier": 3,
+  "type": "efreet",
+  "virtual_armor": 56,
+  "virtual_armor_source": "research/06 §3.1 Tier 3, sloupec VA"
+ },
+ {
+  "ai": "melee",
+  "ai_raw": "Melee / Closest",
+  "anim": {
+   "attack": 4,
+   "die": 2,
+   "walk": 0
+  },
+  "anim_group": "high",
+  "anim_group_source": "tools/uoextract/anim.py:group_kind (tělo < 200 high, 200..399 low)",
+  "anim_source": "_src/classicuo/src/ClassicUO.Assets/AnimationsLoader.cs:1696-1700 (HighAnimationGroup) + tools/uoextract/anim.py:ABSTRACT_GROUPS",
+  "body": 18,
+  "body_source": "research/06 §3.1 Tier 2, sloupec Body: '18'",
+  "class": "Ettin",
+  "damage": [
+   7,
+   17
+  ],
+  "dex": [
+   56,
+   75
+  ],
+  "fame": 3000,
+  "fight_mode": "Closest",
+  "flags": [],
+  "hits": [
+   82,
+   99
+  ],
+  "id": "ettin",
+  "int": [
+   31,
+   55
+  ],
+  "int_": [
+   31,
+   55
+  ],
+  "karma": -3000,
+  "loot": {
+   "era": "pre-aos",
+   "gold_dice": "5d10+25",
+   "gold_source": "_src/servuo/Scripts/Misc/LootPack.cs:428",
+   "pack": "meager",
+   "source": "research/06 §3.1 Tier 2, sloupec Loot (per monstrum, NIKDY z fame)"
+  },
+  "loot_pack": "meager",
+  "loot_raw": "Meager + Average + Potions",
+  "loot_source": "research/06 §3.1 Tier 2, sloupec Loot (per monstrum, NIKDY z fame)",
+  "mana": null,
+  "name": "ettin",
+  "notoriety": 3,
+  "notoriety_source": "research/06 §4.5 `Server/Notoriety.cs:8` — CanBeAttacked = 3 (nepritele, ne zlocinec)",
+  "resist": null,
+  "resist_source": "pending-source (tabulky §3.1 resisty nemaji; docs/05 §5.16 = pre-AoS pouziva VirtualArmor)",
+  "skills": {
+   "Resisting Spells": [
+    401,
+    550
+   ],
+   "Tactics": [
+    501,
+    700
+   ],
+   "Wrestling": [
+    501,
+    600
+   ]
+  },
+  "skills_source": "research/06 §3.1 proza za tabulkou Tier 2",
+  "source": "research/06-world-content-npcs.md §3.1 (ServUO Scripts/Mobiles/Normal/*.cs); anim = AnimationsLoader.cs:1694-1777",
+  "str": [
+   136,
+   165
+  ],
+  "taming_difficulty": null,
+  "tier": 2,
+  "type": "ettin",
+  "virtual_armor": 38,
+  "virtual_armor_source": "research/06 §3.1 Tier 2, sloupec VA"
+ },
+ {
+  "ai": "mage",
+  "ai_raw": "Mage / Closest",
+  "anim": {
+   "attack": 4,
+   "die": 2,
+   "walk": 0
+  },
+  "anim_group": "high",
+  "anim_group_source": "tools/uoextract/anim.py:group_kind (tělo < 200 high, 200..399 low)",
+  "anim_source": "_src/classicuo/src/ClassicUO.Assets/AnimationsLoader.cs:1696-1700 (HighAnimationGroup) + tools/uoextract/anim.py:ABSTRACT_GROUPS",
+  "body": 15,
+  "body_source": "research/06 §3.1 Tier 3, sloupec Body: '15'",
+  "class": "FireElemental",
+  "damage": [
+   7,
+   9
+  ],
+  "dex": [
+   166,
+   185
+  ],
+  "fame": 4500,
+  "fight_mode": "Closest",
+  "flags": [],
+  "hits": [
+   76,
+   93
+  ],
+  "id": "fire_elemental",
+  "int": [
+   101,
+   125
+  ],
+  "int_": [
+   101,
+   125
+  ],
+  "karma": -4500,
+  "loot": {
+   "era": "pre-aos",
+   "gold_dice": "10d10+50",
+   "gold_source": "_src/servuo/Scripts/Misc/LootPack.cs:437",
+   "pack": "average",
+   "source": "research/06 §3.1 Tier 3, sloupec Loot (per monstrum, NIKDY z fame)"
+  },
+  "loot_pack": "average",
+  "loot_raw": "Average + Meager + Gems",
+  "loot_source": "research/06 §3.1 Tier 3, sloupec Loot (per monstrum, NIKDY z fame)",
+  "mana": null,
+  "name": "fireelemental",
+  "notoriety": 3,
+  "notoriety_source": "research/06 §4.5 `Server/Notoriety.cs:8` — CanBeAttacked = 3 (nepritele, ne zlocinec)",
+  "resist": null,
+  "resist_source": "pending-source (tabulky §3.1 resisty nemaji; docs/05 §5.16 = pre-AoS pouziva VirtualArmor)",
+  "skills": {
+   "Evaluating Intelligence": [
+    601,
+    750
+   ],
+   "Magery": [
+    601,
+    750
+   ],
+   "Resisting Spells": [
+    752,
+    1050
+   ],
+   "Tactics": [
+    801,
+    1000
+   ],
+   "Wrestling": [
+    701,
+    1000
+   ]
+  },
+  "skills_source": "research/06 §3.1 proza za tabulkou Tier 3",
+  "source": "research/06-world-content-npcs.md §3.1 (ServUO Scripts/Mobiles/Normal/*.cs); anim = AnimationsLoader.cs:1694-1777",
+  "str": [
+   126,
+   155
+  ],
+  "taming_difficulty": null,
+  "tier": 3,
+  "type": "fire_elemental",
+  "virtual_armor": 40,
+  "virtual_armor_source": "research/06 §3.1 Tier 3, sloupec VA"
+ },
+ {
+  "ai": "melee",
+  "ai_raw": "Melee / Closest",
+  "anim": {
+   "attack": 4,
+   "die": 2,
+   "walk": 0
+  },
+  "anim_group": "high",
+  "anim_group_source": "tools/uoextract/anim.py:group_kind (tělo < 200 high, 200..399 low)",
+  "anim_source": "_src/classicuo/src/ClassicUO.Assets/AnimationsLoader.cs:1696-1700 (HighAnimationGroup) + tools/uoextract/anim.py:ABSTRACT_GROUPS",
+  "body": 20,
+  "body_source": "research/06 §3.1 Tier 1, sloupec Body: '20'",
+  "class": "FrostSpider",
+  "damage": [
+   6,
+   16
+  ],
+  "dex": [
+   126,
+   145
+  ],
+  "fame": 775,
+  "fight_mode": "Closest",
+  "flags": [
+   "poisonous"
+  ],
+  "hit_poison": "regular",
+  "hit_poison_source": "research/06 §3.5 (proza 'Poisoning (HitPoison)': Slime/Snake Lesser, GiantSpider Regular, Scorpion/GiantSerpent Greater, DreadSpider Lethal)",
+  "hits": [
+   46,
+   60
+  ],
+  "id": "frost_spider",
+  "int": [
+   36,
+   60
+  ],
+  "int_": [
+   36,
+   60
+  ],
+  "karma": -775,
+  "loot": {
+   "era": "pre-aos",
+   "gold_dice": "5d10+25",
+   "gold_source": "_src/servuo/Scripts/Misc/LootPack.cs:428",
+   "pack": "meager",
+   "source": "research/06 §3.1 Tier 1, sloupec Loot (per monstrum, NIKDY z fame)"
+  },
+  "loot_pack": "meager",
+  "loot_raw": "Meager + Poor",
+  "loot_source": "research/06 §3.1 Tier 1, sloupec Loot (per monstrum, NIKDY z fame)",
+  "mana": [
+   0,
+   0
+  ],
+  "name": "frostspider",
+  "notoriety": 3,
+  "notoriety_source": "research/06 §4.5 `Server/Notoriety.cs:8` — CanBeAttacked = 3 (nepritele, ne zlocinec)",
+  "resist": null,
+  "resist_source": "pending-source (tabulky §3.1 resisty nemaji; docs/05 §5.16 = pre-AoS pouziva VirtualArmor)",
+  "skills": {
+   "Resisting Spells": [
+    251,
+    400
+   ],
+   "Tactics": [
+    351,
+    500
+   ],
+   "Wrestling": [
+    501,
+    650
+   ]
+  },
+  "skills_source": "research/06 §3.1 tabulka 'Skills for tier 1'",
+  "source": "research/06-world-content-npcs.md §3.1 (ServUO Scripts/Mobiles/Normal/*.cs); anim = AnimationsLoader.cs:1694-1777",
+  "str": [
+   76,
+   100
+  ],
+  "taming_difficulty": null,
+  "tier": 1,
+  "type": "frost_spider",
+  "virtual_armor": 28,
+  "virtual_armor_source": "research/06 §3.1 Tier 1, sloupec VA"
+ },
+ {
+  "ai": null,
+  "ai_raw": "**Mage** / Closest",
+  "anim": {
+   "attack": 4,
+   "die": 2,
+   "walk": 0
+  },
+  "anim_group": "high",
+  "anim_group_source": "tools/uoextract/anim.py:group_kind (tělo < 200 high, 200..399 low)",
+  "anim_source": "_src/classicuo/src/ClassicUO.Assets/AnimationsLoader.cs:1696-1700 (HighAnimationGroup) + tools/uoextract/anim.py:ABSTRACT_GROUPS",
+  "body": 4,
+  "body_source": "research/06 §3.1 Tier 2, sloupec Body: '4'",
+  "class": "Gargoyle",
+  "damage": [
+   7,
+   14
+  ],
+  "dex": [
+   76,
+   95
+  ],
+  "fame": 3500,
+  "fight_mode": "Closest",
+  "flags": [],
+  "hits": [
+   88,
+   105
+  ],
+  "id": "gargoyle",
+  "int": [
+   81,
+   105
+  ],
+  "int_": [
+   81,
+   105
+  ],
+  "karma": -3500,
+  "loot": {
+   "era": "pre-aos",
+   "gold_dice": "10d10+50",
+   "gold_source": "_src/servuo/Scripts/Misc/LootPack.cs:437",
+   "pack": "average",
+   "source": "research/06 §3.1 Tier 2, sloupec Loot (per monstrum, NIKDY z fame)"
+  },
+  "loot_pack": "average",
+  "loot_raw": "Average + MedScrolls + Gems(1–4)",
+  "loot_source": "research/06 §3.1 Tier 2, sloupec Loot (per monstrum, NIKDY z fame)",
+  "mana": null,
+  "name": "gargoyle",
+  "notoriety": 3,
+  "notoriety_source": "research/06 §4.5 `Server/Notoriety.cs:8` — CanBeAttacked = 3 (nepritele, ne zlocinec)",
+  "resist": null,
+  "resist_source": "pending-source (tabulky §3.1 resisty nemaji; docs/05 §5.16 = pre-AoS pouziva VirtualArmor)",
+  "skills": {
+   "Evaluating Intelligence": [
+    701,
+    850
+   ],
+   "Magery": [
+    701,
+    850
+   ],
+   "Resisting Spells": [
+    701,
+    850
+   ],
+   "Tactics": [
+    501,
+    700
+   ],
+   "Wrestling": [
+    401,
+    800
+   ]
+  },
+  "skills_source": "research/06 §3.1 proza za tabulkou Tier 2",
+  "source": "research/06-world-content-npcs.md §3.1 (ServUO Scripts/Mobiles/Normal/*.cs); anim = AnimationsLoader.cs:1694-1777",
+  "str": [
+   146,
+   175
+  ],
+  "taming_difficulty": null,
+  "tier": 2,
+  "type": "gargoyle",
+  "virtual_armor": 32,
+  "virtual_armor_source": "research/06 §3.1 Tier 2, sloupec VA"
+ },
+ {
+  "ai": null,
+  "ai_raw": "**Mage** / Closest",
+  "anim": {
+   "attack": 4,
+   "die": 2,
+   "walk": 0
+  },
+  "anim_group": "high",
+  "anim_group_source": "tools/uoextract/anim.py:group_kind (tělo < 200 high, 200..399 low)",
+  "anim_source": "_src/classicuo/src/ClassicUO.Assets/AnimationsLoader.cs:1696-1700 (HighAnimationGroup) + tools/uoextract/anim.py:ABSTRACT_GROUPS",
+  "body": 22,
+  "body_source": "research/06 §3.1 Tier 2, sloupec Body: '22'",
+  "class": "Gazer",
+  "damage": [
+   5,
+   10
+  ],
+  "dex": [
+   86,
+   105
+  ],
+  "fame": 3500,
+  "fight_mode": "Closest",
+  "flags": [],
+  "hits": [
+   58,
+   75
+  ],
+  "id": "gazer",
+  "int": [
+   141,
+   165
+  ],
+  "int_": [
+   141,
+   165
+  ],
+  "karma": -3500,
+  "loot": {
+   "era": "pre-aos",
+   "gold_dice": "10d10+50",
+   "gold_source": "_src/servuo/Scripts/Misc/LootPack.cs:437",
+   "pack": "average",
+   "source": "research/06 §3.1 Tier 2, sloupec Loot (per monstrum, NIKDY z fame)"
+  },
+  "loot_pack": "average",
+  "loot_raw": "Average + Potions",
+  "loot_source": "research/06 §3.1 Tier 2, sloupec Loot (per monstrum, NIKDY z fame)",
+  "mana": null,
+  "name": "gazer",
+  "notoriety": 3,
+  "notoriety_source": "research/06 §4.5 `Server/Notoriety.cs:8` — CanBeAttacked = 3 (nepritele, ne zlocinec)",
+  "resist": null,
+  "resist_source": "pending-source (tabulky §3.1 resisty nemaji; docs/05 §5.16 = pre-AoS pouziva VirtualArmor)",
+  "skills": {
+   "Evaluating Intelligence": [
+    501,
+    650
+   ],
+   "Magery": [
+    501,
+    650
+   ],
+   "Resisting Spells": [
+    601,
+    750
+   ],
+   "Tactics": [
+    501,
+    700
+   ],
+   "Wrestling": [
+    501,
+    700
+   ]
+  },
+  "skills_source": "research/06 §3.1 proza za tabulkou Tier 2",
+  "source": "research/06-world-content-npcs.md §3.1 (ServUO Scripts/Mobiles/Normal/*.cs); anim = AnimationsLoader.cs:1694-1777",
+  "str": [
+   96,
+   125
+  ],
+  "taming_difficulty": null,
+  "tier": 2,
+  "type": "gazer",
+  "virtual_armor": 36,
+  "virtual_armor_source": "research/06 §3.1 Tier 2, sloupec VA"
+ },
+ {
+  "ai": "melee",
+  "ai_raw": "Melee / Closest",
+  "anim": {
+   "attack": 4,
+   "die": 2,
+   "walk": 0
+  },
+  "anim_group": "high",
+  "anim_group_source": "tools/uoextract/anim.py:group_kind (tělo < 200 high, 200..399 low)",
+  "anim_source": "_src/classicuo/src/ClassicUO.Assets/AnimationsLoader.cs:1696-1700 (HighAnimationGroup) + tools/uoextract/anim.py:ABSTRACT_GROUPS",
+  "body": 153,
+  "body_source": "research/06 §3.1 Tier 1, sloupec Body: '153'",
+  "class": "Ghoul",
+  "damage": [
+   7,
+   9
+  ],
+  "dex": [
+   76,
+   95
+  ],
+  "fame": 2500,
+  "fight_mode": "Closest",
+  "flags": [
+   "undead"
+  ],
+  "flags_source": "research/06 §3.5 (proza 'Undead flag': Skeleton, Zombie, Ghoul, Lich, BoneMagi, Wraith, Spectre, Mummy, Shade, SkeletalKnight)",
+  "hits": [
+   46,
+   60
+  ],
+  "id": "ghoul",
+  "int": [
+   36,
+   60
+  ],
+  "int_": [
+   36,
+   60
+  ],
+  "karma": -2500,
+  "loot": {
+   "era": "pre-aos",
+   "gold_dice": "5d10+25",
+   "gold_source": "_src/servuo/Scripts/Misc/LootPack.cs:428",
+   "pack": "meager",
+   "source": "research/06 §3.1 Tier 1, sloupec Loot (per monstrum, NIKDY z fame)"
+  },
+  "loot_pack": "meager",
+  "loot_raw": "Meager",
+  "loot_source": "research/06 §3.1 Tier 1, sloupec Loot (per monstrum, NIKDY z fame)",
+  "mana": [
+   0,
+   0
+  ],
+  "name": "ghoul",
+  "notoriety": 3,
+  "notoriety_source": "research/06 §4.5 `Server/Notoriety.cs:8` — CanBeAttacked = 3 (nepritele, ne zlocinec)",
+  "resist": null,
+  "resist_source": "pending-source (tabulky §3.1 resisty nemaji; docs/05 §5.16 = pre-AoS pouziva VirtualArmor)",
+  "skills": {
+   "Resisting Spells": [
+    451,
+    600
+   ],
+   "Tactics": [
+    451,
+    600
+   ],
+   "Wrestling": [
+    451,
+    550
+   ]
+  },
+  "skills_source": "research/06 §3.1 tabulka 'Skills for tier 1'",
+  "source": "research/06-world-content-npcs.md §3.1 (ServUO Scripts/Mobiles/Normal/*.cs); anim = AnimationsLoader.cs:1694-1777",
+  "str": [
+   76,
+   100
+  ],
+  "taming_difficulty": null,
+  "tier": 1,
+  "type": "ghoul",
+  "virtual_armor": 28,
+  "virtual_armor_source": "research/06 §3.1 Tier 1, sloupec VA"
+ },
+ {
+  "ai": "melee",
+  "ai_raw": "Melee / Closest",
+  "anim": {
+   "attack": 4,
+   "die": 2,
+   "walk": 0
+  },
+  "anim_group": "high",
+  "anim_group_source": "tools/uoextract/anim.py:group_kind (tělo < 200 high, 200..399 low)",
+  "anim_source": "_src/classicuo/src/ClassicUO.Assets/AnimationsLoader.cs:1696-1700 (HighAnimationGroup) + tools/uoextract/anim.py:ABSTRACT_GROUPS",
+  "body": 21,
+  "body_source": "research/06 §3.1 Tier 2, sloupec Body: '0x15'",
+  "class": "GiantSerpent",
+  "damage": [
+   7,
+   17
+  ],
+  "dex": [
+   56,
+   80
+  ],
+  "fame": 2500,
+  "fight_mode": "Closest",
+  "flags": [
+   "poisonous"
+  ],
+  "hit_poison": "greater",
+  "hit_poison_source": "research/06 §3.5 (proza 'Poisoning (HitPoison)': Slime/Snake Lesser, GiantSpider Regular, Scorpion/GiantSerpent Greater, DreadSpider Lethal)",
+  "hits": [
+   112,
+   129
+  ],
+  "id": "giant_serpent",
+  "int": [
+   66,
+   85
+  ],
+  "int_": [
+   66,
+   85
+  ],
+  "karma": -2500,
+  "loot": {
+   "era": "pre-aos",
+   "gold_dice": "10d10+50",
+   "gold_source": "_src/servuo/Scripts/Misc/LootPack.cs:437",
+   "pack": "average",
+   "source": "research/06 §3.1 Tier 2, sloupec Loot (per monstrum, NIKDY z fame)"
+  },
+  "loot_pack": "average",
+  "loot_raw": "Average",
+  "loot_source": "research/06 §3.1 Tier 2, sloupec Loot (per monstrum, NIKDY z fame)",
+  "mana": null,
+  "name": "giantserpent",
+  "notoriety": 3,
+  "notoriety_source": "research/06 §4.5 `Server/Notoriety.cs:8` — CanBeAttacked = 3 (nepritele, ne zlocinec)",
+  "resist": null,
+  "resist_source": "pending-source (tabulky §3.1 resisty nemaji; docs/05 §5.16 = pre-AoS pouziva VirtualArmor)",
+  "skills": {
+   "Poisoning": [
+    701,
+    1000
+   ],
+   "Resisting Spells": [
+    251,
+    400
+   ],
+   "Tactics": [
+    651,
+    700
+   ],
+   "Wrestling": [
+    601,
+    800
+   ]
+  },
+  "skills_source": "research/06 §3.1 proza za tabulkou Tier 2",
+  "source": "research/06-world-content-npcs.md §3.1 (ServUO Scripts/Mobiles/Normal/*.cs); anim = AnimationsLoader.cs:1694-1777",
+  "str": [
+   186,
+   215
+  ],
+  "taming_difficulty": null,
+  "tier": 2,
+  "type": "giant_serpent",
+  "virtual_armor": 32,
+  "virtual_armor_source": "research/06 §3.1 Tier 2, sloupec VA"
+ },
+ {
+  "ai": "melee",
+  "ai_raw": "Melee / Closest",
+  "anim": {
+   "attack": 4,
+   "die": 2,
+   "walk": 0
+  },
+  "anim_group": "high",
+  "anim_group_source": "tools/uoextract/anim.py:group_kind (tělo < 200 high, 200..399 low)",
+  "anim_source": "_src/classicuo/src/ClassicUO.Assets/AnimationsLoader.cs:1696-1700 (HighAnimationGroup) + tools/uoextract/anim.py:ABSTRACT_GROUPS",
+  "body": 28,
+  "body_source": "research/06 §3.1 Tier 1, sloupec Body: '28'",
+  "class": "GiantSpider",
+  "damage": [
+   5,
+   13
+  ],
+  "dex": [
+   76,
+   95
+  ],
+  "fame": 600,
+  "fight_mode": "Closest",
+  "flags": [
+   "poisonous"
+  ],
+  "hit_poison": "regular",
+  "hit_poison_source": "research/06 §3.5 (proza 'Poisoning (HitPoison)': Slime/Snake Lesser, GiantSpider Regular, Scorpion/GiantSerpent Greater, DreadSpider Lethal)",
+  "hits": [
+   46,
+   60
+  ],
+  "id": "giant_spider",
+  "int": [
+   36,
+   60
+  ],
+  "int_": [
+   36,
+   60
+  ],
+  "karma": -600,
+  "loot": {
+   "era": "pre-aos",
+   "gold_dice": "1d25",
+   "gold_source": "_src/servuo/Scripts/Misc/LootPack.cs:422",
+   "pack": "poor",
+   "source": "research/06 §3.1 Tier 1, sloupec Loot (per monstrum, NIKDY z fame)"
+  },
+  "loot_pack": "poor",
+  "loot_raw": "Poor",
+  "loot_source": "research/06 §3.1 Tier 1, sloupec Loot (per monstrum, NIKDY z fame)",
+  "mana": [
+   0,
+   0
+  ],
+  "name": "giantspider",
+  "notoriety": 3,
+  "notoriety_source": "research/06 §4.5 `Server/Notoriety.cs:8` — CanBeAttacked = 3 (nepritele, ne zlocinec)",
+  "resist": null,
+  "resist_source": "pending-source (tabulky §3.1 resisty nemaji; docs/05 §5.16 = pre-AoS pouziva VirtualArmor)",
+  "skills": {
+   "Poisoning": [
+    601,
+    800
+   ],
+   "Resisting Spells": [
+    251,
+    400
+   ],
+   "Tactics": [
+    351,
+    500
+   ],
+   "Wrestling": [
+    501,
+    650
+   ]
+  },
+  "skills_source": "research/06 §3.1 tabulka 'Skills for tier 1'",
+  "source": "research/06-world-content-npcs.md §3.1 (ServUO Scripts/Mobiles/Normal/*.cs); anim = AnimationsLoader.cs:1694-1777",
+  "str": [
+   76,
+   100
+  ],
+  "taming_difficulty": 591,
+  "tier": 1,
+  "type": "giant_spider",
+  "virtual_armor": 16,
+  "virtual_armor_source": "research/06 §3.1 Tier 1, sloupec VA"
+ },
+ {
+  "ai": "mage",
+  "ai_raw": "Mage / Closest",
+  "anim": {
+   "attack": 4,
+   "die": 2,
+   "walk": 0
+  },
+  "anim_group": "high",
+  "anim_group_source": "tools/uoextract/anim.py:group_kind (tělo < 200 high, 200..399 low)",
+  "anim_source": "_src/classicuo/src/ClassicUO.Assets/AnimationsLoader.cs:1696-1700 (HighAnimationGroup) + tools/uoextract/anim.py:ABSTRACT_GROUPS",
+  "body": 12,
+  "body_source": "research/06 §3.1 Tier 4, sloupec Body: '12 or 59'",
+  "class": "GreaterDragon",
+  "damage": [
+   24,
+   33
+  ],
+  "dex": [
+   81,
+   148
+  ],
+  "fame": 22000,
+  "fight_mode": "Closest",
+  "flags": [],
+  "hits": [
+   1000,
+   2000
+  ],
+  "id": "greater_dragon",
+  "int": [
+   475,
+   675
+  ],
+  "int_": [
+   475,
+   675
+  ],
+  "karma": -15000,
+  "loot": {
+   "era": "pre-aos",
+   "gold_dice": "2d125+400",
+   "gold_source": "_src/servuo/Scripts/Misc/LootPack.cs:457",
+   "pack": "filthy_rich",
+   "source": "research/06 §3.1 Tier 4, sloupec Loot (per monstrum, NIKDY z fame)"
+  },
+  "loot_pack": "filthy_rich",
+  "loot_raw": "FilthyRich ×4 + Gems ×8",
+  "loot_source": "research/06 §3.1 Tier 4, sloupec Loot (per monstrum, NIKDY z fame)",
+  "mana": null,
+  "name": "greaterdragon",
+  "notoriety": 3,
+  "notoriety_source": "research/06 §4.5 `Server/Notoriety.cs:8` — CanBeAttacked = 3 (nepritele, ne zlocinec)",
+  "resist": null,
+  "resist_source": "pending-source (tabulky §3.1 resisty nemaji; docs/05 §5.16 = pre-AoS pouziva VirtualArmor)",
+  "skills": {
+   "Magery": [
+    1100,
+    1400
+   ],
+   "Resisting Spells": [
+    1100,
+    1400
+   ],
+   "Tactics": [
+    1100,
+    1400
+   ],
+   "Wrestling": [
+    1150,
+    1450
+   ]
+  },
+  "skills_source": "research/06 §3.1 proza za tabulkou Tier 4",
+  "source": "research/06-world-content-npcs.md §3.1 (ServUO Scripts/Mobiles/Normal/*.cs); anim = AnimationsLoader.cs:1694-1777",
+  "str": [
+   1025,
+   1425
+  ],
+  "taming_difficulty": null,
+  "tier": 4,
+  "type": "greater_dragon",
+  "virtual_armor": 60,
+  "virtual_armor_source": "research/06 §3.1 Tier 4, sloupec VA"
+ },
+ {
+  "ai": "melee",
+  "ai_raw": "Melee / Closest",
+  "anim": {
+   "attack": 4,
+   "die": 2,
+   "walk": 0
+  },
+  "anim_group": "high",
+  "anim_group_source": "tools/uoextract/anim.py:group_kind (tělo < 200 high, 200..399 low)",
+  "anim_source": "_src/classicuo/src/ClassicUO.Assets/AnimationsLoader.cs:1696-1700 (HighAnimationGroup) + tools/uoextract/anim.py:ABSTRACT_GROUPS",
+  "body": 30,
+  "body_source": "research/06 §3.1 Tier 2, sloupec Body: '30'",
+  "class": "Harpy",
+  "damage": [
+   5,
+   7
+  ],
+  "dex": [
+   86,
+   110
+  ],
+  "fame": 2500,
+  "fight_mode": "Closest",
+  "flags": [],
+  "hits": [
+   58,
+   72
+  ],
+  "id": "harpy",
+  "int": [
+   51,
+   75
+  ],
+  "int_": [
+   51,
+   75
+  ],
+  "karma": -2500,
+  "loot": {
+   "era": "pre-aos",
+   "gold_dice": "5d10+25",
+   "gold_source": "_src/servuo/Scripts/Misc/LootPack.cs:428",
+   "pack": "meager",
+   "source": "research/06 §3.1 Tier 2, sloupec Loot (per monstrum, NIKDY z fame)"
+  },
+  "loot_pack": "meager",
+  "loot_raw": "Meager ×2",
+  "loot_source": "research/06 §3.1 Tier 2, sloupec Loot (per monstrum, NIKDY z fame)",
+  "mana": null,
+  "name": "harpy",
+  "notoriety": 3,
+  "notoriety_source": "research/06 §4.5 `Server/Notoriety.cs:8` — CanBeAttacked = 3 (nepritele, ne zlocinec)",
+  "resist": null,
+  "resist_source": "pending-source (tabulky §3.1 resisty nemaji; docs/05 §5.16 = pre-AoS pouziva VirtualArmor)",
+  "skills": {
+   "Resisting Spells": [
+    501,
+    650
+   ],
+   "Tactics": [
+    701,
+    1000
+   ],
+   "Wrestling": [
+    601,
+    900
+   ]
+  },
+  "skills_source": ".cache/analysis/monsters.tsv (extract-monsters.ps1) — proza §3.1 skilly u tohoto monstra nevypisuje",
+  "source": "research/06-world-content-npcs.md §3.1 (ServUO Scripts/Mobiles/Normal/*.cs); anim = AnimationsLoader.cs:1694-1777",
+  "str": [
+   96,
+   120
+  ],
+  "taming_difficulty": null,
+  "tier": 2,
+  "type": "harpy",
+  "virtual_armor": 28,
+  "virtual_armor_source": "research/06 §3.1 Tier 2, sloupec VA"
+ },
+ {
+  "ai": "melee",
+  "ai_raw": "Melee / Closest",
+  "anim": {
+   "attack": 4,
+   "die": 2,
+   "walk": 0
+  },
+  "anim_group": "high",
+  "anim_group_source": "tools/uoextract/anim.py:group_kind (tělo < 200 high, 200..399 low)",
+  "anim_source": "_src/classicuo/src/ClassicUO.Assets/AnimationsLoader.cs:1696-1700 (HighAnimationGroup) + tools/uoextract/anim.py:ABSTRACT_GROUPS",
+  "body": 31,
+  "body_source": "research/06 §3.1 Tier 1, sloupec Body: '31'",
+  "class": "HeadlessOne",
+  "damage": [
+   5,
+   10
+  ],
+  "dex": [
+   36,
+   55
+  ],
+  "fame": 450,
+  "fight_mode": "Closest",
+  "flags": [],
+  "hits": [
+   16,
+   30
+  ],
+  "id": "headless_one",
+  "int": [
+   16,
+   30
+  ],
+  "int_": [
+   16,
+   30
+  ],
+  "karma": -450,
+  "loot": {
+   "era": "pre-aos",
+   "gold_dice": "1d25",
+   "gold_source": "_src/servuo/Scripts/Misc/LootPack.cs:422",
+   "pack": "poor",
+   "source": "research/06 §3.1 Tier 1, sloupec Loot (per monstrum, NIKDY z fame)"
+  },
+  "loot_pack": "poor",
+  "loot_raw": "Poor",
+  "loot_source": "research/06 §3.1 Tier 1, sloupec Loot (per monstrum, NIKDY z fame)",
+  "mana": null,
+  "name": "a headless one",
+  "notoriety": 3,
+  "notoriety_source": "research/06 §4.5 `Server/Notoriety.cs:8` — CanBeAttacked = 3 (nepritele, ne zlocinec)",
+  "resist": null,
+  "resist_source": "pending-source (tabulky §3.1 resisty nemaji; docs/05 §5.16 = pre-AoS pouziva VirtualArmor)",
+  "skills": {
+   "Resisting Spells": [
+    151,
+    200
+   ],
+   "Tactics": [
+    251,
+    400
+   ],
+   "Wrestling": [
+    251,
+    400
+   ]
+  },
+  "skills_source": "research/06 §3.1 tabulka 'Skills for tier 1'",
+  "source": "research/06-world-content-npcs.md §3.1 (ServUO Scripts/Mobiles/Normal/*.cs); anim = AnimationsLoader.cs:1694-1777",
+  "str": [
+   26,
+   50
+  ],
+  "taming_difficulty": null,
+  "tier": 1,
+  "type": "headless_one",
+  "virtual_armor": 18,
+  "virtual_armor_source": "research/06 §3.1 Tier 1, sloupec VA"
+ },
+ {
+  "ai": "mage",
+  "ai_raw": "Mage / Closest",
+  "anim": {
+   "attack": 4,
+   "die": 2,
+   "walk": 0
+  },
+  "anim_group": "high",
+  "anim_group_source": "tools/uoextract/anim.py:group_kind (tělo < 200 high, 200..399 low)",
+  "anim_source": "_src/classicuo/src/ClassicUO.Assets/AnimationsLoader.cs:1696-1700 (HighAnimationGroup) + tools/uoextract/anim.py:ABSTRACT_GROUPS",
+  "body": 74,
+  "body_source": "research/06 §3.1 Tier 2, sloupec Body: '74'",
+  "class": "Imp",
+  "damage": [
+   10,
+   14
+  ],
+  "dex": [
+   61,
+   80
+  ],
+  "fame": 2500,
+  "fight_mode": "Closest",
+  "flags": [],
+  "hits": [
+   55,
+   70
+  ],
+  "id": "imp",
+  "int": [
+   86,
+   105
+  ],
+  "int_": [
+   86,
+   105
+  ],
+  "karma": -2500,
+  "loot": {
+   "era": "pre-aos",
+   "gold_dice": "5d10+25",
+   "gold_source": "_src/servuo/Scripts/Misc/LootPack.cs:428",
+   "pack": "meager",
+   "source": "research/06 §3.1 Tier 2, sloupec Loot (per monstrum, NIKDY z fame)"
+  },
+  "loot_pack": "meager",
+  "loot_raw": "Meager + MedScrolls ×2",
+  "loot_source": "research/06 §3.1 Tier 2, sloupec Loot (per monstrum, NIKDY z fame)",
+  "mana": null,
+  "name": "imp",
+  "notoriety": 3,
+  "notoriety_source": "research/06 §4.5 `Server/Notoriety.cs:8` — CanBeAttacked = 3 (nepritele, ne zlocinec)",
+  "resist": null,
+  "resist_source": "pending-source (tabulky §3.1 resisty nemaji; docs/05 §5.16 = pre-AoS pouziva VirtualArmor)",
+  "skills": {
+   "Evaluating Intelligence": [
+    201,
+    300
+   ],
+   "Magery": [
+    901,
+    1000
+   ],
+   "Necromancy": [
+    200,
+    200
+   ],
+   "Resisting Spells": [
+    301,
+    500
+   ],
+   "Spirit Speak": [
+    200,
+    200
+   ],
+   "Tactics": [
+    421,
+    500
+   ],
+   "Wrestling": [
+    401,
+    440
+   ]
+  },
+  "skills_source": "research/06 §3.1 proza za tabulkou Tier 2",
+  "source": "research/06-world-content-npcs.md §3.1 (ServUO Scripts/Mobiles/Normal/*.cs); anim = AnimationsLoader.cs:1694-1777",
+  "str": [
+   91,
+   115
+  ],
+  "taming_difficulty": null,
+  "tier": 2,
+  "type": "imp",
+  "virtual_armor": 30,
+  "virtual_armor_source": "research/06 §3.1 Tier 2, sloupec VA"
+ },
+ {
+  "ai": null,
+  "ai_raw": "**NecroMage** / Closest",
+  "anim": {
+   "attack": 4,
+   "die": 2,
+   "walk": 0
+  },
+  "anim_group": "high",
+  "anim_group_source": "tools/uoextract/anim.py:group_kind (tělo < 200 high, 200..399 low)",
+  "anim_source": "_src/classicuo/src/ClassicUO.Assets/AnimationsLoader.cs:1696-1700 (HighAnimationGroup) + tools/uoextract/anim.py:ABSTRACT_GROUPS",
+  "body": 24,
+  "body_source": "research/06 §3.1 Tier 3, sloupec Body: '24'",
+  "class": "Lich",
+  "damage": [
+   24,
+   26
+  ],
+  "dex": [
+   126,
+   145
+  ],
+  "fame": 8000,
+  "fight_mode": "Closest",
+  "flags": [
+   "undead"
+  ],
+  "flags_source": "research/06 §3.5 (proza 'Undead flag': Skeleton, Zombie, Ghoul, Lich, BoneMagi, Wraith, Spectre, Mummy, Shade, SkeletalKnight)",
+  "hits": [
+   103,
+   120
+  ],
+  "id": "lich",
+  "int": [
+   276,
+   305
+  ],
+  "int_": [
+   276,
+   305
+  ],
+  "karma": -8000,
+  "loot": {
+   "era": "pre-aos",
+   "gold_dice": "10d10+250",
+   "gold_source": "_src/servuo/Scripts/Misc/LootPack.cs:447",
+   "pack": "rich",
+   "source": "research/06 §3.1 Tier 3, sloupec Loot (per monstrum, NIKDY z fame)"
+  },
+  "loot_pack": "rich",
+  "loot_raw": "Rich + MedScrolls ×2",
+  "loot_source": "research/06 §3.1 Tier 3, sloupec Loot (per monstrum, NIKDY z fame)",
+  "mana": null,
+  "name": "lich",
+  "notoriety": 3,
+  "notoriety_source": "research/06 §4.5 `Server/Notoriety.cs:8` — CanBeAttacked = 3 (nepritele, ne zlocinec)",
+  "resist": null,
+  "resist_source": "pending-source (tabulky §3.1 resisty nemaji; docs/05 §5.16 = pre-AoS pouziva VirtualArmor)",
+  "skills": {
+   "Evaluating Intelligence": [
+    1000,
+    1000
+   ],
+   "Magery": [
+    701,
+    800
+   ],
+   "Meditation": [
+    851,
+    950
+   ],
+   "Necromancy": [
+    890,
+    991
+   ],
+   "Resisting Spells": [
+    801,
+    1000
+   ],
+   "Spirit Speak": [
+    900,
+    990
+   ],
+   "Tactics": [
+    701,
+    900
+   ]
+  },
+  "skills_source": "research/06 §3.1 proza za tabulkou Tier 3",
+  "source": "research/06-world-content-npcs.md §3.1 (ServUO Scripts/Mobiles/Normal/*.cs); anim = AnimationsLoader.cs:1694-1777",
+  "str": [
+   171,
+   200
+  ],
+  "taming_difficulty": null,
+  "tier": 3,
+  "type": "lich",
+  "virtual_armor": 50,
+  "virtual_armor_source": "research/06 §3.1 Tier 3, sloupec VA"
+ },
+ {
+  "ai": "melee",
+  "ai_raw": "Melee / Closest",
+  "anim": {
+   "attack": 4,
+   "die": 2,
+   "walk": 0
+  },
+  "anim_group": "high",
+  "anim_group_source": "tools/uoextract/anim.py:group_kind (tělo < 200 high, 200..399 low)",
+  "anim_source": "_src/classicuo/src/ClassicUO.Assets/AnimationsLoader.cs:1696-1700 (HighAnimationGroup) + tools/uoextract/anim.py:ABSTRACT_GROUPS",
+  "body": 35,
+  "body_source": "research/06 §3.1 Tier 2, sloupec Body: '35 or 36 (random)'",
+  "class": "Lizardman",
+  "damage": [
+   5,
+   7
+  ],
+  "dex": [
+   86,
+   105
+  ],
+  "fame": 1500,
+  "fight_mode": "Closest",
+  "flags": [],
+  "hits": [
+   58,
+   72
+  ],
+  "id": "lizardman",
+  "int": [
+   36,
+   60
+  ],
+  "int_": [
+   36,
+   60
+  ],
+  "karma": -1500,
+  "loot": {
+   "era": "pre-aos",
+   "gold_dice": "5d10+25",
+   "gold_source": "_src/servuo/Scripts/Misc/LootPack.cs:428",
+   "pack": "meager",
+   "source": "research/06 §3.1 Tier 2, sloupec Loot (per monstrum, NIKDY z fame)"
+  },
+  "loot_pack": "meager",
+  "loot_raw": "Meager",
+  "loot_source": "research/06 §3.1 Tier 2, sloupec Loot (per monstrum, NIKDY z fame)",
+  "mana": null,
+  "name": "lizardman",
+  "notoriety": 3,
+  "notoriety_source": "research/06 §4.5 `Server/Notoriety.cs:8` — CanBeAttacked = 3 (nepritele, ne zlocinec)",
+  "resist": null,
+  "resist_source": "pending-source (tabulky §3.1 resisty nemaji; docs/05 §5.16 = pre-AoS pouziva VirtualArmor)",
+  "skills": {
+   "Resisting Spells": [
+    351,
+    600
+   ],
+   "Tactics": [
+    551,
+    800
+   ],
+   "Wrestling": [
+    501,
+    700
+   ]
+  },
+  "skills_source": "research/06 §3.1 proza za tabulkou Tier 2",
+  "source": "research/06-world-content-npcs.md §3.1 (ServUO Scripts/Mobiles/Normal/*.cs); anim = AnimationsLoader.cs:1694-1777",
+  "str": [
+   96,
+   120
+  ],
+  "taming_difficulty": null,
+  "tier": 2,
+  "type": "lizardman",
+  "virtual_armor": 28,
+  "virtual_armor_source": "research/06 §3.1 Tier 2, sloupec VA"
+ },
+ {
+  "ai": "melee",
+  "ai_raw": "Melee / Closest",
+  "anim": {
+   "attack": 4,
+   "die": 2,
+   "walk": 0
+  },
+  "anim_group": "high",
+  "anim_group_source": "tools/uoextract/anim.py:group_kind (tělo < 200 high, 200..399 low)",
+  "anim_source": "_src/classicuo/src/ClassicUO.Assets/AnimationsLoader.cs:1696-1700 (HighAnimationGroup) + tools/uoextract/anim.py:ABSTRACT_GROUPS",
+  "body": 39,
+  "body_source": "research/06 §3.1 Tier 1, sloupec Body: '39'",
+  "class": "Mongbat",
+  "damage": [
+   1,
+   2
+  ],
+  "dex": [
+   26,
+   38
+  ],
+  "fame": 150,
+  "fight_mode": "Closest",
+  "flags": [],
+  "hits": [
+   4,
+   6
+  ],
+  "id": "mongbat",
+  "int": [
+   6,
+   14
+  ],
+  "int_": [
+   6,
+   14
+  ],
+  "karma": -150,
+  "loot": {
+   "era": "pre-aos",
+   "gold_dice": "1d25",
+   "gold_source": "_src/servuo/Scripts/Misc/LootPack.cs:422",
+   "pack": "poor",
+   "source": "research/06 §3.1 Tier 1, sloupec Loot (per monstrum, NIKDY z fame)"
+  },
+  "loot_pack": "poor",
+  "loot_raw": "Poor",
+  "loot_source": "research/06 §3.1 Tier 1, sloupec Loot (per monstrum, NIKDY z fame)",
+  "mana": [
+   0,
+   0
+  ],
+  "name": "mongbat",
+  "notoriety": 3,
+  "notoriety_source": "research/06 §4.5 `Server/Notoriety.cs:8` — CanBeAttacked = 3 (nepritele, ne zlocinec)",
+  "resist": null,
+  "resist_source": "pending-source (tabulky §3.1 resisty nemaji; docs/05 §5.16 = pre-AoS pouziva VirtualArmor)",
+  "skills": {
+   "Resisting Spells": [
+    51,
+    140
+   ],
+   "Tactics": [
+    51,
+    100
+   ],
+   "Wrestling": [
+    51,
+    100
+   ]
+  },
+  "skills_source": "research/06 §3.1 tabulka 'Skills for tier 1'",
+  "source": "research/06-world-content-npcs.md §3.1 (ServUO Scripts/Mobiles/Normal/*.cs); anim = AnimationsLoader.cs:1694-1777",
+  "str": [
+   6,
+   10
+  ],
+  "taming_difficulty": null,
+  "tier": 1,
+  "type": "mongbat",
+  "virtual_armor": 10,
+  "virtual_armor_source": "research/06 §3.1 Tier 1, sloupec VA"
+ },
+ {
+  "ai": "mage",
+  "ai_raw": "Mage / Closest",
+  "anim": {
+   "attack": 4,
+   "die": 2,
+   "walk": 0
+  },
+  "anim_group": "high",
+  "anim_group_source": "tools/uoextract/anim.py:group_kind (tělo < 200 high, 200..399 low)",
+  "anim_source": "_src/classicuo/src/ClassicUO.Assets/AnimationsLoader.cs:1696-1700 (HighAnimationGroup) + tools/uoextract/anim.py:ABSTRACT_GROUPS",
+  "body": 116,
+  "body_source": "research/06 §3.1 Tier 4, sloupec Body: '0x74 / 0x3EA7 (mount)'",
+  "class": "Nightmare",
+  "damage": [
+   16,
+   22
+  ],
+  "dex": [
+   86,
+   105
+  ],
+  "fame": 14000,
+  "fight_mode": "Closest",
+  "flags": [],
+  "hits": [
+   298,
+   315
+  ],
+  "id": "nightmare",
+  "int": [
+   86,
+   125
+  ],
+  "int_": [
+   86,
+   125
+  ],
+  "karma": -14000,
+  "loot": {
+   "era": "pre-aos",
+   "gold_dice": "10d10+250",
+   "gold_source": "_src/servuo/Scripts/Misc/LootPack.cs:447",
+   "pack": "rich",
+   "source": "research/06 §3.1 Tier 4, sloupec Loot (per monstrum, NIKDY z fame)"
+  },
+  "loot_pack": "rich",
+  "loot_raw": "Rich + Average + LowScrolls + Potions",
+  "loot_source": "research/06 §3.1 Tier 4, sloupec Loot (per monstrum, NIKDY z fame)",
+  "mana": null,
+  "name": "nightmare",
+  "notoriety": 3,
+  "notoriety_source": "research/06 §4.5 `Server/Notoriety.cs:8` — CanBeAttacked = 3 (nepritele, ne zlocinec)",
+  "resist": null,
+  "resist_source": "pending-source (tabulky §3.1 resisty nemaji; docs/05 §5.16 = pre-AoS pouziva VirtualArmor)",
+  "skills": {
+   "Evaluating Intelligence": [
+    104,
+    500
+   ],
+   "Magery": [
+    104,
+    500
+   ],
+   "Resisting Spells": [
+    853,
+    1000
+   ],
+   "Tactics": [
+    976,
+    1000
+   ],
+   "Wrestling": [
+    805,
+    925
+   ]
+  },
+  "skills_source": "research/06 §3.1 proza za tabulkou Tier 4",
+  "source": "research/06-world-content-npcs.md §3.1 (ServUO Scripts/Mobiles/Normal/*.cs); anim = AnimationsLoader.cs:1694-1777",
+  "str": [
+   496,
+   525
+  ],
+  "taming_difficulty": null,
+  "tier": 4,
+  "type": "nightmare",
+  "virtual_armor": 60,
+  "virtual_armor_source": "research/06 §3.1 Tier 4, sloupec VA"
+ },
+ {
+  "ai": "melee",
+  "ai_raw": "Melee / Closest",
+  "anim": {
+   "attack": 4,
+   "die": 2,
+   "walk": 0
+  },
+  "anim_group": "high",
+  "anim_group_source": "tools/uoextract/anim.py:group_kind (tělo < 200 high, 200..399 low)",
+  "anim_source": "_src/classicuo/src/ClassicUO.Assets/AnimationsLoader.cs:1696-1700 (HighAnimationGroup) + tools/uoextract/anim.py:ABSTRACT_GROUPS",
+  "body": 1,
+  "body_source": "research/06 §3.1 Tier 2, sloupec Body: '1'",
+  "class": "Ogre",
+  "damage": [
+   9,
+   11
+  ],
+  "dex": [
+   46,
+   65
+  ],
+  "fame": 3000,
+  "fight_mode": "Closest",
+  "flags": [],
+  "hits": [
+   100,
+   117
+  ],
+  "id": "ogre",
+  "int": [
+   46,
+   70
+  ],
+  "int_": [
+   46,
+   70
+  ],
+  "karma": -3000,
+  "loot": {
+   "era": "pre-aos",
+   "gold_dice": "10d10+50",
+   "gold_source": "_src/servuo/Scripts/Misc/LootPack.cs:437",
+   "pack": "average",
+   "source": "research/06 §3.1 Tier 2, sloupec Loot (per monstrum, NIKDY z fame)"
+  },
+  "loot_pack": "average",
+  "loot_raw": "Average + Potions",
+  "loot_source": "research/06 §3.1 Tier 2, sloupec Loot (per monstrum, NIKDY z fame)",
+  "mana": null,
+  "name": "ogre",
+  "notoriety": 3,
+  "notoriety_source": "research/06 §4.5 `Server/Notoriety.cs:8` — CanBeAttacked = 3 (nepritele, ne zlocinec)",
+  "resist": null,
+  "resist_source": "pending-source (tabulky §3.1 resisty nemaji; docs/05 §5.16 = pre-AoS pouziva VirtualArmor)",
+  "skills": {
+   "Resisting Spells": [
+    551,
+    700
+   ],
+   "Tactics": [
+    601,
+    700
+   ],
+   "Wrestling": [
+    701,
+    800
+   ]
+  },
+  "skills_source": "research/06 §3.1 proza za tabulkou Tier 2",
+  "source": "research/06-world-content-npcs.md §3.1 (ServUO Scripts/Mobiles/Normal/*.cs); anim = AnimationsLoader.cs:1694-1777",
+  "str": [
+   166,
+   195
+  ],
+  "taming_difficulty": null,
+  "tier": 2,
+  "type": "ogre",
+  "virtual_armor": 32,
+  "virtual_armor_source": "research/06 §3.1 Tier 2, sloupec VA"
+ },
+ {
+  "ai": "melee",
+  "ai_raw": "Melee / Closest",
+  "anim": {
+   "attack": 4,
+   "die": 2,
+   "walk": 0
+  },
+  "anim_group": "high",
+  "anim_group_source": "tools/uoextract/anim.py:group_kind (tělo < 200 high, 200..399 low)",
+  "anim_source": "_src/classicuo/src/ClassicUO.Assets/AnimationsLoader.cs:1696-1700 (HighAnimationGroup) + tools/uoextract/anim.py:ABSTRACT_GROUPS",
+  "body": 83,
+  "body_source": "research/06 §3.1 Tier 4, sloupec Body: '83'",
+  "class": "OgreLord",
+  "damage": [
+   20,
+   25
+  ],
+  "dex": [
+   66,
+   75
+  ],
+  "fame": 15000,
+  "fight_mode": "Closest",
+  "flags": [],
+  "hits": [
+   476,
+   552
+  ],
+  "id": "ogre_lord",
+  "int": [
+   46,
+   70
+  ],
+  "int_": [
+   46,
+   70
+  ],
+  "karma": -15000,
+  "loot": {
+   "era": "pre-aos",
+   "gold_dice": "10d10+250",
+   "gold_source": "_src/servuo/Scripts/Misc/LootPack.cs:447",
+   "pack": "rich",
+   "source": "research/06 §3.1 Tier 4, sloupec Loot (per monstrum, NIKDY z fame)"
+  },
+  "loot_pack": "rich",
+  "loot_raw": "Rich ×2",
+  "loot_source": "research/06 §3.1 Tier 4, sloupec Loot (per monstrum, NIKDY z fame)",
+  "mana": null,
+  "name": "ogrelord",
+  "notoriety": 3,
+  "notoriety_source": "research/06 §4.5 `Server/Notoriety.cs:8` — CanBeAttacked = 3 (nepritele, ne zlocinec)",
+  "resist": null,
+  "resist_source": "pending-source (tabulky §3.1 resisty nemaji; docs/05 §5.16 = pre-AoS pouziva VirtualArmor)",
+  "skills": {
+   "Resisting Spells": [
+    1251,
+    1400
+   ],
+   "Tactics": [
+    901,
+    1000
+   ],
+   "Wrestling": [
+    901,
+    1000
+   ]
+  },
+  "skills_source": ".cache/analysis/monsters.tsv (extract-monsters.ps1) — proza §3.1 skilly u tohoto monstra nevypisuje",
+  "source": "research/06-world-content-npcs.md §3.1 (ServUO Scripts/Mobiles/Normal/*.cs); anim = AnimationsLoader.cs:1694-1777",
+  "str": [
+   767,
+   945
+  ],
+  "taming_difficulty": null,
+  "tier": 4,
+  "type": "ogre_lord",
+  "virtual_armor": 50,
+  "virtual_armor_source": "research/06 §3.1 Tier 4, sloupec VA"
+ },
+ {
+  "ai": "melee",
+  "ai_raw": "Melee / Closest",
+  "anim": {
+   "attack": 4,
+   "die": 2,
+   "walk": 0
+  },
+  "anim_group": "high",
+  "anim_group_source": "tools/uoextract/anim.py:group_kind (tělo < 200 high, 200..399 low)",
+  "anim_source": "_src/classicuo/src/ClassicUO.Assets/AnimationsLoader.cs:1696-1700 (HighAnimationGroup) + tools/uoextract/anim.py:ABSTRACT_GROUPS",
+  "body": 17,
+  "body_source": "research/06 §3.1 Tier 2, sloupec Body: '17'",
+  "class": "Orc",
+  "damage": [
+   5,
+   7
+  ],
+  "dex": [
+   81,
+   105
+  ],
+  "fame": 1500,
+  "fight_mode": "Closest",
+  "flags": [],
+  "hits": [
+   58,
+   72
+  ],
+  "id": "orc",
+  "int": [
+   36,
+   60
+  ],
+  "int_": [
+   36,
+   60
+  ],
+  "karma": -1500,
+  "loot": {
+   "era": "pre-aos",
+   "gold_dice": "5d10+25",
+   "gold_source": "_src/servuo/Scripts/Misc/LootPack.cs:428",
+   "pack": "meager",
+   "source": "research/06 §3.1 Tier 2, sloupec Loot (per monstrum, NIKDY z fame)"
+  },
+  "loot_pack": "meager",
+  "loot_raw": "Meager",
+  "loot_source": "research/06 §3.1 Tier 2, sloupec Loot (per monstrum, NIKDY z fame)",
+  "mana": null,
+  "name": "orc",
+  "notoriety": 3,
+  "notoriety_source": "research/06 §4.5 `Server/Notoriety.cs:8` — CanBeAttacked = 3 (nepritele, ne zlocinec)",
+  "resist": null,
+  "resist_source": "pending-source (tabulky §3.1 resisty nemaji; docs/05 §5.16 = pre-AoS pouziva VirtualArmor)",
+  "skills": {
+   "Resisting Spells": [
+    501,
+    750
+   ],
+   "Tactics": [
+    551,
+    800
+   ],
+   "Wrestling": [
+    501,
+    700
+   ]
+  },
+  "skills_source": "research/06 §3.1 proza za tabulkou Tier 2",
+  "source": "research/06-world-content-npcs.md §3.1 (ServUO Scripts/Mobiles/Normal/*.cs); anim = AnimationsLoader.cs:1694-1777",
+  "str": [
+   96,
+   120
+  ],
+  "taming_difficulty": null,
+  "tier": 2,
+  "type": "orc",
+  "virtual_armor": 28,
+  "virtual_armor_source": "research/06 §3.1 Tier 2, sloupec VA"
+ },
+ {
+  "ai": "melee",
+  "ai_raw": "Melee / Closest",
+  "anim": {
+   "attack": 4,
+   "die": 2,
+   "walk": 0
+  },
+  "anim_group": "high",
+  "anim_group_source": "tools/uoextract/anim.py:group_kind (tělo < 200 high, 200..399 low)",
+  "anim_source": "_src/classicuo/src/ClassicUO.Assets/AnimationsLoader.cs:1696-1700 (HighAnimationGroup) + tools/uoextract/anim.py:ABSTRACT_GROUPS",
+  "body": 182,
+  "body_source": "research/06 §3.1 Tier 2, sloupec Body: '182'",
+  "class": "OrcBomber",
+  "damage": [
+   1,
+   8
+  ],
+  "dex": [
+   91,
+   115
+  ],
+  "fame": 2500,
+  "fight_mode": "Closest",
+  "flags": [],
+  "hits": [
+   95,
+   123
+  ],
+  "id": "orc_bomber",
+  "int": [
+   61,
+   85
+  ],
+  "int_": [
+   61,
+   85
+  ],
+  "karma": -2500,
+  "loot": {
+   "era": "pre-aos",
+   "gold_dice": "10d10+50",
+   "gold_source": "_src/servuo/Scripts/Misc/LootPack.cs:437",
+   "pack": "average",
+   "source": "research/06 §3.1 Tier 2, sloupec Loot (per monstrum, NIKDY z fame)"
+  },
+  "loot_pack": "average",
+  "loot_raw": "Average + Meager",
+  "loot_source": "research/06 §3.1 Tier 2, sloupec Loot (per monstrum, NIKDY z fame)",
+  "mana": null,
+  "name": "orcbomber",
+  "notoriety": 3,
+  "notoriety_source": "research/06 §4.5 `Server/Notoriety.cs:8` — CanBeAttacked = 3 (nepritele, ne zlocinec)",
+  "resist": null,
+  "resist_source": "pending-source (tabulky §3.1 resisty nemaji; docs/05 §5.16 = pre-AoS pouziva VirtualArmor)",
+  "skills": {
+   "Resisting Spells": [
+    701,
+    850
+   ],
+   "Swordsmanship": [
+    601,
+    850
+   ],
+   "Tactics": [
+    751,
+    900
+   ],
+   "Wrestling": [
+    601,
+    850
+   ]
+  },
+  "skills_source": "research/06 §3.1 proza za tabulkou Tier 2",
+  "source": "research/06-world-content-npcs.md §3.1 (ServUO Scripts/Mobiles/Normal/*.cs); anim = AnimationsLoader.cs:1694-1777",
+  "str": [
+   147,
+   215
+  ],
+  "taming_difficulty": null,
+  "tier": 2,
+  "type": "orc_bomber",
+  "virtual_armor": 30,
+  "virtual_armor_source": "research/06 §3.1 Tier 2, sloupec VA"
+ },
+ {
+  "ai": "melee",
+  "ai_raw": "Melee / Closest",
+  "anim": {
+   "attack": 4,
+   "die": 2,
+   "walk": 0
+  },
+  "anim_group": "high",
+  "anim_group_source": "tools/uoextract/anim.py:group_kind (tělo < 200 high, 200..399 low)",
+  "anim_source": "_src/classicuo/src/ClassicUO.Assets/AnimationsLoader.cs:1696-1700 (HighAnimationGroup) + tools/uoextract/anim.py:ABSTRACT_GROUPS",
+  "body": 7,
+  "body_source": "research/06 §3.1 Tier 2, sloupec Body: '7'",
+  "class": "OrcCaptain",
+  "damage": [
+   5,
+   15
+  ],
+  "dex": [
+   101,
+   135
+  ],
+  "fame": 2500,
+  "fight_mode": "Closest",
+  "flags": [],
+  "hits": [
+   67,
+   87
+  ],
+  "id": "orc_captain",
+  "int": [
+   86,
+   110
+  ],
+  "int_": [
+   86,
+   110
+  ],
+  "karma": -2500,
+  "loot": {
+   "era": "pre-aos",
+   "gold_dice": "5d10+25",
+   "gold_source": "_src/servuo/Scripts/Misc/LootPack.cs:428",
+   "pack": "meager",
+   "source": "research/06 §3.1 Tier 2, sloupec Loot (per monstrum, NIKDY z fame)"
+  },
+  "loot_pack": "meager",
+  "loot_raw": "Meager ×2",
+  "loot_source": "research/06 §3.1 Tier 2, sloupec Loot (per monstrum, NIKDY z fame)",
+  "mana": null,
+  "name": "orccaptain",
+  "notoriety": 3,
+  "notoriety_source": "research/06 §4.5 `Server/Notoriety.cs:8` — CanBeAttacked = 3 (nepritele, ne zlocinec)",
+  "resist": null,
+  "resist_source": "pending-source (tabulky §3.1 resisty nemaji; docs/05 §5.16 = pre-AoS pouziva VirtualArmor)",
+  "skills": {
+   "Resisting Spells": [
+    701,
+    850
+   ],
+   "Swordsmanship": [
+    701,
+    950
+   ],
+   "Tactics": [
+    851,
+    1000
+   ]
+  },
+  "skills_source": "research/06 §3.1 proza za tabulkou Tier 2",
+  "source": "research/06-world-content-npcs.md §3.1 (ServUO Scripts/Mobiles/Normal/*.cs); anim = AnimationsLoader.cs:1694-1777",
+  "str": [
+   111,
+   145
+  ],
+  "taming_difficulty": null,
+  "tier": 2,
+  "type": "orc_captain",
+  "virtual_armor": 34,
+  "virtual_armor_source": "research/06 §3.1 Tier 2, sloupec VA"
+ },
+ {
+  "ai": "mage",
+  "ai_raw": "Mage / Closest",
+  "anim": {
+   "attack": 4,
+   "die": 2,
+   "walk": 0
+  },
+  "anim_group": "high",
+  "anim_group_source": "tools/uoextract/anim.py:group_kind (tělo < 200 high, 200..399 low)",
+  "anim_source": "_src/classicuo/src/ClassicUO.Assets/AnimationsLoader.cs:1696-1700 (HighAnimationGroup) + tools/uoextract/anim.py:ABSTRACT_GROUPS",
+  "body": 162,
+  "body_source": "research/06 §3.1 Tier 4, sloupec Body: '162'",
+  "class": "PoisonElemental",
+  "damage": [
+   12,
+   18
+  ],
+  "dex": [
+   166,
+   185
+  ],
+  "fame": 12500,
+  "fight_mode": "Closest",
+  "flags": [],
+  "hits": [
+   256,
+   309
+  ],
+  "id": "poison_elemental",
+  "int": [
+   361,
+   435
+  ],
+  "int_": [
+   361,
+   435
+  ],
+  "karma": -12500,
+  "loot": {
+   "era": "pre-aos",
+   "gold_dice": "2d125+400",
+   "gold_source": "_src/servuo/Scripts/Misc/LootPack.cs:457",
+   "pack": "filthy_rich",
+   "source": "research/06 §3.1 Tier 4, sloupec Loot (per monstrum, NIKDY z fame)"
+  },
+  "loot_pack": "filthy_rich",
+  "loot_raw": "FilthyRich + Rich + MedScrolls",
+  "loot_source": "research/06 §3.1 Tier 4, sloupec Loot (per monstrum, NIKDY z fame)",
+  "mana": null,
+  "name": "poisonelemental",
+  "notoriety": 3,
+  "notoriety_source": "research/06 §4.5 `Server/Notoriety.cs:8` — CanBeAttacked = 3 (nepritele, ne zlocinec)",
+  "resist": null,
+  "resist_source": "pending-source (tabulky §3.1 resisty nemaji; docs/05 §5.16 = pre-AoS pouziva VirtualArmor)",
+  "skills": {
+   "Evaluating Intelligence": [
+    801,
+    950
+   ],
+   "Magery": [
+    801,
+    950
+   ],
+   "Meditation": [
+    802,
+    1200
+   ],
+   "Poisoning": [
+    901,
+    1000
+   ],
+   "Resisting Spells": [
+    852,
+    1150
+   ],
+   "Tactics": [
+    801,
+    1000
+   ],
+   "Wrestling": [
+    701,
+    900
+   ]
+  },
+  "skills_source": "research/06 §3.1 proza za tabulkou Tier 4",
+  "source": "research/06-world-content-npcs.md §3.1 (ServUO Scripts/Mobiles/Normal/*.cs); anim = AnimationsLoader.cs:1694-1777",
+  "str": [
+   426,
+   515
+  ],
+  "taming_difficulty": null,
+  "tier": 4,
+  "type": "poison_elemental",
+  "virtual_armor": 70,
+  "virtual_armor_source": "research/06 §3.1 Tier 4, sloupec VA"
+ },
+ {
+  "ai": "animal",
+  "ai_raw": "Animal / Aggressor",
+  "anim": {
+   "attack": 5,
+   "die": 8,
+   "walk": 0
+  },
+  "anim_group": "low",
+  "anim_group_source": "tools/uoextract/anim.py:group_kind (tělo < 200 high, 200..399 low)",
+  "anim_source": "_src/classicuo/src/ClassicUO.Assets/AnimationsLoader.cs:1763-1771 (LowAnimationGroup) + tools/uoextract/anim.py:ABSTRACT_GROUPS",
+  "body": 238,
+  "body_source": "research/06 §3.1 Tier 1, sloupec Body: '238'",
+  "class": "Rat",
+  "damage": [
+   1,
+   2
+  ],
+  "dex": [
+   35,
+   35
+  ],
+  "fame": 150,
+  "fight_mode": "Aggressor",
+  "flags": [],
+  "hits": [
+   6,
+   6
+  ],
+  "id": "rat",
+  "int": [
+   5,
+   5
+  ],
+  "int_": [
+   5,
+   5
+  ],
+  "karma": -150,
+  "loot": {
+   "era": "pre-aos",
+   "gold_dice": "1d25",
+   "gold_source": "_src/servuo/Scripts/Misc/LootPack.cs:422",
+   "pack": "poor",
+   "source": "research/06 §3.1 Tier 1, sloupec Loot (per monstrum, NIKDY z fame)"
+  },
+  "loot_pack": "poor",
+  "loot_raw": "Poor",
+  "loot_source": "research/06 §3.1 Tier 1, sloupec Loot (per monstrum, NIKDY z fame)",
+  "mana": [
+   0,
+   0
+  ],
+  "name": "rat",
+  "notoriety": 3,
+  "notoriety_source": "research/06 §4.5 `Server/Notoriety.cs:8` — CanBeAttacked = 3 (nepritele, ne zlocinec)",
+  "resist": null,
+  "resist_source": "pending-source (tabulky §3.1 resisty nemaji; docs/05 §5.16 = pre-AoS pouziva VirtualArmor)",
+  "skills": {
+   "Resisting Spells": [
+    40,
+    40
+   ],
+   "Tactics": [
+    40,
+    40
+   ],
+   "Wrestling": [
+    40,
+    40
+   ]
+  },
+  "skills_source": "research/06 §3.1 tabulka 'Skills for tier 1'",
+  "source": "research/06-world-content-npcs.md §3.1 (ServUO Scripts/Mobiles/Normal/*.cs); anim = AnimationsLoader.cs:1694-1777",
+  "str": [
+   9,
+   9
+  ],
+  "taming_difficulty": 0.1,
+  "tier": 1,
+  "type": "rat",
+  "virtual_armor": 6,
+  "virtual_armor_source": "research/06 §3.1 Tier 1, sloupec VA"
+ },
+ {
+  "ai": "mage",
+  "ai_raw": "Mage / Closest",
+  "anim": {
+   "attack": 4,
+   "die": 2,
+   "walk": 0
+  },
+  "anim_group": "high",
+  "anim_group_source": "tools/uoextract/anim.py:group_kind (tělo < 200 high, 200..399 low)",
+  "anim_source": "_src/classicuo/src/ClassicUO.Assets/AnimationsLoader.cs:1696-1700 (HighAnimationGroup) + tools/uoextract/anim.py:ABSTRACT_GROUPS",
+  "body": 47,
+  "body_source": "research/06 §3.1 Tier 2, sloupec Body: '47'",
+  "class": "Reaper",
+  "damage": [
+   9,
+   11
+  ],
+  "dex": [
+   66,
+   75
+  ],
+  "fame": 3500,
+  "fight_mode": "Closest",
+  "flags": [],
+  "hits": [
+   40,
+   129
+  ],
+  "id": "reaper",
+  "int": [
+   101,
+   250
+  ],
+  "int_": [
+   101,
+   250
+  ],
+  "karma": -3500,
+  "loot": {
+   "era": "pre-aos",
+   "gold_dice": "10d10+50",
+   "gold_source": "_src/servuo/Scripts/Misc/LootPack.cs:437",
+   "pack": "average",
+   "source": "research/06 §3.1 Tier 2, sloupec Loot (per monstrum, NIKDY z fame)"
+  },
+  "loot_pack": "average",
+  "loot_raw": "Average",
+  "loot_source": "research/06 §3.1 Tier 2, sloupec Loot (per monstrum, NIKDY z fame)",
+  "mana": null,
+  "name": "reaper",
+  "notoriety": 3,
+  "notoriety_source": "research/06 §4.5 `Server/Notoriety.cs:8` — CanBeAttacked = 3 (nepritele, ne zlocinec)",
+  "resist": null,
+  "resist_source": "pending-source (tabulky §3.1 resisty nemaji; docs/05 §5.16 = pre-AoS pouziva VirtualArmor)",
+  "skills": {
+   "Evaluating Intelligence": [
+    901,
+    1000
+   ],
+   "Magery": [
+    901,
+    1000
+   ],
+   "Resisting Spells": [
+    1001,
+    1250
+   ],
+   "Tactics": [
+    451,
+    600
+   ],
+   "Wrestling": [
+    501,
+    600
+   ]
+  },
+  "skills_source": "research/06 §3.1 proza za tabulkou Tier 2",
+  "source": "research/06-world-content-npcs.md §3.1 (ServUO Scripts/Mobiles/Normal/*.cs); anim = AnimationsLoader.cs:1694-1777",
+  "str": [
+   66,
+   215
+  ],
+  "taming_difficulty": null,
+  "tier": 2,
+  "type": "reaper",
+  "virtual_armor": 40,
+  "virtual_armor_source": "research/06 §3.1 Tier 2, sloupec VA"
+ },
+ {
+  "ai": "melee",
+  "ai_raw": "Melee / Closest",
+  "anim": {
+   "attack": 4,
+   "die": 2,
+   "walk": 0
+  },
+  "anim_group": "high",
+  "anim_group_source": "tools/uoextract/anim.py:group_kind (tělo < 200 high, 200..399 low)",
+  "anim_source": "_src/classicuo/src/ClassicUO.Assets/AnimationsLoader.cs:1696-1700 (HighAnimationGroup) + tools/uoextract/anim.py:ABSTRACT_GROUPS",
+  "body": 48,
+  "body_source": "research/06 §3.1 Tier 2, sloupec Body: '48'",
+  "class": "Scorpion",
+  "damage": [
+   5,
+   10
+  ],
+  "dex": [
+   76,
+   95
+  ],
+  "fame": 2000,
+  "fight_mode": "Closest",
+  "flags": [
+   "poisonous"
+  ],
+  "hit_poison": "greater",
+  "hit_poison_source": "research/06 §3.5 (proza 'Poisoning (HitPoison)': Slime/Snake Lesser, GiantSpider Regular, Scorpion/GiantSerpent Greater, DreadSpider Lethal)",
+  "hits": [
+   50,
+   63
+  ],
+  "id": "scorpion",
+  "int": [
+   16,
+   30
+  ],
+  "int_": [
+   16,
+   30
+  ],
+  "karma": -2000,
+  "loot": {
+   "era": "pre-aos",
+   "gold_dice": "5d10+25",
+   "gold_source": "_src/servuo/Scripts/Misc/LootPack.cs:428",
+   "pack": "meager",
+   "source": "research/06 §3.1 Tier 2, sloupec Loot (per monstrum, NIKDY z fame)"
+  },
+  "loot_pack": "meager",
+  "loot_raw": "Meager",
+  "loot_source": "research/06 §3.1 Tier 2, sloupec Loot (per monstrum, NIKDY z fame)",
+  "mana": null,
+  "name": "scorpion",
+  "notoriety": 3,
+  "notoriety_source": "research/06 §4.5 `Server/Notoriety.cs:8` — CanBeAttacked = 3 (nepritele, ne zlocinec)",
+  "resist": null,
+  "resist_source": "pending-source (tabulky §3.1 resisty nemaji; docs/05 §5.16 = pre-AoS pouziva VirtualArmor)",
+  "skills": {
+   "Poisoning": [
+    801,
+    1000
+   ],
+   "Resisting Spells": [
+    301,
+    350
+   ],
+   "Tactics": [
+    603,
+    750
+   ],
+   "Wrestling": [
+    503,
+    650
+   ]
+  },
+  "skills_source": ".cache/analysis/monsters.tsv (extract-monsters.ps1) — proza §3.1 skilly u tohoto monstra nevypisuje",
+  "source": "research/06-world-content-npcs.md §3.1 (ServUO Scripts/Mobiles/Normal/*.cs); anim = AnimationsLoader.cs:1694-1777",
+  "str": [
+   73,
+   115
+  ],
+  "taming_difficulty": 591,
+  "tier": 2,
+  "type": "scorpion",
+  "virtual_armor": 28,
+  "virtual_armor_source": "research/06 §3.1 Tier 2, sloupec VA"
+ },
+ {
+  "ai": "melee",
+  "ai_raw": "Melee / Closest",
+  "anim": {
+   "attack": 5,
+   "die": 8,
+   "walk": 0
+  },
+  "anim_group": "low",
+  "anim_group_source": "tools/uoextract/anim.py:group_kind (tělo < 200 high, 200..399 low)",
+  "anim_source": "_src/classicuo/src/ClassicUO.Assets/AnimationsLoader.cs:1763-1771 (LowAnimationGroup) + tools/uoextract/anim.py:ABSTRACT_GROUPS",
+  "body": 238,
+  "body_source": "research/06 §3.1 Tier 1, sloupec Body: '238'",
+  "class": "SewerRat",
+  "damage": [
+   1,
+   2
+  ],
+  "dex": [
+   25,
+   25
+  ],
+  "fame": 300,
+  "fight_mode": "Closest",
+  "flags": [],
+  "hits": [
+   6,
+   6
+  ],
+  "id": "sewer_rat",
+  "int": [
+   6,
+   10
+  ],
+  "int_": [
+   6,
+   10
+  ],
+  "karma": -300,
+  "loot": {
+   "era": "pre-aos",
+   "gold_dice": "1d25",
+   "gold_source": "_src/servuo/Scripts/Misc/LootPack.cs:422",
+   "pack": "poor",
+   "source": "research/06 §3.1 Tier 1, sloupec Loot (per monstrum, NIKDY z fame)"
+  },
+  "loot_pack": "poor",
+  "loot_raw": "Poor",
+  "loot_source": "research/06 §3.1 Tier 1, sloupec Loot (per monstrum, NIKDY z fame)",
+  "mana": [
+   0,
+   0
+  ],
+  "name": "`Sewerrat`",
+  "notoriety": 3,
+  "notoriety_source": "research/06 §4.5 `Server/Notoriety.cs:8` — CanBeAttacked = 3 (nepritele, ne zlocinec)",
+  "resist": null,
+  "resist_source": "pending-source (tabulky §3.1 resisty nemaji; docs/05 §5.16 = pre-AoS pouziva VirtualArmor)",
+  "skills": {
+   "Resisting Spells": [
+    50,
+    50
+   ],
+   "Tactics": [
+    50,
+    50
+   ],
+   "Wrestling": [
+    50,
+    50
+   ]
+  },
+  "skills_source": "research/06 §3.1 tabulka 'Skills for tier 1'",
+  "source": "research/06-world-content-npcs.md §3.1 (ServUO Scripts/Mobiles/Normal/*.cs); anim = AnimationsLoader.cs:1694-1777",
+  "str": [
+   9,
+   9
+  ],
+  "taming_difficulty": null,
+  "tier": 1,
+  "type": "sewer_rat",
+  "virtual_armor": 6,
+  "virtual_armor_source": "research/06 §3.1 Tier 1, sloupec VA"
+ },
+ {
+  "ai": null,
+  "ai_raw": "**NecroMage** / Closest",
+  "anim": {
+   "attack": 4,
+   "die": 2,
+   "walk": 0
+  },
+  "anim_group": "high",
+  "anim_group_source": "tools/uoextract/anim.py:group_kind (tělo < 200 high, 200..399 low)",
+  "anim_source": "_src/classicuo/src/ClassicUO.Assets/AnimationsLoader.cs:1696-1700 (HighAnimationGroup) + tools/uoextract/anim.py:ABSTRACT_GROUPS",
+  "body": 106,
+  "body_source": "research/06 §3.1 Tier 4, sloupec Body: '106'",
+  "class": "ShadowWyrm",
+  "damage": [
+   29,
+   35
+  ],
+  "dex": [
+   68,
+   200
+  ],
+  "fame": 22500,
+  "fight_mode": "Closest",
+  "flags": [],
+  "hits": [
+   558,
+   599
+  ],
+  "id": "shadow_wyrm",
+  "int": [
+   488,
+   620
+  ],
+  "int_": [
+   488,
+   620
+  ],
+  "karma": -22500,
+  "loot": {
+   "era": "pre-aos",
+   "gold_dice": "2d125+400",
+   "gold_source": "_src/servuo/Scripts/Misc/LootPack.cs:457",
+   "pack": "filthy_rich",
+   "source": "research/06 §3.1 Tier 4, sloupec Loot (per monstrum, NIKDY z fame)"
+  },
+  "loot_pack": "filthy_rich",
+  "loot_raw": "FilthyRich ×3 + Gems ×5",
+  "loot_source": "research/06 §3.1 Tier 4, sloupec Loot (per monstrum, NIKDY z fame)",
+  "mana": null,
+  "name": "shadowwyrm",
+  "notoriety": 3,
+  "notoriety_source": "research/06 §4.5 `Server/Notoriety.cs:8` — CanBeAttacked = 3 (nepritele, ne zlocinec)",
+  "resist": null,
+  "resist_source": "pending-source (tabulky §3.1 resisty nemaji; docs/05 §5.16 = pre-AoS pouziva VirtualArmor)",
+  "skills": {
+   "Detecting Hidden": [
+    900,
+    1000
+   ],
+   "Evaluating Intelligence": [
+    801,
+    1000
+   ],
+   "Magery": [
+    801,
+    1000
+   ],
+   "Meditation": [
+    525,
+    750
+   ],
+   "Necromancy": [
+    800,
+    900
+   ],
+   "Resisting Spells": [
+    1003,
+    1300
+   ],
+   "Spirit Speak": [
+    1000,
+    1050
+   ],
+   "Tactics": [
+    976,
+    1000
+   ],
+   "Wrestling": [
+    976,
+    1000
+   ]
+  },
+  "skills_source": "research/06 §3.1 proza za tabulkou Tier 4",
+  "source": "research/06-world-content-npcs.md §3.1 (ServUO Scripts/Mobiles/Normal/*.cs); anim = AnimationsLoader.cs:1694-1777",
+  "str": [
+   898,
+   1030
+  ],
+  "taming_difficulty": null,
+  "tier": 4,
+  "type": "shadow_wyrm",
+  "virtual_armor": 70,
+  "virtual_armor_source": "research/06 §3.1 Tier 4, sloupec VA"
+ },
+ {
+  "ai": "melee",
+  "ai_raw": "Melee / Closest",
+  "anim": {
+   "attack": 4,
+   "die": 2,
+   "walk": 0
+  },
+  "anim_group": "high",
+  "anim_group_source": "tools/uoextract/anim.py:group_kind (tělo < 200 high, 200..399 low)",
+  "anim_source": "_src/classicuo/src/ClassicUO.Assets/AnimationsLoader.cs:1696-1700 (HighAnimationGroup) + tools/uoextract/anim.py:ABSTRACT_GROUPS",
+  "body": 50,
+  "body_source": "research/06 §3.1 Tier 1, sloupec Body: '50 or 56 (random)'",
+  "class": "Skeleton",
+  "damage": [
+   3,
+   7
+  ],
+  "dex": [
+   56,
+   75
+  ],
+  "fame": 450,
+  "fight_mode": "Closest",
+  "flags": [
+   "undead"
+  ],
+  "flags_source": "research/06 §3.5 (proza 'Undead flag': Skeleton, Zombie, Ghoul, Lich, BoneMagi, Wraith, Spectre, Mummy, Shade, SkeletalKnight)",
+  "hits": [
+   34,
+   48
+  ],
+  "id": "skeleton",
+  "int": [
+   16,
+   40
+  ],
+  "int_": [
+   16,
+   40
+  ],
+  "karma": -450,
+  "loot": {
+   "era": "pre-aos",
+   "gold_dice": "1d25",
+   "gold_source": "_src/servuo/Scripts/Misc/LootPack.cs:422",
+   "pack": "poor",
+   "source": "research/06 §3.1 Tier 1, sloupec Loot (per monstrum, NIKDY z fame)"
+  },
+  "loot_pack": "poor",
+  "loot_raw": "Poor",
+  "loot_source": "research/06 §3.1 Tier 1, sloupec Loot (per monstrum, NIKDY z fame)",
+  "mana": null,
+  "name": "skeleton",
+  "notoriety": 3,
+  "notoriety_source": "research/06 §4.5 `Server/Notoriety.cs:8` — CanBeAttacked = 3 (nepritele, ne zlocinec)",
+  "resist": null,
+  "resist_source": "pending-source (tabulky §3.1 resisty nemaji; docs/05 §5.16 = pre-AoS pouziva VirtualArmor)",
+  "skills": {
+   "Resisting Spells": [
+    451,
+    600
+   ],
+   "Tactics": [
+    451,
+    600
+   ],
+   "Wrestling": [
+    451,
+    550
+   ]
+  },
+  "skills_source": "research/06 §3.1 tabulka 'Skills for tier 1'",
+  "source": "research/06-world-content-npcs.md §3.1 (ServUO Scripts/Mobiles/Normal/*.cs); anim = AnimationsLoader.cs:1694-1777",
+  "str": [
+   56,
+   80
+  ],
+  "taming_difficulty": null,
+  "tier": 1,
+  "type": "skeleton",
+  "virtual_armor": 16,
+  "virtual_armor_source": "research/06 §3.1 Tier 1, sloupec VA"
+ },
+ {
+  "ai": "melee",
+  "ai_raw": "Melee / Closest",
+  "anim": {
+   "attack": 4,
+   "die": 2,
+   "walk": 0
+  },
+  "anim_group": "high",
+  "anim_group_source": "tools/uoextract/anim.py:group_kind (tělo < 200 high, 200..399 low)",
+  "anim_source": "_src/classicuo/src/ClassicUO.Assets/AnimationsLoader.cs:1696-1700 (HighAnimationGroup) + tools/uoextract/anim.py:ABSTRACT_GROUPS",
+  "body": 51,
+  "body_source": "research/06 §3.1 Tier 1, sloupec Body: '51'",
+  "class": "Slime",
+  "damage": [
+   1,
+   5
+  ],
+  "dex": [
+   16,
+   21
+  ],
+  "fame": 300,
+  "fight_mode": "Closest",
+  "flags": [
+   "poisonous"
+  ],
+  "hit_poison": "lesser",
+  "hit_poison_source": "research/06 §3.5 (proza 'Poisoning (HitPoison)': Slime/Snake Lesser, GiantSpider Regular, Scorpion/GiantSerpent Greater, DreadSpider Lethal)",
+  "hits": [
+   15,
+   19
+  ],
+  "id": "slime",
+  "int": [
+   16,
+   20
+  ],
+  "int_": [
+   16,
+   20
+  ],
+  "karma": -300,
+  "loot": {
+   "era": "pre-aos",
+   "gold_dice": "1d25",
+   "gold_source": "_src/servuo/Scripts/Misc/LootPack.cs:422",
+   "pack": "poor",
+   "source": "research/06 §3.1 Tier 1, sloupec Loot (per monstrum, NIKDY z fame)"
+  },
+  "loot_pack": "poor",
+  "loot_raw": "Poor + Gems",
+  "loot_source": "research/06 §3.1 Tier 1, sloupec Loot (per monstrum, NIKDY z fame)",
+  "mana": null,
+  "name": "slime",
+  "notoriety": 3,
+  "notoriety_source": "research/06 §4.5 `Server/Notoriety.cs:8` — CanBeAttacked = 3 (nepritele, ne zlocinec)",
+  "resist": null,
+  "resist_source": "pending-source (tabulky §3.1 resisty nemaji; docs/05 §5.16 = pre-AoS pouziva VirtualArmor)",
+  "skills": {
+   "Poisoning": [
+    301,
+    500
+   ],
+   "Resisting Spells": [
+    151,
+    200
+   ],
+   "Tactics": [
+    193,
+    340
+   ],
+   "Wrestling": [
+    193,
+    340
+   ]
+  },
+  "skills_source": "research/06 §3.1 tabulka 'Skills for tier 1'",
+  "source": "research/06-world-content-npcs.md §3.1 (ServUO Scripts/Mobiles/Normal/*.cs); anim = AnimationsLoader.cs:1694-1777",
+  "str": [
+   22,
+   34
+  ],
+  "taming_difficulty": 231,
+  "tier": 1,
+  "type": "slime",
+  "virtual_armor": 8,
+  "virtual_armor_source": "research/06 §3.1 Tier 1, sloupec VA"
+ },
+ {
+  "ai": "melee",
+  "ai_raw": "Melee / Closest",
+  "anim": {
+   "attack": 4,
+   "die": 2,
+   "walk": 0
+  },
+  "anim_group": "high",
+  "anim_group_source": "tools/uoextract/anim.py:group_kind (tělo < 200 high, 200..399 low)",
+  "anim_source": "_src/classicuo/src/ClassicUO.Assets/AnimationsLoader.cs:1696-1700 (HighAnimationGroup) + tools/uoextract/anim.py:ABSTRACT_GROUPS",
+  "body": 52,
+  "body_source": "research/06 §3.1 Tier 1, sloupec Body: '52'",
+  "class": "Snake",
+  "damage": [
+   1,
+   4
+  ],
+  "dex": [
+   16,
+   25
+  ],
+  "fame": 300,
+  "fight_mode": "Closest",
+  "flags": [
+   "poisonous"
+  ],
+  "hit_poison": "lesser",
+  "hit_poison_source": "research/06 §3.5 (proza 'Poisoning (HitPoison)': Slime/Snake Lesser, GiantSpider Regular, Scorpion/GiantSerpent Greater, DreadSpider Lethal)",
+  "hits": [
+   15,
+   19
+  ],
+  "id": "snake",
+  "int": [
+   6,
+   10
+  ],
+  "int_": [
+   6,
+   10
+  ],
+  "karma": -300,
+  "loot": null,
+  "loot_pack": null,
+  "loot_raw": "—",
+  "loot_source": "research/06 §3.1 Tier 1, sloupec Loot (per monstrum, NIKDY z fame)",
+  "mana": [
+   0,
+   0
+  ],
+  "name": "snake",
+  "notoriety": 3,
+  "notoriety_source": "research/06 §4.5 `Server/Notoriety.cs:8` — CanBeAttacked = 3 (nepritele, ne zlocinec)",
+  "resist": null,
+  "resist_source": "pending-source (tabulky §3.1 resisty nemaji; docs/05 §5.16 = pre-AoS pouziva VirtualArmor)",
+  "skills": {
+   "Poisoning": [
+    501,
+    700
+   ],
+   "Resisting Spells": [
+    151,
+    200
+   ],
+   "Tactics": [
+    193,
+    340
+   ],
+   "Wrestling": [
+    193,
+    340
+   ]
+  },
+  "skills_source": "research/06 §3.1 tabulka 'Skills for tier 1'",
+  "source": "research/06-world-content-npcs.md §3.1 (ServUO Scripts/Mobiles/Normal/*.cs); anim = AnimationsLoader.cs:1694-1777",
+  "str": [
+   22,
+   34
+  ],
+  "taming_difficulty": 591,
+  "tier": 1,
+  "type": "snake",
+  "virtual_armor": 16,
+  "virtual_armor_source": "research/06 §3.1 Tier 1, sloupec VA"
+ },
+ {
+  "ai": "mage",
+  "ai_raw": "Mage / Closest",
+  "anim": {
+   "attack": 4,
+   "die": 2,
+   "walk": 0
+  },
+  "anim_group": "high",
+  "anim_group_source": "tools/uoextract/anim.py:group_kind (tělo < 200 high, 200..399 low)",
+  "anim_source": "_src/classicuo/src/ClassicUO.Assets/AnimationsLoader.cs:1696-1700 (HighAnimationGroup) + tools/uoextract/anim.py:ABSTRACT_GROUPS",
+  "body": 26,
+  "body_source": "research/06 §3.1 Tier 3, sloupec Body: '26'",
+  "class": "Spectre",
+  "damage": [
+   7,
+   11
+  ],
+  "dex": [
+   76,
+   95
+  ],
+  "fame": 4000,
+  "fight_mode": "Closest",
+  "flags": [
+   "undead"
+  ],
+  "flags_source": "research/06 §3.5 (proza 'Undead flag': Skeleton, Zombie, Ghoul, Lich, BoneMagi, Wraith, Spectre, Mummy, Shade, SkeletalKnight)",
+  "hits": [
+   46,
+   60
+  ],
+  "id": "spectre",
+  "int": [
+   36,
+   60
+  ],
+  "int_": [
+   36,
+   60
+  ],
+  "karma": -4000,
+  "loot": {
+   "era": "pre-aos",
+   "gold_dice": "5d10+25",
+   "gold_source": "_src/servuo/Scripts/Misc/LootPack.cs:428",
+   "pack": "meager",
+   "source": "research/06 §3.1 Tier 3, sloupec Loot (per monstrum, NIKDY z fame)"
+  },
+  "loot_pack": "meager",
+  "loot_raw": "Meager",
+  "loot_source": "research/06 §3.1 Tier 3, sloupec Loot (per monstrum, NIKDY z fame)",
+  "mana": null,
+  "name": "spectre",
+  "notoriety": 3,
+  "notoriety_source": "research/06 §4.5 `Server/Notoriety.cs:8` — CanBeAttacked = 3 (nepritele, ne zlocinec)",
+  "resist": null,
+  "resist_source": "pending-source (tabulky §3.1 resisty nemaji; docs/05 §5.16 = pre-AoS pouziva VirtualArmor)",
+  "skills": {
+   "Evaluating Intelligence": [
+    551,
+    700
+   ],
+   "Magery": [
+    551,
+    700
+   ],
+   "Resisting Spells": [
+    551,
+    700
+   ],
+   "Tactics": [
+    451,
+    600
+   ],
+   "Wrestling": [
+    451,
+    550
+   ]
+  },
+  "skills_source": ".cache/analysis/monsters.tsv (extract-monsters.ps1) — proza §3.1 skilly u tohoto monstra nevypisuje",
+  "source": "research/06-world-content-npcs.md §3.1 (ServUO Scripts/Mobiles/Normal/*.cs); anim = AnimationsLoader.cs:1694-1777",
+  "str": [
+   76,
+   100
+  ],
+  "taming_difficulty": null,
+  "tier": 3,
+  "type": "spectre",
+  "virtual_armor": 28,
+  "virtual_armor_source": "research/06 §3.1 Tier 3, sloupec VA"
+ },
+ {
+  "ai": "melee",
+  "ai_raw": "Melee / Closest",
+  "anim": {
+   "attack": 4,
+   "die": 2,
+   "walk": 0
+  },
+  "anim_group": "high",
+  "anim_group_source": "tools/uoextract/anim.py:group_kind (tělo < 200 high, 200..399 low)",
+  "anim_source": "_src/classicuo/src/ClassicUO.Assets/AnimationsLoader.cs:1696-1700 (HighAnimationGroup) + tools/uoextract/anim.py:ABSTRACT_GROUPS",
+  "body": 67,
+  "body_source": "research/06 §3.1 Tier 3, sloupec Body: '67'",
+  "class": "StoneGargoyle",
+  "damage": [
+   11,
+   17
+  ],
+  "dex": [
+   76,
+   95
+  ],
+  "fame": 4000,
+  "fight_mode": "Closest",
+  "flags": [],
+  "hits": [
+   148,
+   165
+  ],
+  "id": "stone_gargoyle",
+  "int": [
+   81,
+   105
+  ],
+  "int_": [
+   81,
+   105
+  ],
+  "karma": -4000,
+  "loot": {
+   "era": "pre-aos",
+   "gold_dice": "10d10+50",
+   "gold_source": "_src/servuo/Scripts/Misc/LootPack.cs:437",
+   "pack": "average",
+   "source": "research/06 §3.1 Tier 3, sloupec Loot (per monstrum, NIKDY z fame)"
+  },
+  "loot_pack": "average",
+  "loot_raw": "Average ×2 + Gems + Potions",
+  "loot_source": "research/06 §3.1 Tier 3, sloupec Loot (per monstrum, NIKDY z fame)",
+  "mana": null,
+  "name": "stonegargoyle",
+  "notoriety": 3,
+  "notoriety_source": "research/06 §4.5 `Server/Notoriety.cs:8` — CanBeAttacked = 3 (nepritele, ne zlocinec)",
+  "resist": null,
+  "resist_source": "pending-source (tabulky §3.1 resisty nemaji; docs/05 §5.16 = pre-AoS pouziva VirtualArmor)",
+  "skills": {
+   "Resisting Spells": [
+    851,
+    1000
+   ],
+   "Tactics": [
+    801,
+    1000
+   ],
+   "Wrestling": [
+    601,
+    1000
+   ]
+  },
+  "skills_source": "research/06 §3.1 proza za tabulkou Tier 3",
+  "source": "research/06-world-content-npcs.md §3.1 (ServUO Scripts/Mobiles/Normal/*.cs); anim = AnimationsLoader.cs:1694-1777",
+  "str": [
+   246,
+   275
+  ],
+  "taming_difficulty": null,
+  "tier": 3,
+  "type": "stone_gargoyle",
+  "virtual_armor": 50,
+  "virtual_armor_source": "research/06 §3.1 Tier 3, sloupec VA"
+ },
+ {
+  "ai": "mage",
+  "ai_raw": "Mage / Closest",
+  "anim": {
+   "attack": 4,
+   "die": 2,
+   "walk": 0
+  },
+  "anim_group": "high",
+  "anim_group_source": "tools/uoextract/anim.py:group_kind (tělo < 200 high, 200..399 low)",
+  "anim_source": "_src/classicuo/src/ClassicUO.Assets/AnimationsLoader.cs:1696-1700 (HighAnimationGroup) + tools/uoextract/anim.py:ABSTRACT_GROUPS",
+  "body": 76,
+  "body_source": "research/06 §3.1 Tier 3, sloupec Body: '76'",
+  "class": "Titan",
+  "damage": [
+   13,
+   16
+  ],
+  "dex": [
+   126,
+   145
+  ],
+  "fame": 11500,
+  "fight_mode": "Closest",
+  "flags": [],
+  "hits": [
+   322,
+   351
+  ],
+  "id": "titan",
+  "int": [
+   281,
+   305
+  ],
+  "int_": [
+   281,
+   305
+  ],
+  "karma": -11500,
+  "loot": {
+   "era": "pre-aos",
+   "gold_dice": "2d125+400",
+   "gold_source": "_src/servuo/Scripts/Misc/LootPack.cs:457",
+   "pack": "filthy_rich",
+   "source": "research/06 §3.1 Tier 3, sloupec Loot (per monstrum, NIKDY z fame)"
+  },
+  "loot_pack": "filthy_rich",
+  "loot_raw": "FilthyRich + Average + MedScrolls",
+  "loot_source": "research/06 §3.1 Tier 3, sloupec Loot (per monstrum, NIKDY z fame)",
+  "mana": null,
+  "name": "titan",
+  "notoriety": 3,
+  "notoriety_source": "research/06 §4.5 `Server/Notoriety.cs:8` — CanBeAttacked = 3 (nepritele, ne zlocinec)",
+  "resist": null,
+  "resist_source": "pending-source (tabulky §3.1 resisty nemaji; docs/05 §5.16 = pre-AoS pouziva VirtualArmor)",
+  "skills": {
+   "Evaluating Intelligence": [
+    851,
+    1000
+   ],
+   "Magery": [
+    851,
+    1000
+   ],
+   "Resisting Spells": [
+    802,
+    1100
+   ],
+   "Tactics": [
+    601,
+    800
+   ],
+   "Wrestling": [
+    401,
+    500
+   ]
+  },
+  "skills_source": "research/06 §3.1 proza za tabulkou Tier 3",
+  "source": "research/06-world-content-npcs.md §3.1 (ServUO Scripts/Mobiles/Normal/*.cs); anim = AnimationsLoader.cs:1694-1777",
+  "str": [
+   536,
+   585
+  ],
+  "taming_difficulty": null,
+  "tier": 3,
+  "type": "titan",
+  "virtual_armor": 40,
+  "virtual_armor_source": "research/06 §3.1 Tier 3, sloupec VA"
+ },
+ {
+  "ai": "melee",
+  "ai_raw": "Melee / Closest",
+  "anim": {
+   "attack": 4,
+   "die": 2,
+   "walk": 0
+  },
+  "anim_group": "high",
+  "anim_group_source": "tools/uoextract/anim.py:group_kind (tělo < 200 high, 200..399 low)",
+  "anim_source": "_src/classicuo/src/ClassicUO.Assets/AnimationsLoader.cs:1696-1700 (HighAnimationGroup) + tools/uoextract/anim.py:ABSTRACT_GROUPS",
+  "body": 53,
+  "body_source": "research/06 §3.1 Tier 2, sloupec Body: '53 or 54 (random)'",
+  "class": "Troll",
+  "damage": [
+   8,
+   14
+  ],
+  "dex": [
+   46,
+   65
+  ],
+  "fame": 3500,
+  "fight_mode": "Closest",
+  "flags": [],
+  "hits": [
+   106,
+   123
+  ],
+  "id": "troll",
+  "int": [
+   46,
+   70
+  ],
+  "int_": [
+   46,
+   70
+  ],
+  "karma": -3500,
+  "loot": {
+   "era": "pre-aos",
+   "gold_dice": "10d10+50",
+   "gold_source": "_src/servuo/Scripts/Misc/LootPack.cs:437",
+   "pack": "average",
+   "source": "research/06 §3.1 Tier 2, sloupec Loot (per monstrum, NIKDY z fame)"
+  },
+  "loot_pack": "average",
+  "loot_raw": "Average",
+  "loot_source": "research/06 §3.1 Tier 2, sloupec Loot (per monstrum, NIKDY z fame)",
+  "mana": null,
+  "name": "troll",
+  "notoriety": 3,
+  "notoriety_source": "research/06 §4.5 `Server/Notoriety.cs:8` — CanBeAttacked = 3 (nepritele, ne zlocinec)",
+  "resist": null,
+  "resist_source": "pending-source (tabulky §3.1 resisty nemaji; docs/05 §5.16 = pre-AoS pouziva VirtualArmor)",
+  "skills": {
+   "Resisting Spells": [
+    451,
+    600
+   ],
+   "Tactics": [
+    501,
+    700
+   ],
+   "Wrestling": [
+    501,
+    700
+   ]
+  },
+  "skills_source": "research/06 §3.1 proza za tabulkou Tier 2",
+  "source": "research/06-world-content-npcs.md §3.1 (ServUO Scripts/Mobiles/Normal/*.cs); anim = AnimationsLoader.cs:1694-1777",
+  "str": [
+   176,
+   205
+  ],
+  "taming_difficulty": null,
+  "tier": 2,
+  "type": "troll",
+  "virtual_armor": 40,
+  "virtual_armor_source": "research/06 §3.1 Tier 2, sloupec VA"
+ },
+ {
+  "ai": "mage",
+  "ai_raw": "Mage / Closest",
+  "anim": {
+   "attack": 4,
+   "die": 2,
+   "walk": 0
+  },
+  "anim_group": "high",
+  "anim_group_source": "tools/uoextract/anim.py:group_kind (tělo < 200 high, 200..399 low)",
+  "anim_source": "_src/classicuo/src/ClassicUO.Assets/AnimationsLoader.cs:1696-1700 (HighAnimationGroup) + tools/uoextract/anim.py:ABSTRACT_GROUPS",
+  "body": 16,
+  "body_source": "research/06 §3.1 Tier 3, sloupec Body: '16'",
+  "class": "WaterElemental",
+  "damage": [
+   7,
+   9
+  ],
+  "dex": [
+   66,
+   85
+  ],
+  "fame": 4500,
+  "fight_mode": "Closest",
+  "flags": [],
+  "hits": [
+   76,
+   93
+  ],
+  "id": "water_elemental",
+  "int": [
+   101,
+   125
+  ],
+  "int_": [
+   101,
+   125
+  ],
+  "karma": -4500,
+  "loot": {
+   "era": "pre-aos",
+   "gold_dice": "10d10+50",
+   "gold_source": "_src/servuo/Scripts/Misc/LootPack.cs:437",
+   "pack": "average",
+   "source": "research/06 §3.1 Tier 3, sloupec Loot (per monstrum, NIKDY z fame)"
+  },
+  "loot_pack": "average",
+  "loot_raw": "Average + Meager + Potions",
+  "loot_source": "research/06 §3.1 Tier 3, sloupec Loot (per monstrum, NIKDY z fame)",
+  "mana": null,
+  "name": "waterelemental",
+  "notoriety": 3,
+  "notoriety_source": "research/06 §4.5 `Server/Notoriety.cs:8` — CanBeAttacked = 3 (nepritele, ne zlocinec)",
+  "resist": null,
+  "resist_source": "pending-source (tabulky §3.1 resisty nemaji; docs/05 §5.16 = pre-AoS pouziva VirtualArmor)",
+  "skills": {
+   "Evaluating Intelligence": [
+    601,
+    750
+   ],
+   "Magery": [
+    601,
+    750
+   ],
+   "Resisting Spells": [
+    1001,
+    1150
+   ],
+   "Tactics": [
+    501,
+    700
+   ],
+   "Wrestling": [
+    501,
+    700
+   ]
+  },
+  "skills_source": "research/06 §3.1 proza za tabulkou Tier 3",
+  "source": "research/06-world-content-npcs.md §3.1 (ServUO Scripts/Mobiles/Normal/*.cs); anim = AnimationsLoader.cs:1694-1777",
+  "str": [
+   126,
+   155
+  ],
+  "taming_difficulty": null,
+  "tier": 3,
+  "type": "water_elemental",
+  "virtual_armor": 40,
+  "virtual_armor_source": "research/06 §3.1 Tier 3, sloupec VA"
+ },
+ {
+  "ai": "mage",
+  "ai_raw": "Mage / Closest",
+  "anim": {
+   "attack": 4,
+   "die": 2,
+   "walk": 0
+  },
+  "anim_group": "high",
+  "anim_group_source": "tools/uoextract/anim.py:group_kind (tělo < 200 high, 200..399 low)",
+  "anim_source": "_src/classicuo/src/ClassicUO.Assets/AnimationsLoader.cs:1696-1700 (HighAnimationGroup) + tools/uoextract/anim.py:ABSTRACT_GROUPS",
+  "body": 180,
+  "body_source": "research/06 §3.1 Tier 4, sloupec Body: '180 or 49 (random)'",
+  "class": "WhiteWyrm",
+  "damage": [
+   17,
+   25
+  ],
+  "dex": [
+   101,
+   130
+  ],
+  "fame": 18000,
+  "fight_mode": "Closest",
+  "flags": [],
+  "hits": [
+   433,
+   456
+  ],
+  "id": "white_wyrm",
+  "int": [
+   386,
+   425
+  ],
+  "int_": [
+   386,
+   425
+  ],
+  "karma": -18000,
+  "loot": {
+   "era": "pre-aos",
+   "gold_dice": "2d125+400",
+   "gold_source": "_src/servuo/Scripts/Misc/LootPack.cs:457",
+   "pack": "filthy_rich",
+   "source": "research/06 §3.1 Tier 4, sloupec Loot (per monstrum, NIKDY z fame)"
+  },
+  "loot_pack": "filthy_rich",
+  "loot_raw": "FilthyRich ×2 + Average + Gems(1–5)",
+  "loot_source": "research/06 §3.1 Tier 4, sloupec Loot (per monstrum, NIKDY z fame)",
+  "mana": null,
+  "name": "whitewyrm",
+  "notoriety": 3,
+  "notoriety_source": "research/06 §4.5 `Server/Notoriety.cs:8` — CanBeAttacked = 3 (nepritele, ne zlocinec)",
+  "resist": null,
+  "resist_source": "pending-source (tabulky §3.1 resisty nemaji; docs/05 §5.16 = pre-AoS pouziva VirtualArmor)",
+  "skills": {
+   "Evaluating Intelligence": [
+    991,
+    1000
+   ],
+   "Magery": [
+    991,
+    1000
+   ],
+   "Resisting Spells": [
+    991,
+    1000
+   ],
+   "Tactics": [
+    976,
+    1000
+   ],
+   "Wrestling": [
+    901,
+    1000
+   ]
+  },
+  "skills_source": "research/06 §3.1 proza za tabulkou Tier 4",
+  "source": "research/06-world-content-npcs.md §3.1 (ServUO Scripts/Mobiles/Normal/*.cs); anim = AnimationsLoader.cs:1694-1777",
+  "str": [
+   721,
+   760
+  ],
+  "taming_difficulty": null,
+  "tier": 4,
+  "type": "white_wyrm",
+  "virtual_armor": 64,
+  "virtual_armor_source": "research/06 §3.1 Tier 4, sloupec VA"
+ },
+ {
+  "ai": "mage",
+  "ai_raw": "Mage / **Aggressor**",
+  "anim": {
+   "attack": 4,
+   "die": 2,
+   "walk": 0
+  },
+  "anim_group": "high",
+  "anim_group_source": "tools/uoextract/anim.py:group_kind (tělo < 200 high, 200..399 low)",
+  "anim_source": "_src/classicuo/src/ClassicUO.Assets/AnimationsLoader.cs:1696-1700 (HighAnimationGroup) + tools/uoextract/anim.py:ABSTRACT_GROUPS",
+  "body": 58,
+  "body_source": "research/06 §3.1 Tier 3, sloupec Body: '58'",
+  "class": "Wisp",
+  "damage": [
+   17,
+   18
+  ],
+  "dex": [
+   196,
+   225
+  ],
+  "fame": 4000,
+  "fight_mode": "**Aggressor**",
+  "flags": [],
+  "hits": [
+   118,
+   135
+  ],
+  "id": "wisp",
+  "int": [
+   196,
+   225
+  ],
+  "int_": [
+   196,
+   225
+  ],
+  "karma": 0,
+  "loot": {
+   "era": "pre-aos",
+   "gold_dice": "10d10+250",
+   "gold_source": "_src/servuo/Scripts/Misc/LootPack.cs:447",
+   "pack": "rich",
+   "source": "research/06 §3.1 Tier 3, sloupec Loot (per monstrum, NIKDY z fame)"
+  },
+  "loot_pack": "rich",
+  "loot_raw": "Rich + Average",
+  "loot_source": "research/06 §3.1 Tier 3, sloupec Loot (per monstrum, NIKDY z fame)",
+  "mana": null,
+  "name": "wisp",
+  "notoriety": 3,
+  "notoriety_source": "research/06 §4.5 `Server/Notoriety.cs:8` — CanBeAttacked = 3 (nepritele, ne zlocinec)",
+  "resist": null,
+  "resist_source": "pending-source (tabulky §3.1 resisty nemaji; docs/05 §5.16 = pre-AoS pouziva VirtualArmor)",
+  "skills": {
+   "Evaluating Intelligence": [
+    800,
+    800
+   ],
+   "Magery": [
+    800,
+    800
+   ],
+   "Resisting Spells": [
+    800,
+    800
+   ],
+   "Tactics": [
+    800,
+    800
+   ],
+   "Wrestling": [
+    800,
+    800
+   ]
+  },
+  "skills_source": ".cache/analysis/monsters.tsv (extract-monsters.ps1) — proza §3.1 skilly u tohoto monstra nevypisuje",
+  "source": "research/06-world-content-npcs.md §3.1 (ServUO Scripts/Mobiles/Normal/*.cs); anim = AnimationsLoader.cs:1694-1777",
+  "str": [
+   196,
+   225
+  ],
+  "taming_difficulty": null,
+  "tier": 3,
+  "type": "wisp",
+  "virtual_armor": 40,
+  "virtual_armor_source": "research/06 §3.1 Tier 3, sloupec VA"
+ },
+ {
+  "ai": "mage",
+  "ai_raw": "Mage / Closest",
+  "anim": {
+   "attack": 4,
+   "die": 2,
+   "walk": 0
+  },
+  "anim_group": "high",
+  "anim_group_source": "tools/uoextract/anim.py:group_kind (tělo < 200 high, 200..399 low)",
+  "anim_source": "_src/classicuo/src/ClassicUO.Assets/AnimationsLoader.cs:1696-1700 (HighAnimationGroup) + tools/uoextract/anim.py:ABSTRACT_GROUPS",
+  "body": 26,
+  "body_source": "research/06 §3.1 Tier 3, sloupec Body: '26'",
+  "class": "Wraith",
+  "damage": [
+   7,
+   11
+  ],
+  "dex": [
+   76,
+   95
+  ],
+  "fame": 4000,
+  "fight_mode": "Closest",
+  "flags": [
+   "undead"
+  ],
+  "flags_source": "research/06 §3.5 (proza 'Undead flag': Skeleton, Zombie, Ghoul, Lich, BoneMagi, Wraith, Spectre, Mummy, Shade, SkeletalKnight)",
+  "hits": [
+   46,
+   60
+  ],
+  "id": "wraith",
+  "int": [
+   36,
+   60
+  ],
+  "int_": [
+   36,
+   60
+  ],
+  "karma": -4000,
+  "loot": {
+   "era": "pre-aos",
+   "gold_dice": "5d10+25",
+   "gold_source": "_src/servuo/Scripts/Misc/LootPack.cs:428",
+   "pack": "meager",
+   "source": "research/06 §3.1 Tier 3, sloupec Loot (per monstrum, NIKDY z fame)"
+  },
+  "loot_pack": "meager",
+  "loot_raw": "Meager",
+  "loot_source": "research/06 §3.1 Tier 3, sloupec Loot (per monstrum, NIKDY z fame)",
+  "mana": null,
+  "name": "wraith",
+  "notoriety": 3,
+  "notoriety_source": "research/06 §4.5 `Server/Notoriety.cs:8` — CanBeAttacked = 3 (nepritele, ne zlocinec)",
+  "resist": null,
+  "resist_source": "pending-source (tabulky §3.1 resisty nemaji; docs/05 §5.16 = pre-AoS pouziva VirtualArmor)",
+  "skills": {
+   "Evaluating Intelligence": [
+    551,
+    700
+   ],
+   "Magery": [
+    551,
+    700
+   ],
+   "Resisting Spells": [
+    551,
+    700
+   ],
+   "Tactics": [
+    451,
+    600
+   ],
+   "Wrestling": [
+    451,
+    550
+   ]
+  },
+  "skills_source": ".cache/analysis/monsters.tsv (extract-monsters.ps1) — proza §3.1 skilly u tohoto monstra nevypisuje",
+  "source": "research/06-world-content-npcs.md §3.1 (ServUO Scripts/Mobiles/Normal/*.cs); anim = AnimationsLoader.cs:1694-1777",
+  "str": [
+   76,
+   100
+  ],
+  "taming_difficulty": null,
+  "tier": 3,
+  "type": "wraith",
+  "virtual_armor": 28,
+  "virtual_armor_source": "research/06 §3.1 Tier 3, sloupec VA"
+ },
+ {
+  "ai": "melee",
+  "ai_raw": "Melee / Closest",
+  "anim": {
+   "attack": 4,
+   "die": 2,
+   "walk": 0
+  },
+  "anim_group": "high",
+  "anim_group_source": "tools/uoextract/anim.py:group_kind (tělo < 200 high, 200..399 low)",
+  "anim_source": "_src/classicuo/src/ClassicUO.Assets/AnimationsLoader.cs:1696-1700 (HighAnimationGroup) + tools/uoextract/anim.py:ABSTRACT_GROUPS",
+  "body": 62,
+  "body_source": "research/06 §3.1 Tier 3, sloupec Body: '62'",
+  "class": "Wyvern",
+  "damage": [
+   8,
+   19
+  ],
+  "dex": [
+   153,
+   172
+  ],
+  "fame": 4000,
+  "fight_mode": "Closest",
+  "flags": [],
+  "hits": [
+   125,
+   141
+  ],
+  "id": "wyvern",
+  "int": [
+   51,
+   90
+  ],
+  "int_": [
+   51,
+   90
+  ],
+  "karma": -4000,
+  "loot": {
+   "era": "pre-aos",
+   "gold_dice": "10d10+50",
+   "gold_source": "_src/servuo/Scripts/Misc/LootPack.cs:437",
+   "pack": "average",
+   "source": "research/06 §3.1 Tier 3, sloupec Loot (per monstrum, NIKDY z fame)"
+  },
+  "loot_pack": "average",
+  "loot_raw": "Average + Meager + MedScrolls",
+  "loot_source": "research/06 §3.1 Tier 3, sloupec Loot (per monstrum, NIKDY z fame)",
+  "mana": null,
+  "name": "wyvern",
+  "notoriety": 3,
+  "notoriety_source": "research/06 §4.5 `Server/Notoriety.cs:8` — CanBeAttacked = 3 (nepritele, ne zlocinec)",
+  "resist": null,
+  "resist_source": "pending-source (tabulky §3.1 resisty nemaji; docs/05 §5.16 = pre-AoS pouziva VirtualArmor)",
+  "skills": {
+   "Poisoning": [
+    601,
+    800
+   ],
+   "Resisting Spells": [
+    651,
+    800
+   ],
+   "Tactics": [
+    651,
+    900
+   ],
+   "Wrestling": [
+    651,
+    800
+   ]
+  },
+  "skills_source": "research/06 §3.1 proza za tabulkou Tier 3",
+  "source": "research/06-world-content-npcs.md §3.1 (ServUO Scripts/Mobiles/Normal/*.cs); anim = AnimationsLoader.cs:1694-1777",
+  "str": [
+   202,
+   240
+  ],
+  "taming_difficulty": null,
+  "tier": 3,
+  "type": "wyvern",
+  "virtual_armor": 40,
+  "virtual_armor_source": "research/06 §3.1 Tier 3, sloupec VA"
+ },
+ {
+  "ai": "melee",
+  "ai_raw": "Melee / Closest",
+  "anim": {
+   "attack": 4,
+   "die": 2,
+   "walk": 0
+  },
+  "anim_group": "high",
+  "anim_group_source": "tools/uoextract/anim.py:group_kind (tělo < 200 high, 200..399 low)",
+  "anim_source": "_src/classicuo/src/ClassicUO.Assets/AnimationsLoader.cs:1696-1700 (HighAnimationGroup) + tools/uoextract/anim.py:ABSTRACT_GROUPS",
+  "body": 3,
+  "body_source": "research/06 §3.1 Tier 1, sloupec Body: '3'",
+  "class": "Zombie",
+  "damage": [
+   3,
+   7
+  ],
+  "dex": [
+   31,
+   50
+  ],
+  "fame": 600,
+  "fight_mode": "Closest",
+  "flags": [
+   "undead"
+  ],
+  "flags_source": "research/06 §3.5 (proza 'Undead flag': Skeleton, Zombie, Ghoul, Lich, BoneMagi, Wraith, Spectre, Mummy, Shade, SkeletalKnight)",
+  "hits": [
+   28,
+   42
+  ],
+  "id": "zombie",
+  "int": [
+   26,
+   40
+  ],
+  "int_": [
+   26,
+   40
+  ],
+  "karma": -600,
+  "loot": {
+   "era": "pre-aos",
+   "gold_dice": "5d10+25",
+   "gold_source": "_src/servuo/Scripts/Misc/LootPack.cs:428",
+   "pack": "meager",
+   "source": "research/06 §3.1 Tier 1, sloupec Loot (per monstrum, NIKDY z fame)"
+  },
+  "loot_pack": "meager",
+  "loot_raw": "Meager",
+  "loot_source": "research/06 §3.1 Tier 1, sloupec Loot (per monstrum, NIKDY z fame)",
+  "mana": null,
+  "name": "zombie",
+  "notoriety": 3,
+  "notoriety_source": "research/06 §4.5 `Server/Notoriety.cs:8` — CanBeAttacked = 3 (nepritele, ne zlocinec)",
+  "resist": null,
+  "resist_source": "pending-source (tabulky §3.1 resisty nemaji; docs/05 §5.16 = pre-AoS pouziva VirtualArmor)",
+  "skills": {
+   "Resisting Spells": [
+    151,
+    400
+   ],
+   "Tactics": [
+    351,
+    500
+   ],
+   "Wrestling": [
+    351,
+    500
+   ]
+  },
+  "skills_source": "research/06 §3.1 tabulka 'Skills for tier 1'",
+  "source": "research/06-world-content-npcs.md §3.1 (ServUO Scripts/Mobiles/Normal/*.cs); anim = AnimationsLoader.cs:1694-1777",
+  "str": [
+   46,
+   70
+  ],
+  "taming_difficulty": null,
+  "tier": 1,
+  "type": "zombie",
+  "virtual_armor": 18,
+  "virtual_armor_source": "research/06 §3.1 Tier 1, sloupec VA"
+ }
+]

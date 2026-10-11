@@ -11,6 +11,10 @@ const Loop = preload("res://app/loop.gd")
 const InputMapScript = preload("res://app/input_map.gd")
 const MapScript = preload("res://sim/world/map.gd")
 const TextureCache = preload("res://render/texture_cache.gd")
+# 2026-10-11 (`render.own_art`): prepinac vlastniho artu PO KUSECH. Konfiguraci
+# cte `render/own_art.gd` (`assets/own-art.json`); `app.main` ji preda do
+# `render.textures` (atlasovy art) a `app.world_view` (animace postavy).
+const OwnArtScript = preload("res://render/own_art.gd")
 const WalkScript = preload("res://sim/world/walk.gd")
 const MovementScript = preload("res://sim/systems/movement.gd")
 const MobileScript = preload("res://sim/entity/mobile.gd")
@@ -80,6 +84,26 @@ const InteractionScript = preload("res://sim/systems/interaction.gd")
 const ConfigScript = preload("res://app/config.gd")
 const MetricsScript = preload("res://app/metrics.gd")
 
+# --- M5 (2026-10-10): SOUBOJ, MONSTRA, SMRT, LOOT -------------------------
+# PROC ZVLASŤ: do teto chvile `attack` routoval na `sim.combat`, ale ten
+# v `sim.systems` NEBYL - hrac dostal "Not available yet"
+# (`DALSI-SESSION.md` sekce C). Tohle je integracni misto: instance systemu
+# zaklada `app/main` (jedine misto, kde se potkava sim a klient, docs/02 §2.5).
+const CombatScript = preload("res://sim/systems/combat.gd")
+const DeathScript = preload("res://sim/systems/death.gd")
+const LootScript = preload("res://sim/systems/loot.gd")
+const PoisonScript = preload("res://sim/systems/poison.gd")
+const DecayScript = preload("res://sim/systems/decay.gd")
+const AiScript = preload("res://sim/systems/ai.gd")
+const SpawnScript = preload("res://sim/world/spawn.gd")
+# Vybava hrace: `sim.combat` z ni bere bonusy (HCI/DCI/DI). Do M5 ji `app/main`
+# nemel - `entity.equipment` je hotova granule, ale nikdo ji v behu hry
+# neinstancoval, takze bonusy zbrane se NEMERILY.
+const EquipmentScript = preload("res://sim/entity/equipment.gd")
+# Staty monstra z `data/monsters.json` (M5) - `Mobile._init` da vychozi 10/10/10,
+# monstrum ale ma STR/DEX/INT z DAT (kontrakt M5 §3.4).
+const StatsScript = preload("res://sim/entity/stats.gd")
+
 const DEFAULT_SEED: int = 1234
 # PRAVIDLA POLITIKY (ZADANI-24): JSON v `user://` - hrac je muze menit bez
 # zasahu do kodu a `sim.policy` je cte jako DATA (`sim/sim_world.gd:load_policy`).
@@ -136,6 +160,23 @@ var policy_panel = null          # `ui.policy_panel` (2026-10-09, D3 jako HUD)
 var skill_list = null            # `ui.skill_list` (2026-10-10, D10)
 var vendor_gump = null           # `ui.vendor_gump` (2026-10-10, D10)
 var vendor = null                # `sim.vendor` (2026-10-10, D10)
+# M5 (2026-10-10): systemy souboje a smrti. Drzi se TADY (ne jen v
+# `sim.systems`), aby na ne mohl `_postav_monstra_u_hrace` a debug overlay
+# sahat - `sim.systems` je slovnik pro routing, ne misto pro klienta.
+var combat = null
+var death = null
+var loot = null
+var poison = null
+var decay = null
+var ai = null
+var spawn = null
+var equipment = null             # `entity.equipment` (vybava a bonusy hrace)
+# Cache dat monster a skillu pro `_postav_monstra_u_hrace()` (M5): nacte se
+# JEDNOU za proces, aby se JSON neparsoval pro kazde monstrum zvlast.
+var _monstra_data: Dictionary = {}
+var _monstra_nactena: bool = false
+var _skill_ids: Dictionary = {}
+var _skill_ids_nactene: bool = false
 var prodejce = 0                 # serial vendora NPC ve svete (0 = nikdo)
 var balvany: Array = []          # pozice rudnych balvanu (pro sondu smycky)
 var _skill_s: float = 0.0        # casovac obnovy seznamu skillu (2x/s)
@@ -164,6 +205,10 @@ var _politika_s: float = 0.0     # casovac okna pravidel (5x/s, D3 jako HUD)
 # "zaseky 2 framy z ~2300 na ~130 ms" (2026-10-09) a klouzavy prumer
 # (`app.metrics`) takovy spickovy frame SCHOVA. Overlay ho ukaze a vynuluje.
 var _peak_ms: float = 0.0
+# Prepinace z prikazove radky (ctou se na JEDNOM miste, viz `_parsuj_prepinace`).
+var _vlastni_vypnuto: bool = false   # `--no-own-art` (A/B srovnani: jen UO art)
+var _policy_cesta: String = ""       # `--policy` / `--policy=<cesta>` (M10)
+var _vlastni_art: Array = []         # vrstvy z `assets/own-art.json` (muze byt prazdne)
 
 
 func _ready() -> void:
@@ -173,12 +218,16 @@ func _ready() -> void:
 	# `project.godot` je bootstrap granule a agenti do nej nesmi (docs/09 §9.2);
 	# efekt je stejny. Uzivatel muze tyz radek prenest do `project.godot`.
 	RenderingServer.set_default_clear_color(Color(0.0, 0.0, 0.0, 1.0))
+	# PREPINACE PRVNÍ: `_setup_world()` se rozhoduje podle `_vlastni_vypnuto`,
+	# jestli vrstvy vlastniho artu vubec nacte - kdyby se ctly az po stavbe
+	# sveta, `--no-own-art` by nemelo zadny efekt (a to by se hledalo tezko).
+	_parsuj_prepinace()
 	var data: Dictionary = _load_data()
 	metrics = MetricsScript.new()
 	sim = SimScript.new(DEFAULT_SEED, data)
 	loop = Loop.new()
 	loop.sim = sim
-	loop.input_map = InputMapScript.new()
+	loop.input_map = InputMapScript.new({}, sim.registry)
 	add_child(loop)
 	_setup_ui()
 	_setup_world()
@@ -190,16 +239,55 @@ func _ready() -> void:
 	# Bez prepinace je to NO-OP: `sim.policy` i `sim.executor` zustanou null
 	# (`sim_world.gd:133`), takze kazdy tik se preskoci a replaye ani hash
 	# se nemENI. Vypnuto je to i kdyz soubor existuje - to je ten rozdil.
-	var policy_cesta: String = ""
-	for arg in OS.get_cmdline_user_args():
-		if str(arg) == "--policy":
-			policy_cesta = POLICY_PATH
-		elif str(arg).begins_with("--policy="):
-			policy_cesta = str(arg).substr("--policy=".length())
-	if policy_cesta != "" and FileAccess.file_exists(policy_cesta) \
-			and sim.load_policy(policy_cesta):
-		print("[main] politika nactena z ", policy_cesta, " (zapnuta pripojmem --policy)")
+	# (Samotne CTENI prepinacu je v `_parsuj_prepinace()`, protoze se podle
+	# `--no-own-art` staví svet jeste pred timhle blokem.)
+	if _policy_cesta != "" and FileAccess.file_exists(_policy_cesta) \
+			and sim.load_policy(_policy_cesta):
+		print("[main] politika nactena z ", _policy_cesta, " (zapnuta pripojmem --policy)")
 	print("[main] sim spusten (seed ", DEFAULT_SEED, ", datovych souboru ", data.size(), ")")
+
+
+func _parsuj_prepinace() -> void:
+	# JEDNO misto pro prikazovou radku. Prepinace:
+	#   --policy | --policy=<cesta> ... zapne automatizaci (M10, opt-in)
+	#   --no-own-art ................. vypne vlastni art jako CELEK (A/B srovnani)
+	# Neznamy argument se NEPOLKNE tise - hodi se videt, kdyz se preklepne.
+	for arg in OS.get_cmdline_user_args():
+		var a := str(arg)
+		if a == "--policy":
+			_policy_cesta = POLICY_PATH
+		elif a.begins_with("--policy="):
+			_policy_cesta = a.substr("--policy=".length())
+		elif a == "--no-own-art":
+			_vlastni_vypnuto = true
+		elif a.begins_with("--"):
+			print("[main] neznamy prepinac: ", a)
+
+
+func _nacti_vlastni_art() -> Array:
+	# Vrstvy vlastniho artu z `assets/own-art.json` (granule `render.own_art`).
+	# Vadna konfigurace se NESMI tvarit jako "vlastni art neni": kazda chyba se
+	# vypise a hra jede na UO art - bezpecne, ale viditelne (docs/08 §8.6).
+	if _vlastni_vypnuto:
+		print("[main] vlastni art VYPNUT pripojmem --no-own-art (kresli se jen UO art)")
+		return []
+	var cfg: Dictionary = OwnArtScript.load_config()
+	for chyba in cfg.get("errors", []):
+		push_warning("app.main: vlastni art: " + str(chyba))
+	if not bool(cfg.get("ok", false)):
+		push_warning("app.main: konfigurace vlastniho artu neni v poradku - "
+			+ "kresli se jen UO art (assets/own-art.json)")
+		return []
+	print("[main] vlastni art: ", cfg["layers"].size(), " vrstvy (",
+		", ".join(_jmena_vrstev(cfg["layers"])), ")")
+	return cfg["layers"]
+
+
+func _jmena_vrstev(vrstvy: Array) -> Array:
+	var out: Array = []
+	for v in vrstvy:
+		out.append(str(v.get("name", "?")))
+	return out
 
 
 func _process(_delta: float) -> void:
@@ -322,6 +410,24 @@ func _debug_values() -> Dictionary:
 		hodnoty["fps"] = float(r.get("fps", 0.0))
 		hodnoty["frame_ms"] = float(r.get("frame_ms", 0.0))
 	hodnoty["peak_ms"] = _peak_ms
+	# M5 (2026-10-10): stav souboje a sveta monster na obrazovce. Bez toho by
+	# "hra vypadá, že nic nedělá" nešlo rozeznat od "monstrum v registru není".
+	if registry != null and registry.has_method("size"):
+		hodnoty["mobily"] = int(registry.size())
+	if world_view != null and world_view.has_method("mobily_videt"):
+		# POZOR: promenna je `world_view`, ne `view` - `view` je jen lokalni
+		# jmeno v `_setup_world()`. Namerено 2026-10-11 (parse error).
+		hodnoty["mobilu_videt"] = int(world_view.mobily_videt())
+		hodnoty["tel"] = int(world_view.tela_videt())
+	if combat != null and player != null:
+		var boj: Dictionary = combat.state_of(int(player.serial))
+		hodnoty["war"] = bool(boj.get("war", false))
+		hodnoty["target"] = int(boj.get("target", 0))
+		hodnoty["swing_ms"] = int(boj.get("delay_ms", 0))
+	if death != null and player != null:
+		hodnoty["duch"] = bool(death.is_ghost(int(player.serial)))
+	if spawn != null and spawn.has_method("spawned_total"):
+		hodnoty["spawned"] = int(spawn.spawned_total())
 	return hodnoty
 
 
@@ -513,7 +619,16 @@ func _setup_world() -> void:
 		return
 	world_view = view
 	map = MapScript.new()
-	textures = TextureCache.new()
+	# VLASTNI ART PO KUSECH (2026-10-11): vrstvy se nactou PRED cache a cache je
+	# indexuje PRVNÍ, takze pro (kind, id) z vlastni sady vyhraje vlastni sprite
+	# a vsechno ostatni zustane z UO. Vypnute je to pripojmem `--no-own-art`.
+	_vlastni_art = _nacti_vlastni_art()
+	view.nastav_vlastni_art(_vlastni_art)
+	if _vlastni_art.is_empty():
+		textures = TextureCache.new()
+	else:
+		textures = TextureCache.new(TextureCache.MANIFEST_PATH, TextureCache.MAX_BYTES,
+			TextureCache.ATLAS_PREFIX, _vlastni_art)
 	# Ikony do batohu jdou INJEKCI (`ui/` nesmi na `render/`, docs/04 §4.1).
 	if backpack != null:
 		backpack.nastav_textury(textures)
@@ -684,8 +799,89 @@ func _setup_player(view) -> void:
 	sim.systems["vendor"] = vendor
 	var prodanych: int = _postav_vendora(registry)
 
+	# --- M5: SYSTEMY SOUBOJE, SMRTI, LOOTU, AI A SPAWNU -------------------
+	# PORADI JE POVINNE (zavislosti konstruktorem), proto se zakladaji tady a
+	# ne po jednotlivych kusech vys:
+	#   loot  -> zna serialy (tela), RNG a kontejner
+	#   decay -> zna hodiny a kontejner (rozpad predmetu i tel)
+	#   death -> zna REGISTR (kdo umrel), kontejner (obsah tela), decay (rozpad)
+	#            a loot (co monstrum necha) - bez lootu by telo bylo prazdne
+	#            a `loot_reason` by to rekl
+	#   combat -> zna zbrane/zbroje z DAT, smrt (kdo umre) a vybavu (bonusy)
+	#   equipment -> vybava HRACE (vrstvy, bonusy) pro combat
+	#   ai     -> zna movement (kroky) a combat (utok)
+	#   spawn  -> zna monsters/spawns z DAT a registr (kam mobily dat)
+	# Do `sim.systems` se registruji VSECHNY: `SimWorld.SYSTEM_ORDER` je radi
+	# a `sim.commands` je odtud bere (dynamicky routing).
+	loot = LootScript.new(container, items, sim.rng(), sim.events(), sim,
+		"res://data/items.json", "res://data/vendors.json", "res://data/balance.json")
+	sim.systems["loot"] = loot
+	decay = DecayScript.new(sim.clock(), sim.events(), container, items)
+	sim.systems["decay"] = decay
+	death = DeathScript.new(registry, container, items, sim.events(), sim, decay,
+		0, "res://data/balance.json", loot)
+	death.set_player(serial)
+	sim.systems["death"] = death
+	equipment = EquipmentScript.new(registry, container, items, tiledata)
+	combat = CombatScript.new(registry, null, items, equipment, null, sim.rng(),
+		sim.clock(), sim.events(), death, "res://data/weapons.json",
+		"res://data/armor.json", "res://data/balance.json",
+		"res://data/skills.json")
+	sim.systems["combat"] = combat
+	poison = PoisonScript.new(registry, sim.rng(), sim.clock(), sim.events())
+	sim.systems["poison"] = poison
+	ai = AiScript.new(registry, movement, combat, sim.clock(), sim.events(), sim.rng())
+	if ai.has_method("set_player"):
+		ai.set_player(serial)
+	sim.systems["ai"] = ai
+	var d_spawns = _read_json_file("res://data/spawns.json")
+	var d_monstra = _read_json_file("res://data/monsters.json")
+	print("[main] spawn data: spawns=", (d_spawns is Dictionary), " monsters=",
+		(d_monstra is Array), " (", (d_monstra as Array).size() if d_monstra is Array else -1, ")")
+	spawn = SpawnScript.new(registry, sim, sim.clock(), sim.events(), sim.rng(),
+		d_spawns, d_monstra, "res://data/spawns.json", "res://data/monsters.json")
+	sim.systems["spawn"] = spawn
+	# STAVOVE ZDROJE (docs/04 §4.7): kdo ma stav, ktery patri do save a hashe,
+	# se zaregistruje. Bez toho by se smernice boje, duchove, fronta rozpadu,
+	# stavy AI a tabulka spawnu po `save -> load` ztratily (a round-trip by
+	# hlásil jiný `state_hash`). `loot` stav nema (je to jen pravidlo).
+	sim.register_state_source("combat", combat)
+	sim.register_state_source("death", death)
+	sim.register_state_source("decay", decay)
+	sim.register_state_source("ai", ai)
+	sim.register_state_source("spawn", spawn)
+	var bodu: int = _zapoj_spawn()
+	# MONSTRA VIDET HNED (2026-10-10): hřbitov u Britainu je od hráče 120 dláždic,
+	# takže by hráč na snímku žádné monstrum neměl. Vedle hráče proto stojí
+	# TŘI monstra z téhož bodu (stejná data jako spawn) - je to VĚDOMÝ SEŠITEK
+	# pro demo (stejná třída jako `_postav_stanice` a `_postav_balvany`).
+	# Cesta zpět: smazat volání `_postav_monstra_u_hrace()`.
+	var monster: int = _postav_monstra_u_hrace()
+	print("[main] M5: loot+decay+death+combat+poison+ai+spawn | spawn bodu ",
+		bodu, ", monster u hrace ", monster)
+
 	view.set_registry(registry)
 	view.set_player(player)
+	if view.has_method("set_mobily"):
+		# Kresleni ostatnich mobili, tela a jmen (M5) - bez toho by monstrum
+		# existovalo v simulaci, ale na obrazovce nebylo.
+		view.set_mobily(registry, container, items)
+	if view.has_method("nastav_decay"):
+		view.nastav_decay(decay)
+	# ROZPAD PREDMETU NA ZEMI (M5): kdo predmety poklada, musi to OHLAST
+	# (`sim.decay` je jedine misto, kde se rozpady pocitaji). Tydka se to
+	# stanic (kovadlina/vyhen), balvanu a startovniho batohu - bez toho by
+	# predmety na zemi zustaly navzdy (60 min je smlouva, docs/05 §5.4).
+	var hlaseno: int = 0
+	# POZOR NA JMENO: `serial` je v `_setup_player` uz jednou deklarovany
+	# (`var serial: int = sim.next_serial()`), takze druha deklarace tehoz jmena
+	# v teze funkci je PARSE ERROR ("already declared"). Namerено 2026-10-11.
+	for serial_predmetu in items.keys():
+		var it = items[serial_predmetu]
+		if it != null and int(it.parent) == 0:
+			decay.register(it)
+			hlaseno += 1
+	print("[main] rozpad: registrovanych predmetu na zemi ", hlaseno)
 	controller = get_node_or_null("PlayerController")
 	if controller == null:
 		push_warning("app.main: ve scene chybi uzel PlayerController - hrac se nepohne")
@@ -1064,8 +1260,185 @@ func _postav_vendora(reg) -> int:
 	return 1
 
 
-func _prodejce_pozadavek() -> void:
-	# Potvrzeny nakup/prodej z obchodniho okna (D10). UI je TENKY KLIENT: posle
+func _read_json_file(cesta: String):
+	# Nacteni JSONu pro systemy, ktere chteji DATA (ne cestu): `sim.spawn` ma
+	# `spawns`/`monsters` jako prvni vstupy a kdyz dostane `null`, cte si je
+	# samo - jenze prave ta cesta se 2026-10-11 ukazala jako nespolehliva
+	# (viz `sim/world/spawn.gd:_init`). Predavame proto hotova data.
+	# Chybejici soubor vraci `null` a volajici to HLASI (zadna ticha nula).
+	if not FileAccess.file_exists(cesta):
+		push_warning("app.main: chybi " + cesta)
+		return null
+	return JSON.parse_string(FileAccess.get_file_as_string(cesta))
+
+
+func _zapoj_spawn() -> int:	# SPAWN BODY Z DAT (M5, `data/spawns.json`). Body se registruji, ale
+	# `sim.world.spawn` je plní sám ve svém ticku (deficit + prodleva) - hráč
+	# tedy monstra nevidí hned na hřbitově 120 dlaždic daleko; proto existuje
+	# `_postav_monstra_u_hrace()` pro demo.
+	#
+	# ⚠ `no_spawn_in_town` se NEVYNUCUJE (spawn to hlásí v `region_check_source`):
+	# `data/regions.json` ještě není, takže "je ten bod ve městě?" nemá kdo
+	# odpovědět. Tichý předpoklad "není" by byl horší než pojmenovaná mezera.
+	if spawn == null:
+		push_warning("app.main: `sim.spawn` neni - monstra se nebudou obnovovat")
+		return 0
+	if not FileAccess.file_exists("res://data/spawns.json"):
+		push_warning("app.main: chybi data/spawns.json - spawn body se nezaregistruji")
+		return 0
+	var d = JSON.parse_string(FileAccess.get_file_as_string("res://data/spawns.json"))
+	if not (d is Dictionary):
+		push_warning("app.main: data/spawns.json neni objekt")
+		return 0
+	var body = (d as Dictionary).get("points", [])
+	if not (body is Array):
+		return 0
+	var zapsano: int = 0
+	for bod in body:
+		if bod is Dictionary and spawn.register(bod) >= 0:
+			zapsano += 1
+			print("[main] spawn bod: ", str((bod as Dictionary).get("id", "?")),
+				" na ", int((bod as Dictionary).get("x", 0)), ",",
+				int((bod as Dictionary).get("y", 0)), " max ",
+				int((bod as Dictionary).get("max", 0)))
+	return zapsano
+
+
+func _postav_monstra_u_hrace() -> int:
+	# MONSTRA VEDLE HRACE (M5, VĚDOMÝ SEŠITEK pro demo - stejná třída jako
+	# `_postav_stanice` a `_postav_balvany`). Důvod je naměřený: hřbitov
+	# z `data/spawns.json` je od Britainu daleko, takže by na snímku nebylo co
+	# zabít a "hráč zabije monstrum" by nešlo ukázat. Data (typy, staty, skilly)
+	# jdou Z MONSTER.JSON téhož bodu, ne z kódu.
+	#
+	# Cesta zpět: smazat volání v `_setup_player` (a ideálně i tuhle funkci).
+	if spawn == null or player == null:
+		return 0
+	var postaveno: int = 0
+	# ⚠ ROZESTUP (namEReno 2026-10-11 ze snimku `p20b-obrazky/m5-souboj.png`):
+	# prvni verze stavela vsechna tri monstra na `+1..+2` dlazdice od hrace,
+	# takze se v izometrii prekryla ("hromada") a na snimku nebylo poznat, co
+	# je co. Jsou proto dal a vic do stran - hrac je vidi, ale nesplynou.
+	var pozice: Array = [Vector3i(3, 1, 0), Vector3i(4, 2, 0), Vector3i(2, 4, 0)]
+	var typy: Array = ["skeleton", "zombie", "rat"]
+	for i in mini(pozice.size(), typy.size()):
+		var mob = _monstrum(str(typy[i]), player.pos + (pozice[i] as Vector3i))
+		if mob == null:
+			continue
+		mob.ai = {"state": "idle", "target": 0, "home": mob.pos, "timer_ms": 0}
+		registry.register(mob)
+		sim.push_event("mobile_added", {"serial": int(mob.serial),
+			"body": int(mob.body), "hue": int(mob.hue), "name": mob.name,
+			"x": int(mob.pos.x), "y": int(mob.pos.y), "z": int(mob.pos.z),
+			"notoriety": int(mob.notoriety), "type": str(typy[i])})
+		postaveno += 1
+		print("[main] monstrum: ", mob.name, " (", str(typy[i]), ", telo ",
+			int(mob.body), ") na ", mob.pos, " hp ", int(mob.hp))
+	if postaveno > 0:
+		_hlaseni_do_zurnalu("A skeleton, a zombie and a rat are nearby. (click one to attack)")
+	return postaveno
+
+
+func _monstrum(typ: String, pos: Vector3i):
+	# Mobil z `data/monsters.json` - STEJNÁ pravidla jako `sim.world.spawn._vytvor`
+	# (staty z rozsahů, skilly v desetinách, `damage`/`resist`/`loot_pack` na
+	# mobilu). Kdyby si to `app` počítalo po svém, vznikly by dva modely téhož
+	# monstra - proto se bere jen to, co jde z dat, a `spawn` zůstává jediný,
+	# kdo monstra plodí ve světě.
+	var rec: Dictionary = _monstrum_data(typ)
+	if rec.is_empty():
+		push_warning("app.main: monstrum '" + typ + "' v data/monsters.json neni")
+		return null
+	var rec_body: int = int(rec.get("body", 0))
+	if rec_body <= 0:
+		push_warning("app.main: monstrum '" + typ + "' nema telo (body)")
+		return null
+	var mob = MobileScript.new(sim.next_serial(), rec_body, pos)
+	mob.name = str(rec.get("name", typ))
+	mob.hue = int(rec.get("hue", 0))
+	mob.stats = _staty(rec)
+	mob.max_hp = _rozsah(rec.get("hits", [mob.stats.hits_max(), mob.stats.hits_max()]))
+	mob.hp = mob.max_hp
+	mob.max_stam = mob.stats.stam_max()
+	mob.stam = mob.max_stam
+	mob.max_mana = mob.stats.mana_max()
+	mob.mana = mob.max_mana
+	mob.notoriety = int(rec.get("notoriety", 3))
+	mob.fame = int(rec.get("fame", 0))
+	mob.karma = int(rec.get("karma", 0))
+	var skills = rec.get("skills")
+	if skills is Dictionary:
+		for jmeno in (skills as Dictionary).keys():
+			var sid: int = _skill_id(str(jmeno))
+			if sid < 0:
+				push_warning("app.main: skill '" + str(jmeno) + "' neni v data/skills.json")
+				continue
+			var v = (skills as Dictionary)[jmeno]
+			mob.skills.set_value(sid, _rozsah(v) if v is Array else int(v))
+	# `sim.combat` bere damage z `mob.damage` a resist z `mob.resist` (mobil je
+	# jako pole nema - kontrakt M5 §2/-3.4); `loot_pack` bere `sim.death`.
+	mob.set("damage", rec.get("damage", []))
+	mob.set("resist", rec.get("resist", {}))
+	mob.set("loot_pack", str(rec.get("loot_pack", "")))
+	mob.set("type", typ)
+	return mob
+
+
+func _monstrum_data(typ: String) -> Dictionary:
+	# Cachovany pohled do `data/monsters.json` (typ -> zaznam). Nacte se jednou
+	# za proces; chybejici soubor se HLASI, ne ticha nula.
+	if _monstra_data.is_empty() and not _monstra_nactena:
+		_monstra_nactena = true
+		if not FileAccess.file_exists("res://data/monsters.json"):
+			push_warning("app.main: chybi data/monsters.json - monstra se nepostavi")
+			return {}
+		var parsed = JSON.parse_string(FileAccess.get_file_as_string(
+			"res://data/monsters.json"))
+		if not (parsed is Array):
+			push_warning("app.main: data/monsters.json neni seznam")
+			return {}
+		for rec in parsed:
+			if rec is Dictionary:
+				# `type` i `id` (data maji obe jmena - viz content-report)
+				var k: String = str(rec.get("type", rec.get("id", "")))
+				if k != "":
+					_monstra_data[k] = rec
+	return _monstra_data.get(typ, {})
+
+
+func _staty(rec: Dictionary):
+	var st = StatsScript.new(_rozsah(rec.get("str", [10, 10])),
+		_rozsah(rec.get("dex", [10, 10])), _rozsah(rec.get("int_",
+			rec.get("int", [10, 10]))))
+	return st
+
+
+func _rozsah(v) -> int:
+	# Rozsah `[min, max]` z dat - jedna hodnota z RNG simulace (determinismus).
+	if v is Array and (v as Array).size() >= 2:
+		return sim.rng().range_i(int((v as Array)[0]), int((v as Array)[1]))
+	if v is Array and (v as Array).size() == 1:
+		return int((v as Array)[0])
+	if v == null:
+		return 0
+	return int(v)
+
+
+func _skill_id(jmeno: String) -> int:
+	# Jmeno skillu -> id z `data/skills.json`. Bez souboru vraci -1 ("nevim"),
+	# nikdy tichy fallback na wrestling.
+	if _skill_ids.is_empty() and not _skill_ids_nactene:
+		_skill_ids_nactene = true
+		if FileAccess.file_exists(SKILLS_DATA):
+			var parsed = JSON.parse_string(FileAccess.get_file_as_string(SKILLS_DATA))
+			if parsed is Array:
+				for rec in parsed:
+					if rec is Dictionary and rec.has("name") and rec.has("id"):
+						_skill_ids[str(rec["name"])] = int(rec["id"])
+	return int(_skill_ids.get(jmeno, -1))
+
+
+func _prodejce_pozadavek() -> void:	# Potvrzeny nakup/prodej z obchodniho okna (D10). UI je TENKY KLIENT: posle
 	# hotovy `Command`, tady se jen vyzvedne a preda simulaci (stejna cesta jako
 	# u klaves a okna vyroby).
 	if vendor_gump == null or sim == null:

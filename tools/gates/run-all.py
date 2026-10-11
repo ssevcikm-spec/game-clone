@@ -47,6 +47,10 @@ ORDER = [
     ("G14", "check-state-float.py"),
     ("G4", "check-wiring.py"),
     ("G6", "check-assets.py"),
+    # G15 (vlastni art se prepina po kusech) patri HNED za G6: G6 meri assety
+    # jako soubory, G15 meri, ze je hra OPRAVDU bere (a ze zbytek zustal z UO).
+    # Pridano 2026-10-11 (integrace `assets/own-lit/` + `assets/own/`).
+    ("G15", "check-own-art.py"),
     ("G7", "check-save.py"),
     ("G8", "check-determinism.py"),
     ("G9", "check-replay.py"),

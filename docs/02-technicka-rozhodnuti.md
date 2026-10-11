@@ -148,6 +148,20 @@ viditelné bloky**, aby 29 milionů dlaždic nebylo nikdy v paměti naráz.
 | Tónování hue | cache `ImageTexture` variant podle `(art_id, hue)` s LRU; UO art má index 0 = „použij hue" |
 | Světlo | jedna vrstva `CanvasModulate` + světelné zdroje jako `PointLight2D`; úroveň světla z hodin a `light.mul` (§5.11) |
 
+**Vlastní art po kusech (2026-10-11, `M6`/`M8`):** art se nevyměňuje jako celek,
+ale **po `(kind, id)`**. Rozhoduje o tom jediný soubor `assets/own-art.json`
+(čte ho `render/own_art.gd`): jeho vrstvy se indexují **před** `assets/uo/`,
+takže vlastní sprite vyhraje tam, kde je, a **všechno ostatní zůstává z UO**
+(`assets/uo/` je fallback a nemění se). Kontrakt manifestu je **stejný jako
+`assets/uo/`** (`id`, `kind`, `page`, `x`, `y`, `w`, `h`, `ox`, `oy`, `rect`;
+stránky 2048²), takže se renderer nemění — `render.textures` jen indexuje dvě
+sady v určeném pořadí a `offset()` bere ze **stejného záznamu** jako texturu.
+Geometrie zůstává: dlaždice **44 × 44**, `ISO_STEP = 22`, `Z_SCALE = 4`
+(brána `G1` platí dál). Vlastní postava se **netonuje UO hue sadou** (barvu má
+z Blenderu) — proto to `app.world_view` u vlastních spritů přeskakuje a proto
+má `G10` od 2026-10-11 druhou, rovnocennou kontrolu (shoda s barvami vlastního
+spritu) vedle UO palety kůže.
+
 ## 2.5 Struktura projektu
 
 ```

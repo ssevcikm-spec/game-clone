@@ -25,6 +25,9 @@ const Anim = preload("res://render/anim_player.gd")
 const Hue = preload("res://render/hue_cache.gd")
 const Sort = preload("res://render/sort.gd")
 const TiledataScript = preload("res://sim/world/tiledata.gd")
+# JMENA A PRUHY (M5, 2026-10-10): `render.names` je tenky kreslic - dostane
+# hotovy radek a vykresli ho. Klient si notoriety NEDOPOCITAVA (docs/04 §4.4).
+const NamePlates = preload("res://render/name_plates.gd")
 # M9 (15. session): davkove kresleni - cely pohled jako JEDEN mesh (1-2 draw
 # cally misto tisice). Kdyz se runtime atlas naplni, `_mesh` to NAHLASI a kresli
 # se puvodni cestou (ticha degradace by byla horsi nez pomale kresleni).
@@ -150,6 +153,11 @@ var player_missing: bool = false   # postava je, ale nema sprite (vada, ne ticho
 # rict, KTERA skupina a KTERY frame se opravdu prehral. 0/0 = nekreslilo se.
 var player_frame: int = 0
 var player_frames: int = 0
+# M5 (2026-10-10): pocitadla pro obrazek a pro branu - "je to videt na snimku"
+# se tim da podlozit cislem. `mobily_bez_sprite` je VIDET vada, ne ticho.
+var _mobilu_kresleno: int = 0
+var _mobily_bez_sprite: int = 0
+var _tel_kresleno: int = 0
 
 var _iso
 var _chunk = null
@@ -160,6 +168,11 @@ var _player = null
 var _action: int = 4               # 4 = idle (viz app/player_controller.gd)
 var _view_dir: int = 0             # smer KRESLENI postavy (viz `set_view_dir`)
 var _anim = null
+# Vlastni art po kusech (granule `render.own_art`): seznam vrstev z
+# `assets/own-art.json`, ktery `app.main` preda pres `nastav_vlastni_art()`.
+# Prazdny seznam = jen UO art, presne jako driv.
+var _own_layers: Array = []
+var _registry = null               # sim.entity_registry (pro `render.anim`)
 var _sort = null                   # render.sort (jedina funkce razeni)
 var _hues = null                   # render.hue (barva kuze; bez nej je postava seda)
 var _hue_cache_hit: bool = false   # tonovany sprite se pocita jen pri zmene
@@ -168,6 +181,15 @@ var _hue_last_hued: Texture2D = null
 var _hlasene_diry: Dictionary = {} # art id, o kterych uz bylo hlaseno, ze chybi
 var _list_center: Vector2i = Vector2i(-99999, -99999)   # stred postaveneho seznamu
 var _player_offset: Vector2 = Vector2.ZERO  # posun postavy mezi dlazdicemi (V2)
+# M5 (2026-10-10): kresleni ostatnich mobili, tela predmetu na zemi a jmen.
+# `_draw_registry` je `sim.entity_registry` (jedine misto pro mobily),
+# `_container`/`_items` jsou potreba pro tela (obsah tela je v kontejneru).
+var _draw_registry = null
+var _container = null
+var _items = null
+var _decay = null                  # sim.decay: kdo je telo (jedno pravidlo)
+var _jmena = null                  # render.names (injekce v `setup()`)
+var _telesa_videt: bool = true
 var _mesh = null                   # render.chunk_mesh (M9) - null = puvodni cesta
 var _mesh_seznam: Array = []       # seznam, pro ktery je mesh postaveny
 var _mesh_klic: int = -2147483647
@@ -274,6 +296,7 @@ func _ready() -> void:
 func setup(map, textures) -> void:
 	# Vola `app.main` po nacteni dat; do te doby se nekresli (a je to videt).
 	_textures = textures
+	_jmena = NamePlates.new()
 	# `world.tiledata` je potreba pro `TexID` (textura svahu) - bez nej by se
 	# svah kreslil jako rovna plocha a zustala by v nem dira.
 	_tiledata = TiledataScript.new()
@@ -291,7 +314,20 @@ func set_registry(registry) -> void:
 	# `sim.entity_registry`); registr zaklada `app.main` (integraci misto).
 	# Do 2026-10-06 bral `play()` `serial` jako telo - dnes je to jen fallback
 	# pro klienta bez registru.
-	_anim = Anim.new(Anim.MANIFEST_PATH, registry)
+	_registry = registry
+	_znovu_anim()
+
+
+func nastav_vlastni_art(vrstvy: Array) -> void:
+	# Vrstvy vlastniho artu pro ANIMACE (atlasovy art jde do `render.textures`,
+	# ktere dostava `app.main` primo). Poradi vrstev je priorita; prazdny seznam
+	# znamena "jen UO export" - a to je videt ve `stats()` cache.
+	_own_layers = vrstvy
+	_znovu_anim()
+
+
+func _znovu_anim() -> void:
+	_anim = Anim.new(Anim.MANIFEST_PATH, _registry, _own_layers)
 
 
 func set_player(mobile) -> void:
@@ -301,6 +337,162 @@ func set_player(mobile) -> void:
 	# po spusteni kreslil smer 0).
 	if _player != null:
 		_view_dir = ((int(_player.dir) % 8) + 8) % 8
+
+
+# --- OSTATNI MOBILOVE, TELA A JMENA (M5, 2026-10-10) ----------------------
+#
+# PROC: do M5 kreslil `app/world_view` JEN HRACE. Monstrum, ktere `sim.world.spawn`
+# postavil do sveta, tedy existovalo v simulaci, ale na obrazovce nebylo - a to
+# je presne vada, kterou `ZADANI-20` E5 zakazuje ("monstrum musí být vidět na
+# snímku"). Tenhle blok kresli VSEchny mobily z registru (animaci resi
+# `render.anim.body_of` podle jejich tela), tela (corpse) a predmety na zemi.
+#
+# PORADI VRSTEV: mobily a tela se kresli PRED hracem (`_draw_player`), takze
+# hrac je navrchu - ve stejne dlazdici ma hrac prednost (ROZHODNUTI KLONU).
+# Presne razeni podle (x+y) jako `render.sort` by bylo drazsi nez prinos:
+# mobily stoji na svych dlazdicich a prekryv je videt jen u sousedu.
+
+func set_mobily(registry, container, items) -> void:
+	# Zdroj pravdy o mobilech je `sim.entity_registry` (jedine misto, kde se
+	# mobil hleda podle serialu). `container`/`items` jsou potreba pro tela a
+	# predmety na zemi; bez nich se kresli jen mobily.
+	_draw_registry = registry
+	_items = items
+	_container = container
+	_znovu_anim()
+
+
+func nastav_decay(decay) -> void:
+	# `sim.decay` je JEDNO misto, kde je pravidlo "co je telo" - klient si ho
+	# neopisuje (`_je_telo` se ptá odsud). Bez nej plati `type == "corpse"`.
+	_decay = decay
+
+
+func nastav_telesa(videt: bool) -> void:	# Prepinac pro snímky: bez těl je obraz čistší, ale výchozí je ZAPNUTO -
+	# "není vidět, že monstrum umřelo" by byla vada.
+	_telesa_videt = videt
+
+
+func telesa_videt() -> bool:
+	return _telesa_videt
+
+
+func mobily_videt() -> int:
+	# POCET mobilu, ktere se kreslily (meritelne) - prijimaci kriterium
+	# "je to videt na snimku" se tak da podlozit cislem, ne dojmem.
+	return _mobilu_kresleno
+
+
+func tela_videt() -> int:
+	return _tel_kresleno
+
+
+func mobily_bez_sprite() -> int:
+	# Kolik mobilu se NEKRESLILO (chybi sprite pro jejich telo). Neni to ticho:
+	# `sim.world.spawn` dava telo z DAT, ale export `assets/uo/anim` muze telo
+	# nemit - pak se monstrum v simulaci hýbe a na obrazovce neni.
+	return _mobily_bez_sprite
+
+
+func _draw_mobily() -> void:
+	# Vsechny mobily KROMĚ hrace. Kdo nema sprite (napr. telo, ktere v
+	# `assets/uo/anim` neni), se PRESKOCI a pocita se do `mobily_bez_sprite`.
+	_mobilu_kresleno = 0
+	_mobily_bez_sprite = 0
+	if _draw_registry == null or _anim == null:
+		return
+	for mob in _draw_registry.all():
+		if _player != null and int(mob.serial) == int(_player.serial):
+			continue
+		var dopadlo: bool = _draw_mobil(mob)
+		if dopadlo:
+			_mobilu_kresleno += 1
+		else:
+			_mobily_bez_sprite += 1
+
+
+func _draw_mobil(mob) -> bool:
+	var clip: Dictionary = _anim.play(int(mob.serial), _anim_idle(), int(mob.dir))
+	if not bool(clip.get("ok", false)) or clip.get("texture") == null:
+		return false
+	var ground: Vector2 = _ground_of(Vector3i(int(mob.pos.x), int(mob.pos.y),
+		int(mob.pos.z)))
+	var texture: Texture2D = clip["texture"]
+	if not bool(clip.get("own", false)):
+		texture = _hued(texture, int(mob.hue))
+	var anchor: Vector2 = clip["anchor"]
+	if not bool(clip.get("mirror", false)):
+		draw_texture(texture, ground - anchor)
+	else:
+		var w: float = float(texture.get_width())
+		draw_set_transform(Vector2(ground.x - float(clip["mirror_x"]) + w,
+			ground.y - anchor.y), 0.0, Vector2(-1.0, 1.0))
+		draw_texture(texture, Vector2.ZERO)
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	drawn += 1
+	# JMENO + HP PRUH (docs/05 §5.5.2): klient jen zobrazuje, co je ve stavu.
+	# `_jmena` je hotovy modul `render.names` (injekce v `setup()`).
+	if _jmena != null:
+		_jmena.kresli(self, ground, {"name": str(mob.name), "hp": int(mob.hp),
+			"hp_max": int(mob.max_hp), "notoriety": int(mob.notoriety)}, false)
+	return true
+
+
+func _draw_tela() -> void:
+	# Tela (corpse) a predmety na zemi (`parent == 0`). Do M5 se nekreslily
+	# VUBEC (ani kovadlina a balvany) - hrac je musel hledat po pameti.
+	_tel_kresleno = 0
+	# POZOR: `_items is null` je v GDScript PARSE ERROR ("Expected type
+	# specifier after is") - `is` je test typu, ne porovnani. Namerено 2026-10-11
+	# pri prvnim spusteni sondy `p43-souboj-sonda.gd`.
+	if _items == null or _textures == null:
+		return
+	var serialy: Array = _items.keys()
+	serialy.sort()                       # deterministicke poradi kresleni
+	for serial in serialy:
+		var it = _items[serial]
+		if it == null or int(it.parent) != 0:
+			continue
+		if int(it.tile) <= 0:
+			continue
+		var tex: Texture2D = _textures.texture(int(it.tile))
+		if tex == null:
+			continue
+		var ground: Vector2 = _ground_of(Vector3i(int(it.pos.x), int(it.pos.y),
+			int(it.pos.z)))
+		var off: Vector2i = _textures.offset(int(it.tile))
+		draw_texture(tex, ground - Vector2(float(off.x), float(off.y)))
+		if _je_telo(it):
+			_tel_kresleno += 1
+			if _jmena != null:
+				_jmena.kresli(self, ground, {"name": str(it.get("name")),
+					"hp": 0, "hp_max": 0, "notoriety": 0}, false)
+		drawn += 1
+
+
+func _je_telo(it) -> bool:
+	# Identita tela je v `sim.decay.is_corpse_entity` (jedno misto, kde to
+	# pravidlo je) - klient si ho NEOPSUJE. Kdyz decay neni, plati `type`.
+	if _decay != null and _decay.has_method("is_corpse_entity"):
+		return bool(_decay.is_corpse_entity(it))
+	return str(it.get("type")) == "corpse"
+
+
+func _ground_of(pos: Vector3i) -> Vector2:
+	# Linka zeme pro libovolnou pozici (stejny vzorec jako
+	# `player_ground_position`, ale bez posunu beziciho kroku - ten ma jen hrac).
+	return snap_screen(_iso.to_screen(pos.x, pos.y, pos.z)
+		+ Vector2(Const.ISO_STEP, Const.TILE_H / 2.0))
+
+
+func _anim_idle() -> int:
+	return 4
+
+
+func _hued(texture: Texture2D, hue: int) -> Texture2D:
+	if hue == 0 or _hues == null or not _hues.available():
+		return texture
+	return _hues.hued(texture, hue)
 
 
 func set_action(action: int) -> void:
@@ -785,8 +977,19 @@ func _draw_puvodni() -> void:
 			continue
 		draw_texture(art, pozice)
 		drawn += 1
+	# M5: mobily a tela se kresli PRED hracem (hrac je navrchu), ale PRED
+	# zbytkem poradi hrace - proto se sem vklada `_draw_player` uz tady.
+	_kresli_mobily_a_tela()
 	if _player != null and not player_drawn:
 		_draw_player()
+
+
+func _kresli_mobily_a_tela() -> void:
+	# JEDNO MISTO, odkud se kresli mobily a tela (dve cesty kresleni:
+	# `_kresli_mesh` i `_draw_puvodni`) - kdyby to bylo na obou, kreslilo by se
+	# dvakrat a pocitadla by lhala.
+	_draw_tela()
+	_draw_mobily()
 
 
 func _obrazovka(margin: float) -> Rect2:
@@ -944,10 +1147,12 @@ func _kresli_mesh(predchozi: bool = false) -> void:
 			_mesh_stats = st
 			drawn = int(st.get("kvadru", 0)) - int(st.get("der", 0))
 		_mesh.draw_before_predchozi(self)
+		_kresli_mobily_a_tela()
 		_draw_player()
 		_mesh.draw_after_predchozi(self)
 		return
 	_mesh.draw_before(self)
+	_kresli_mobily_a_tela()
 	_draw_player()
 	_mesh.draw_after(self)
 
@@ -1101,7 +1306,12 @@ func _draw_player() -> void:
 	# i pro mereni (`player_ground_position`).
 	var ground: Vector2 = player_ground_position()
 	var texture: Texture2D = clip["texture"]
-	texture = player_hue(texture, int(_player.hue))
+	# ⚠ UO hue sada se na VLASTNI spritu NEPOUZIVA (2026-10-11): `anim.mul` je
+	# sediva rampa a barvu mu dava az hue, ale nasi postavu obarvil Blender -
+	# preindexovani pres 32barevnou UO sadu by ji prebarvilo (a "vlastni art"
+	# by pak byl jen jina silueta v UO barvach). Kresli se proto tak, jak je.
+	if not bool(clip.get("own", false)):
+		texture = player_hue(texture, int(_player.hue))
 	if not bool(clip.get("mirror", false)):
 		draw_texture(texture, ground - anchor)
 		return

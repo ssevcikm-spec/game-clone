@@ -6,6 +6,123 @@
 > **Současný stav se bere z tohoto bloku** a ověřuje se živě (§„Předletová
 > kontrola" níž je starší a **datovaná**).
 
+## ✅ CO JE NOVÉHO (2026-10-11) — VLASTNÍ ART JE VE HŘE A PŘEPÍNÁ SE PO KUSECH (blok A z `DALSI-SESSION.md`)
+
+> ⚠ **V TOMTO STROMĚ BĚŽELA DRUHÁ SESSION (M5 — souboj/monstra/smrt).**
+> Strom byl na začátku téhle session **čistý** (06:2x) a během ní do něj začala
+> zapisovat druhá session: `sim/systems/{combat,death,decay,ai,loot,poison}.gd`,
+> `sim/world/spawn.gd`, `data/{monsters,weapons,armor,item_properties,spawns}.json`,
+> `render/name_plates.gd`, `tests/cases/{combat,death,decay,ai,loot,poison,spawn}.gd`
+> a **do mých souborů** `render/anim_player.gd`, `app/main.gd`, `app/world_view.gd`,
+> `app/input_map.gd`, `app/player_controller.gd`, `tests/cases/render_anim.gd`.
+> `DALSI-SESSION.md` přitom tvrdí, že A a C jsou **disjunktní** — nejsou.
+> **Důsledek pro čísla níž:** testy i brány měří **sloučený strom** (moje práce + M5),
+> takže `2629/0` **není** jen moje práce a `G4`/`G6` hlásí i soubory M5.
+
+**Co bylo zadáno:** blok **A** z [`DALSI-SESSION.md`](DALSI-SESSION.md) — „zapoj vlastní
+art do hry tak, aby se přepínal PO KUSECH; pro `(kind, id)`, které vlastní sada obsahuje,
+vlastní sprite, jinak UO art“. Základ `assets/own-lit/` (1× se světlem), placaté předměty
+z `assets/own/`.
+
+**Stav před session:** testy **1852 kontrol / 0 selhání**, brány **13 měřeno / 0 chyb**,
+HEAD `b697e0f`, pracovní strom **čistý**.
+**Stav po integraci:** testy **2629 kontrol / 0 selhání** (82 case souborů — včetně granulí
+M5), brány **14 měřeno / 0 chyb** (nová `G15`), `G6` a `G10` po **vědomé re-baseline**.
+
+### 1) Co je hotové (a čím je to doložené)
+
+| Věc | Soubor | Naměřené |
+|---|---|---|
+| **Konfigurace „co se bere odkud“** | `assets/own-art.json` + `render/own_art.gd` (nový) | 2 vrstvy (`own-lit`, `own`), pořadí = priorita; `sprites` vybírá `(kind, id)`. Chyby se vrací **seznamem** (chybějící manifest, neznámý druh, prázdný výběr, překryv id, chybějící anim list) |
+| **Seam v atlase** | `render/texture_cache.gd` | vrstvy se indexují **PŘED UO** → vlastní vyhrává **v textuře i v `offset()`** (kotva ze stejného záznamu). `stats()` dělí původ: `own 6 / uo 47680`, `page_path()`/`is_own()`/`own_ids()` = doklad pro bránu |
+| **Seam v animacích** | `render/anim_player.gd` | vlastní klíč vyhrává, co sada nemá (běh, idle) **zůstává z UO**; `play()` vrací `own`, `sheet_file()` je doklad. Vlastní klíčů: **5** (40/40 chůze všech 8 směrů → 5 spritů) |
+| **Zapojení do hry** | `app/main.gd`, `app/world_view.gd` | `--no-own-art` vypne vlastní art jako celek (A/B); **UO hue se na vlastní spritu NEpoužívá** (`anim.mul` je šedá rampa, naši postavu obarvil Blender) |
+| **Nová brána `G15`** | `tools/gates/check-own-art.py` + `tools/gates/own_art_probe.gd` | měří **voláním** `texture()`, `offset()`, `page_path()`, `sheet_file()` a porovnává s manifesty; self-test **9 případů / 0 chyb**; na stromě `vlastnich_id 6, vlastnich_zkontrolovano 6, prepnuto 6, anim_fallback_akce 3` |
+| **Test chování** | `tests/cases/own_art.gd` (nový) | vlastní vyhrává (i offset), výběr po kusech vyhodí id, fallback je **přesně stejný** jako s vypnutým artem, `stats()` dělí původ, animace po klíči + `own` flag |
+| **`G6` rozšířena o vlastní art** | `tools/gates/check-assets.py` | self-test **12 případů / 0 chyb**; na stromě `own_vrstev 2, own_spritu 6, own_stranek 2, own_seam_id 6, own_seam_chybi 0, own_spritu_prazdnych 0`. **Vlastní sada je v gitu → G6 je odsud měřená i v CI** (dřív byla vždy NEMĚŘENO) |
+| **`G10` po re-baseline** | `tools/gates/check-render.py` | self-test **10 případů / 0 chyb**; vlastní snímek `vlastni_pixelu 692 / po erozi 132` → **OK**; týž snímek bez vlastního artu `236 / 0` → **VADA (exit 1)** |
+
+### 2) Snímek a **co je na něm vidět špatně** (bod 5 zadání)
+
+> **Snímky NEJSOU v gitu** — jsou v `.cache/render/dukaz/` (a `.cache/` je v `.gitignore`).
+> Důvod je závazný: snímek hry obsahuje **mapu a statiky z instalace UO**, takže je to
+> **odvozené dílo** stejně jako `assets/uo/` (zadání: „necommituj nic odvozeného z UO
+> artu“). Cesta zpět/vpřed je stejná jako u `_analyza/`: kdo má `assets/uo/`, přegeneruje
+> je sondou `tools/gates/own_art_probe.gd` (postup v její hlavičce).
+
+* **`.cache/render/dukaz/own-art-hra.png`** — hra s vlastním artem, hráč na
+  (1495,1630) v **chůzi** (proto vlastní postava; ve stoje by kreslila UO idle — viz níž).
+* **`.cache/render/dukaz/own-art-uo-baseline.png`** — **totéž místo** s `--no-own-art`
+  (A/B; kamera je doloženě shodná: `camera=(-2734.667, 68812.0)`).
+* **`.cache/render/dukaz/own-art-srovnani.png`** — postava a ikony vedle sebe.
+* **`.cache/render/dukaz/own-art-teren.png`**, **`own-art-rozdil.png`** — terén a rozdílová
+  mapa (rozdílných **496 415 px** z 921 600).
+
+**Co je na snímku vidět (doloženo čísly, ne dojmem):** kreslicí seznam obsahuje
+**`land 3: 291 dlaždic`** a **`land 1001: 691 dlaždic`** = **obě vlastní dlaždice** jsou
+v záběru; postava je vlastní (`own=true`, `list=…/ownlit-400-0-1.png`, `frame 0/8` proti
+UO `frame 1/10`); v batohu jsou **4 vlastní ikony** (dýka, krumpáč, ruda, ingot — art id
+`0x4E85, 0x4F51, 0x59B7, 0x5BEF` z `data/items.json`).
+
+**Co je na něm ŠPATNĚ (přiznané vady, ne „hotovo“):**
+
+1. **Batoh nemá pozadí** — ikony i texty leží přímo na mapě. Vlastní dýka a ingot jsou
+   tmavé a malé (14×28 a 14×31 px), takže **splývají s terénem**; na snímku je najde
+   oko jen podle popisků. (Naměřeno: shoda se zdrojovým atlasem má průměrný rozdíl RGB
+   **11–37**, takže tam opravdu jsou — jen se nedají přečíst.)
+2. **Vlastní sada má jen CHŮZI.** Když hráč stojí, kreslí se **UO idle** — postava tedy
+   při stání „přepne zpátky“ na půjčený art. Je to správné chování seamu po kusech,
+   ale vizuálně je to nejnápadnější vada integrace.
+3. **Přechod postavy je vidět**: UO postava je nahá a obarvená hue sadou, vlastní má
+   modrou tuniku a hnědé nohy — vedle sebe to vypadá jako **dvě různé hry** (A/B snímek).
+4. **Vlastní dýka a ingot jsou z `assets/own/` (bez světla)**, zatímco terén a postava
+   z `assets/own-lit/` (se světlem) — míchají se tedy dva světy. Je to **vědomý
+   kompromis** zadání („ber je zatím z `assets/own/`“), ale na snímku je vidět, že
+   placaté předměty mají slabší stín (dýka 7 px, ingot 11 px proti rudě 235 px).
+5. **Terén se sice přepnul (496 415 px rozdílu), ale obě vlastní dlaždice vypadají
+   UO velmi podobně** — rozdíl je hlavně v odstínu trávy/hlíny. Kdo čeká „jiný svět“,
+   nedostane ho; to je `M7` (nejmenší hratelný vzorek), ne vada seamu.
+
+### 3) Vědomé odchylky (zapsané, ne tiché)
+
+1. **Odchylka od `tools/artgen/SEAM.md` §4:** návrh počítal s **jednou** sadou a se
+   `pieces.json` uvnitř jejího jmenného prostoru. Sady jsou **dvě** (`own-lit` + `own`)
+   a každá pokrývá jiný kus téhož id prostoru, takže je přepínač **jeden soubor**
+   `assets/own-art.json` (jinak by se „kdo vyhrává“ rozhodovalo na dvou místech).
+2. **Vlastní postava se netonuje UO hue sadou.** `app/world_view` u vlastních spritů
+   `player_hue` přeskakuje. Důvod: `anim.mul` je šedá rampa a barvu mu dává hue, ale
+   naši postavu obarvil Blender; preindexování přes 32barevnou UO sadu by z „vlastního
+   artu“ udělalo jen jinou siluetu v UO barvách.
+3. **`G10` má od 2026-10-11 druhou, rovnocennou kontrolu.** Původní `kuze_pixelu ≥ 500`
+   měří **tonování hue**; u vlastní postavy platit nemůže. Nová kontrola měří shodu
+   s barvami vlastního spritu **po erozi masky 3×3** (naměřeno 138 vs 0; hranice 60).
+4. **Sonda `own_art_probe.gd` posílá do hry skutečné příkazy `move`** a drží hráče na
+   dlaždici, aby se dala udělat A/B dvojice. Je to nástroj měření, **ne** změna produkce.
+
+### 4) Co zůstává otevřené (pojmenované)
+
+1. **⚠ Ikona, která se nestihla načíst, se v `ui.backpack` už nikdy neobjeví** — řádek se
+   staví jednou, `texture()` při asynchronním načítání vrátí `null` a `flush()` se znovu
+   nezavolá, dokud se nezmění obsah. Sonda to obchází opakovaným plněním; **v produkci je
+   to vada** (nová stránka atlasu = trvale chybějící ikona). Doporučení: `flush()` na
+   změnu `verze()`/`pending()` z `render.textures`.
+2. **Vlastní sada nemá idle ani běh** → ve stoje a v běhu kreslí UO art. Doplnit do
+   `assets/own-lit/` (session B), pak se `anim_fallback_akce` v `G15` změní.
+3. **Granule pro vlastní art nejsou v plánu** — `.forge/roadmap.json` ani `tools/roadmap-gen.py`
+   se needitovaly (patří uživateli / integrační session, `docs/07` §7.1 bod 5), takže
+   `G4` o `render/own_art.gd` nic netvrdí a `plan-status.py` ho nevidí.
+4. **`assets/own-art.json` není v `docs/04 §4.5`** (datové typy) — smlouva je zatím jen
+   v §4.2 u `render.own_art`; pinning schématu patří uživateli.
+5. **Snímek je z `.cache/` a není reprodukovatelný v CI** (windowed Godot, `assets/uo/`
+   nejsou v gitu) **a záměrně není v gitu ani jako důkaz** — obsahuje UO mapu, tedy
+   odvozené dílo. Kdo je chce přegenerovat, potřebuje `assets/uo/` a sondu
+   `tools/gates/own_art_probe.gd` (postup je v hlavičce souboru).
+6. **Sloučený strom s M5**: `app/main.gd`, `app/world_view.gd`, `render/anim_player.gd`
+   a `tests/cases/render_anim.gd` obsahují **obojí** (moje i M5). Commit je proto
+   **po souborech** a v jednom commitu putuje i část práce M5 — je to přiznané, ne tiché.
+
+---
+
 ## ✅ CO JE NOVÉHO (2026-10-10, DRUHÁ ČÁST) — **CELÁ KRÁTKÁ SMYČKA SE DÁ ZAHRÁT** (bez zásahu z konzole)
 
 **Co bylo zadáno (uživatel, 2026-10-10):** „Ano“ na otázku, zda dodělat
