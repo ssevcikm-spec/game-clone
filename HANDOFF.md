@@ -124,17 +124,27 @@ cihlová podlaha.
 
 ## 🔗 COMMITY TÉTO SESSION (a ověřený push)
 
-`…` — `assets/stone-path/{manifest.json, atlas/land_0.png}` (nová vrstva),
+`2991923` — `assets/stone-path/{manifest.json, atlas/land_0.png}` (nová vrstva),
 `assets/own-art.json` (vrstva `stone-path` na `1001–1004`; `own-lit` bez land
 1001), `tools/artgen/pbr_dlazdice.py` (nový nástroj v repu),
 `tools/gates/own_art_probe.gd` + `tools/gates/check-own-art.py` (id
 z konfigurace, fallback odvozený), `tools/gates/check-style.py` (materiál
-`pbr` → měřená tvrdá alfa), `HANDOFF.md`, `LESSONS.md`.
+`pbr` → měřená tvrdá alfa), `RESERSE-ART-PIPELINE-2026-10-11.md` (datum
+spotřeby), `ZADANI-26-VARIANTY-DLAZDIC.md` + `PROMPTY-DLAZDICE-NANO-BANANA.md`
+(dokumenty, na které odkazuje už commitnutý `HANDOFF`/`LESSONS`).
+**Ověřeno živě po pushi:** `git rev-list --count origin/main..HEAD` → **0**,
+`origin/main` = `HEAD` = `2991923` (`47827e1..2991923 main -> main`).
+
+⚠ **Bloky `HANDOFF.md` a `LESSONS.md` odnesly commity souběžné session**
+(`eb69308`, `47827e1`) — byly ve stromě dřív, než jsem stihl commitnout sám,
+a jsou v nich **celé** (proto je tenhle commit už nemění). Její commit `eb69308`
+zároveň **předběhl ten můj**, takže na origin chvíli visel `HANDOFF`, který
+odkazoval na `assets/stone-path/` — než doběhl `2991923`. Kdo v tomhle stromě
+pracuje souběžně, ať s tím počítá (viz `LESSONS.md`, osmá část).
 
 ⚠ **Do mého commitu patří i řádek `"groups"` v `assets/own-art.json`** — ten
-přidala **paralelní session** (její `render/*` v tu chvíli nebyly commitnuté).
-Bez jejího kódu je klíč jen ignorovaný záznam, takže nic nerozbije; kdo bude
-commity skládat, ať ví, že tenhle řádek přišel odsud.
+přidala **paralelní session**; její `render/*` už v `eb69308` jsou, takže klíč
+je dnes platný. Kdo bude commity skládat, ať ví, že tenhle řádek přišel odsud.
 
 ---
 
