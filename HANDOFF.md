@@ -94,6 +94,14 @@ s UO mapou v gitu, chybějící `data/regions.json`).
 5. **Licence:** mod s artem z instalace UO se distribuovat nesmí — má to být
    **vynucené** (kontrola), nebo stačí pravidlo v dokumentaci pro moddery?
 
+## 🔗 COMMITY TÉTO SESSION (a ověřený push)
+
+`31956c4` (krok S1: `sim/content.gd` + `data/content-layers.json` + zapojení do
+`app/main` + testy) → `946fbe2` (návrh S1–S6 + kontrakt `docs/04 §4.9`) →
+`bedaa1f` (LESSONS + toto předání) → `…` (doplnění commitů do předání).
+**Ověřeno živě:** `git rev-list --count origin/main..HEAD` → **0**,
+`origin/main` = `HEAD`.
+
 ---
 
 
