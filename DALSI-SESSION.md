@@ -15,8 +15,11 @@
 | Krátká smyčka je hratelná: těžba → výroba → **prodej** | commit `d8e2a14`, HANDOFF 2026-10-10/2 |
 | Automatizace **vypnutá** (opt-in `--policy`), spam opraven u zdroje | `app/main.gd`, `sim/decision_log.gd`, testy **1852/0**, mutace chycena |
 | Vlastní art: pipeline + 1× sada (46 spritů) + 2× srovnání | `tools/artgen/`, `assets/own/`, `assets/own2x/`, `pack_atlas.py --check` 476/0 |
+| **1× sada SE SVĚTLEM** (`assets/own-lit/`, 46 spritů, kontaktní stín + AO + jedno slunce) | `pack_atlas_lit.py --check` **893/0**, determinismus hlášen ve dvou úrovních, `MERENI.md` §9, `ZADANI-25` §11 |
 | Brána `G14` (float ve stavu) | `tools/gates/check-state-float.py`, self-test 6/0 |
 | Pravidlo „UO duchovně, ne tělesně" | `docs/01` §1.2.1 |
+
+**Nic neběží** — všechny koleje jsou dotažené do stavu, kdy se dá zadat session A.
 
 **Automatizace je vypnutá, ale zapnout se dá** (`M10`): `HRA.cmd` předává
 argumenty dál (`%*`), takže stačí
@@ -30,9 +33,11 @@ Bez přepínače se politika **nenačte ani když soubor existuje** a do žurná
 neteče nic. Spam je navíc opraven u zdroje (throttle podle pravidla), takže
 i se zapnutou politikou jdou do žurnálu jen **změny**.
 
-**Běží:** session, která na 1× sadu aplikuje **světlo** (kontaktní stín + AO +
-jedno slunce) → `assets/own-lit/` + srovnávací list. Až doběhne, je to základ
-pro session **A**.
+**Běží:** nic. Vlastní art má tři hotové sady: `assets/own/` (1× bez světla),
+`assets/own2x/` (2×, jen pro srovnání) a **`assets/own-lit/` (1× se světlem —
+základ pro integraci)**. U `own-lit` platí změřeno: **terén a postava jsou
+připravené**, **placaté předměty (dýka, ingot) ještě ne** — jejich stín je
+1px lem a kontrast klesl (dýka 25,7 → 15,2), což řeší session B.
 
 ---
 
@@ -171,8 +176,9 @@ ROZHODNUTI-2026-10-10-MODERNI-UO.md (M1–M10, směr). Pak tools/artgen/SEAM.md
 
 Úkol: zapoj vlastní art do hry tak, aby se přepínal PO KUSECH — pro (kind, id),
 které vlastní sada obsahuje, se použije vlastní sprite, jinak zůstane UO art.
-Vlastní sada je v assets/own/ (a assets/own-lit/, až doběhne session se světlem);
-kontrakt manifestu je stejný jako assets/uo/.
+Základ je assets/own-lit/ (1× SE SVĚTLEM): terén a postava jsou připravené,
+placaté předměty (dýka, ingot) ber zatím z assets/own/ nebo je vynech — jejich
+stín a kontrast řeší session B. Kontrakt manifestu je stejný jako assets/uo/.
 
 Hotovo, když: 1) ve hře je vidět vlastní dýka/krumpáč/ruda/ingot, postava
 a 2 dlaždice; 2) id bez vlastního artu se beze změny použije z UO; 3) brány G6
@@ -195,9 +201,12 @@ Než začneš: přečti DALSI-SESSION.md (sekce B), tools/artgen/MERENI.md
 (co je změřeno a co jsou pasti), ZADANI-25 §10 (co dalo 2× a co vzalo)
 a LESSONS.md – záznamy z 2026-10-10 o artu.
 
-Úkol: vlastní art přestane být "3D hladký" proti UO pixel artu. Naměřeno v
-pilotu: předměty mají menší kontrast a chybí tmavý obrys (UO ho má), ingot čte
-jako kostka, krumpáč jako tyč, chůze se při zoomu skoro nerozezná.
+Úkol: vlastní art přestane být "3D hladký" proti UO pixel artu. Dvě konkrétní
+věci jsou UŽ ZMĚŘENÉ (ZADANI-25 §11), začni jimi:
+(i) STÍN PRO PLACATÉ PŘEDMĚTY — dýka má viditelný jen 1px lem (7 px), ingot
+11 px, kdežto ruda 235 px; (ii) VRÁTIT KONTRAST — jedno směrové slunce bez
+výplně vzalo kovům odlesky (rozptyl jasu dýky 25,7 → 15,2, postavy 50,8 → 45,2)
+a sada je tmavší o 8–13 %. Pak teprve řeš obrys/čitelnost obecně.
 
 Hotovo, když: existuje srovnávací list UO | náš starý | náš nový pro dýku,
 terén a postavu; read_image potvrdí, že se to zlepšilo JAKO ČITELNOST; je

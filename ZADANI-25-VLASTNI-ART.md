@@ -219,3 +219,41 @@ obsah je 11×11 vs 11×12 px) a **červený křížek** (střed dlaždice) sedí
 na chodidlech a čte se jako červené pixely v artu. A jedna **vada modelu, ne
 rozlišení**: náš tvar dýky neodpovídá UO (UO = kompaktní dýka se záštitou,
 náš = tenká dlouhá čepel).
+
+## 11. VÝSLEDEK: 1× se světlem (2026-10-10) — `assets/own-lit/`
+
+**Vyrobeno:** `assets/own-lit/` = **46 spritů** (2 land + 4 item + 40 anim,
+3 stránky 2048²), rozlišení **1×** (44 px dlaždice, krok 22, kotva
+`ox=(w>>1)−22, oy=h−44`), z 2× převzato **jen světlo** (1 směrové slunce +
+Fast-GI AO + kontaktní stín z kontaktní roviny; **21 konstant se bere z 2×
+větve** a Blender spadne, kdyby se rozešly). `assets/own/` a `assets/own2x/`
+zůstaly nedotčené (1× kontrola po celou dobu 476/0).
+
+**Kontrola:** `pack_atlas_lit.py --check` = **893 kontrol / 0 chyb** (spuštěno
+ověřovatelem znovu: exit 0): kotva 46/46, stín viditelný 44/44, stín
+v kontaktním okruhu 44/44, neukrojený 44/44, geometrie proti 1× ≤ 2 px,
+recept 21/21. **Determinismus se hlásí ve DVOU úrovních:** manifest SHA shodný,
+stránky land/item **bajtově shodné**, `anim_0` se liší u **80 px o ±1 (RGB)** —
+EEVEE není bajtově deterministický a brána to říká, místo aby to zamlčela.
+
+**Čas:** render celé lit sady 37,7 s + zabalení 12,1 s ≈ **1,08 s/sprite**
+(faceta ≈ 2,3 h) — proti 1× bez světla **+17 %**, ale `beauty` na frame je
+**levnější** (0,197 vs 0,385 s, jedno slunce místo tří); dražší je postprocess
+(2,26×) a druhé kolo renderu.
+
+**Co je lepší (měřeno z pixelů):** objekty **stojí NA dlaždici** (viditelný
+stín: ruda 235 px, postava 60, krumpáč 20, ingot 11, dýka 7; krytí do 126/255);
+barvy blíž UO (tráva (57,70,51) → (48,61,44) vs UO (42,64,13)); **jeden směr
+světla v celé sadě**.
+
+**Co je horší:** **kontrast klesl u všeho** (rozptyl jasu: dýka 25,7 → 15,2,
+postava 50,8 → 45,2, tráva 6,1 → 5,7) — jedno slunce bez výplně bere kovům
+odlesky; je to tmavší o 8–13 %; **placaté předměty stín skrývají** (dýka 7 px
+= 1px lem); box spritu roste (dýka 14×28 → 26×35), obsah zůstává (|Δ| ≤ 2 px
+u 44 spritů).
+
+**Doporučení (potvrzeno ověřovatelem):** `assets/own-lit/` je **základ pro
+integraci** pro **terén a postavu** (přínos je měřený), ale **před integrací
+placatých předmětů** doladit dvě věci: (i) **stín pro placaté předměty**
+(dýka/ingot mají 1px lem) a (ii) **vrátit část kontrastu** (slabá výplň nebo
+silnější slunce) — to je náplň session **B**.
