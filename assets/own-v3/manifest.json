@@ -1,0 +1,1539 @@
+{
+ "anim": {
+  "duvod": "postava se ve hre bere z anim listu (render/anim_player.gd), ne z manifestu - proto jsou framy i tady",
+  "file": "anim/anim-sheets.json",
+  "frame_ms": 80,
+  "framu": 8,
+  "id_klic": "body*1000 + action*100 + dir*10 + frame",
+  "pixels_decoded": true,
+  "smeru": 5
+ },
+ "generator": "tools/artgen/pack_atlas_v3.py",
+ "pad": 1,
+ "page_size": 2048,
+ "pages": [
+  {
+   "count": 40,
+   "file": "atlas/anim_0.png",
+   "h": 2048,
+   "w": 2048
+  },
+  {
+   "count": 4,
+   "file": "atlas/item_0.png",
+   "h": 2048,
+   "w": 2048
+  },
+  {
+   "count": 2,
+   "file": "atlas/land_0.png",
+   "h": 2048,
+   "w": 2048
+  }
+ ],
+ "report": {
+  "anim_barva_pozadi_px": 0,
+  "anim_box_px": {
+   "400000": [
+    34,
+    84
+   ],
+   "400001": [
+    34,
+    84
+   ],
+   "400002": [
+    34,
+    84
+   ],
+   "400003": [
+    34,
+    84
+   ],
+   "400004": [
+    34,
+    84
+   ],
+   "400005": [
+    34,
+    84
+   ],
+   "400006": [
+    34,
+    84
+   ],
+   "400007": [
+    34,
+    84
+   ],
+   "400010": [
+    34,
+    84
+   ],
+   "400011": [
+    34,
+    84
+   ],
+   "400012": [
+    34,
+    84
+   ],
+   "400013": [
+    34,
+    84
+   ],
+   "400014": [
+    34,
+    84
+   ],
+   "400015": [
+    34,
+    84
+   ],
+   "400016": [
+    34,
+    84
+   ],
+   "400017": [
+    34,
+    84
+   ],
+   "400020": [
+    34,
+    84
+   ],
+   "400021": [
+    34,
+    84
+   ],
+   "400022": [
+    34,
+    84
+   ],
+   "400023": [
+    34,
+    84
+   ],
+   "400024": [
+    34,
+    84
+   ],
+   "400025": [
+    34,
+    84
+   ],
+   "400026": [
+    34,
+    84
+   ],
+   "400027": [
+    34,
+    84
+   ],
+   "400030": [
+    34,
+    84
+   ],
+   "400031": [
+    34,
+    84
+   ],
+   "400032": [
+    34,
+    84
+   ],
+   "400033": [
+    34,
+    84
+   ],
+   "400034": [
+    34,
+    84
+   ],
+   "400035": [
+    34,
+    84
+   ],
+   "400036": [
+    34,
+    84
+   ],
+   "400037": [
+    34,
+    84
+   ],
+   "400040": [
+    34,
+    84
+   ],
+   "400041": [
+    34,
+    84
+   ],
+   "400042": [
+    34,
+    84
+   ],
+   "400043": [
+    34,
+    84
+   ],
+   "400044": [
+    34,
+    84
+   ],
+   "400045": [
+    34,
+    84
+   ],
+   "400046": [
+    34,
+    84
+   ],
+   "400047": [
+    34,
+    84
+   ]
+  },
+  "anim_listu": 5,
+  "anim_meritko_max": 0.09009,
+  "anim_meritko_min": 0.09009,
+  "anim_obsah_pod_kontaktem_max_px": 5.82,
+  "anim_obsah_sirka_px": {
+   "400000": 16,
+   "400001": 16,
+   "400002": 16,
+   "400003": 16,
+   "400004": 16,
+   "400005": 16,
+   "400006": 16,
+   "400007": 16,
+   "400010": 16,
+   "400011": 16,
+   "400012": 16,
+   "400013": 16,
+   "400014": 16,
+   "400015": 16,
+   "400016": 16,
+   "400017": 16,
+   "400020": 16,
+   "400021": 16,
+   "400022": 16,
+   "400023": 16,
+   "400024": 16,
+   "400025": 16,
+   "400026": 16,
+   "400027": 16,
+   "400030": 16,
+   "400031": 16,
+   "400032": 16,
+   "400033": 16,
+   "400034": 16,
+   "400035": 16,
+   "400036": 16,
+   "400037": 16,
+   "400040": 16,
+   "400041": 16,
+   "400042": 16,
+   "400043": 16,
+   "400044": 16,
+   "400045": 16,
+   "400046": 16,
+   "400047": 16
+  },
+  "anim_obsah_vyska_px": {
+   "400000": 61,
+   "400001": 61,
+   "400002": 61,
+   "400003": 61,
+   "400004": 61,
+   "400005": 61,
+   "400006": 61,
+   "400007": 61,
+   "400010": 61,
+   "400011": 61,
+   "400012": 61,
+   "400013": 61,
+   "400014": 61,
+   "400015": 61,
+   "400016": 61,
+   "400017": 61,
+   "400020": 61,
+   "400021": 61,
+   "400022": 61,
+   "400023": 61,
+   "400024": 61,
+   "400025": 61,
+   "400026": 61,
+   "400027": 61,
+   "400030": 61,
+   "400031": 61,
+   "400032": 61,
+   "400033": 61,
+   "400034": 61,
+   "400035": 61,
+   "400036": 61,
+   "400037": 61,
+   "400040": 61,
+   "400041": 61,
+   "400042": 61,
+   "400043": 61,
+   "400044": 61,
+   "400045": 61,
+   "400046": 61,
+   "400047": 61
+  },
+  "anim_pozadi_cesta": [
+   "alfa"
+  ],
+  "anim_pozadovano": 40,
+  "anim_px_na_jednotku": [
+   31.6
+  ],
+  "anim_px_na_jednotku_merene": [
+   44.68
+  ],
+  "anim_px_na_jednotku_podle_spritu": {
+   "400000": 31.6,
+   "400001": 31.6,
+   "400002": 31.6,
+   "400003": 31.6,
+   "400004": 31.6,
+   "400005": 31.6,
+   "400006": 31.6,
+   "400007": 31.6,
+   "400010": 31.6,
+   "400011": 31.6,
+   "400012": 31.6,
+   "400013": 31.6,
+   "400014": 31.6,
+   "400015": 31.6,
+   "400016": 31.6,
+   "400017": 31.6,
+   "400020": 31.6,
+   "400021": 31.6,
+   "400022": 31.6,
+   "400023": 31.6,
+   "400024": 31.6,
+   "400025": 31.6,
+   "400026": 31.6,
+   "400027": 31.6,
+   "400030": 31.6,
+   "400031": 31.6,
+   "400032": 31.6,
+   "400033": 31.6,
+   "400034": 31.6,
+   "400035": 31.6,
+   "400036": 31.6,
+   "400037": 31.6,
+   "400040": 31.6,
+   "400041": 31.6,
+   "400042": 31.6,
+   "400043": 31.6,
+   "400044": 31.6,
+   "400045": 31.6,
+   "400046": 31.6,
+   "400047": 31.6
+  },
+  "anim_stin_max_alfa": 63,
+  "anim_stin_px_30_90": {
+   "400000": 113,
+   "400001": 113,
+   "400002": 114,
+   "400003": 113,
+   "400004": 113,
+   "400005": 113,
+   "400006": 114,
+   "400007": 113,
+   "400010": 113,
+   "400011": 113,
+   "400012": 114,
+   "400013": 113,
+   "400014": 113,
+   "400015": 113,
+   "400016": 114,
+   "400017": 113,
+   "400020": 113,
+   "400021": 113,
+   "400022": 114,
+   "400023": 113,
+   "400024": 113,
+   "400025": 113,
+   "400026": 114,
+   "400027": 113,
+   "400030": 115,
+   "400031": 113,
+   "400032": 113,
+   "400033": 113,
+   "400034": 115,
+   "400035": 113,
+   "400036": 113,
+   "400037": 113,
+   "400040": 114,
+   "400041": 113,
+   "400042": 113,
+   "400043": 113,
+   "400044": 114,
+   "400045": 113,
+   "400046": 113,
+   "400047": 113
+  },
+  "anim_stin_viditelne_px": {
+   "400000": 112,
+   "400001": 115,
+   "400002": 112,
+   "400003": 115,
+   "400004": 112,
+   "400005": 115,
+   "400006": 112,
+   "400007": 115,
+   "400010": 113,
+   "400011": 115,
+   "400012": 111,
+   "400013": 115,
+   "400014": 113,
+   "400015": 115,
+   "400016": 111,
+   "400017": 115,
+   "400020": 115,
+   "400021": 115,
+   "400022": 113,
+   "400023": 115,
+   "400024": 115,
+   "400025": 115,
+   "400026": 113,
+   "400027": 115,
+   "400030": 114,
+   "400031": 115,
+   "400032": 110,
+   "400033": 115,
+   "400034": 114,
+   "400035": 115,
+   "400036": 110,
+   "400037": 115,
+   "400040": 112,
+   "400041": 115,
+   "400042": 112,
+   "400043": 115,
+   "400044": 112,
+   "400045": 115,
+   "400046": 112,
+   "400047": 115
+  },
+  "anim_stin_viditelne_px_min": 110,
+  "anim_stin_vrstva_px": {
+   "400000": 123,
+   "400001": 123,
+   "400002": 124,
+   "400003": 123,
+   "400004": 123,
+   "400005": 123,
+   "400006": 124,
+   "400007": 123,
+   "400010": 123,
+   "400011": 123,
+   "400012": 124,
+   "400013": 123,
+   "400014": 123,
+   "400015": 123,
+   "400016": 124,
+   "400017": 123,
+   "400020": 123,
+   "400021": 123,
+   "400022": 124,
+   "400023": 123,
+   "400024": 123,
+   "400025": 123,
+   "400026": 124,
+   "400027": 123,
+   "400030": 125,
+   "400031": 123,
+   "400032": 123,
+   "400033": 123,
+   "400034": 125,
+   "400035": 123,
+   "400036": 123,
+   "400037": 123,
+   "400040": 124,
+   "400041": 123,
+   "400042": 123,
+   "400043": 123,
+   "400044": 124,
+   "400045": 123,
+   "400046": 123,
+   "400047": 123
+  },
+  "anim_styl_barvy_max": 39,
+  "anim_styl_polopruhle_px_max": 0,
+  "anim_vyrobeno": 40,
+  "item_barva_pozadi_px": 0,
+  "item_box_px": {
+   "3717": [
+    44,
+    44
+   ],
+   "3921": [
+    30,
+    36
+   ],
+   "6583": [
+    52,
+    51
+   ],
+   "7151": [
+    30,
+    39
+   ]
+  },
+  "item_meritko_max": 0.207101,
+  "item_meritko_min": 0.074627,
+  "item_obsah_pod_kontaktem_max_px": 13.3,
+  "item_obsah_sirka_px": {
+   "3717": 25,
+   "3921": 11,
+   "6583": 32,
+   "7151": 12
+  },
+  "item_obsah_vyska_px": {
+   "3717": 27,
+   "3921": 12,
+   "6583": 36,
+   "7151": 16
+  },
+  "item_pozadi_cesta": [
+   "alfa"
+  ],
+  "item_pozadovano": 4,
+  "item_px_na_jednotku": [
+   26.17,
+   34.14,
+   36.04,
+   72.64
+  ],
+  "item_px_na_jednotku_merene": [
+   37.01,
+   48.28,
+   50.97,
+   102.72
+  ],
+  "item_px_na_jednotku_podle_spritu": {
+   "3717": 36.04,
+   "3921": 34.14,
+   "6583": 72.64,
+   "7151": 26.17
+  },
+  "item_stin_max_alfa": 70,
+  "item_stin_px_30_90": {
+   "3717": 0,
+   "3921": 0,
+   "6583": 233,
+   "7151": 8
+  },
+  "item_stin_viditelne_px": {
+   "3717": 78,
+   "3921": 28,
+   "6583": 266,
+   "7151": 34
+  },
+  "item_stin_viditelne_px_min": 28,
+  "item_stin_vrstva_px": {
+   "3717": 69,
+   "3921": 0,
+   "6583": 277,
+   "7151": 14
+  },
+  "item_styl_barvy_max": 40,
+  "item_styl_polopruhle_px_max": 0,
+  "item_vyrobeno": 4,
+  "land_barva_pozadi_px": 0,
+  "land_box_px": {
+   "1001": [
+    44,
+    44
+   ],
+   "3": [
+    44,
+    44
+   ]
+  },
+  "land_meritko_max": 0.088531,
+  "land_meritko_min": 0.088353,
+  "land_obsah_pod_kontaktem_max_px": 21.89,
+  "land_obsah_sirka_px": {
+   "1001": 46,
+   "3": 45
+  },
+  "land_obsah_vyska_px": {
+   "1001": 45,
+   "3": 45
+  },
+  "land_pozadi_cesta": [
+   "alfa"
+  ],
+  "land_pozadovano": 2,
+  "land_stin_duvod": "dlazdice je podlaha - stin pod ni je cely schovany pod ni",
+  "land_stin_max_alfa": 0,
+  "land_stin_px_30_90": {},
+  "land_stin_viditelne_px": {},
+  "land_stin_viditelne_px_min": 0,
+  "land_stin_vrstva_px": {},
+  "land_styl_barvy_max": 17,
+  "land_styl_polopruhle_px_max": 0,
+  "land_vyrobeno": 2,
+  "stin_recept": "v3",
+  "stin_recept_cisla": {
+   "ao_dosah_jednotek": 0.2,
+   "ao_kroku": 16,
+   "ao_kvalita": 0.5,
+   "ao_paprsku": 4,
+   "ao_rezim": [
+    "AMBIENT_OCCLUSION_ONLY",
+    "AMBIENT_OCCLUSION"
+   ],
+   "kontaktni_rovina_albedo": 0.5,
+   "kontaktni_rovina_z": -0.004,
+   "obloha_barva": [
+    0.4,
+    0.44,
+    0.5,
+    1.0
+   ],
+   "obloha_sila": 0.5,
+   "slunce_energie": 4.0,
+   "slunce_pocet": 2,
+   "slunce_rotace_rad": [
+    -0.7,
+    0.0,
+    -2.6
+   ],
+   "slunce_uhel_deg": 12.0,
+   "stin_mekkost_px": 1.2,
+   "stin_odstup_px": 0.9,
+   "stin_posun_px": [
+    -2,
+    -1
+   ],
+   "stin_recept": "v3",
+   "stin_sila": 0.5,
+   "stin_sirka_px": 0.6,
+   "vypln_energie": 1.5,
+   "vypln_rotace_rad": [
+    -0.7,
+    0.0,
+    0.541592653589793
+   ],
+   "vypln_stin": false,
+   "vypln_uhel_deg": 12.0
+  },
+  "styl_doostreni_procent": 0,
+  "styl_tvrda_alfa_prah": 128
+ },
+ "source": {
+  "blender": "5.2.1 LTS (BLENDER_EEVEE, film_transparent, Fast-GI AO, 1 smerove slunce + vypln, kontaktni rovina)",
+  "geometrie": "1 jednotka = 1 dlazdice = 44 px; kotva jako UO (ox=(w>>1)-22, oy=h-44) - ROZLISENI SE NEMENI",
+  "kamera": {
+   "azimut_deg": 45.0,
+   "elevace_deg": 35.26439,
+   "svisle_roztazeni": 1.732051,
+   "zrcadleni_x": true
+  },
+  "lit_kontrakt": {
+   "ground_px": 22,
+   "iso_step_px": 22,
+   "kotva": "item/anim: ox=(w>>1)-22, oy=h-44; land: 0,0",
+   "ortho_scale": 1.4545454545454546,
+   "px_per_unit": 352,
+   "render_px": 512,
+   "rozliseni": "1x (ZADANI-25 §10: rozliseni se NEMENI)",
+   "stin": "recept v3 - ubytek od obrysu objektu (viz odchylky_od_v2)",
+   "svetlo": "1 smerove slunce + VYPLN (protismer, bez stinu) + Fast-GI AO + kontaktni stin",
+   "tile_px": 44
+  },
+  "odchylky_od_v2": {
+   "geometrie": "NEMENI SE (44 px, krok 22, kotva jako UO)",
+   "obloha_sila": {
+    "v2": 0.45,
+    "v3": 0.5
+   },
+   "reference": "assets/own-lit",
+   "rozliseni": "NEMENI SE (1x; 2x je ve stejnem meritku mekci)",
+   "stin_recept": {
+    "duvod": "placate predmety mely stin jen jako 1px lem (dyka 6 px, ingot 11 px) - MERENI.md §9.3 bod 3",
+    "mekkost_px": {
+     "v2": null,
+     "v3": 1.2
+    },
+    "odstup_px": {
+     "v2": null,
+     "v3": 0.9
+    },
+    "posun_px": {
+     "v2": null,
+     "v3": [
+      -2,
+      -1
+     ]
+    },
+    "sila": {
+     "v2": 0.55,
+     "v3": 0.5
+    },
+    "sirka_px": {
+     "v2": null,
+     "v3": 0.6
+    },
+    "v2": "v2 (radialni ubytek od kotvy)",
+    "v3": "v3 (pas od obrysu objektu, posunuty ve smeru svetla)"
+   },
+   "svetlo_pocet_slunci": {
+    "v2": 1,
+    "v3": 2
+   },
+   "vypln": {
+    "v2": null,
+    "v3": {
+     "duvod": "vratit odlesky a obrysovy lem kovum (MERENI.md §9.3 bod 1: rozptyl jasu dyky 25,7 -> 15,2)",
+     "energie": 1.5,
+     "smer": "protismer zakladniho slunce",
+     "uhel_deg": 12.0,
+     "use_shadow": false
+    }
+   }
+  },
+  "odvozeno_z": "artgen_common.py (geometrie 1x) + assets/own-lit (v2 jako zaklad srovnani)",
+  "pipeline": "tools/artgen (build_model_v3.py -> render_v3.py -> postprocess_lit.py s receptem stinu v3)",
+  "px_per_unit": 352,
+  "render_px": 512,
+  "sada": "own-v3 (art krok 2: stin pro placate predmety + navrat kontrastu)",
+  "svetlo": "1 smerove slunce + VYPLN (protismer, use_shadow=False) + Fast-GI AO + kontaktni stin (recept v3)",
+  "svetlo_recept": {
+   "ao_dosah_jednotek": 0.2,
+   "ao_kroku": 16,
+   "ao_kvalita": 0.5,
+   "ao_paprsku": 4,
+   "ao_rezim": [
+    "AMBIENT_OCCLUSION_ONLY",
+    "AMBIENT_OCCLUSION"
+   ],
+   "kontaktni_rovina_albedo": 0.5,
+   "kontaktni_rovina_z": -0.004,
+   "obloha_barva": [
+    0.4,
+    0.44,
+    0.5,
+    1.0
+   ],
+   "obloha_sila": 0.5,
+   "slunce_energie": 4.0,
+   "slunce_pocet": 2,
+   "slunce_rotace_rad": [
+    -0.7,
+    0.0,
+    -2.6
+   ],
+   "slunce_uhel_deg": 12.0,
+   "stin_mekkost_px": 1.2,
+   "stin_odstup_px": 0.9,
+   "stin_posun_px": [
+    -2,
+    -1
+   ],
+   "stin_recept": "v3",
+   "stin_sila": 0.5,
+   "stin_sirka_px": 0.6,
+   "vypln_energie": 1.5,
+   "vypln_rotace_rad": [
+    -0.7,
+    0.0,
+    0.541592653589793
+   ],
+   "vypln_stin": false,
+   "vypln_uhel_deg": 12.0
+  }
+ },
+ "sprites": [
+  {
+   "h": 84,
+   "id": 400000,
+   "kind": "anim",
+   "ox": -5,
+   "oy": 40,
+   "page": "atlas/anim_0.png",
+   "rect": [
+    0,
+    0,
+    34,
+    84
+   ],
+   "w": 34,
+   "x": 0,
+   "y": 0
+  },
+  {
+   "h": 84,
+   "id": 400001,
+   "kind": "anim",
+   "ox": -5,
+   "oy": 40,
+   "page": "atlas/anim_0.png",
+   "rect": [
+    35,
+    0,
+    69,
+    84
+   ],
+   "w": 34,
+   "x": 35,
+   "y": 0
+  },
+  {
+   "h": 84,
+   "id": 400002,
+   "kind": "anim",
+   "ox": -5,
+   "oy": 40,
+   "page": "atlas/anim_0.png",
+   "rect": [
+    70,
+    0,
+    104,
+    84
+   ],
+   "w": 34,
+   "x": 70,
+   "y": 0
+  },
+  {
+   "h": 84,
+   "id": 400003,
+   "kind": "anim",
+   "ox": -5,
+   "oy": 40,
+   "page": "atlas/anim_0.png",
+   "rect": [
+    105,
+    0,
+    139,
+    84
+   ],
+   "w": 34,
+   "x": 105,
+   "y": 0
+  },
+  {
+   "h": 84,
+   "id": 400004,
+   "kind": "anim",
+   "ox": -5,
+   "oy": 40,
+   "page": "atlas/anim_0.png",
+   "rect": [
+    140,
+    0,
+    174,
+    84
+   ],
+   "w": 34,
+   "x": 140,
+   "y": 0
+  },
+  {
+   "h": 84,
+   "id": 400005,
+   "kind": "anim",
+   "ox": -5,
+   "oy": 40,
+   "page": "atlas/anim_0.png",
+   "rect": [
+    175,
+    0,
+    209,
+    84
+   ],
+   "w": 34,
+   "x": 175,
+   "y": 0
+  },
+  {
+   "h": 84,
+   "id": 400006,
+   "kind": "anim",
+   "ox": -5,
+   "oy": 40,
+   "page": "atlas/anim_0.png",
+   "rect": [
+    210,
+    0,
+    244,
+    84
+   ],
+   "w": 34,
+   "x": 210,
+   "y": 0
+  },
+  {
+   "h": 84,
+   "id": 400007,
+   "kind": "anim",
+   "ox": -5,
+   "oy": 40,
+   "page": "atlas/anim_0.png",
+   "rect": [
+    245,
+    0,
+    279,
+    84
+   ],
+   "w": 34,
+   "x": 245,
+   "y": 0
+  },
+  {
+   "h": 84,
+   "id": 400010,
+   "kind": "anim",
+   "ox": -5,
+   "oy": 40,
+   "page": "atlas/anim_0.png",
+   "rect": [
+    280,
+    0,
+    314,
+    84
+   ],
+   "w": 34,
+   "x": 280,
+   "y": 0
+  },
+  {
+   "h": 84,
+   "id": 400011,
+   "kind": "anim",
+   "ox": -5,
+   "oy": 40,
+   "page": "atlas/anim_0.png",
+   "rect": [
+    315,
+    0,
+    349,
+    84
+   ],
+   "w": 34,
+   "x": 315,
+   "y": 0
+  },
+  {
+   "h": 84,
+   "id": 400012,
+   "kind": "anim",
+   "ox": -5,
+   "oy": 40,
+   "page": "atlas/anim_0.png",
+   "rect": [
+    350,
+    0,
+    384,
+    84
+   ],
+   "w": 34,
+   "x": 350,
+   "y": 0
+  },
+  {
+   "h": 84,
+   "id": 400013,
+   "kind": "anim",
+   "ox": -5,
+   "oy": 40,
+   "page": "atlas/anim_0.png",
+   "rect": [
+    385,
+    0,
+    419,
+    84
+   ],
+   "w": 34,
+   "x": 385,
+   "y": 0
+  },
+  {
+   "h": 84,
+   "id": 400014,
+   "kind": "anim",
+   "ox": -5,
+   "oy": 40,
+   "page": "atlas/anim_0.png",
+   "rect": [
+    420,
+    0,
+    454,
+    84
+   ],
+   "w": 34,
+   "x": 420,
+   "y": 0
+  },
+  {
+   "h": 84,
+   "id": 400015,
+   "kind": "anim",
+   "ox": -5,
+   "oy": 40,
+   "page": "atlas/anim_0.png",
+   "rect": [
+    455,
+    0,
+    489,
+    84
+   ],
+   "w": 34,
+   "x": 455,
+   "y": 0
+  },
+  {
+   "h": 84,
+   "id": 400016,
+   "kind": "anim",
+   "ox": -5,
+   "oy": 40,
+   "page": "atlas/anim_0.png",
+   "rect": [
+    490,
+    0,
+    524,
+    84
+   ],
+   "w": 34,
+   "x": 490,
+   "y": 0
+  },
+  {
+   "h": 84,
+   "id": 400017,
+   "kind": "anim",
+   "ox": -5,
+   "oy": 40,
+   "page": "atlas/anim_0.png",
+   "rect": [
+    525,
+    0,
+    559,
+    84
+   ],
+   "w": 34,
+   "x": 525,
+   "y": 0
+  },
+  {
+   "h": 84,
+   "id": 400020,
+   "kind": "anim",
+   "ox": -5,
+   "oy": 40,
+   "page": "atlas/anim_0.png",
+   "rect": [
+    560,
+    0,
+    594,
+    84
+   ],
+   "w": 34,
+   "x": 560,
+   "y": 0
+  },
+  {
+   "h": 84,
+   "id": 400021,
+   "kind": "anim",
+   "ox": -5,
+   "oy": 40,
+   "page": "atlas/anim_0.png",
+   "rect": [
+    595,
+    0,
+    629,
+    84
+   ],
+   "w": 34,
+   "x": 595,
+   "y": 0
+  },
+  {
+   "h": 84,
+   "id": 400022,
+   "kind": "anim",
+   "ox": -5,
+   "oy": 40,
+   "page": "atlas/anim_0.png",
+   "rect": [
+    630,
+    0,
+    664,
+    84
+   ],
+   "w": 34,
+   "x": 630,
+   "y": 0
+  },
+  {
+   "h": 84,
+   "id": 400023,
+   "kind": "anim",
+   "ox": -5,
+   "oy": 40,
+   "page": "atlas/anim_0.png",
+   "rect": [
+    665,
+    0,
+    699,
+    84
+   ],
+   "w": 34,
+   "x": 665,
+   "y": 0
+  },
+  {
+   "h": 84,
+   "id": 400024,
+   "kind": "anim",
+   "ox": -5,
+   "oy": 40,
+   "page": "atlas/anim_0.png",
+   "rect": [
+    700,
+    0,
+    734,
+    84
+   ],
+   "w": 34,
+   "x": 700,
+   "y": 0
+  },
+  {
+   "h": 84,
+   "id": 400025,
+   "kind": "anim",
+   "ox": -5,
+   "oy": 40,
+   "page": "atlas/anim_0.png",
+   "rect": [
+    735,
+    0,
+    769,
+    84
+   ],
+   "w": 34,
+   "x": 735,
+   "y": 0
+  },
+  {
+   "h": 84,
+   "id": 400026,
+   "kind": "anim",
+   "ox": -5,
+   "oy": 40,
+   "page": "atlas/anim_0.png",
+   "rect": [
+    770,
+    0,
+    804,
+    84
+   ],
+   "w": 34,
+   "x": 770,
+   "y": 0
+  },
+  {
+   "h": 84,
+   "id": 400027,
+   "kind": "anim",
+   "ox": -5,
+   "oy": 40,
+   "page": "atlas/anim_0.png",
+   "rect": [
+    805,
+    0,
+    839,
+    84
+   ],
+   "w": 34,
+   "x": 805,
+   "y": 0
+  },
+  {
+   "h": 84,
+   "id": 400030,
+   "kind": "anim",
+   "ox": -5,
+   "oy": 40,
+   "page": "atlas/anim_0.png",
+   "rect": [
+    840,
+    0,
+    874,
+    84
+   ],
+   "w": 34,
+   "x": 840,
+   "y": 0
+  },
+  {
+   "h": 84,
+   "id": 400031,
+   "kind": "anim",
+   "ox": -5,
+   "oy": 40,
+   "page": "atlas/anim_0.png",
+   "rect": [
+    875,
+    0,
+    909,
+    84
+   ],
+   "w": 34,
+   "x": 875,
+   "y": 0
+  },
+  {
+   "h": 84,
+   "id": 400032,
+   "kind": "anim",
+   "ox": -5,
+   "oy": 40,
+   "page": "atlas/anim_0.png",
+   "rect": [
+    910,
+    0,
+    944,
+    84
+   ],
+   "w": 34,
+   "x": 910,
+   "y": 0
+  },
+  {
+   "h": 84,
+   "id": 400033,
+   "kind": "anim",
+   "ox": -5,
+   "oy": 40,
+   "page": "atlas/anim_0.png",
+   "rect": [
+    945,
+    0,
+    979,
+    84
+   ],
+   "w": 34,
+   "x": 945,
+   "y": 0
+  },
+  {
+   "h": 84,
+   "id": 400034,
+   "kind": "anim",
+   "ox": -5,
+   "oy": 40,
+   "page": "atlas/anim_0.png",
+   "rect": [
+    980,
+    0,
+    1014,
+    84
+   ],
+   "w": 34,
+   "x": 980,
+   "y": 0
+  },
+  {
+   "h": 84,
+   "id": 400035,
+   "kind": "anim",
+   "ox": -5,
+   "oy": 40,
+   "page": "atlas/anim_0.png",
+   "rect": [
+    1015,
+    0,
+    1049,
+    84
+   ],
+   "w": 34,
+   "x": 1015,
+   "y": 0
+  },
+  {
+   "h": 84,
+   "id": 400036,
+   "kind": "anim",
+   "ox": -5,
+   "oy": 40,
+   "page": "atlas/anim_0.png",
+   "rect": [
+    1050,
+    0,
+    1084,
+    84
+   ],
+   "w": 34,
+   "x": 1050,
+   "y": 0
+  },
+  {
+   "h": 84,
+   "id": 400037,
+   "kind": "anim",
+   "ox": -5,
+   "oy": 40,
+   "page": "atlas/anim_0.png",
+   "rect": [
+    1085,
+    0,
+    1119,
+    84
+   ],
+   "w": 34,
+   "x": 1085,
+   "y": 0
+  },
+  {
+   "h": 84,
+   "id": 400040,
+   "kind": "anim",
+   "ox": -5,
+   "oy": 40,
+   "page": "atlas/anim_0.png",
+   "rect": [
+    1120,
+    0,
+    1154,
+    84
+   ],
+   "w": 34,
+   "x": 1120,
+   "y": 0
+  },
+  {
+   "h": 84,
+   "id": 400041,
+   "kind": "anim",
+   "ox": -5,
+   "oy": 40,
+   "page": "atlas/anim_0.png",
+   "rect": [
+    1155,
+    0,
+    1189,
+    84
+   ],
+   "w": 34,
+   "x": 1155,
+   "y": 0
+  },
+  {
+   "h": 84,
+   "id": 400042,
+   "kind": "anim",
+   "ox": -5,
+   "oy": 40,
+   "page": "atlas/anim_0.png",
+   "rect": [
+    1190,
+    0,
+    1224,
+    84
+   ],
+   "w": 34,
+   "x": 1190,
+   "y": 0
+  },
+  {
+   "h": 84,
+   "id": 400043,
+   "kind": "anim",
+   "ox": -5,
+   "oy": 40,
+   "page": "atlas/anim_0.png",
+   "rect": [
+    1225,
+    0,
+    1259,
+    84
+   ],
+   "w": 34,
+   "x": 1225,
+   "y": 0
+  },
+  {
+   "h": 84,
+   "id": 400044,
+   "kind": "anim",
+   "ox": -5,
+   "oy": 40,
+   "page": "atlas/anim_0.png",
+   "rect": [
+    1260,
+    0,
+    1294,
+    84
+   ],
+   "w": 34,
+   "x": 1260,
+   "y": 0
+  },
+  {
+   "h": 84,
+   "id": 400045,
+   "kind": "anim",
+   "ox": -5,
+   "oy": 40,
+   "page": "atlas/anim_0.png",
+   "rect": [
+    1295,
+    0,
+    1329,
+    84
+   ],
+   "w": 34,
+   "x": 1295,
+   "y": 0
+  },
+  {
+   "h": 84,
+   "id": 400046,
+   "kind": "anim",
+   "ox": -5,
+   "oy": 40,
+   "page": "atlas/anim_0.png",
+   "rect": [
+    1330,
+    0,
+    1364,
+    84
+   ],
+   "w": 34,
+   "x": 1330,
+   "y": 0
+  },
+  {
+   "h": 84,
+   "id": 400047,
+   "kind": "anim",
+   "ox": -5,
+   "oy": 40,
+   "page": "atlas/anim_0.png",
+   "rect": [
+    1365,
+    0,
+    1399,
+    84
+   ],
+   "w": 34,
+   "x": 1365,
+   "y": 0
+  },
+  {
+   "h": 44,
+   "id": 3717,
+   "kind": "item",
+   "ox": 0,
+   "oy": 0,
+   "page": "atlas/item_0.png",
+   "rect": [
+    53,
+    0,
+    97,
+    44
+   ],
+   "w": 44,
+   "x": 53,
+   "y": 0
+  },
+  {
+   "h": 36,
+   "id": 3921,
+   "kind": "item",
+   "ox": -7,
+   "oy": -8,
+   "page": "atlas/item_0.png",
+   "rect": [
+    129,
+    0,
+    159,
+    36
+   ],
+   "w": 30,
+   "x": 129,
+   "y": 0
+  },
+  {
+   "h": 51,
+   "id": 6583,
+   "kind": "item",
+   "ox": 4,
+   "oy": 7,
+   "page": "atlas/item_0.png",
+   "rect": [
+    0,
+    0,
+    52,
+    51
+   ],
+   "w": 52,
+   "x": 0,
+   "y": 0
+  },
+  {
+   "h": 39,
+   "id": 7151,
+   "kind": "item",
+   "ox": -7,
+   "oy": -5,
+   "page": "atlas/item_0.png",
+   "rect": [
+    98,
+    0,
+    128,
+    39
+   ],
+   "w": 30,
+   "x": 98,
+   "y": 0
+  },
+  {
+   "h": 44,
+   "id": 3,
+   "kind": "land",
+   "ox": 0,
+   "oy": 0,
+   "page": "atlas/land_0.png",
+   "rect": [
+    0,
+    0,
+    44,
+    44
+   ],
+   "w": 44,
+   "x": 0,
+   "y": 0
+  },
+  {
+   "h": 44,
+   "id": 1001,
+   "kind": "land",
+   "ox": 0,
+   "oy": 0,
+   "page": "atlas/land_0.png",
+   "rect": [
+    45,
+    0,
+    89,
+    44
+   ],
+   "w": 44,
+   "x": 45,
+   "y": 0
+  }
+ ],
+ "version": 1
+}

@@ -24,7 +24,86 @@ Typy: `chyba` (moje vada) · `past-nástroje` (prostředí/nástroj, ne logika) 
 
 ---
 
-# 2026-10-11 (druhá část) — PIXEL-ART STYL: „ROZMAZANÝ“ NEBYLO ROZLIŠENÍ
+# 2026-10-11 (třetí část) — ART v3: STÍN BYL V POSTPROCESSU, KONTRAST VE SVĚTLE
+
+### 2026-10-11 — „Předmět nemá stín“ nebylo v renderu, ale v ubytku od kotvy (chyba)
+**Co se stalo:** dýka měla ve sprite vidět **6 px** stínu (krytí 16/255), ingot
+**11 px**, kdežto ruda 261 px. Vypadalo to jako vada renderu (málo světla, špatný
+úhel). Sonda `probe_stin_raw.py` naměřila opak: **hustota zastínění v renderu je
+0,73–0,83** (dýka) a **0,67–0,73** (ingot) — render stín MÁ, ale je **1 px
+široký**. Vada byla v postprocessu: ubytek se počítal **radiálně od kotvy**
+a půdorys placatého předmětu je od kotvy dál než R0 (0,14 jednotky = ~1,4 px;
+dýka má ~0,3 jednotky), takže ubytek vyšel **0,017** a stín se zahodil.
+**Doklad:** `tools/artgen/probe_stin_raw.py`, `MERENI.md` §11.2–11.3; oprava
+(`RECEPTY_STINU["v3"]` v `postprocess_lit.py`: pás od **obrysu** objektu, krytí
+z **naměřené** hustoty) dala dýce **28 px** a ingotu **34 px**;
+`_srovnani-v3.json`, snímek `_srovnani-predpo.png`.
+**Ponaučení:** u **generovaného** artu se vada „něco není vidět“ nemá hledat
+v renderu, dokud se nezměří **rozložení** té veličiny v surovém snímku
+(histogram, vzdálenost od obrysu). A pozor na jednotky: konstanta v **světových
+jednotkách** (R0 = 0,14) je po zmenšení 512 → 44 px jen **1,4 px** — což je méně
+než jeden pixel rastru.
+
+### 2026-10-11 — Stín vložený na špatný počátek plátna: 59 px ve vrstvě, 0 px ve spritu (chyba)
+**Co se stalo:** nový recept počítal vrstvu stínu správně (**59 px** nad prahem,
+max 123/255), ale v hotovém spritu bylo **0 px** stínu. Příčina: vrstva se
+počítá na **větším plátně** s počátkem posunutým o `okraj`, ale vkládala se na
+`(vloz_x, vloz_y)` — tedy o `okraj` px vedle, mimo okno spritu.
+**Doklad:** `_ladici_stin_v3.py` (docasna sonda) — `platno=46x52 vloz=(-9,-29)
+okraj=8`, `je_stin_px=63`, `a_sprite=(0,0)`. Oprava: vkládat na `(okraj, okraj)`
+a **statistiku měřit ze stejného okna**; `postprocess_lit.py`.
+**Ponaučení:** když se něco počítá na **jinak posunutém plátně**, musí se to
+i **vkládat** podle toho posunu — a metrika se musí čítat ze **stejného okna**,
+jinak hlásí nulu u funkční vrstvy (a to je horší než chybějící metrika).
+
+### 2026-10-11 — Tmavý obal místo stínu: nejlepší ČÍSLA dala nejhorší variantu (postup)
+**Co se stalo:** recept v3 se silou **1,0** měl nejlepší čísla („dýka 28 px,
+max 123/255“) a na snímku `_srovnani-recept-stinu.png` ve hře 1 : 1 to byl
+**tmavý obal** kolem předmětu (průměrné krytí 97–107/255) — na trávě skvrna.
+Síla **0,5** (dýka 48/255, ruda 53/255) je čitelný kontaktní stín.
+**Doklad:** `tools/artgen/srovnani_receptu_stinu.py`,
+`_srovnani-recept-stinu.json`; výsledná konstanta v `postprocess_lit.RECEPTY_STINU`.
+**Ponaučení:** u **vzhledu** je počet pixelů a maximum **špatná osa rozhodnutí** —
+sada variant se musí vykreslit **na dlaždici, ve stejném měřítku a 1 : 1**
+(`srovnani_receptu_stinu.py`) a rozhodnout **pohledem**. Číslo pak jen říká, jak
+je to silné.
+
+### 2026-10-11 — Prázdný srovnávací list vypadá jako hotový list (chyba)
+**Co se stalo:** `list_sheet` hledal buňky klíčem `(jmeno_sady, cely_klic)`
+místo `(jmeno_sady, popisek)`. List se **uložil prázdný**, jen s popisky
+sloupců — a nic nespadlo. Našel to až **pohled** na snímek.
+**Doklad:** `tools/artgen/srovnani_sady.py` (`list_sheet` teď na 0 vložených
+buněk **končí chybou**); `MERENI.md` §11.6 bod 6.
+**Ponaučení:** generátor obrázku musí na konci **spočítat, kolik buněk vložil**,
+a při nule **skončit chybou**. Totéž platí pro každý „výstup pro pohled“: bez
+toho je prázdný výstup k nerozeznání od hotového.
+
+### 2026-10-11 — Laboratoř, která přepisuje výstup mezi modely, měří jiný model (chyba)
+**Co se stalo:** sonda variant světla psala do `_rawvar/<varianta>/`. Když se
+spustila pro druhý model, **přepsala** snímky prvního — a měření pak četlo
+ingot tam, kde si myslelo dýku (vyšlo to jako „jiný dosah stínu“).
+**Doklad:** `tools/artgen/probe_svetlo_var.py` (výstup je nyní
+`_rawvar/<varianta>/<plan>/`), `MERENI.md` §11.6 bod 5.
+**Ponaučení:** měřicí skript, který se pouští víckrát nad různými vstupy, musí
+mít v cestě **i ten vstup** (plán/model/datum). Jinak se dva běhy potichu
+přepíšou a číslo vypadá jako rozdíl, který není.
+
+### 2026-10-11 — Dlaždice z cizí sady a klíč, který v sadě není (past-nástroje)
+**Co se stalo:** dva falešné nálezy na srovnávacím listu: (1) dlaždice se brala
+**vždy z UO sady** — a ta má v sobě popisky `UNUSED`/`UN!!`, takže náš art ležel
+na cizí dláždici (a vypadalo to jako vada našeho artu); (2) UO postava se
+nenačetla, protože UO anim list má klíče `400/0/0`, kdežto naše sada má sprity
+s id `400000` v manifestu.
+**Doklad:** `tools/artgen/srovnani_sady.py` (`dlazdice(sada, man)` bere z té
+sady, kterou list ukazuje), `srovnani_zoom.py` (`_tyz_fram` čte
+`anim/anim-sheets.json`); `MERENI.md` §11.6 body 7–8.
+**Ponaučení:** srovnávací list musí brát **každou složku z té sady, kterou
+zrovna kreslí** — „pozadí z reference“ je klasická cesta k falešnému nálezu.
+A když dva formáty mají jiný klíč, je to **překlad**, ne chybějící data.
+
+---
+
+
 
 ### 2026-10-11 — Rozmazaný art nebyl rozlišení ani model, ale CHYBĚJÍCÍ KROK (postup)
 **Co se stalo:** uživatel viděl vlastní art jako „rozmazaný, chybí mu detaily“.

@@ -585,3 +585,182 @@ kontaktní stín, paleta pod 80 barvami, měřeno na spritech i na animacích
 z anim listu. Ostrost se **hlásí, ale nehlídá** (ruda má po stylu 19,4 a je
 čitelnější; metrika, která trestá žádoucí vlastnost, není brána).
 
+---
+
+## 11. DOPLNĚNO 2026-10-11 — SADA v3 (`assets/own-v3/`): stín pro placaté předměty a návrat kontrastu
+
+> **Co je tenhle oddíl:** **doplněk k měření** (nic výše se nepřepisuje), vznikl
+> z `ZADANI-25` §11 — dvě vady, které v2 nechala otevřené: (i) placaté předměty
+> mají stín jen jako **1px lem** (dýka 6 px, ingot 11 px), (ii) **kontrast klesl**
+> (dýka 25,7 → 15,2). **Odkud brát současný stav:** `assets/own-v3/manifest.json`
+> (`report`), `tools/artgen/_casy-v3.json`, `_srovnani-v3.json`,
+> `_srovnani-predpo.json`, `_srovnani-recept-stinu.json`, `_determinismus-v3.json`,
+> `_mutace-v3.json`. **Staré sady se neměnily** — `pack_atlas.py --check` (476/0)
+> a `pack_atlas_lit.py --check` (900/0) jsou po celou dobu zelené.
+
+### 11.1 Co se vyrobilo
+
+| Co | Hodnota |
+|---|---|
+| dlaždice / předměty / postava | **2 / 4 / 40** spritů, **46** celkem, 3 stránky 2048² |
+| nový jmenný prostor | **`assets/own-v3/`** (`manifest.json`, `atlas/*.png`, `anim/anim-sheets.json`) |
+| skripty | `artgen_common_v3.py`, `artgen_blender_v3.py`, `build_model_v3.py`, `render_v3.py`, `pack_atlas_v3.py`, `probe_determinismus_v3.py`, `probe_mutace_v3.py`, `mereni_v3.py` |
+| sondy a listy | `probe_stin_raw.py`, `probe_svetlo_var.py`, `srovnani_svetlo_var.py`, `srovnani_stin_var.py`, `nahled_na_terenu.py`, `srovnani_sady.py`, `srovnani_zoom.py`, `srovnani_predpo.py`, `srovnani_receptu_stinu.py` |
+| zdroje | `blend/v3_*.blend` (vznikají z `lit_*.blend` — **model ani kamera se nestaví znovu**) |
+| renderované snímky | `_rawv3/` (ignorováno vzorem `tools/artgen/_*`) |
+
+**Rozlišení a geometrie se NEMĚNILY** (44 px, krok 22, kotva `ox=(w>>1)−22`,
+`oy=h−44`; shoda proti 1x sadě i proti v2 sadě ≤ 2 px u 44 spritů).
+
+### 11.2 Dvě změny — a KTERÁ VADA BYLA ODKUD
+
+| Vada (měřená) | Kde opravdu byla | Co ji řeší |
+|---|---|---|
+| dýka 6 px stínu, ingot 11 px | **v postprocessu**, ne v renderu: ubytek stínu se počítal **radiálně od kotvy** a půdorys placatého předmětu je od kotvy dál než R0 (dýka ~0,3 jednotky = 3–4 px), takže ubytek vyšel ~0,017 | recept stínu **v3**: pás se počítá **od obrysu objektu** (posunutého ve směru světla) |
+| kontrast dýky 25,7 → 15,2, sada tmavší o 8–13 % | **ve světle**: jedno směrové slunce bez výplně | **VÝPLŇ** (druhé slunce z protisměru, `use_shadow=False`, energie 1,5) + obloha 0,45 → 0,50 |
+
+**Kde vada NEBYLA (a je to měřené, ne odhad):** v renderu. `probe_stin_raw.py`
+naměřil, že hustota zastínění u placatého předmětu je **0,73–0,83** (dýka)
+a **0,67–0,73** (ingot) — render stín MÁ. Je ale **1 px široký**: `hustota > 0,5`
+leží mimo obrys objektu u dýky v **6 px** a u ingotu v **547 px**, a po zmenšení
+512 px → sprite (měřítko **0,097**) z něj zůstane antialias.
+
+### 11.3 Jak je stín v3 postavený (a co zůstalo měřené)
+
+```
+alfa = ubytek × krytí × síla × 255
+  ubytek  = smoothstep od obrysu objektu (posun masky ve směru světla)
+  krytí   = 90. percentil ZMĚŘENÉ hustoty z 5 px za posunutým obrysem
+  síla    = 0,5   (zvoleno POHLEDEM na sadu variant, viz 11.6)
+```
+
+* **Měřené zůstává krytí** (jak je stín v tomhle renderu silný); **tvar pásu**
+  (šířka 0,6 px + měkkost 1,2 px, odstup 0,9 px) je **px ve spritu**, protože
+  1px lem z renderu se po zmenšení ztratí. Je to zapsané, ne zamčené.
+* Posun masky `(−2, −1)` px je **měřený směr**: težiště stínu je proti težišti
+  objektu posunuté **+50, +36 px** v renderu (tabulka `_svetlo-var.json`) → stín
+  leží **doprava dolů**, takže maska se posouvá doleva nahoru.
+
+### 11.4 Naměřené výsledky (`srovnani_sady.py`, z PIXELŮ)
+
+| Prvek | UO | náš 1× bez světla | náš lit (v2) | **náš v3** |
+|---|---|---|---|---|
+| dýka 3921: stín px / max krytí | 0 / 0 | 0 / 0 | **6 / 16** | **28 / 56** |
+| krumpáč 3717 | 0 / 0 | 0 / 0 | 20 / 18 | **78 / 13** |
+| ruda 6583 | 0 / 0 | 0 / 0 | 261 / 58 | **266 / 70** |
+| ingot 7151 | 0 / 0 | 0 / 0 | 11 / 50 | **34 / 38** |
+| kontrast (sd jádra) – předměty | 47,96 | 21,64 | 15,33 | **16,99** |
+| kontrast (sd jádra) – postava | — | 46,83 | 44,20 | **46,87** |
+| průměrný jas těla – předměty | 96,7 | 68,5 | 64,5 | **73,6** |
+| průměrný jas těla – postava | — | 109,0 | 103,6 | **119,7** |
+
+**Čti to takhle:** (a) placaté předměty mají stín **28 a 34 px místo 6 a 11**;
+(b) kontrast je **nad v2** u předmětů (15,33 → 16,99) i u postavy (44,2 → 46,9)
+a **zůstává pod 1× bez světla** — v2 ztrátu nedorovnal, v3 jen část;
+(c) jas je **nad v2** a u postavy **nad 1× bez světla** (119,7 vs 109,0) —
+sada už není tmavší (v2 byla o 8–13 %).
+
+### 11.5 Naměřené časy (`mereni_v3.py`, jeden běh)
+
+| Fáze | v2 (lit) | v3 | poměr |
+|---|---|---|---|
+| render dýka (1 sprite), celý proces | 5,83 s | **7,08 s** | 1,21× |
+| — `beauty` (práce v Blenderu) | 1,87 s | 1,96 s | 1,05× |
+| render postava (8 framů), celý proces | 8,89 s | 9,23 s | 1,04× |
+| postprocess 9 spritů (in-process) | 3,32 s | **2,50 s** | 0,75× |
+| postprocess celé sady (46 spritů, in-process) | 14,19 s | 14,77 s | 1,04× |
+| **na 1 sprite (render + postprocess)** | **2,004 s** | **2,090 s** | **1,043×** |
+| render celé v3 sady (46 spritů, 3 plány) | — | 36,57 s | — |
+| zabalení v3 atlasu (46 spritů, zápis) | — | 18,28 s | — |
+
+**Čas navíc je 4,3 % na sprite** — a je to **render** (druhé světlo), ne
+postprocess: ten je u v3 na 9 spritech dokonce **rychlejší** (2,50 s vs 3,32 s),
+protože v2 počítá radiální ubytek na každém pixelu roviny, kdežto v3 jen dvě
+vzdálenostní transformace na menším plátně. Přepočet ceny celé facety zůstává
+v řádu hodin stroje (pilot §5: stroj není úzké hrdlo).
+
+### 11.6 Co se muselo ručně sáhnout (a co to bylo za pasti)
+
+| # | Vada | Kdo ji našel | Poznámka |
+|---|---|---|---|
+| 1 | **stín se vkládal na špatný počátek plátna** (`vloz_x` místo `okraj`) → v okně spritu bylo **0 px stínu**, i když vrstva měla 59 px nad prahem | číslo v reportu („stin_viditelne_px = 0“) | vrstva se počítá na **větším plátně** s počátkem posunutým o `okraj` — vkládat se musí na `(okraj, okraj)` |
+| 2 | **krytí vycházelo 0,007** → stín by zmizel | číslo v reportu | měřilo se od **neposunuté** masky, ale stín leží za **posunutým** obrysem; když se masky pletly, měřily se pixely uvnitř těla (hustota ~0) |
+| 3 | **hustota v těle je neměřitelná** (objekt překrývá rovinu) | `probe_stin_raw.py` | první verze v3 brala „stín = změřená hustota“ a u placatého předmětu dostala **nulu** |
+| 4 | **síla 1,0 dělala ze stínu tmavý obal** (průměrné krytí 97–107/255) | **POHLED** (`_srovnani-recept-stinu.png`) | číslo („28 px, max 123/255“) vypadalo dobře; teprve list ve hře 1 : 1 ukázal skvrnu. Zvoleno **0,5** |
+| 5 | **výstup laboratoře se přepisoval mezi modely** (`_rawvar/<varianta>/` bez plánu) → měřilo se ingotem proti dýce | `srovnani_svetlo_var.py` (nesedělo `dosah`) | výstup je po **plánech**: `_rawvar/<varianta>/<plan>/` |
+| 6 | **srovnávací list byl PRAZDNY** (`bunky.get((jmeno, cely_klic))` místo popisku) | **pohled** na list | prázdný list vypadá jako „hotovo“; `list_sheet` teď na 0 vložených buněk **končí chybou** |
+| 7 | **dlaždice se brala vždy z UO sady** (má v sobě popisky `UNUSED`/`UN!!`) → náš art na cizí dláždici | **pohled** na list | dlaždice se bere z **té sady, kterou list ukazuje** |
+| 8 | **UO postava se na listu nenačetla** (UO anim klíče jsou `400/0/0`, ne `400000`) | **pohled** na list | `srovnani_zoom.py` umí frame z `anim/anim-sheets.json` |
+| 9 | **Brána hledala stín podle „poloprůhledné pixely mimo siluetu“** a u placatého předmětu hlásila 0 px | běh brány (v2) | v3 hledá stín **podle barvy vrstvy stínu** a navíc měří **počet** pixelů u placatých předmětů |
+
+### 11.7 Stav bran po zásahu
+
+| Brána | Výsledek |
+|---|---|
+| `pack_atlas_v3.py --check` (nová sada) | **823 kontrol, 0 chyb** |
+| — kotva `ox=(w>>1)−22, oy=h−44` | 46/46 spritů |
+| — stín **viditelný** ve spritu | 44/44 (item+anim); dlaždice 0 px záměrně |
+| — **placaté předměty** (dýka, ingot) mají ≥ 26 px stínu | 28 a 34 px (v2: 6 a 11) |
+| — krytí stínu ≥ 8/255 | splněno; **1 sprite je pod 26** (krumpáč 13/255) — brána to **vypisuje** a je to v 11.8 |
+| — stín se nedotýká okraje spritu | 44/44 |
+| — geometrie proti 1x sadě **i proti v2** | 44 + 44 spritů, max 2 px |
+| — recept stínu: živý recept × `artgen_common_v3` × manifest | shodné (5 čísel) |
+| — determinismus (dva běhy celé pipeline) | manifest SHA **shodný**, pixely **max 0** (tolerance 6) |
+| **mutace (`probe_mutace_v3.py`)** | **6/6 odhaleno** (ztenčený stín plochého předmětu, ztloustlý stín, posunutá kotva, jiná síla v manifestu, změněný manifest, chybějící stránka) |
+| `pack_atlas.py --check` (1× sada) | **476 kontrol, 0 chyb** |
+| `pack_atlas_lit.py --check` (v2 sada) | **900 kontrol, 0 chyb** |
+
+### 11.8 Co se NEZLEPŠILO (a je to pojmenované)
+
+1. **Krumpáč (3717) má stín naznačený, ne jasný** — 78 px, ale krytí **13/255**.
+   Důvod je měřený: krytí je 90. percentil z 1px lemu renderu a u tenké rukojeti
+   je lem slabý. Není to vada brány ani sady; brána to **vypisuje**
+   (`POZOR: 1 spritu ma krytí stinu < 26/255`).
+2. **Kontrast předmětů zůstává pod 1× bez světla** (16,99 vs 21,64) a hluboko pod
+   UO (47,96). Výplň vrátila jen část: **kovy v UO mají ručně kreslený odlesk**,
+   který žádné světlo nevyrobí. Tohle je hranice „UO duchovně, ne tělesně“
+   (`docs/01` §1.2.1), ne nedodělek.
+3. **„Antialiasovaná hlína“** — naše tráva/hlína jsou šumové textury, kdežto UO
+   maluje 1bitové hrany. Světlo to nemění (styl ano, `styl.py`); je to vidět
+   v `_srovnani-zoom.png` ve sloupci UO.
+4. **Stín postavy u nohou je slabý** — 110 px, ale krytí 63/255 a při pohledu na
+   `_srovnani-zoom.png` (anim 400000) se nohy „dotýkají“ jen málo. v2 měla 58 px
+   s krytím 81/255; v3 má víc plochy, ale menší krytí (síla 0,5).
+5. **Past, která se má pamatovat: sada variant se posuzuje POHLEDEM, ne jen
+   číslem** — síla 1,0 měla nejlepší čísla („víc stínu“) a byla to nejhorší
+   varianta.
+
+### 11.9 Jak to pustit znovu
+
+```powershell
+$env:PYTHONIOENCODING='utf-8'
+cd E:\Workspaces\game-clone
+& 'C:\Program Files\Blender Foundation\Blender 5.2\blender.exe' -b -P tools\artgen\build_model_v3.py -- --plan all
+& 'C:\Program Files\Blender Foundation\Blender 5.2\blender.exe' -b -P tools\artgen\render_v3.py -- --plan tiles
+& 'C:\Program Files\Blender Foundation\Blender 5.2\blender.exe' -b -P tools\artgen\render_v3.py -- --plan items
+& 'C:\Program Files\Blender Foundation\Blender 5.2\blender.exe' -b -P tools\artgen\render_v3.py -- --plan character
+python tools\artgen\pack_atlas_v3.py                    # atlas + manifest do assets/own-v3/
+python tools\artgen\pack_atlas_v3.py --check             # brana: 823 kontrol
+python tools\artgen\probe_stin_raw.py                    # hustota stinu v SUROVYCH renderech
+python tools\artgen\probe_determinismus_v3.py            # dva behy -> _determinismus-v3.json
+python tools\artgen\probe_mutace_v3.py                   # mutacni test brany (6 vad)
+& 'C:\Program Files\Blender Foundation\Blender 5.2\blender.exe' -b -P tools\artgen\render_v3.py -- --plan timing --jen dagger
+& 'C:\Program Files\Blender Foundation\Blender 5.2\blender.exe' -b -P tools\artgen\render_v3.py -- --plan timing --jen character
+python tools\artgen\mereni_v3.py                         # casy -> _casy-v3.json
+python tools\artgen\srovnani_sady.py                     # list UO | stary | novy (+ cisla)
+python tools\artgen\srovnani_zoom.py                     # zoom pres vsechny sady ve stejnem meritku
+python tools\artgen\srovnani_predpo.py                   # "pred / po" 1 : 1, 8x
+python tools\artgen\srovnani_receptu_stinu.py            # varianty sily stinu (POHLED)
+python tools\artgen\pack_atlas.py --check                # 1x sada musi zustat 476/0
+python tools\artgen\pack_atlas_lit.py --check            # v2 sada musi zustat 900/0
+```
+
+### 11.10 Co se u v3 NEMĚŘILO
+
+* **Vzhled ve hře** — sada se do `render/` nezapojuje (integrace je samostatná
+  granule; `assets/own-lit/` je zatím to, co hra čte).
+* **Ostatní směry postavy zvlášť** — všech 40 framů prošlo branou, ale na listech
+  jsou vidět jen směry 0 (a v `_srovnani-v3.png` framy 0/4/7).
+* **Stín na klidné (stojící) postavě** — měřil se jen `walk`.
+* **Dlaždice v3** — kontaktní stín nemají a mít nemají (dlaždice JE podlaha).
+* **Běh v CI** — Blender v CI runneru není (skill `game-assets`).

@@ -1,3 +1,62 @@
+# Předání — game-clone (2026-10-11, ART v3: STÍN PRO PLACATÉ PŘEDMĚTY + NÁVRAT KONTRASTU)
+
+> **Co je tenhle soubor:** **stav projektu** pro další session agenta. Přepisuje
+> se celý; historie je v `git log`. Nový blok je vždy **nahoře**; starší bloky se
+> needitují (jen doplňují). **Současný stav se bere z tohoto bloku.**
+>
+> **Odkud brát detaily téhle práce:** `tools/artgen/MERENI.md` **§11** (co se
+> naměřilo, jak, a co se NEZLEPŠILO), `_casy-v3.json`, `_srovnani-v3.json`,
+> `_srovnani-predpo.json`, `_determinismus-v3.json`, `_mutace-v3.json`.
+> Snímky: `tools/artgen/_srovnani-v3.png` (UO | 1× | lit | v3),
+> `_srovnani-zoom.png` (zoom ve stejném měřítku), `_srovnani-predpo.png`
+> (před/po 1 : 1, 8×), `_srovnani-recept-stinu.png` (varianty síly stínu).
+> **Snímky nejsou v gitu** (obsahují UO art) — jsou v `tools/artgen/_*`,
+> což je ignorováno; znovu je vyrobí příkazy v `MERENI.md` §11.9.
+
+## ✅ CO JE NOVÉHO (2026-10-11, sada `assets/own-v3/`)
+
+**Co se udělalo:** vznikl **třetí jmenný prostor artu** `assets/own-v3/`
+(46 spritů: 2 dlaždice + 4 předměty + 40 framů postavy) a kolem něj celá
+větev skriptů (`*_v3.py`). Řeší **dvě měřené vady** z `ZADANI-25` §11:
+
+1. **STÍN PRO PLACATÉ PŘEDMĚTY.** Dýka měla stín **6 px** (krytí 16/255), ingot
+   **11 px**; nově **28 px** (56/255) a **34 px** (38/255). Vada byla
+   v **postprocessu**, ne v renderu: `probe_stin_raw.py` naměřil, že render stín
+   MÁ (hustota 0,73–0,83), ale je **1 px široký** a starý recept ho zahodil
+   radiálním úbytkem **od kotvy**. Nový recept počítá úbytek **od obrysu
+   objektu** (posunutého ve směru světla) a sílu bere **z měřené hustoty**.
+2. **NÁVRAT KONTRASTU.** K jednomu slunci přibyla **výplň** (druhé slunce
+   z protisměru, `use_shadow=False`, energie 1,5) a obloha šla 0,45 → 0,50.
+   Kontrast (sd jádra) předměty **15,33 → 16,99**, postava **44,20 → 46,87**;
+   jas těla předměty **64,5 → 73,6**, postava **103,6 → 119,7** (v2 byla tmavší
+   o 8–13 %, v3 už ne).
+
+**Kontroly:** `pack_atlas_v3.py --check` = **823 kontrol / 0 chyb**; geometrie
+shodná s 1× sadou **i s v2** (44+44 spritů, max 2 px); determinismus (dva běhy
+celé pipeline) = **shodný manifest SHA, pixely max 0**; mutační test
+`probe_mutace_v3.py` = **6/6 odhaleno**. Staré sady nedotčené:
+`pack_atlas.py --check` **476/0**, `pack_atlas_lit.py --check` **900/0**.
+
+**Čas navíc:** **+4,3 % na sprite** (2,004 → 2,090 s) a je to **render** (druhé
+světlo), ne postprocess — ten je u v3 na 9 spritech **rychlejší** (2,50 s vs
+3,32 s). Zabalení celé v3 sady 18,3 s, render celé sady 36,6 s.
+
+**Co je na tom ŠPATNĚ (přiznané, měřené):** (1) **krumpáč** má stín naznačený,
+ne jasný (78 px, ale krytí **13/255**) — brána to **vypisuje**; (2) kontrast
+předmětů zůstává **pod 1× bez světla** (16,99 vs 21,64) a hluboko pod UO (47,96)
+— kovy v UO mají ručně kreslený odlesk, který žádné světlo nevyrobí; (3) naše
+tráva je **šumová textura**, kdežto UO maluje 1bitové hrany (vidět
+v `_srovnani-zoom.png`); (4) **stín postavy u nohou je slabý** (110 px, ale
+krytí 63/255).
+
+**Otevřeno:** (a) integrace do hry — hra zatím čte `assets/own-lit/`
+(`render/own_art.gd`, `assets/own-art.json`); přepnutí na `own-v3` je samostatná
+věc (jiný jmenný prostor, stejný kontrakt manifestu); (b) síla stínu je jedna
+konstanta pro celou sadu — krumpáč by chtěl víc a postava taky; (c) síla 1,0
+byla **nejhorší varianta**, i když měla nejlepší čísla (past zapsaná v §11.6).
+
+---
+
 # Předání — game-clone (2026-10-11, M5: SOUBOJ, MONSTRA, SMRT, LOOT)
 
 > **Co je tenhle soubor:** **stav projektu** pro další session agenta. Přepisuje
