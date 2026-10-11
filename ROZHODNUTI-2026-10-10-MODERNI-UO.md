@@ -312,5 +312,60 @@ jde **do stavu** (člen, jehož jméno je v `state()`), a jakýkoli
 | **Automatizace útoku** (`attack` do `ACTION_KINDS`, podmínka o cíli, `policy_state()` o cíli) — `[O]` 1–2 granule | sahá na `sim/policy.gd`, `sim/executor.gd`, `sim_world.gd`; je to **změna specu hotových modulů `MK`**, takže si zaslouží vlastní zadání, ne „přilepení" k jiné práci | zadat jako granuli k `MK` se změnou specu |
 | **2× varianta artu** (88×44, `Z_SCALE 8`, slunce + AO + kontaktní stín) vedle 1× a původního spritu | spec je hotová (`ZADANI-25` §9); **pilot 1× doběhl** 2026-10-10 | vyrenderovat srovnávací list a rozhodnout geometrii **z obrázku**; zapojení do hry je samostatná granule |
 | **Art v plánu** (granule pro pipeline a pro integraci `assets/own/`) | chybí **změřená cena** — pilot ji dává; plánovat podle dojmu je to, co `M7` odmítá | po `tools/artgen/MERENI.md` doplnit granule v `tools/roadmap-gen.py` + `docs/07` (patří uživateli / integrační session) |
-| **Zbylých 7 rozporů z auditu** (`docs/08` F1/F4, `docs/06` C1–C10 vs `check-content`, `docs/05` trvanlivost nástrojů vs existující `entity.equipment`) | část se dotýká souborů, které druhá session **právě mění** (`harvest.gd`) — zapsané tvrzení o stavu by zestárlo dřív, než vznikne | po jejím commitu projít a doplnit |
+| **Zbylých 7 rozporů z auditu** (`docs/08` F1/F4, `docs/06` C1–C10 vs `check-content`, `docs/05` trvanlivost nástrojů vs existující `entity.equipment`) | část se dotýká souborů, které druhá session **právě mění** (`harvest.gd`) — zapsané tvrzení o stavu by zestárlo dřív, než vznikne | **VYŘEŠENO 2026-10-10** (commit `a5f8845` + `9d6e6a6`): všech 11 rozporů z auditu je opraveno nebo označeno jako historické |
+
+---
+
+## 10. Druhé kolo pokynů uživatele (2026-10-10 večer) — M9, M10
+
+### M9 — UO je vzor DUCHOVNÍ, ne tělesný
+
+**Pokyn uživatele:** „**Vůbec se nemusíme držet UO.** UO je sice vzor, ale
+duchovně, pocitově, ne tělesně/doslovně. **Předměty nejsou kopie a dýka může
+vypadat jinak.**“
+
+**Zapsáno jako závazné pravidlo** do [`docs/01`](docs/01-cil-a-scope.md)
+**§1.2.1** (tabulka „co zůstává kontrakt / co je volné“ + čtyři důsledky).
+Stručně: **kontrakt** (id prostory, geometrie mřížky, kotvy spritů, formát
+manifestu, determinismus) zůstává; **tvary a vzhled** jsou volné. „Neshoduje se
+s UO“ **není vada** — vada je jen rozbitý kontrakt nebo něco, co se nedá
+přečíst. Umělecká odchylka se ale zapisuje stejně jako odchylka mechaniky,
+jinak ji příští session „opraví“ zpátky podle reference.
+
+**Důsledek pro art:** dýka může vypadat jinak než UO dýka; postava může být
+ užší/širší (naměřeno: UO 24–25 px, naše 16 px — obojí přípustné); co zůstává,
+je **měřítko vůči dlaždici a čitelnost**.
+
+### M10 — Automatizace je ve hře VYPNUTÁ (a spam opraven u zdroje)
+
+**Pokyn uživatele:** „**Ještě bych vypnul ve hře automatizaci, spamuje to
+hru.**“
+
+**Co se změnilo:**
+
+1. **Automatizace se už nenačítá automaticky** z `user://policy.json`
+   (`app/main.gd`). Je **opt-in** na příkazové řádce:
+   `-- --policy` (vezme `user://policy.json`) nebo `--policy=<cesta>`.
+   Bez přepínače zůstanou `sim.policy` i `sim.executor` `null`, tik se přeskočí
+   a **replaye ani hash se nemění**.
+2. **Spam opraven u zdroje** (`sim/decision_log.gd`): throttle byl
+   „naposledy publikovaný text“, takže ho **střídající se pravidla minula**
+   a do žurnálu teklo ~10 řádků/s, dokud se nenaplnil `MAX_LINES`. Nově je
+   throttle **podle pravidla** (`kind|rule_id -> poslední text`), takže se
+   opakuje jen to, co se **opravdu změnilo**.
+
+**Důkaz:** testy **1 852 kontrol / 0 selhání** (74 case souborů, nový
+`tests/cases/decision_log_throttle.gd` měří právě střídání pravidel);
+v `tools/gates/mutace-tests.py` opravena **mrtvá kotva** (přepsáním throttle
+přestala platit) a přidána mutace „throttle má jeden společný klíč“ → chycena.
+
+**Co to NEMĚNÍ:** `D3` platí dál („hra smí provést, co hráč rozhodl“) —
+automatizace je hotová a zůstává v repu i v plánu, jen se **nezapíná sama**.
+Až se vrátí, má být opt-in a bez spamu.
+
+### Kam dál (rozcestník)
+
+[`DALSI-SESSION.md`](DALSI-SESSION.md) — co zadat další session (A: integrace
+vlastního artu do hry, B: kvalita artu, C: `M5` souboj, D: obsah pro hráče,
+E: modding), včetně paste-ready zadání a toho, co jde dělat paralelně.
 

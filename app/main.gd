@@ -182,13 +182,23 @@ func _ready() -> void:
 	add_child(loop)
 	_setup_ui()
 	_setup_world()
-	# POLITIKA (ZADANI-24, `sim.policy`/`sim.executor`): kdyz ma hrac pravidla
-	# v `user://policy.json`, nactou se pri startu a kazdy tik je vyhodnoti.
-	# Bez souboru je to NO-OP (proto se ptame na existenci - hlaska o chybejicim
-	# souboru by byla v zurnalu kazdy start). Vykonavatel je tim dosazitelny
-	# z produkce; pravidla jsou data, ne kod.
-	if FileAccess.file_exists(POLICY_PATH) and sim.load_policy(POLICY_PATH):
-		print("[main] politika nactena z ", POLICY_PATH)
+	# POLITIKA JE OD 2026-10-10 ZAMERNE VYPNUTA (pokyn uzivatele: „vypnul bych
+	# ve hře automatizaci, spamuje to hru“). Nenacita se uz AUTOMATICKY z
+	# `user://policy.json`; kdo ji chce, zapne ji PRIPOJEM na prikazove radce:
+	#     godot --path . -- --policy             (vezme user://policy.json)
+	#     godot --path . -- --policy=<cesta>     (jina cesta)
+	# Bez prepinace je to NO-OP: `sim.policy` i `sim.executor` zustanou null
+	# (`sim_world.gd:133`), takze kazdy tik se preskoci a replaye ani hash
+	# se nemENI. Vypnuto je to i kdyz soubor existuje - to je ten rozdil.
+	var policy_cesta: String = ""
+	for arg in OS.get_cmdline_user_args():
+		if str(arg) == "--policy":
+			policy_cesta = POLICY_PATH
+		elif str(arg).begins_with("--policy="):
+			policy_cesta = str(arg).substr("--policy=".length())
+	if policy_cesta != "" and FileAccess.file_exists(policy_cesta) \
+			and sim.load_policy(policy_cesta):
+		print("[main] politika nactena z ", policy_cesta, " (zapnuta pripojmem --policy)")
 	print("[main] sim spusten (seed ", DEFAULT_SEED, ", datovych souboru ", data.size(), ")")
 
 

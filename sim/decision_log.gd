@@ -30,7 +30,7 @@ var _entries: Array[Dictionary] = []
 var _dropped: int = 0
 var _tick: int = 0
 var _sink = null              # objekt s `push_event(name, data)` (SimWorld)
-var _published: String = ""   # naposledy publikovany text (throttle)
+var _published: Dictionary = {}   # "kind|rule_id" -> naposledy publikovany text (throttle)
 
 
 func _init(sink = null) -> void:
@@ -85,7 +85,7 @@ func dropped() -> int:
 func clear() -> void:
 	_entries.clear()
 	_dropped = 0
-	_published = ""
+	_published.clear()
 
 
 func _record(kind: String, rule_id: String, why: String, state_ref) -> Dictionary:
@@ -112,7 +112,15 @@ func _publish(e: Dictionary) -> void:
 		text = "policy: " + str(e["rule_id"]) + " -> " + str(e["why"])
 	else:
 		text = "policy: " + str(e["rule_id"]) + " skipped: " + str(e["why"])
-	if text == _published:
+	# THROTTLE PODLE PRAVIDLA, ne podle jednoho posledniho textu (oprava
+	# 2026-10-10): dokud se porovnaval jen JEDEN posledni text, dve pravidla,
+	# ktera se v tiku STRIDAJI (`kup_krumpac skipped: …` / `cekej_na_skill
+	# skipped: …`), ho minula a do zurnalu teklo ~10 radku za sekundu - hrac to
+	# videl jako spam a `MAX_LINES` zurnalu se tim plnil. Ted ma kazde
+	# (kind, rule_id) vlastni posledni text, takze se opakuje jen to, co se
+	# opravdu ZMENILO (duvod, nebo kind).
+	var klic: String = str(e["kind"]) + "|" + str(e["rule_id"])
+	if str(_published.get(klic, "")) == text:
 		return
-	_published = text
+	_published[klic] = text
 	_sink.push_event("message", {"text": text, "kind": "system"})

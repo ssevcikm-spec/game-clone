@@ -90,6 +90,38 @@ odchýlí, musí to být **rozhodnutí zapsané v `docs/`** s důvodem — ne ti
 rozdíl v kódu. „Nevím, jak to UO dělalo" je přípustný stav, ale musí být
 vidět: `UNVERIFIED` + co je potřeba změřit.
 
+### 1.2.1 Jak se reference používá: DUCHOVNĚ, NE TĚLESNĚ (rozhodnutí uživatele 2026-10-10)
+
+> „**Vůbec se nemusíme držet UO.** UO je sice vzor, ale **duchovně, pocitově,
+> ne tělesně/doslovně. Předměty nejsou kopie a dýka může vypadat jinak.**"
+> — pokyn uživatele 2026-10-10 (zapsáno jako závazné pravidlo).
+
+**Co to znamená — a co ne.** Rozdíl je mezi **kontraktem** (co musí sedět, aby
+data a engine fungovaly) a **tvary/vzhledem** (co je volné):
+
+| Zůstává závazné (technický kontrakt, ne estetika) | Je volné (vzhled a tvary) |
+|---|---|
+| **id prostory a art id v datech** (`land` = id, `item` = id + `0x4000`, `texmap` = id + `0x10000`; `data/items.json` ukazuje na art id) | **jak předmět vypadá** — naše dýka nemusí být UO dýka; kritériem je, že **čte jako dýka** a sedí na dlaždici |
+| **geometrie mřížky** (dlaždice 44×44, `ISO_STEP` 22, `Z_SCALE` 4) — dokud se nezmění **koordinovaně** (`core/const.gd` + literály v `render/chunk_renderer.gd`, které hlídá `G1`) | **styl kresby** (obrys, kontrast, barvy, hustota detailu), **tvary postav a monster**, efekty |
+| **kotvy spritů** (aby sprite stála na dlaždici: `ox/oy` podle stejného vzorce jako UO) | **velikost a proporce** v rámci dlaždice (naměřeno: UO kreslí postavu 24–25 px širokou, naše 16 px — metričtější; obojí je přípustné) |
+| **formát manifestu/atlasu** (aby renderer a brány fungovaly) | **UI vzhled** (gumpová logika je dobová; modernizace je povolená, `D3`) |
+| **determinismus, hash, replaye** | **jména a texty** v UI (data UO zůstávají zdrojem názvů předmětů, ale to je datová otázka, ne estetická) |
+
+**Důsledky, které z toho plynou pro práci:**
+
+1. **„Neshoduje se s UO" NENÍ vada.** Vada je jen to, co rozbije kontrakt
+   (kotva, id prostor, geometrie bez koordinované změny) nebo **nečte se**
+   (z předmětu nejde poznat, co to je).
+2. **UO se používá jako orákulum pro pocit:** časování, riziko, ekonomika,
+   systémová logika, měřítko vůči dlaždici/postavě. Ne jako šablona tvarů.
+3. **Umělecké rozhodnutí je volné, ale musí být vědomé** — když se odchýlíme
+   (jiná dýka, širší postava), patří to do `docs/` stejně jako odchylka
+   mechaniky (§ „Pravidlo odchylky" výš), protože jinak to příští session
+   „opraví" zpátky podle reference.
+4. **Pozor na věci, které vypadají jako vzhled, ale jsou kontrakt** — dlaždice
+   a kotvy jsou příklad: změna je možná, ale je to **koordinovaná změna
+   s bránou `G1`**, ne svoboda jednoho souboru.
+
 ## 1.3 Hlavní herní smyčka, která musí fungovat celá
 
 Tohle je **jediná smyčka, která definuje hotovou hru**. Musí projít od začátku

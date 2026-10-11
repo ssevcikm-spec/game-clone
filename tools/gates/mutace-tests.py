@@ -1206,8 +1206,19 @@ MODULY = {
              "if int(e.get(\"tick\", 0)) >= 0:"),
             ("strop se ignoruje (log roste bez omezeni)",
              "while _entries.size() > MAX_ENTRIES:", "while false:"),
+            # ⚠ 2026-10-10: kotva se přepsala, když throttle začal být PO PRAVIDLE
+            # (`_published` je slovník `kind|rule_id -> text`). Původní kotva
+            # `if text == _published:` v kódu NENÍ → mutace by se tiše
+            # neprovedla. Ověřeno běžícím harnessem.
             ("stejna zprava se do zurnalu sype porad",
-             "if text == _published:\n\t\treturn", "if false:\n\t\treturn"),
+             'if str(_published.get(klic, "")) == text:\n\t\treturn',
+             "if false:\n\t\treturn"),
+            # Stridani dvou pravidel byl PŘESNĚ ten spam, který uživatel viděl
+            # ve hře ("vypnul bych automatizaci, spamuje to hru"). Chytá to case
+            # `decision_log_throttle`.
+            ("throttle ma jeden spolecny klic (stridani pravidel spamma)",
+             'var klic: String = str(e["kind"]) + "|" + str(e["rule_id"])',
+             'var klic: String = ""'),
         ],
     },
     # Vzory pro ZAPOJENI politiky do `SimWorld` (`sim/sim_world.gd`). Chytá je
