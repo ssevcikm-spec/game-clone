@@ -268,14 +268,22 @@ ani teď — jen jsem do `assets/own-art.json` přidal `groups` (aditivní řád
 
 ## 🔗 COMMITY TÉTO SESSION (a ověřený push)
 
-`…` — `render/texture_cache.gd` (varianta, `groups`, `stats.variants`),
+`eb69308` — `render/texture_cache.gd` (varianta, `groups`, `stats.variants`),
 `render/own_art.gd` (validace `groups`), `render/chunk_renderer.gd` (výběr
-v seznamu), `tests/cases/land_variants.gd` + `.uid` (nový case),
-`tools/gates/check-land-variants.py` + `tools/gates/land_variants_probe.gd` +
-`.uid` (nová brána **G17**), `tools/gates/run-all.py` (registrace G17),
+v seznamu; soubor byl na disku s CRLF — srovnáno na LF podle `.gitattributes`),
+`tests/cases/land_variants.gd` (nový case),
+`tools/gates/check-land-variants.py` + `tools/gates/land_variants_probe.gd`
+(nová brána **G17**), `tools/gates/run-all.py` (registrace G17),
 `docs/04` §4.2 a `docs/08` §8.2 (smlouva), `HANDOFF.md`, `LESSONS.md`.
-**Necommitoval jsem** `assets/own-art.json` ani `assets/stone-path/` (cizí
-rozdělaná práce) — `groups` v konfiguraci proto čeká na commit paralelní session.
+**Necommitoval jsem** `assets/own-art.json`, `assets/stone-path/`,
+`tools/gates/own_art_probe.gd`, `tools/gates/check-own-art.py`,
+`tools/gates/check-style.py`, `tools/artgen/pbr_dlazdice.py` (práce paralelní
+session) — `groups` v konfiguraci proto čeká na **její** commit.
+**Ověřeno živě po pushi:** `git rev-list --count origin/main..HEAD` → **0**,
+`origin/main` = `HEAD` = **eb69308** (`git rev-parse --short origin/main`).
+⚠ V témže commitu je i **blok paralelní session** v `HANDOFF.md` a `LESSONS.md`
+(obojí **aditivně**, 0 smazaných řádků) — stavové dokumenty přebírá ten, kdo
+končí později, a nic z nich nesmí zmizet.
 
 ---
 
