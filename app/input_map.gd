@@ -110,6 +110,11 @@ var zoom: float = 1.0
 # bezi za mysi". Stav drzi klient; meni ho `auto_run_step()` a je VIDET
 # (print pri kazde zmene).
 var auto_run: bool = false
+# M5 (2026-10-11): dosah klavesy `A` (utok na nejblizsi monstrum). Je to VSTUP
+# klienta, ne pravidlo simulace: smlouva `attack` serial posila a `sim.combat`
+# dosah NERESI (v UO ho hlida klient). 10 dlazdic = stejne jako `AGGRO_RANGE`
+# v `sim.ai`, aby "na co dosahnu klavesou" a "co si me vsimne" sedelo.
+const ATTACK_RANGE: int = 10
 var _levy_minule: bool = false
 var _pravy_minule: bool = false
 var _seq: int = 0
@@ -119,11 +124,16 @@ var _krok_ms: Dictionary = {}       # nazev akce -> cas posledniho VYDANEHO krok
 # Vstup ho dostava od `app/main` (jedina instance registru je ve `SimWorld`) -
 # kdyz ho nema, klik na svet proste nic neposle (`area_mobile` vraci 0).
 var _registry = null
+# SIM SVET (M5): pro `Query` na `sim.interaction.nearest_lootable` (klavesa `Q`).
+# Klient se neptá vlastnim seznamem - pravidlo "co je lootovatelne a na dosah"
+# je v simulaci (`sim.interaction`), tady se jen predava vysledek do prikazu.
+var _world = null
 
 
-func _init(binding_table: Dictionary = {}, registry = null) -> void:
+func _init(binding_table: Dictionary = {}, registry = null, world = null) -> void:
 	bindings = binding_table
 	_registry = registry
+	_world = world
 	_iso = Iso.new()
 
 
@@ -372,9 +382,46 @@ func area_mobile(tile: Vector2i, player: int = 0) -> int:
 	return int(kandidati[0])
 
 
+func nearest_hostile(player: int) -> int:
+	# Nejnizsi serial NEPRATELSKEHO mobila na dosah (0 = nic). Pro klavesu `A`:
+	# hrac nemusi trefovat mysi. Vzdalenost je Chebyshev od HRACE (ne od pocatku
+	# sveta) a limit je `ATTACK_RANGE` dlazdic.
+	if _registry == null or player <= 0:
+		return 0
+	var ja = _registry.get_mobile(int(player))
+	if ja == null:
+		return 0
+	var kandidati: Array = []
+	for mob in _registry.all():
+		if int(mob.serial) == int(player):
+			continue
+		if int(mob.hp) <= 0:
+			continue
+		if str(mob.ai.get("state", "")) == "vendor":
+			continue
+		var d: int = maxi(absi(int(mob.pos.x) - int(ja.pos.x)),
+			absi(int(mob.pos.y) - int(ja.pos.y)))
+		if d > ATTACK_RANGE:
+			continue
+		kandidati.append(int(mob.serial))
+	if kandidati.is_empty():
+		return 0
+	kandidati.sort()
+	return int(kandidati[0])
+
+
+func nearest_lootable(player: int) -> int:	# Serial tela s lootem na dosah (0 = nic). Ptáme se SIMULACE - klient si
+	# nevede vlastni seznam lootovatelnych veci (druhá pravda by se rozešla).
+	var system = null
+	if _world != null and _world.get("systems") is Dictionary:
+		system = (_world.get("systems") as Dictionary).get("interaction")
+	if system == null or not system.has_method("nearest_lootable"):
+		return 0
+	return int(system.nearest_lootable(int(player)))
+
+
 func attack_command(player: Vector2i, screen: Vector2, camera_offset: Vector2,
-		z: int = 0) -> Dictionary:
-	# Klik mysi na svet -> utok, kdyz je tam nepritel. Jinak prazdny slovnik
+		z: int = 0) -> Dictionary:	# Klik mysi na svet -> utok, kdyz je tam nepritel. Jinak prazdny slovnik
 	# (zadny prikaz, zadny krok) - "nic tu neni" neni chyba vstupu.
 	var world: Vector2 = _na_svet(screen, camera_offset)
 	var tile: Vector2i = _iso.to_tile(world.x, world.y, z)
@@ -412,6 +459,11 @@ func key_command(action: String, serial: int = 0) -> Dictionary:
 			return {"t": "target_reply", "cursor": 0}
 		"use":
 			return {"t": "use", "serial": serial} if serial > 0 else {}
+		"loot":
+			# M5 (2026-10-11): `Q` = vezmi obsah nejblizsiho tela s lootem.
+			# `serial` predava volajici (kontroler zna registr a dosah) - kdyz
+			# ho nema, prikaz se neposle (zadny tichy prazdny loot).
+			return {"t": "loot", "serial": serial} if serial > 0 else {}
 	return {}
 
 

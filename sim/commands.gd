@@ -45,6 +45,7 @@ const REQUIRED := {
 	"craft": {"recipe": TYPE_INT, "count": TYPE_INT},
 	"vendor": {"action": TYPE_STRING, "vendor": TYPE_INT, "lines": TYPE_ARRAY},
 	"context": {"serial": TYPE_INT, "entry": TYPE_INT},
+	"loot": SERIAL_ONLY,
 	"say": {"text": TYPE_STRING},
 	"resurrect": {"accept": TYPE_BOOL},
 	"save": SLOT_ONLY,
@@ -126,6 +127,12 @@ func dispatch(sim, c: Dictionary) -> void:
 			_route(sim, t, "craft", "craft", [_player(sim), c["recipe"], c["count"]])
 		"context":
 			_route(sim, t, "interaction", "context_action", [_player(sim), c["serial"], c["entry"]])
+		"loot":
+			# M5 (2026-10-11): vezmi cely obsah tela s lootem. Vlastni prikaz
+			# NAD RAMEC §4.3 - do teto chvile se loot z monstra nedal sehrat
+			# (telo se jen otevrelo). Klavesa `Q` posila serial z
+			# `sim.interaction.nearest_lootable`.
+			_route(sim, t, "interaction", "loot_all", [_player(sim), c["serial"]])
 		"vendor":
 			var method: String = "buy" if c["action"] == "buy" else "sell"
 			_route(sim, t, "vendor", method, [_player(sim), c["vendor"], c["lines"]])

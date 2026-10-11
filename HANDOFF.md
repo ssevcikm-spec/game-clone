@@ -150,6 +150,32 @@ opravdu zasáhlo. Sonda: `_analyza/p48-m5-snimek.gd` (běh s oknem, zapisuje PNG
 i `You cannot move there.` (monstrum zkouší krok) a **hp hráče 0/87** — monstrum
 hráče zabilo.
 
+### 7) Loot klávesou `Q` (aby se loot dal sehrát i bez drag & drop)
+
+**Proč:** sonda `p54` sbírala loot PRIMO přes kontejner (jako drag & drop), ale
+**hráč takovou cestu neměl** — `use` na tělo jen poslalo `gump_open` a předměty
+v těle zůstaly. Přijímací kritérium („loot jde sebrat") tím bylo splněné jen
+v simulaci, ne ve hře.
+
+**Co je nové:** `Command{t:"loot", serial}` (NAD RÁMEC `docs/04 §4.3` — patří
+tam) → `sim.interaction.loot_all(m, serial)`; klávesa **`Q`** vezme obsah
+nejbližšího těla s lootem na dosah 2 dlaždice. Kontextové menu těla má nově
+i položku **Loot** (`0x65`). Pravidla (dosah, `blessed`/`newbie` zůstávají
+majiteli těla) jsou v SIMULACI, klient jen předá serial.
+
+**Dvě vady, které to odhalilo (obě opravené):**
+1. `describe()` vracel tělo jako `unknown` — `data/items.json` u artu těla
+   (`0x4000 + body`) **žádnou kategorii `container` nemá**, takže `loot_all`
+   odpovídal `not_container`. Identita těla je `type == "corpse"`.
+2. Klávesa `A` (útok na nejbližší monstrum) brala vzdálenost od POČÁTKU SVĚTA
+   místo od hráče — na Britainu (1495, 1630) by „na dosah" nikdy nic nebylo.
+
+**Naměřeno** (`_analyza/p55-loot-sonda.gd`, cesta přes `Command{t:"loot"}`):
+zabitý kostlivec → tělo 32 → `nearest_lootable = 32` → `batoh 17 → 17 předmětů,
+v těle zbylo 0`, **zlato v batohu 60 → 82**. Testy **2638/0**, brány
+**15 měřeno / 0 chyb**.
+
+
 
 ### 5) Mutace (důkaz, že testy měří)
 

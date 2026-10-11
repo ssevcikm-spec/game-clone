@@ -142,6 +142,12 @@ const MOUSE := {
 # se na to muze zeptat). Presna sada patri granuli `ui.hotkeys`.
 const ATTACK_KEYS := {
 	"attack": [KEY_A],
+	# LOOT (M5, 2026-10-11): `Q` = vezmi obsah nejblizsiho tela s lootem.
+	# Do teto chvile se loot z monstra NEDAL sehrat: telo se sice "otevrelo"
+	# (`_open_container` poslal `gump_open`), ale predmety v nem zustaly.
+	# `Q` jde do `sim.interaction.loot_all` - pravidla (dosah, `blessed`) jsou
+	# v simulaci, klient jen predava serial.
+	"loot": [KEY_Q],
 }
 
 # ⚠ UI KLAVESY (20. session): nejsou to prikazy pro sim, takze NEJSOU
@@ -276,7 +282,7 @@ static func register_actions() -> int:
 			if not InputMap.action_has_event(action, stop):
 				InputMap.action_add_event(action, stop)
 				added += 1
-	# OBECNA INTERAKCE (20. session): klavesy E a T na jednu akci.
+	# OBECNA INTERAKCE (20. session): klient posle jen cil, nástroj vybira sim.
 	for action in INTERACT_KEYS.keys():
 		if not InputMap.has_action(action):
 			InputMap.add_action(action)
@@ -286,7 +292,8 @@ static func register_actions() -> int:
 			if not InputMap.action_has_event(action, inter):
 				InputMap.action_add_event(action, inter)
 				added += 1
-	# UTOCNA KLAVESA (M5): `A` = utoc na nejblizsi monstrum (viz `ATTACK_KEYS`).
+	# UTOCNA KLAVESA + LOOT (M5): `A` = utoc na nejblizsi monstrum, `Q` = vezmi
+	# loot z nejblizsiho tela. Presna sada patri `ui.hotkeys`; dokud neni, je tady.
 	for action in ATTACK_KEYS.keys():
 		if not InputMap.has_action(action):
 			InputMap.add_action(action)
@@ -364,6 +371,27 @@ func _process(_delta: float) -> void:
 			input_map.gui_pas = view.gui_odsazeni * 2.0
 	# Krok v letu ridi STAV (akce) i posun v pixelech - viz hlavicka (V2).
 	update_step(_pending_of_player())
+	# LOOT (M5): `Q` vezme obsah nejblizsiho tela. Serial se bere ze SIMULACE
+	# (`sim.interaction.nearest_lootable`) - klient si nevede vlastni seznam.
+	# Hlasi se do konzole i do zurnalu; kdyz neni co lootovat, `Q` NIC neposle
+	# (prazdny prikaz by jen zahltil frontu).
+	if input_map != null and sim != null and player != null \
+			and input_map.akce_just_pressed("loot"):
+		var telo: int = input_map.nearest_lootable(int(player.serial))
+		if telo > 0:
+			sim.enqueue({"t": "loot", "serial": telo})
+			print("[controller] loot: telo ", telo)
+		else:
+			print("[controller] loot: nic k sebrání (zadne telo s obsahem na dosah)")
+	# UTOCNA KLAVESA (M5): `A` = utoc na nejblizsi monstrum (bez mysi).
+	if input_map != null and sim != null and player != null \
+			and input_map.akce_just_pressed("attack"):
+		var cil: int = input_map.nearest_hostile(int(player.serial))
+		if cil > 0:
+			sim.enqueue({"t": "attack", "serial": cil})
+			print("[controller] utok: monstrum ", cil)
+		else:
+			print("[controller] utok: zadne monstrum na dosah")
 	# UI KLAVESY (20. session): batoh se prepina klavesou `B`. Pres `input_map`
 	# (jedine misto s `Input`) a HLAST do konzole - ticho by znamenalo, ze hrac
 	# nevi, jestli okno otevrel on, nebo se neco pokazilo.

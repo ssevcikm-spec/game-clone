@@ -230,7 +230,7 @@ func _ready() -> void:
 	sim = SimScript.new(DEFAULT_SEED, data)
 	loop = Loop.new()
 	loop.sim = sim
-	loop.input_map = InputMapScript.new({}, sim.registry)
+	loop.input_map = InputMapScript.new({}, sim.registry, sim)
 	add_child(loop)
 	_setup_ui()
 	_setup_world()

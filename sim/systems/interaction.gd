@@ -74,6 +74,14 @@ const MESSAGE_UNAVAILABLE := "Not available yet."
 const ENTRY_CUSTOM_MIN := 0x64            # >= 0x64 = vlastni polozka
 const ENTRY_BACKPACK := 0x0078            # Open Backpack (self)
 const ENTRY_PAPERDOLL := 0x0193           # Paperdoll (self)
+# M5 (2026-10-11): "Loot" u kontejneru (tela). Vlastni polozka, proto cislo
+# >= 0x64; je to ROZHODNUTI KLONU (reference ma loot tažením predmetu, my ho
+# nabízíme i jedním kliknutím, aby se loot z těla dal sehrát bez drag & drop).
+const ENTRY_LOOT := 0x65
+# Dosah na lootovani tela: stejna hodnota jako dosah na predmet/kovadlinu
+# (`docs/05 §5.4` "dosah 2 dlazdice"). Tělo se lootuje na blizko, ne z druheho
+# konce mapy.
+const LOOT_RANGE := 2
 
 # `category == "tool"` obsahuje i kovadlinu a vyhen - jsou to CÍLE, ne nastroje
 # (mereno nad `data/items.json`: 18 zaznamu `tool`, z toho 16 nastroju).
@@ -236,6 +244,7 @@ func context_menu(m: int, serial: int) -> Array[Dictionary]:
 		out.append({"entry": ENTRY_CUSTOM_MIN + 1, "text": "Look", "custom": true})
 	elif kdo == "container":
 		out.append({"entry": ENTRY_CUSTOM_MIN, "text": "Open", "custom": true})
+		out.append({"entry": ENTRY_LOOT, "text": "Loot", "custom": true})
 	else:
 		out.append({"entry": ENTRY_CUSTOM_MIN, "text": "Look", "custom": true})
 	return out
@@ -254,12 +263,102 @@ func context_action(m: int, serial: int, entry: int) -> Dictionary:
 			# smlouve, viz hlavicka) - dokud se nedoplni, posilame ho takhle.
 			_event("gump_open", {"gump": "paperdoll", "data": {"serial": m}})
 			return {"ok": true, "action": "paperdoll", "reason": ""}
+		ENTRY_LOOT:
+			return loot_all(m, serial)
 	if entry >= ENTRY_CUSTOM_MIN:
 		return _fail("not_available")
 	return _fail("unknown_entry")
 
 
 # -- to, co pouziva test (a co je merene) ----------------------------------
+
+func loot_all(m: int, serial: int) -> Dictionary:
+	# VEZMI CELY OBSAH KONTEJNERU (tela s lootem) - M5, 2026-10-11. Telo se
+	# jinak jen "otevrelo" (`_open_container`) a predmety v nem zustaly, takze
+	# se loot z monstra NEDAL sehrat; herova cesta k `Command{t:"context",
+	# entry:0x65}` je klavesa `Q` (`app/input_map.loot_command`) pres
+	# `nearest_lootable`.
+	#
+	# PRAVIDLA: (1) kontajner musi byt na dosah (`LOOT_RANGE`), (2) `blessed`
+	# a `newbie` predmety v cizim tele zustavaji (rozhodnuti: jsou to newbie
+	# veci majitele tela, ne loot), (3) nic se neztraci - co se nevejde, zustane
+	# v tele a je to VIDET v `zbytek`.
+	var mob = _mobile(m)
+	if mob == null or int(mob.backpack) <= 0:
+		return _fail("no_mobile")
+	var cil: Dictionary = describe(serial)
+	if str(cil.get("kind", "")) != "container":
+		return _fail("not_container")
+	if not _na_dosah(mob, cil):
+		return _fail("too_far")
+	if _containers == null:
+		return _fail("not_available")
+	var pred: Array = _containers.contents(serial)
+	var vzato: Array = []
+	var zustalo: int = 0
+	for s in pred:
+		var it = _item(int(s))
+		if it == null:
+			continue
+		if _je_chraneny(it):
+			zustalo += 1
+			continue
+		if _containers.add(int(mob.backpack), it):
+			vzato.append(int(s))
+		else:
+			zustalo += 1
+	_event("container_contents", {"serial": serial,
+		"items": _containers.contents(serial)})
+	_event("message", {"text": "You take %d item(s)." % vzato.size(), "kind": "system"})
+	return {"ok": true, "action": "loot", "reason": "", "taken": vzato,
+		"left": zustalo}
+
+
+func nearest_lootable(m: int) -> int:
+	# Nejnizsi serial kontejneru s obsahem na dosah (0 = nic). Pro klavesu `Q`:
+	# hrac nemusi klikat na presnou dlazdici tela. Hleda se podle poradi serialu,
+	# aby volba nezavisela na poradi klicu slovniku.
+	if _items == null or _containers == null:
+		return 0
+	var mob = _mobile(m)
+	if mob == null:
+		return 0
+	var kandidati: Array = []
+	for serial in _items.keys():
+		var it = _item(int(serial))
+		if it == null or str(it.get("type")) != "corpse":
+			continue
+		if _containers.contents(int(serial)).is_empty():
+			continue
+		if not _na_dosah(mob, {"item": it, "pos": it.pos}):
+			continue
+		kandidati.append(int(serial))
+	if kandidati.is_empty():
+		return 0
+	kandidati.sort()
+	return int(kandidati[0])
+
+
+func _je_chraneny(item) -> bool:
+	# `blessed` (0x01) a `newbie` (0x02) z CIZIHO tela se neberou - jsou to
+	# veci majitele tela (stejny flagname jako `sim.death`).
+	var f: int = int(item.get("flags"))
+	return (f & 0x01) != 0 or (f & 0x02) != 0
+
+
+func _na_dosah(mob, cil: Dictionary) -> bool:
+	# Dosah `LOOT_RANGE` dlazdic - pocita se z pozice mobilu a pozice predmetu
+	# (Chebyshev, jako `sim.craft._station_near`); chybejici pozice = "nevim",
+	# a to NENI "na dosah" (radsi odmitnout nez lootovat pres celou mapu).
+	var it = cil.get("item")
+	if it == null or mob == null:
+		return false
+	var p = it.get("pos")
+	if p == null:
+		return false
+	return maxi(absi(int(p.x) - int(mob.pos.x)), absi(int(p.y) - int(mob.pos.y))) \
+		<= LOOT_RANGE
+
 
 func describe(serial: int) -> Dictionary:
 	# Co je cil: `kind` je to, podle ceho rozhoduje §5.2.2.
@@ -271,6 +370,13 @@ func describe(serial: int) -> Dictionary:
 		var kind: String = "unknown"
 		if _is_door(tile):
 			kind = "door"
+		elif str(item.get("type")) == "corpse":
+			# ⚠⚠ TELO JE KONTEJNER (M5, namEReno 2026-10-11): `data/items.json`
+			# u artu tela (0x4000 + body) ZADNOU kategorii `container` nema, takze
+			# `describe` ho vracelo jako `unknown` a `loot_all` odpovidal
+			# `not_container` - loot z monstra se NEDAL sehrat. Identita tela je
+			# `type == "corpse"` (`sim.death` ho tak stavi), ne kategorie artu.
+			kind = "container"
 		elif cat == "container":
 			kind = "container"
 		elif cat == "tool" and not (role in TARGET_ROLES):
