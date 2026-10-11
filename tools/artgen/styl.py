@@ -7,18 +7,24 @@ UO sprite téhož druhu **61 barev a 0 polopruhlednych**. To je presne to, co
 uzivatel vidi jako "rozmazany a bez detailu": hladky antialiasovany 3D render
 misto pixel artu. Prvni integrace (2026-10-11) to jen prenesla do hry.
 
-RESI TO TRI VECI (v tomto poradi):
+RESI TO DVĚ VECI (v tomto poradi; obe se aplikuji na MALEM spritu, tedy az po
+Lanczosu):
 
-  1. DOOSTRENI (`doostri`) - UnsharpMask na MALEM spritu (po Lanczosu, pred
-     kvantizaci). Vrati ostrost hrany; namEReno na prototypu 26,8 -> 48,7
-     (UO ma 41,4).
-  2. TVRDA ALFA (`tvrda_alfa`) - na SILUETE je alfa 0/255 (pixel art nema
+  1. TVRDA ALFA (`tvrda_alfa`) - na SILUETE je alfa 0/255 (pixel art nema
      pruhledne okraje). Kontaktni stin zustava MEKKY - je to stin, ne silueta,
      a jeho mekkost je zamer (viz `postprocess_lit.vrstva_stinu`).
-  3. PALETA (`postav_paletu`, `na_paletu`) - kvantizace na N barev. Paleta se
-     stavi z TOHO, CO SE OPRAVDU KRESLI (`SadaPalety.pridej` dostava pixely po
-     doostreni a jen tam, kde bude pixel videt), takze neni opsana z palety UO
-     a sedi na nasi svetelnou sestavu.
+  2. PALETA (`postav_paletu`, `na_paletu`) - kvantizace na N barev. Paleta se
+     stavi z TOHO, CO SE OPRAVDU KRESLI (`SadaPalety.pridej` dostava pixely
+     a jen tam, kde bude pixel videt), takze neni opsana z palety UO a sedi na
+     nasi svetelnou sestavu.
+
+⚠ DOOSTRENI (`doostri`) JE V MODULU, ALE VE VYCHOZIM NASTAVENI VYPNUTE
+(`DOOSTRENI_PROCENT = 0`). NamEReno POHLEDEM 2026-10-11: i maly UnsharpMask
+dela na TENKE DIAGONALE (rukojet krumpace) stridave svetle/tmave pixely -
+Lanczos tam nechava krouzkovani, doostreni ho zesili a paleta obe hodnoty
+zpevni; rukojet pak vypada jako teckovana cara. Ostrost po stylu je vyssi
+nez pred nim i bez doostreni (26,3 -> 31,5). Kdo ho zapne, at se na vysledek
+PODIVA na 8-14x zvetsenem spritu, ne jen na cislo ostrosti.
 
 CO SE ZAMERNE NEDELA: obrys/outline (to je jina zmena - nesmi pohnout kotvou
 ani boxem) a dither (u 44px dlazdice by z nej byl sum).

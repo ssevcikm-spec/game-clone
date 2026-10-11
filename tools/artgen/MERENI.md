@@ -551,3 +551,37 @@ python tools\artgen\pack_atlas.py --check               # 1× sada musí zůstat
 * **Chování ostatních směrů postavy zvlášť** — všech 40 framů (5 směrů × 8) se
   vyrobilo a prošlo branou, ale na listu je vidět jen směr 0 (8 framů).
 * **Běh v CI** — Blender v CI runneru není (skill `game-assets`).
+
+---
+
+## 10. DODATEK 2026-10-11 — PIXEL-ART STYL (co z čísel výš PŘESTALO PLATIT)
+
+> **Co je tenhle dodatek:** doplnění k **záznamu měření** (historické oddíly se
+> needitují). Čísla výš byla správná **ve svém čase** (před stylem). Kdo je čte
+> dnes, musí vědět, co je nahradilo.
+
+Do pipeline přibyl **stylový krok** (`styl.py`: tvrdá alfa + paleta na model;
+doostření vypnuté) a obě sady se přegenerovaly. Co to mění:
+
+| Místo výš | Bylo (před stylem) | Je (po stylu) |
+|---|---|---|
+| §9.5 `pack_atlas_lit.py --check` | 893 kontrol / 0 chyb | **900 kontrol / 0 chyb** |
+| §9.5 `pack_atlas.py --check` | 476 / 0 | **476 / 0** (beze změny počtu) |
+| §9.2 „není to pixel art“ (antialias) | antialiasovaný render | **silueta 0/255**; antialias zůstal jen v kontaktním stínu (záměr) |
+| §9.3 bod 5 „není to pixel art“ | totéž | **neplatí** — je to pixel art s paletou |
+| §9.3 bod 1 „kontrast se snížil“ | měřeno na antialiasovaném spritu | **přeměřeno**: postava 472 → **39 barev**, 148 → **0** poloprůhledných, ostrost 26,3 → **31,5** |
+| §8.3 „2× je měkčí“ | platí dál | platí dál — **rozlišení není cesta** (proto styl, ne 2×) |
+
+**Dvě věci, které se změnily a nejsou v tabulkách výš:**
+
+1. **`px_na_jednotku` se nezměnilo** (kotvy a boxy zůstaly), ale **sada stránek
+   se přepsala** — manifest má jiný SHA (`a745b968…`, dřív `5ee4e8f2…`).
+2. **Tolerance determinismu pixelů je 6, ne 1.** Kvantizace zesiluje šum EEVEE
+   (±1 úroveň v renderu → až ±5 v atlasu); **manifest SHA zůstává přesně
+   shodný**. Důvod je v `probe_determinismus_lit.py` u `PIXEL_TOLERANCE`.
+
+**Brána stylu:** `python tools/gates/check-style.py` (G16) — silueta 0/255 mimo
+kontaktní stín, paleta pod 80 barvami, měřeno na spritech i na animacích
+z anim listu. Ostrost se **hlásí, ale nehlídá** (ruda má po stylu 19,4 a je
+čitelnější; metrika, která trestá žádoucí vlastnost, není brána).
+

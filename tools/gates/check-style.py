@@ -12,10 +12,14 @@ Kontroluje se:
      styl mohl tise preskocit a vsechno ostatni by bylo zelene,
   K2 zadny sprite nema na SILUETE polopruhledny pixel (kontaktni stin se
      neposuzuje - jeho mekkost je zamer; pozna se podle barvy stinu),
-  K3 pocet barev v tele je pod stropem (pixel art ma malou paletu),
-  K4 ostrost hrany (gradient jasu) je vetsi nez pred stylem - meri se proti
-     prahu odvozenemu z NAMERENE hodnoty PRED stylem (26,3 u postavy), ne
-     z dojmu.
+  K3 pocet barev v tele je pod stropem (pixel art ma malou paletu).
+
+⚠ CO BRANA ZAMERNE NEMERI: **ostrost hrany**. Zkusila to (hranice 28 mezi
+namerenymi 26,3 pred a 31,5 po stylu) a ukazalo se, ze u rudy hlasi vadu
+o SPRAVNEM obrazku: ruda ma po stylu 19,4 (pred 14,5) a je CITELNEJSI - je to
+hladky kamen s malou paletou, gradient jasu u nej nema co merit. Ostrost se
+proto jen HLASI (`nejmensi_ostrost`, `nejvetsi_ostrost`), nehlida se.
+Metrika, ktera tresta zadouci vlastnost, neni brana (skill `game-assets`).
 
 V CI nejsou `assets/uo/` (gitignore), ale VLASTNI sada je v gitu, takze tahle
 brana meri i v CI - jako G6.
@@ -43,8 +47,8 @@ CONFIG = "assets/own-art.json"
 # Strop barev je 2x vic, nez kolik ma nejhorsi sprite po stylu (39) - aby brana
 # nepadala na kosmetice, ale poznala NAVRAT ROZMAZANI (472 barev).
 MAX_BAREV = 80
-# Ostrost: 26,3 pred stylem, 31,5 po. Hranice 28 je mezi nimi.
-MIN_OSTROST = 28.0
+# ⚠ Ostrost tu ZAMERNE neni jako prah - viz docstring (u rudy hlasi vadu
+# o spravnem obrazku). Cislo se jen hlasi.
 
 
 def barva_stinu(root: Path) -> tuple[int, int, int]:
