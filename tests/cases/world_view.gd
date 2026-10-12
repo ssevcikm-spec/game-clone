@@ -159,6 +159,16 @@ class FakeMovement:
 		return (kroky.get(serial, {}) as Dictionary).duplicate()
 
 
+class FakeCombat:
+	# Nahrazuje `sim.combat` v testu ANIMACE UTOKU (dokonceni P1): vraci okno,
+	# ktere si test nastavi. Prazdny slovnik = nikdo neuderil (kresli se
+	# chuze/postoj) - presne to dela `sim.combat.anim_of` bez utoku.
+	var okno: Dictionary = {}
+
+	func anim_of(_serial: int) -> Dictionary:
+		return okno.duplicate()
+
+
 func _arg(name: String, fallback: String) -> String:
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--" + name + "="):
@@ -671,6 +681,82 @@ func run(t) -> void:
 	var neznamy_serial: Dictionary = view.animace_mobila(12345)
 	t._check(neznamy_serial.is_empty(),
 		"app.world_view: nezname serial vraci prazdny slovnik (namEReno %s)" % str(neznamy_serial))
+	view.set("_jmena", jmena_zaloha)
+
+	# 7f) ⚠⚠ DOKONCENI P1 (2026-10-12) - UTOK A PLYNUY POSUN CIZI POSTAVY.
+	#     Dve veci, ktere uzivatel videl jako "svet je mrtvy":
+	#       (g) UTOK: `sim.combat.anim_of` vraci, kdo prave uderil - a utok ma
+	#           prednost pred chuzi (jinak by ho chuze prebila),
+	#       (h) POSUN: krok v letu se do kresleni PRICITA (jako u hrace od V2);
+	#           bez toho cizi postavy skakaly po dlazdicich.
+	var utoky := FakeCombat.new()
+	view.set_combat(utoky)
+	var krok_px: float = float(consts["ISO_STEP"])
+	# ⚠ Sekce (e) vysadila `movement` (merila stare chovani) - tady se MUSI
+	# vratit, jinak by 7f meritil "bez systemu" a vyslo by, ze utok/posun
+	# nefunguji (namEReno v prvnim behu: chuze vysla jako postoj 4).
+	view.set_movement(kroky)
+	view.set("_jmena", null)          # 7f kresli take - jen animacni vetev
+	kroky.kroky[99] = {"dir": 5, "run": false, "start_ms": 1000, "delay_ms": 400, "z": 0}
+	utoky.okno = {"action": 2, "left_ms": 100}
+	var s_utokem: Dictionary = view.animace_mobila(99)
+	t._check(int(s_utokem.get("action", -1)) == 2,
+		"app.world_view: UTOK ma prednost pred chuzi (namEReno %s)" % str(s_utokem))
+	view.set("_anim", falesny_mob)
+	view.call("_draw_mobil", cizi)
+	t._check(falesny_mob.akce == 2,
+		"app.world_view: kresleni dostane akci utoku 2 (namEReno %d)" % falesny_mob.akce)
+	# bez okna (nikdo neuderil) se vraci chuze - "utok" se nesmi tvarit jako vecny
+	utoky.okno = {}
+	var bez_utoku: Dictionary = view.animace_mobila(99)
+	t._check(int(bez_utoku.get("action", -1)) == 0,
+		"app.world_view: po okne utoku se vraci chuze (namEReno %s)" % str(bez_utoku))
+	# (h) POSUN: v pulce kroku (cas 1200 z 1000+400) je posun pul dlaždice.
+	#     Ocekavana hodnota se pocita z IZOMETRIE (`screen = ((x-y), (x+y)) *
+	#     ISO_STEP`) a z tabulky smeru v `core/const.gd`, ne z mereneho modulu -
+	#     jinak by test meril sám sebe. Pozor: smer kroku je 5 (ne 0), takze
+	#     posun je (-2, 0) * ISO_STEP - prvni verze testu to spletla a hlasila
+	#     SPRAVNOU hodnotu jako vadu.
+	var smer: int = int(kroky.kroky[99].get("dir", 0))
+	var dx: int = int(consts["DIR_DX"][smer])
+	var dy: int = int(consts["DIR_DY"][smer])
+	var posun_pul: Vector2 = view.call("_posun_mobila", cizi, 1200)
+	var ocekavane_pul := Vector2(
+		roundf(float(dx - dy) * krok_px * 0.5),
+		roundf(float(dx + dy) * krok_px * 0.5 / 2.0))
+	t._check(posun_pul == ocekavane_pul,
+		"app.world_view: cizi postava v pulce kroku je na pul dlazdice (namEReno %s, cekano %s)"
+			% [str(posun_pul), str(ocekavane_pul)])
+	# Na KONCI kroku je posun presne jedna dlazdice - v tu chvili `apply_step`
+	# prepise `pos`, takze se obraz NESMI pohnout (zadny skok).
+	var posun_cely: Vector2 = view.call("_posun_mobila", cizi, 1400)
+	var ocekavane_cely := Vector2(float(dx - dy) * krok_px, float(dx + dy) * krok_px / 2.0)
+	t._check(posun_cely == ocekavane_cely,
+		"app.world_view: na konci kroku je posun presne jedna dlazdice (namEReno %s, cekano %s)"
+			% [str(posun_cely), str(ocekavane_cely)])
+	# Bez kroku v letu je posun NULA (postava stoji na dlazdici).
+	kroky.kroky.erase(99)
+	t._check(view.call("_posun_mobila", cizi, 1400) == Vector2.ZERO,
+		"app.world_view: bez kroku je posun cizi postavy nula (namEReno %s)"
+			% str(view.call("_posun_mobila", cizi, 1400)))
+	# Kreslici cesta posun OPRAVDU pouzije: `ground_mobila` je funkce, kterou
+	# `_draw_mobil` vola - a rozdil proti ciste dlazdici musi byt PRESNE posun.
+	# (Prvni verze testu kontrolovala jen "neco se nakreslilo" a mutace
+	# "posun se neprida" PROSLA - tedy slepa kontrola.)
+	# ⚠ Krok se musi ZNOVU ZADAT: predchozi kontrola ("bez kroku je posun nula")
+	# ho smazala - bez toho by rozdil vysel 0 a kontrola by hlasila vadu.
+	kroky.kroky[99] = {"dir": smer, "run": false, "start_ms": 1000, "delay_ms": 400, "z": 0}
+	var zaklad_dlazdice: Vector2 = view.call("_ground_of", cizi.pos)
+	var kreslene: Vector2 = view.ground_mobila(cizi, 1200)
+	t._check(kreslene - zaklad_dlazdice == ocekavane_pul,
+		"app.world_view: kresleni cizi postavy pricita posun kroku (rozdil %s, cekano %s)"
+			% [str(kreslene - zaklad_dlazdice), str(ocekavane_pul)])
+	kroky.kroky[99] = {"dir": 0, "run": false, "start_ms": 1000, "delay_ms": 400, "z": 0}
+	var pred_drawn: int = int(view.drawn)
+	view.call("_draw_mobil", cizi)
+	t._check(int(view.drawn) == pred_drawn + 1,
+		"app.world_view: kresleni cizi postavy s posunem probehlo (drawn %d -> %d)"
+			% [pred_drawn, int(view.drawn)])
 	view.set("_jmena", jmena_zaloha)
 
 	# 8) ⚠ 18. session: klic hrace SEDI MEZI STATIKY sveho pruchodU. Pri STEJNEM

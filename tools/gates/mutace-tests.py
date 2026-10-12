@@ -951,6 +951,20 @@ MODULY = {
             ("cizi postava se kresli v postoji natvrdo (P1 vracena)",
              "_anim.play(int(mob.serial), int(akce[\"action\"]),\n\t\tint(akce[\"dir\"]))",
              "_anim.play(int(mob.serial), ACTION_IDLE, int(mob.dir))"),
+            # --- DOKONCENI P1 (2026-10-12): UTOK A PLYNUY POSUN ------------
+            # Kdyby se okno animace utoku ignorovalo, postava by pri uderu dál
+            # stála nebo šla - a test 7f (g) to musi videt.
+            ("animace utoku se ignoruje (uder se nekresli)",
+             "if not utok.is_empty():", "if false:"),
+            # Kdyby se posun kroku nepridal, cizi postavy by skákaly po
+            # dlaždicích (hrac ma plynuly posun od V2) - test 7f (h) to vidi.
+            # ⚠ Vzor je CELY `return` radek: prvni verze vyrizla jen
+            # `+ _posun_mobila(...)` a nechala v souboru pokracovaci radek s
+            # `\` - mutant se NENACETL (parse error) a harness to spravne
+            # hlasil jako NEPLATNOU, ne chycenou mutaci.
+            ("posun kroku se u cizich postav neprida",
+             "return pozice_dlazdice + _posun_mobila(mob, now_ms)",
+             "return pozice_dlazdice"),
         ],
     },
     # M9 (15. session): davkove kresleni. Mutace miri na GEOMETRII, PORADI

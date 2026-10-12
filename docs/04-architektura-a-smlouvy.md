@@ -667,6 +667,14 @@ hláška, ale **stav boje se neruší**, takže po návratu na dosah swingy pokr
 (reference kontroluje na obou místech: `BaseWeapon.OnSwing` → `CheckHit` → `InRange`).
 Dosah **zbraně** (luky) je věc zbraně, ne tohoto pravidla.
 
+**DOPLNĚNO 2026-10-12 (dokončení P1) — ANIMACE ÚTOKU:** událost `mobile_anim`
+je **jednorázová**, ale klient kreslí každý frame — proto
+`sim.combat.anim_of(serial)` vrací `{action: 2, left_ms}` a klient z něj kreslí
+okno **`ANIM_ATTACK_MS` = 400 ms** (5 framů po 80 ms, `docs/05 §5.1.1`).
+**Není to součást `state()`** (save/hash): je to časování obrazu, ne stav světa —
+replaye ani uložené hry se tím nemění. Když `anim_of` nic nevrací, kreslí se
+chůze/postoj (staré chování).
+
 **Přijímací kritérium:** se zbraní a `tactics=100` dá 20 swingů na cíl s `hp`
 > 0 alespoň 5 zásahů (nenulový damage) a cíl ztratí hp; **bez zbraně**
 (wrestling) funguje útok dál.

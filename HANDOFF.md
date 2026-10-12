@@ -1,3 +1,90 @@
+# Předání — game-clone (2026-10-12, SESSION „P1b“: DOKONČENÍ P1 — ÚTOK SE KRESLÍ A CIZÍ POSTAVY UŽ NEŠOUPU)
+
+> **Co je tenhle soubor:** **stav projektu** pro další session agenta. Přepisuje
+> se celý; historie je v `git log`. Nový blok je vždy **nahoře**; starší bloky se
+> needitují (jen doplňují). **Současný stav se bere z tohoto bloku.**
+>
+> **Odkud brát detaily:** zadání [`ZADANI-27-POCIT.md`](ZADANI-27-POCIT.md) §3 P1,
+> `LESSONS.md` 2026-10-12 (dvě nová ponaučení z mutací), smlouva `docs/04 §4.6.4`
+> a `docs/05 §5.5.1/§5.5.2`, sonda `_analyza/p1b-utok-snimek.gd`.
+> ⚠ **V témže stromě pracovaly paralelní session** (zvuk P3, G10/art) — jejich
+> soubory jsem needitoval a do svého commitu vzal jen svoje.
+
+## ✅ CO SE UDĚLALO (a proč právě to)
+
+Dokončení **P1** ze `ZADANI-27`: uživatel 12. 10. řekl, že svět je „mrtvý“.
+První část P1 opravila animace chůze (stav místo natvrdo zapsaného postoje);
+zůstaly dvě věci, které jsou vidět ještě víc:
+
+| Věc | Soubor | Naměřeno |
+|---|---|---|
+| **Animace ÚTOKU** pro cizí postavy i hráče | `sim/systems/combat.gd` (`ANIM_ATTACK_MS`, `_anim_do`, `_anim_dir`, `anim_of`), `app/world_view.gd` (`set_combat`, `_utok_animace`), `app/main.gd` | událost `mobile_anim` je JEDNORÁZOVÁ, ale klient kreslí každý frame — takže se stav čte přes `anim_of` (do `state()`/hashe se **záměrně nedostává**: je to časování obrazu, ne stav světa, takže se replaye a uložení nemění) |
+| **Plynulý POSUN cizích postav** | `app/world_view.gd` (`_posun_mobila`, `ground_mobila`, `_wall_kroky`) | stejná matematika jako u hráče od V2 — používá se **tatáž** statická `player_controller.step_fraction` a **nastěnný** čas startu kroku (cas simulace teče v 50ms ticích → u hráče naměřeno 97,8 % framů bez pohybu) |
+| **Vizuální důkaz** | `_analyza/p1b-utok-snimek.gd`, `p20b-obrazky/p1-utok.png` | `sim.combat` zapojen: **true**; akce **před uderem 4 (postoj) → v okamžiku uderu 2 (útok)**; v žurnálu téhož snímku `rat swings at you and misses.` / `rat hits you for 2 damage.` |
+| **Testy** | `tests/cases/world_view.gd` sekce **7f** | 7 nových kontrol: útok má přednost před chůzí (i v kreslicí cestě), po okně se vrací chůze, posun v půlce kroku = půl dlaždice, na konci = celá, bez kroku nula, a **kreslení posun opravdu použije** |
+| **Mutace** | `tools/gates/mutace-tests.py` | **21 z 21 chyceno** (dvě nové: „animace utoku se ignoruje“, „posun kroku se u cizich postav neprida“) |
+
+## 📊 NAMĚŘENO (2026-10-12, tato session)
+
+| Co | Hodnota | Doklad |
+|---|---|---|
+| **Testy** | **2 856 kontrol / 0 selhání**, `exit 0` | `godot --headless --path . --script res://tests/run_tests.gd` (`.tmp/p1h-testy.log`) |
+| **Mutace (`--only world_view`)** | **21 z 21 chyceno**, `smlouva vstupu: OK`, `exit 0` | `.tmp/p1h-mutace.log` |
+| **Brány** | **18 měřeno / 0 čeká / 0 chyb** (G13 poradní; G18 a G19 přidaly paralelní session) | `python tools/gates/run-all.py` (`.tmp/p1h-brany.log`) |
+| **Snímek G10** | obnoven po změně kódu kreslení: `snimek_stari_h 0.03`, `vlastni_pixelu_po_erozi 269`, OK | `python tools/gates/check-render.py` |
+| **Důkaz pohledem** | `sim.combat` v kreslení **true**, akce **4 → 2**, okno útoku zachyceno na snímku | `_analyza/p1b-utok-snimek.gd`, `.tmp/p1b-snimek.log` |
+| **Replaye a determinismus** | **beze změny hashů** (G9, G8 OK) — animační okno není ve `state()` | `run-all.py` |
+
+## 🚧 CO ODHALILA PRÁCE (dvě chyby, obě v MÉM měření)
+
+1. **Slepá kontrola kreslení.** První verze testu měřila jen matematiku posunu
+   a u kreslení kontrolovala „něco se nakreslilo“ — mutace
+   „posun se nepridá“ **prošla** (`20 z 21`). Opraveno: kreslení i test používají
+   tutéž funkci `ground_mobila()` a měří se **rozdíl proti čisté dlaždici**.
+2. **Neplatný mutant místo chyceného.** Vzor mutace vyřízl jen část vícřádkového
+   výrazu a nechal v souboru `\` → mutant se nenačetl; harness to správně hlásil
+   jako `NEPLATNA`, ne jako chycenou vadu. Vzor teď bere celý `return`.
+   **Obě chyby jsou v `LESSONS.md`** (2026-10-12, první dvě).
+
+## ⚠ CO ZŮSTÁVÁ OTEVŘENÉ (pojmenované, ne zamlčené)
+
+1. **ANIMACE SMRTI u cizích postav není** — a **není to klientská mezera**:
+   `sim.death.die()` odebere mobil z registru **v témže tiku** (docs/04 §4.6.7)
+   a tělo má art `0x2006`, který v našem atlasu **není** (`tela_bez_artu` to
+   hlásí). Kdo to chce, musí změnit **smlouvu smrti** (mobil na ~400 ms
+   „umírá“) **a** dovézt art těla — je to samostatné zadání, ne „dojezd P1“.
+2. **Animace útoku má pevné okno 400 ms** (`ANIM_ATTACK_MS`), nezávislé na
+   prodlevě zbraně (ta je 1,25–3 s). Je to vědomé: kreslí se 5 framů po 80 ms
+   (`docs/05 §5.1.1`). Kdo bude chtít delší, má to v jedné konstantě.
+3. **Posun cizích postav začíná „až od chvíle, kdy klient krok uvidí“** (stejná
+   vlastnost, jakou má hráč od V2) — u kroku, který začal před vykreslením, se
+   první frame dopočítá z nuly. Neměřeno na reálném hraní.
+4. **Z P2:** dosah zbraně (luky) půjde do dat s nimi; `range.melee` platí pro všechny útoky.
+5. **Zvuk (P3)** dělala paralelní session, v době psaní je v gitu **zapojený** —
+   nezávisle jsem ho neměřil (viz blok „Zvuk“ nahoře/pod tímto).
+
+## 🧍 CO ČEKÁ NA TEBE
+
+1. **Hrát to.** P1 je teď vidět: cizí postavy chodí, při úderu se animují a jdou
+   plynule. Až si to zahraješ, řekni, co ještě vadí (tooltipy, pravé tlačítko,
+   drag & drop a den/noc jsou pořád neudělané — `DALSI-SESSION.md` §D).
+2. **Smazat `p20b-obrazky/m5-souboj.png` z gitu?** (Obsahuje mapu z instalace UO;
+   nové snímky se necommitují, co už v gitu je, jsem nemazal.)
+3. **Zobrazení zdraví** zůstává odložené (`docs/01 §1.8`).
+
+## 🔗 COMMITY TÉHLE SESSION
+
+**`<doplnit po commitu>`** — `app/world_view.gd`, `app/main.gd`,
+`tests/cases/world_view.gd`, `tools/gates/mutace-tests.py`,
+`docs/04 §4.6.4`, `docs/05 §5.5.1 + §5.5.2`, `LESSONS.md`, `HANDOFF.md`.
+⚠ **`sim/systems/combat.gd` v tomhle commitu NENÍ:** souběžná zvuková session ho
+zabrala do svého commitu **`b7d8064`** (a v `d6bba36` to sama přiznala jako
+„cizi hunk v combat.gd“). Kód je v HEAD, jen pod cizím commitem — ověřeno:
+`git show HEAD:sim/systems/combat.gd` obsahuje `ANIM_ATTACK_MS` i `func anim_of`.
+Sonda a snímky **nejsou v gitu** (`_analyza/`, `p20b-obrazky/`).
+
+---
+
 # Předání — game-clone (2026-10-12, SESSION „Zvuk“ (pokračování): ZAPOJENO VŠE PŘIPRAVENÉ — a dvě nové brány)
 
 > **Co je tenhle soubor:** **stav projektu** pro další session agenta. Přepisuje

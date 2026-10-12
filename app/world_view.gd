@@ -31,6 +31,10 @@ const NamePlates = preload("res://render/name_plates.gd")
 # M9 (15. session): davkove kresleni - cely pohled jako JEDEN mesh (1-2 draw
 # cally misto tisice). Kdyz se runtime atlas naplni, `_mesh` to NAHLASI a kresli
 # se puvodni cestou (ticha degradace by byla horsi nez pomale kresleni).
+# PLYNULY POSUN CIZICH POSTAV (dokonceni P1): `step_fraction` je STATICKA
+# funkce hrace - pouziva se TATAZ, aby se dve odvozeni nemohla rozejit
+# (kruhova zavislost nehrozi: `app/player_controller` preloaduje jen `core/`).
+const PlayerCtrl = preload("res://app/player_controller.gd")
 const MeshScript = preload("res://render/chunk_mesh.gd")
 
 const VIEW_TILES_X: int = 64
@@ -185,6 +189,12 @@ var _registry = null               # sim.entity_registry (pro `render.anim`)
 # SUNULA, protoze udalost `mobile_anim` v `app/` nikdo neodebiral. Stav (ne
 # event) je jedina pravda: `pending_step(serial)` vraci bezici krok.
 var _movement = null
+# sim.combat (dokonceni P1): animace UTOKU pro cizi postavy i hrace. Stav je
+# prezentační (`anim_of`), nikoli simulační - do hashe se nepočítá.
+var _combat = null
+# NASTENNY cas startu kroku CIZI postavy (serial -> {klic, start_ms}) - pro
+# plynuly posun (viz `_posun_mobila`). Neni to stav hry, jen casovani obrazu.
+var _wall_kroky: Dictionary = {}
 var _sort = null                   # render.sort (jedina funkce razeni)
 var _hues = null                   # render.hue (barva kuze; bez nej je postava seda)
 var _hue_cache_hit: bool = false   # tonovany sprite se pocita jen pri zmene
@@ -388,6 +398,13 @@ func set_movement(movement) -> void:
 	_movement = movement
 
 
+func set_combat(combat) -> void:
+	# Dokonceni P1 (2026-10-12): `sim.combat.anim_of(serial)` vraci, kdo prave
+	# uderil (`{action, left_ms}`), aby se utok kreslil i u CIZICH postav a
+	# u hrace. Kdyz system neni, kresli se chuze/postoj - stare chovani.
+	_combat = combat
+
+
 func nastav_decay(decay) -> void:
 	# `sim.decay` je JEDNO misto, kde je pravidlo "co je telo" - klient si ho
 	# neopisuje (`_je_telo` se ptá odsud). Bez nej plati `type == "corpse"`.
@@ -448,13 +465,14 @@ func _draw_mobil(mob) -> bool:
 	# ⚠⚠ P1 (2026-10-12): do teto chvile tu bylo `_anim_idle()` NATVRDO, takze
 	# se kazdy cizi mobil kreslil v postoji - a protoze se to tykalo vsech NPC,
 	# byl svet "mrtvy" jako celek. Akce i smer jdou ze stavu (`_akce_mobila`).
+	# POSUN MEZI DLAZDICEMI (dokonceni P1): bez nej se cizi postavy "sunuly" -
+	# hrac mel plynuly posun od V2, cizi mobily skakovaly po dlazdicich.
 	var akce: Dictionary = _akce_mobila(mob)
 	var clip: Dictionary = _anim.play(int(mob.serial), int(akce["action"]),
 		int(akce["dir"]))
 	if not bool(clip.get("ok", false)) or clip.get("texture") == null:
 		return false
-	var ground: Vector2 = _ground_of(Vector3i(int(mob.pos.x), int(mob.pos.y),
-		int(mob.pos.z)))
+	var ground: Vector2 = ground_mobila(mob)
 	var texture: Texture2D = clip["texture"]
 	if not bool(clip.get("own", false)):
 		texture = _hued(texture, int(mob.hue))
@@ -552,6 +570,12 @@ func _akce_mobila(mob) -> Dictionary:
 	# 400 ms "klouzala do strany". Je to TATAZ vada V2, jakou u hrace resi
 	# `_view_dir` v `app/player_controller.gd`.
 	var dir: int = ((int(mob.dir) % 8) + 8) % 8
+	# UTOK MA PREDNOST (dokonceni P1): kdyz mobil prave uderil, kresli se animace
+	# utoku - chuze by ji prebila. Stav dava `sim.combat.anim_of` (klient si ji
+	# NEDOMYSLI; docs/01 §1.5 bod 9).
+	var utok: Dictionary = _utok_animace(int(mob.serial))
+	if not utok.is_empty():
+		return {"action": int(utok.get("action", ACTION_IDLE)), "dir": dir}
 	if _movement == null or not _movement.has_method("pending_step"):
 		return {"action": ACTION_IDLE, "dir": dir}
 	var krok: Dictionary = _movement.pending_step(int(mob.serial))
@@ -560,6 +584,72 @@ func _akce_mobila(mob) -> Dictionary:
 	var smer: int = int(krok.get("dir", dir))
 	return {"action": ACTION_RUN if bool(krok.get("run", false)) else ACTION_WALK,
 		"dir": ((smer % 8) + 8) % 8}
+
+
+func ground_mobila(mob, now_ms: int = -1) -> Vector2:
+	# KDE SE CIZI POSTAVA KRESLI (vcetne posunu mezi dlazdicemi). VEREJNE
+	# SCHVALNE: `_draw_mobil` pouziva TUTO funkci a test/sonda meri TUTEZ
+	# hodnotu. Duvod je namEReny: prvni verze testu mela posun jen ve
+	# `_posun_mobila` a kresleni kontrolovala poctem nakreslenych - a mutace
+	# "posun se neprida" PROSLA (kresleni probehlo i bez posunu). Mereni musi
+	# byt na tom, co kresleni opravdu pouzije.
+	var pozice_dlazdice: Vector2 = _ground_of(
+		Vector3i(int(mob.pos.x), int(mob.pos.y), int(mob.pos.z)))
+	return pozice_dlazdice + _posun_mobila(mob, now_ms)
+
+
+func _utok_animace(serial: int) -> Dictionary:
+	# PREZENTACNI stav ze simulace (`sim.combat.anim_of`): kdo prave uderil.
+	# Kdyz `sim.combat` neni (starsi klient, test), vraci se prazdno a kresli se
+	# chuze/postoj - presne stare chovani (a je to videt, ne tise "nejak").
+	if _combat == null or not _combat.has_method("anim_of"):
+		return {}
+	var a = _combat.anim_of(serial)
+	return a if a is Dictionary else {}
+
+
+func _posun_mobila(mob, now_ms: int = -1) -> Vector2:
+	# PLYNULY POSUN CIZI POSTAVY (dokonceni P1 - V2 pro vsechny): stejna
+	# matematika jako u hrace (`app/player_controller.player_pixel_offset`),
+	# vcetne `step_fraction` - jedna funkce, zadne druhe odvozovani. Kdyz krok
+	# neni v letu, vraci nulu a postava stoji na dlazdici.
+	# `now_ms` je VSTUP PRO TESTY (stejne jako u hrace): s nim plati cas
+	# simulace, bez nej nastenny cas (`_wall_kroky`).
+	if _movement == null or not _movement.has_method("pending_step") or _iso == null:
+		return Vector2.ZERO
+	var krok: Dictionary = _movement.pending_step(int(mob.serial))
+	if krok.is_empty():
+		_wall_kroky.erase(int(mob.serial))
+		return Vector2.ZERO
+	var cas: int = 0
+	var start: int = 0
+	if now_ms >= 0:
+		cas = now_ms
+		start = int(krok.get("start_ms", 0))
+	else:
+		# NASTENNY cas startu (jako u hrace): cas simulace tece v ticcich po
+		# 50 ms, takze by se obraz pohnul jen ~8x za krok - u hrace namEReno
+		# 97,8 % framu BEZ pohybu (V2, sonda `_analyza/p31-jitter.gd`). Klic
+		# obsahuje i smer a beh, takze NOVY krok vzdy prepise cas startu.
+		var klic: String = "%d|%d|%s" % [int(krok.get("start_ms", 0)),
+			int(krok.get("dir", 0)), str(bool(krok.get("run", false)))]
+		var stav: Dictionary = _wall_kroky.get(int(mob.serial), {})
+		if str(stav.get("klic", "")) != klic:
+			stav = {"klic": klic, "start_ms": Time.get_ticks_msec()}
+			_wall_kroky[int(mob.serial)] = stav
+		cas = Time.get_ticks_msec()
+		start = int(stav["start_ms"])
+	var f: float = PlayerCtrl.step_fraction(cas - start, int(krok.get("delay_ms", 0)))
+	var dir: int = int(krok.get("dir", 0))
+	var kam := Vector2i(int(mob.pos.x) + Const.DIR_DX[dir],
+		int(mob.pos.y) + Const.DIR_DY[dir])
+	var od: Vector2 = _iso.to_screen(int(mob.pos.x), int(mob.pos.y), int(mob.pos.z))
+	var kam_px: Vector2 = _iso.to_screen(kam.x, kam.y,
+		int(krok.get("z", int(mob.pos.z))))
+	# ZAOKROUHLENI NA CELY PIXEL (stejny duvod jako u hrace): subpixelovy posun
+	# u pixel-artu meni vzorkovani a krajina "sumi" (namEReno 91,55 % pixelu).
+	var posun: Vector2 = (kam_px - od) * f
+	return Vector2(roundf(posun.x), roundf(posun.y))
 
 
 func _hued(texture: Texture2D, hue: int) -> Texture2D:
@@ -1364,7 +1454,14 @@ func _draw_player() -> void:
 	if _player == null or _anim == null:
 		return
 	player_drawn = true
-	var clip: Dictionary = _anim.play(int(_player.serial), _action, _view_dir)
+	# UTOK MA PREDNOST i u hrace (dokonceni P1): `_action` z `player_controller`
+	# zna jen chuzi/beh/postoj - kdyz hrac uderi, bez tohohle by se tvaril, ze
+	# stoji. Stav dava `sim.combat` (klient si ji nedomysli).
+	var akce_hrace: int = _action
+	var utok_hrace: Dictionary = _utok_animace(int(_player.serial))
+	if not utok_hrace.is_empty():
+		akce_hrace = int(utok_hrace.get("action", akce_hrace))
+	var clip: Dictionary = _anim.play(int(_player.serial), akce_hrace, _view_dir)
 	if not bool(clip.get("ok", false)) or clip.get("texture") == null:
 		player_missing = true
 		player_frame = 0

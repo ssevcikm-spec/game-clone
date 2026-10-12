@@ -1079,6 +1079,10 @@ func _setup_player(view) -> void:
 		# `has_method` je tu ze stejneho duvodu jako u `set_mobily`: kdo ma
 		# starsi `world_view`, dostane presne stare chovani (a je to videt).
 		view.set_movement(movement)
+	if view.has_method("set_combat"):
+		# Dokonceni P1 (2026-10-12): animace UTOKU (`sim.combat.anim_of`) - bez
+		# toho by postava pri uderu dál jen stála nebo šla.
+		view.set_combat(combat)
 	if view.has_method("nastav_decay"):
 		view.nastav_decay(decay)
 	# ROZPAD PREDMETU NA ZEMI (M5): kdo predmety poklada, musi to OHLAST

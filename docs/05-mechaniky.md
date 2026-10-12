@@ -276,6 +276,13 @@ v `research/03` popsané také** — přepnutí je konstanta
 
 - Animace útoku (frame podle směru), zvuk zásahu, číslo damage v žurnálu,
   jméno cíle a jeho HP pruh po kliku, smrt a tělo s lootem.
+- **DOPLNĚNO 2026-10-12 (dokončení P1):** animaci útoku kreslí klient **ze stavu**
+  (`sim.combat.anim_of`, okno `ANIM_ATTACK_MS` = 400 ms), **ne z jednorázové
+  události** `mobile_anim`; posun mezi dlaždicemi platí i pro **cizí** postavy
+  (stejná matematika jako u hráče — `player_controller.step_fraction`).
+  Animace **smrti** u cizích postav chybí: `sim.death.die` odebírá mobil
+  z registru v témže tiku a art těla (`0x2006`) v atlasu není — je to samostatné
+  zadání (smlouva smrti + art), ne klientská mezera.
 - **Let projektilu je vidět, ale nerozhoduje** (`M2`): zásah se počítá při akci,
   let je efekt — kdyby let rozhodoval, mění se balanc (uhýbání) i smysl
   automatizace (`D3`).

@@ -24,6 +24,31 @@ Typy: `chyba` (moje vada) · `past-nástroje` (prostředí/nástroj, ne logika) 
 
 ---
 
+### 2026-10-12 — MUTACE ODHALILA SLEPOU KONTROLU KRESLENÍ (chyba, ale ta užitečná)
+**Co se stalo:** dokončení P1 přidalo posun mezi dlaždicemi i cizím postavám.
+První verze testu měřila `_posun_mobila()` (matematiku) a u kreslení kontrolovala
+jen „něco se nakreslilo“ (`drawn`). Mutační harness vrátil
+`20 z 21 … NECHYCENE: world_view/posun kroku se u cizich postav neprida` — tedy
+**kontrola byla slepá**: kreslení proběhne i bez posunu.
+**Oprava:** kreslení i test teď používají TUTEŽ funkci `ground_mobila()`
+a měří se **rozdíl proti čisté dlaždici**, což je přesně to, co mutace mění.
+**Doklad:** `.tmp/p1g-mutace.log` (20/21, slepá) → `.tmp/p1h-mutace.log`
+(**21/21 chyceno**), `tests/cases/world_view.gd` sekce 7f.
+**Ponaučení:** „proběhlo to“ není měření. Když test u kreslení kontroluje jen
+počítač volání, mutace „nepřidej posun“ projde — měř **hodnotu, kterou kreslení
+skutečně použilo**.
+
+### 2026-10-12 — NEPLATNÝ mutant není slepá kontrola (past-nástroje)
+**Co se stalo:** vzor mutace vyřízl jen `+ _posun_mobila(...)` a nechal
+v souboru pokračovací řádek s `\` — mutant se **nenačetl** (parse error).
+Harness to správně hlásil jako `NEPLATNA - MUTANT SE NEMERIL`, nikoli jako
+CHYCENOU; po přepsání zdroje na jednoduchý `return pozice + posun` je mutant
+platný a chycený.
+**Doklad:** `.tmp/p1g-mutace.log` (`MUTANT SE NENACTL`), `.tmp/p1h-mutace.log` (21/21).
+**Ponaučení:** u vícřádkových výrazů ber do vzoru **celý `return`**, ne jen
+zlomek — a když harness hlásí NEPLATNOU, je to vada **nástroje/mutace**, ne
+důkaz o chování kódu.
+
 ### 2026-10-12 — „Zavřeno při zadání“ není „zavřeno“ (chyba)
 **Co se stalo:** P2 zavedla dosah do `attack` (kontrola v okamžiku **zadání**),
 ale `resolve_swing` se vyhodnocuje až za 1,25–3 s — cíl tedy mohl utéct a **rána
