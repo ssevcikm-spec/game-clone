@@ -218,6 +218,15 @@ klíče `combat` — kdyby zůstal, **ticho by přeskočil i čtení dosahu** (h
 `LESSONS.md`, `HANDOFF.md` (tento blok).
 **Push ověřen živě:** `a9ac4b3..db0378e main -> main`,
 `git rev-list --count origin/main..HEAD` → **0**.
+
+**`e8913cd`** — dokončení P2 téhož dne: `sim/systems/combat.gd` (`resolve_swing`
+kontroluje dosah), `tests/cases/combat.gd` (B2 bod 5), nová mutace v
+`tools/gates/mutace-tests.py`, `docs/04 §4.6.4`, `docs/05 §5.5.1`, `LESSONS.md`.
+**Naměřeno:** testy **2 848 / 0** (se souběžnou zvukovou session ve stromě),
+mutace `--only combat` = **2 z 2 CHYCENA** (harness vrátil `exit 2` kvůli tomu, že
+paralelní session sáhla během běhu na `craft.gd` — jeho guard to ohlásil, mutace
+samotné prošly), brány **16 měřeno / 0 chyb**.
+**Push ověřen živě:** `0a30745..e8913cd main -> main`, `rev-list --count` → **0**.
 ⚠ **Měření proběhlo v souběžném stromě:** paralelní session už rozjela **P3 (zvuk)**
 (`app/loop.gd`, `app/sound.gd`, `assets/sounds/`, `tests/cases/sound.gd`) — do
 svého commitu jsem ji nevzal a čísla výš jsou změřená s její rozdělanou prací
