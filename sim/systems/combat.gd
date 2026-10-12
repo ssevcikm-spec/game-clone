@@ -324,6 +324,15 @@ func resolve_swing(m: int, target: int) -> Dictionary:
 	if not cil.alive():
 		_uklid(m)
 		return _fail_swing("target_dead")
+	# DOSAH V OKAMZIKU SWINGU (2026-10-12, dokončení P2): `attack` kontroluje
+	# dosah pri ZADANI, ale cil muze behem swingu (1,25-3 s) odejit - a do te
+	# doby se zásah vyhodnotil na dalku. Reference kontroluje i tady
+	# (`BaseWeapon.OnSwing` -> `CheckHit` -> `InRange`). Stav boje se ZAMERNE
+	# NERUSI (`_uklid` se nevola): kdyz se cil vrati na dosah, swingy pokracuji -
+	# hrac tim o boj neprisel, jen rana vysla naprazdno.
+	if not _na_dosah(mob, cil):
+		_message("You are too far away to attack.")
+		return _fail_swing("too_far")
 
 	var zbroj: Dictionary = _weapon(mob)
 	var skill_atk: int = _skill_atk(zbroj)
@@ -1039,8 +1048,18 @@ func _anim_dir(m: int, akce: int) -> void:
 
 
 func _sound(m: int, kind: String) -> void:
-	# Zvuk (kontrakt M5 §2: `sound`; klient zatim ignoruje, D5).
-	_events_push("sound", {"serial": m, "kind": kind})
+	# Zvuk (kontrakt M5 §2: `sound`). ⚠ POZICE JDE V UDALOSTI (2026-10-12):
+	# klient si ji NEMUZE dohledat pozdeji - u smrti je mobil v dobe doruceni
+	# udalosti uz odstraneny z registru (`sim.death.die`) a zvuk by vysel jako
+	# "moc daleko" (namEReno: `ticho 1`, zvuk smrti se neprehral). Smlouva
+	# `docs/04 §4.4` ma `{id, x, y, z}` presne proto; tady se k ni kod blizi.
+	var pos := Vector3i.ZERO
+	if _registry != null and int(m) > 0:
+		var mob = _registry.get_mobile(int(m))
+		if mob != null:
+			pos = mob.pos
+	_events_push("sound", {"serial": m, "kind": kind,
+		"x": int(pos.x), "y": int(pos.y), "z": int(pos.z)})
 
 
 func _events_push(name: String, data: Dictionary) -> void:

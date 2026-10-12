@@ -226,6 +226,26 @@ func run(t) -> void:
 	t._check(int(combat.state_of(SERIAL_A).get("target", 0)) == 0x4000000B,
 		"combat: odmitnuty utok NEPREPNE cil (vyslo %d)"
 			% int(combat.state_of(SERIAL_A).get("target", 0)))
+	# (5) DOSAH V OKAMZIKU SWINGU (2026-10-12, dokonceni P2): `attack` kontroluje
+	#     dosah pri ZADANI, ale cil muze behem swingu odejit. Stav boje se pritom
+	#     NERUSI - kdyz se cil vrati, swingy pokracuji.
+	blizky.pos = Vector3i(10 + melee + 3, 10, 0)          # cil utekl
+	var v_utekl: Dictionary = combat.resolve_swing(SERIAL_A, 0x4000000B)
+	t._check(not bool(v_utekl.get("ok", true))
+			and str(v_utekl.get("reason", "")) == "too_far",
+		"combat: cil, ktery behem swingu utekl, dostane `too_far` (vyslo %s)" % str(v_utekl))
+	t._check(int(blizky.hp) == int(blizky.max_hp),
+		"combat: utekly cil NEDOSTANE damage (hp %d z %d)"
+			% [int(blizky.hp), int(blizky.max_hp)])
+	t._check(int(combat.state_of(SERIAL_A).get("target", 0)) == 0x4000000B
+			and int(combat.state_of(SERIAL_A).get("next_swing_ms", 0)) > 0,
+		"combat: odmitnuty swing NERUSI stav boje (cil %d, next %d)"
+			% [int(combat.state_of(SERIAL_A).get("target", 0)),
+				int(combat.state_of(SERIAL_A).get("next_swing_ms", 0))])
+	blizky.pos = Vector3i(10 + melee, 10, 0)              # cil se vratil
+	var v_zpet: Dictionary = combat.resolve_swing(SERIAL_A, 0x4000000B)
+	t._check(bool(v_zpet.get("ok", false)),
+		"combat: cil zpet na dosahu zase dostane swing (vyslo %s)" % str(v_zpet))
 
 	# -- C) 20 SWINGU -> ALESPON 5 ZASAHU (prijimaci kriterium §4.6.4) ----
 	# Kazdy swing ma cil PLNÝ (hp se pred kazdym obnovi), aby se merilo

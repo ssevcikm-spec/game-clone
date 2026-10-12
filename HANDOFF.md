@@ -181,13 +181,17 @@ klíče `combat` — kdyby zůstal, **ticho by přeskočil i čtení dosahu** (h
 
 ## ⚠ CO ZŮSTÁVÁ OTEVŘENÉ (pojmenované, ne zamlčené)
 
-1. **Dosah se kontroluje při ZADÁNÍ (`attack`), ne při samotném swingu.** Když cíl
-   během swingu uteče, zásah se pořád vyhodnotí; reference kontroluje i v okamžiku
-   swingu. Je to **vědomá mez** (menší zásah, snadno měřitelná), ale je potřeba ji
-   zavřít, než bude luk/útěk.
+1. ~~Dosah se kontroluje při ZADÁNÍ (`attack`), ne při samotném swingu.~~
+   **ZAVŘENO 2026-10-12 (tentýž den):** `resolve_swing` kontroluje dosah taky
+   (naměřeno před opravou: cíl o 3 dlaždice dál → `{ok:true, hit:true}`); stav
+   boje se přitom **neruší**, takže po návratu na dosah swingy pokračují.
+   Doklad: `tests/cases/combat.gd` (B2 bod 5) + mutace
+   „dosah se v okamžiku swingu nekontroluje“ → CHYCENA.
 2. **`range.melee` platí na VŠECHNY útoky** — dosah zbraně (luky, oštěpy, dostřel
    7–10 z `docs/05` §5.5.1) do dat půjde **s nimi**, ne s tímhle klíčem.
-3. **P3 (zvuk) není udělaná** — v repu je pořád **0× `AudioStream`**.
+3. **P3 (zvuk)** — v době psaní tohohle bloku ji **dělá paralelní session**
+   (`app/sound.gd`, `sim/systems/{craft,harvest}.gd`, `tests/cases/sound.gd`);
+   do svého commitu jsem ji nevzal.
 4. **Z P1 zůstává:** útok/smrt se u cizích postav neanimují a cizí postavy se
    pořád „šoupou“ po dlaždicích (plynulý posun má zavedený jen hráč).
 5. **V repu je trackovaný snímek s mapou z instalace UO**

@@ -661,6 +661,10 @@ swing: resolve_swing(m, t) → hit chance (zbraňový skill vs zbraňový skill)
 hodnota jako `sim/systems/ai.gd` `MELEE_RANGE`); mimo dosah vrací
 `{ok:false, reason:"too_far"}` **a hlášku** a **swing se neplánuje** (odmítnutý
 příkaz nesmí změnit stav boje). Do tohoto data `attack` vzdálenost **neměřil**.
+**Dosah se kontroluje i v okamžiku SWINGU** (`resolve_swing`, doplněno týž den):
+cíl může během swingu (1,25–3 s) odejít, a tehdy zásah nepadne — `too_far` a
+hláška, ale **stav boje se neruší**, takže po návratu na dosah swingy pokračují
+(reference kontroluje na obou místech: `BaseWeapon.OnSwing` → `CheckHit` → `InRange`).
 Dosah **zbraně** (luky) je věc zbraně, ne tohoto pravidla.
 
 **Přijímací kritérium:** se zbraní a `tactics=100` dá 20 swingů na cíl s `hp`

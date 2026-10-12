@@ -589,6 +589,13 @@ MODULY = {
         "mutace": [
             ("dosah melee se nekontroluje (P2 vracena)",
              "if not _na_dosah(mob, cil):", "if false:"),
+            # Dosah se musi kontrolovat i V OKAMZIKU SWINGU (cil muze behem
+            # swingu odejit). Vzor je zamerne CELY BLOK - text `if not
+            # _na_dosah(mob, cil):` je v souboru dvakrat (i v `attack`) a harness
+            # mutuje jen PRVNI vyskyt, takze kratsi vzor by "prosel" a nic nemeril.
+            ("dosah se v okamziku swingu nekontroluje (utekly cil dostane ranu)",
+             '\tif not _na_dosah(mob, cil):\n\t\t_message("You are too far away to attack.")\n\t\treturn _fail_swing("too_far")',
+             "\tpass"),
         ],
     },
     "skill_gain": {

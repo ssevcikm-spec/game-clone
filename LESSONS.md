@@ -24,6 +24,29 @@ Typy: `chyba` (moje vada) · `past-nástroje` (prostředí/nástroj, ne logika) 
 
 ---
 
+### 2026-10-12 — „Zavřeno při zadání“ není „zavřeno“ (chyba)
+**Co se stalo:** P2 zavedla dosah do `attack` (kontrola v okamžiku **zadání**),
+ale `resolve_swing` se vyhodnocuje až za 1,25–3 s — cíl tedy mohl utéct a **rána
+padla na dálku**. Naměřeno testem: s cílem posunutým o 3 dlaždice vrátil
+`resolve_swing` `{ok:true, hit:true}`. Doplněna kontrola i do `resolve_swing`
+(stav boje se přitom **neruší** — po návratu na dosah swingy pokračují).
+**Doklad:** `tests/cases/combat.gd` (sekce B2, bod 5), nová mutace
+„dosah se v okamžiku swingu nekontroluje“ → CHYCENA.
+**Ponaučení:** u časovaných akcí se ptej **na oba okamžiky** — zadání i provedení.
+Kontrola, která proběhne jen při zadání, je bezpečná jen do prvního kroku cíle.
+
+### 2026-10-12 — Mutační harness má guard proti SOUČASNÉMU pisateli (postup)
+**Co se stalo:** během mutačního běhu sáhla paralelní session na
+`sim/systems/craft.gd`. Harness místo tichého měření skončil s
+`CHYBA: original se zmenil u craft - mutuje se jen kopie, toto je vada nastroje`
+(`exit 2`) — přitom obě mutace byly `CHYCENA` a baseline čistý.
+**Doklad:** `.tmp/p2b-mutace.log` (poslední řádek), `git status` v témže okamžiku.
+**Ponaučení:** ve stromě s víc session je **exit 2 mutačního harnessu zpráva
+o souběhu**, ne o mutantovi. Čti poslední řádek, ne jen souhrn — a čísla
+z takového běhu označ jako „změřená se souběžným zápisem“.
+
+---
+
 # 2026-10-12 (část „Zvuk“) — SESSION P3: PRVNÍ ZVUK VE HŘE (A PROČ SE NEPŘEHRÁVAL)
 
 > **Zadání:** `ZADANI-27-POCIT.md` §3 **P3** (volná kolej — `P1` a `P2` dělala
