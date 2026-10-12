@@ -59,17 +59,23 @@ esac
 echo "== snímek pro G10/G13 =="
 snapshot="${SNAPSHOT_DIR}/snapshot.png"
 rm -f "${snapshot}" 2>/dev/null || true
-movie_cmd=("${GODOT}" --path "${ROOT}" --rendering-driver opengl3 --resolution 1280x720
-           --write-movie "${SNAPSHOT_DIR}/frame.png" --quit-after 5)
+# SNIMEK MUSI BYT Z CHUZE (2026-10-12): vlastni postavu kresli hra jen v nekterych
+# animacich (v klidu kresli UO art), takze snimek ve stoje nema ani jeden pixel
+# vlastni postavy a G10 spravne hlasi VADU - o hre, ktera je v poradku. Ridic
+# `tools/gates/snapshot-walk.gd` je kvuli tomu v repu (driv lezel v .gitignore).
+movie_cmd=("${GODOT}" --path "${ROOT}" --rendering-driver opengl3
+           --write-movie "${SNAPSHOT_DIR}/frame.png"
+           --script res://tools/gates/snapshot-walk.gd)
 if command -v xvfb-run >/dev/null 2>&1; then
   xvfb-run -a "${movie_cmd[@]}" >/dev/null 2>&1 || true
 else
   "${movie_cmd[@]}" >/dev/null 2>&1 || true
 fi
-# Godot pojmenovává framy frame0000000.png apod.; pro G10 potřebujeme jednu cestu.
-# Hledá se jen globem - `ls | head` selhalo, když v PATH nebyly coreutils.
+# Frame 150 je v chuzi (namEReno: 366 px vlastni postavy presne / 266 po erozi);
+# frame 130 je ve stoje (0 px). Kdyz 150 neni, bere se prvni frame - a s nim
+# G10 rekne, ze vlastni postava na snimku neni (coz je pravda o TOM snimku).
 first_frame=""
-for candidate in "${SNAPSHOT_DIR}"/frame*.png; do
+for candidate in "${SNAPSHOT_DIR}/frame00000150.png" "${SNAPSHOT_DIR}"/frame*.png; do
   if [ -e "${candidate}" ]; then
     first_frame="${candidate}"
     break

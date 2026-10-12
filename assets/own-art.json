@@ -3,20 +3,12 @@
  "comment": "Ktere (kind, id) se berou z vlastniho artu. Poradi vrstev je poradi priority: prvni vrstva, ktera id obsahuje, vyhrava; co tu neni, zustava z assets/uo/ (fallback). Konfiguraci cte render/own_art.gd, ktery take hlasi kazdou vadu seznamem.",
  "layers": [
   {
-   "name": "own-lit",
-   "manifest": "res://assets/own-lit/manifest.json",
-   "anim": "res://assets/own-lit/anim/anim-sheets.json",
+   "name": "own-v3",
+   "manifest": "res://assets/own-v3/manifest.json",
+   "anim": "res://assets/own-v3/anim/anim-sheets.json",
    "sprites": {
     "land": [3],
-    "item": [3717, 6583]
-   }
-  },
-  {
-   "name": "own",
-   "manifest": "res://assets/own/manifest.json",
-   "anim": null,
-   "sprites": {
-    "item": [3921, 7151]
+    "item": [3717, 3921, 6583, 7151]
    }
   },
   {
@@ -32,5 +24,8 @@
     ]
    }
   }
- ]
+ ],
+ "_historie": {
+  "2026-10-12": "Vrstva `own-v3` nahradila DVE vrstvy (`own-lit` na land 3 + item 3717/6583 a `own` na item 3921/7151). Duvod je namEReny: `own-lit` mel u PLACATYCH predmetu stin jen 1px lem (dyka 6 px, ingot 11 px; MERENI.md §9.3) a proto se dve z ctyr id brala ze starsi sady `assets/own/` BEZ SVETLA - v obraze se michaly dva svety. Sada v3 ma stin z obrysu (3921: 28 px, 7151: 34 px) a vraceny kontrast, takze bere VSEchna ctyri id. `assets/own-lit/` i `assets/own/` zustavaji na disku (art nastroje je pouzivaji jako baseline pro srovnani), ale hra je uz necte. Detaily: tools/artgen/MERENI.md §11, HANDOFF 2026-10-12."
+ }
 }

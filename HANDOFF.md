@@ -1,3 +1,124 @@
+# Předání — game-clone (2026-10-12, SESSION „G10 A SADA v3“: hra bere `own-v3`, brána už nemůže měřit včerejší snímek)
+
+> **Co je tenhle soubor:** **stav projektu** pro další session agenta. Přepisuje
+> se celý; historie je v `git log`. Nový blok je vždy **nahoře**; starší bloky se
+> needitují (jen doplňují). **Současný stav se bere z tohoto bloku.**
+>
+> **Odkud brát detaily téhle práce:** `docs/08 §8.3.1` (jak se vyrábí snímek pro
+> G10 a proč musí být z chůze), `assets/own-art.json` (klíč `_historie`),
+> `tools/gates/check-render.py` (kontrola stáří snímku + self-test),
+> `tools/gates/snapshot-walk.gd` (nový řidič v repu), `LESSONS.md` 2026-10-12
+> (čtyři záznamy s naměřenými čísly). Čísla o sadě v3: `tools/artgen/MERENI.md`
+> §11 (blok „ART v3“ níž).
+>
+> ⚠ **V tomtéž stromě pracovala PARALELNÍ SESSION** (`ZADANI-27-POCIT`: animace
+> postav, dosah interakce, odezva). Její **rozpracované** soubory v době mého
+> commitu: `app/main.gd`, `app/world_view.gd`, `tests/cases/world_view.gd`,
+> `tools/check-art-fallback.py` (nový), `tools/gates/mutace-tests.py`,
+> `docs/01`, `docs/04`, `NAVRH-MODDING`. **Nesahal jsem na ně** a necommitoval
+> je; moje ověření proběhlo ve stromě, kde ty změny **byly** (viz „Naměřeno“).
+
+## ✅ CO SE UDĚLALO (a proč právě to)
+
+Uživatel řekl jen „Pokračuj“. Podle stavu (`HANDOFF`, `DALSI-SESSION`,
+`NAVRH-MODDING`) byla nejbližší **hotová, ale nepoužitá** věc: sada
+`assets/own-v3/` (art krok 2: stín pro placaté předměty + návrat kontrastu) —
+hra četla `own-lit` a u dvou ze čtyř předmětů ještě starší `own` **bez světla**.
+Při ověřování se ukázalo, že **G10 měřila snímek z předchozího dne** — takže
+práce vyústila do tří věcí: zapnout lepší art, opravit měřidlo a dovézt do repa
+nástroj, který vyrábí jeho vstup.
+
+| Věc | Soubor | Naměřeno |
+|---|---|---|
+| **Hra bere sadu `own-v3`** | `assets/own-art.json` | místo 3 vrstev (`own-lit`, `own`, `stone-path`) jsou **2** (`own-v3`, `stone-path`); v logu `[main] vlastni art: 2 vrstvy (own-v3, stone-path)`; `own-v3` dodává **land 3** + **všechny 4 předměty** (3717, 3921, 6583, 7151) |
+| **Brána G15 to vidí** | `tools/gates/check-own-art.py` | `vlastnich_id 9 / zkontrolovano 9 / prepnuto 9`, `cfg_ok 1`, `cfg_errors 0` |
+| **Brána G16 (styl)** | `tools/gates/check-style.py` | `OK` — manifest v3 má vlastní měřený report (tvrdá alfa 128, poloprůhledné 0) |
+| **Brána G10 (obraz)** | `tools/gates/check-render.py` | `vlastni_pixelu 368`, **po erozi 267** (hranice 60), snímek **z chůze** |
+| **G10 už nemůže měřit včerejšek** | `tools/gates/check-render.py` | před opravou: `snimek_stari_h 26.4` a **VADA** („STARŠÍ než 27 vstupů obrazu“); po: `0.01 h`, `OK`. Self-test **10 případů / 0 chyb** (2 nové: starý snímek → VADA **s ověřeným důvodem**, čerstvý → OK) |
+| **Snímek pro G10 se vyrábí z chůze** | `tools/gates/snapshot-walk.gd` (nový, v repu) + `ci-godot.sh` | vlastní postava je v obraze **jen v chůzi**: frame 130 = **0 px**, frame 150 = **366 px** (267 po erozi); řidič dřív ležel v gitignorovaném `.cache/analysis/` |
+| **Smlouva a postup** | `docs/08 §8.3.1` | kdy je zastaralý snímek VADA (art) a kdy jen poznámka (kód kreslení) + přesné příkazy |
+
+**Rozhodnutí, která byla potřeba (a proč):**
+
+1. **`own-v3` nahrazuje DVĚ vrstvy, ne jednu.** `own-lit` měl u placatých
+   předmětů stín jen jako 1px lem (dýka 6 px, ingot 11 px), proto se dvě ze čtyř
+   id brala ze starší sady `assets/own/` **bez světla** — v obraze se míchaly dva
+   světy. v3 má stín z obrysu (3921: 28 px, 7151: 34 px) a vrácený kontrast,
+   takže bere všechna čtyři id. `own-lit/` i `own/` **zůstávají na disku** (art
+   nástroje je používají jako baseline pro srovnání) — hra je jen nečte.
+2. **Zastaralost snímku je VADA jen u artu.** U **kódu kreslení**
+   (`render/*.gd`, `app/world_view.gd`, `app/main.gd`) je to **poznámka**:
+   kód se mění často a obraz měnit nemusí, ale má být vidět, že snímek může být
+   ze staršího obrazu. Kdyby to byla vada, brána by blokovala každou editaci
+   (a v tomhle stromě i práci paralelní session).
+3. **Řidič pro snímek patří do repa.** Byl v `.cache/analysis/demo-chuze.gd`
+   (gitignore), takže čerstvý klon si ho nedovezl — a přesně to se stalo:
+   vyrobil jsem snímek bez řidiče (postava ve stoje) a G10 hlásila „0 pixelů
+   vlastní postavy“ o hře, která je v pořádku.
+4. **`--fixed-fps` je pro A/B povinné.** Bez něj není obraz reprodukovatelný
+   (naměřeno: 3,14 % rozdílu mezi dvěma běhy téhož stavu; **71,28 %** u běhu
+   bez `--fixed-fps` s pohybujícími se mobily). S řidičem a `--fixed-fps` je
+   noise floor **0,17 %**.
+
+## 📊 NAMĚŘENO (2026-10-12, tato session)
+
+| Co | Hodnota | Doklad (příkaz / soubor) |
+|---|---|---|
+| **G10 na živém stromu (před opravou)** | `snimek_stari_h 26.4`, VADA: „snímek snapshot.png je STARŠÍ než 27 vstupů obrazu“ | `python tools/gates/check-render.py` |
+| **G10 po regeneraci snímku** | `snimek_stari_h 0.01`, `vlastni_pixelu 368` / po erozi **267**, `OK` | tamtéž |
+| **Self-test G10** | **10 případů / 0 chyb** (nově `stale` → VADA s ověřeným důvodem; `cerstvy` → OK) | `python tools/gates/check-render.py --self-test` |
+| **Vlastní postava v obraze** | chůze frame 150 = **366 px** (267 po erozi), stoj frame 130 = **0 px** | `_analyza/p69-ab-art.py` + paleta z `assets/own-v3/anim/` |
+| **Noise floor obrazu** | 5 framů = **0 %**; 90 framů bez `--fixed-fps` = **71,28 %**; s `--fixed-fps` = **3,14 %**; řidič + `--fixed-fps` = **0,17 %** | `_analyza/p69-ab-art.py` (`.cache/render/p69-*.png`) |
+| **Dvě sady proti sobě (in-game)** | **58,43 %** pixelů — ale část je posun kamery, proto to **není** důkaz o artu | `.cache/render/art-lit-chuze.png` vs `art-v3-chuze.png` (bez `--fixed-fps`), maska `ab-art-maska.png` |
+| **G15 / G16** | G15 `9 / 9 / 9`, G16 `OK` | `tools/gates/run-all.py` |
+| **Testy a brány (ve stromě s prací paralelní session)** | viz „Commity“ — čísla z běhu, který proběhl **před** mým commitem; strom nebyl jen můj | `tests/run_tests.gd`, `tools/gates/run-all.py` |
+| **Archiv starého snímku** | `.cache/render/archiv/snapshot-2026-10-11-1006.png` (26,4 h starý, 1280×720) | `Copy-Item` (nemazal jsem ho) |
+
+## ⚠ CO ZŮSTÁVÁ OTEVŘENÉ (pojmenované, ne zamlčené)
+
+1. **V CI je G10 pořád NEMĚŘENO** (`assets/uo` v CI není → brána to hlásí jako
+   NEMĚŘENO). Kontrola stáří snímku tedy dnes chrání **lokální** běh; v CI se
+   snímek generuje v témž kroku, takže by prošel.
+2. **`assets/own-lit/` a `assets/own/` zůstávají na disku a hra je nečte.**
+   Nejsou to mrtvé assety (art nástroje je používají jako baseline), ale kdo
+   hledá „co hra kreslí“, musí číst `assets/own-art.json`, ne složky.
+3. **Změna sady je jedna konfigurace, ne kód** — cesta zpět je vrátit
+   `assets/own-art.json` (staré znění je v `git show HEAD~1:assets/own-art.json`
+   nebo v `.cache/own-art-puvodni.json`).
+4. **Snímek `snapshot.png` je z běhu, ve kterém byly i rozpracované změny
+   paralelní session** (`app/main.gd` + `app/world_view.gd`, animace cizích
+   postav). Je to poctivě dnešní obraz, ale není to „stav z commitu“ — kdo bude
+   měřit A/B, ať si snímek vygeneruje znovu.
+5. **Stojící postava je pořád UO art** (`anim_fallback_akce: 3`) — to je téma
+   `ZADANI-27-POCIT` (paralelní session), ne vada téhle práce. Je to zároveň
+   důvod, proč G10 potřebuje snímek z chůze.
+6. **`_analyza/` sondy nejsou v repu** (`p69-ab-art.py`, `p70-alfa-anim.py` —
+   druhá má stejné číslo jako sonda paralelní session `p70-art-fallback-mutace.py`).
+
+## 🧍 CO ČEKÁ NA TEBE (rozhodnutí, která agent nemá dělat za tebe)
+
+1. **Nechat `own-v3` (dnešní stav), nebo se vrátit k `own-lit`?** Rozdíl je
+   vidět na postavě a předmětech (stín u placatých předmětů 6 → 28 px, kontrast
+   15,33 → 16,99, jas zpět na 64,5 → 73,6 — `MERENI.md` §11). Vrácení = jedna
+   konfigurace.
+2. **Má být zastaralý snímek VADA i pro kód kreslení?** Dnes je to poznámka
+   (důvod v rozhodnutí 2 výš). Pokud ano, G10 začne být červená po každé editaci
+   `app/world_view.gd` — to je změna smlouvy brány.
+3. Otevřené otázky paralelní session (`ZADANI-27-POCIT`) a plánovací blok
+   uživatele („POCIT“) zůstávají v platnosti — tenhle blok je nemění.
+
+## 🔗 COMMITY TÉTO SESSION (a ověřený push)
+
+`C1` — `assets/own-art.json` (vrstva `own-v3` místo `own-lit` + `own`),
+`tools/gates/check-render.py` (kontrola stáří snímku + poznámka o kódu),
+`tools/gates/ci-godot.sh` (snímek přes řidiče), `tools/gates/snapshot-walk.gd`
+(nový, v repu), `docs/08 §8.3.1`, `LESSONS.md` (2026-10-12), `HANDOFF.md`
+(tento blok, **nad** blokem paralelní session).
+**Push ověřen živě:** _(doplněno v navazujícím commitu)_
+
+---
+
+
 # Předání — game-clone (2026-10-12, PLÁNOVACÍ BLOK: uživatel zvolil směr „POCIT“ — tři měřené vady)
 
 > **Co je tenhle soubor:** **stav projektu** pro další session agenta. Přepisuje

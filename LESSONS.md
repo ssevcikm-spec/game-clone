@@ -24,6 +24,79 @@ Typy: `chyba` (moje vada) · `past-nástroje` (prostředí/nástroj, ne logika) 
 
 ---
 
+# 2026-10-12 — SESSION „G10 A SADA v3“: BRÁNA MĚŘILA VČEREJŠÍ SNÍMEK (A SNÍMEK VE STOJE NEMÁ VLASTNÍ POSTAVU)
+
+> **Zadání:** „Pokračuj“ — session si sama vybrala podle stavu: dokončit otevřenou
+> věc z koleje B (`own-v3` je hotová a měřená, ale hra čte `own-lit`) a při tom
+> ověřit, že G10 měří **dnešní** obraz. Co je hotové a naměřené, je v `HANDOFF.md`
+> (blok nahoře); jak se snímek vyrábí, je v `docs/08 §8.3.1`.
+> ⚠ **V témže stromě pracovala paralelní session** (`ZADANI-27-POCIT`, animace
+> postav) — její soubory jsem needitoval.
+
+### 2026-10-12 — G10 měřila snímek starý 26,4 h a byla zelená (vada brány)
+**Co se stalo:** `run-all.py` snímek **negeneruje** — G10 čte, co je na disku.
+Naměřeno: `.cache/render/snapshot.png` byl z **10:06 předchozího dne**, ale
+`assets/own-lit/manifest.json` a vrstva `stone-path` byly přepsané večer
+(23:00+). G10 tedy měřila obraz, který už ve hře nebyl, hlásila
+`kuze_pixelu 5361`, `vlastni_pixelu 354` a verdikt **OK** — a nikdo by to
+nepoznal, protože čísla vypadají jako čísla.
+**Doklad:** `python tools/gates/check-render.py` na tom stavu → `snimek_stari_h
+26.4`, `VADA: snímek snapshot.png je STARŠÍ než 27 vstupů obrazu (např.
+assets/own-art.json, …)`. Po regeneraci: `snimek_stari_h 0.01`, `OK`.
+Self-test `--self-test` má **10 případů / 0 chyb** (nově: snímek o hodinu starší
+než art → VADA **s ověřeným důvodem**; týž strom s čerstvým snímkem → OK).
+**Ponaučení:** brána, která má **vstup na disku**, musí měřit i jeho **stáří** —
+jinak měří minulost a tváří se jako dnešek. A pozor na dvojí metr: u **artu** je
+zastaralost VADA (art je důkaz), u **kódu kreslení** jen POZNÁMKA (kód se mění
+často a obraz měnit nemusí) — jinak by brána blokovala každou editaci.
+
+### 2026-10-12 — Snímek ve stoje nemá vlastní postavu (a řidič byl v .gitignore) (past-postupu)
+**Co se stalo:** Po přepnutí hry na `own-v3` hlásila G10 „0 pixelů vlastní
+postavy“ — o hře, která je v pořádku. Příčina: vlastní art kreslí hra jen
+v **některých animacích**; ve stoje (action 4 = idle) padá na UO art. Snímek
+jsem vyrobil bez řidiče (jen `--write-movie`), takže zachytil postoj.
+**Doklad:** týž běh, různé framy: **130 → 0 px, 150 → 366 px** (267 po erozi)
+proti palate `assets/own-v3/`; v logu `[snimek] SOUHRN: akci animace [4, 1, 4, 1, …]`.
+Kanonický řidič přitom ležel v **gitignorovaném** `.cache/analysis/demo-chuze.gd`,
+takže si ho čerstvý klon nedovezl — a snímek vyrobil „po svém“.
+**Ponaučení:** nástroj, který vyrábí **vstup brány**, patří do repa
+(`tools/gates/snapshot-walk.gd`) a dokumentace (`docs/08 §8.3.1`) — jinak si
+každý vyrobí jiný vstup a brána říká o hře něco jiného. Zároveň: „postava není
+vidět“ může znamenat „je zrovna ve stoje“ — než začneš hledat vadu v kreslení,
+zeptej se, **který frame** jsi změřil.
+
+### 2026-10-12 — Obraz hry není reprodukovatelný; bez `--fixed-fps` měříš šum (past-nástroje)
+**Co se stalo:** Dva běhy **téhož** stavu (stejná scéna, stejný frame) se lišily
+podle způsobu spuštění: 90 framů bez `--fixed-fps` → **71,28 %** pixelů,
+90 framů s `--fixed-fps` → **3,14 %**, a s **řidičem** + `--fixed-fps` →
+**0,17 %**. Rozdíly nejsou v UI (to je identické), ale ve světě — stavba seznamu
+dlaždic je dělená po čase, takže se obraz zastaví v jiném stavu.
+**Doklad:** `_analyza/p69-ab-art.py` (rozdíl dvou snímků, prah 12/765) nad
+`.cache/render/p69-*.png`; maska rozdílu `.cache/render/p69-maska-sum.png`.
+**Ponaučení:** každé vizuální A/B musí mít **změřený noise floor** (dva běhy
+téhož stavu) — jinak se „změna“ dá vyrobit i tam, kde žádná není. A když chci
+A/B sady artu ve hře, musí to být **týž řidič, týž frame, `--fixed-fps`**;
+jinak se mezi běhy posune i kamera a rozdíl je 58 % (naměřeno), což o artu
+netvrdí nic.
+
+### 2026-10-12 — `git show > soubor` v PowerShellu = UTF-16LE; hra pak tiše jede na UO artu (past-nástroje)
+**Co se stalo:** Při A/B jsem si chtěl vzít starou konfiguraci `assets/own-art.json`
+z gitu: `git show HEAD:assets/own-art.json > .cache/x.json`. Soubor byl
+**UTF-16LE**, `render/own_art.gd` ho nepřečetl („Unexpected character, radek 0“),
+hra se **tiše** přepnula na UO art — a mou A/B jsem tím znehodnotil (framy
+nevznikly). Past je známá, ale její **důsledek tady není „rozbitý soubor“**:
+hra jede dál a jen ohlásí WARNING.
+**Doklad:** `WARNING: app.main: vlastni art: konfigurace se necte (Unexpected
+character, radek 0)`; po zápisu přes `[System.IO.File]::WriteAllText(...UTF8 bez BOM)`
+konfigurace funguje.
+**Ponaučení:** konfiguraci brána/šablona **nikdy nekopíruj přes `>`** — piš
+bajty (`write` tool, `WriteAllText`). A když A/B vyjde „divně“, **nejdřív se
+podívej do logu, jestli se vůbec použilo to, co mělo** (`[main] vlastni art:
+N vrstvy (…)`) — jinak měříš fallback.
+
+---
+
+
 # 2026-10-11 (devátá část) — SESSION „S1b“: CESTA K DATŮM JE PARAMETR (A DVĚ BRÁNY, KTERÉ MĚŘILY NĚCO JINÉHO)
 
 > **Zadání:** `NAVRH-MODDING-2026-10-11.md` §4 **S1b** — dopnout 9 modulových

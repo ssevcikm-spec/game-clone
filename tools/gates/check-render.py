@@ -24,6 +24,7 @@ import argparse
 import json
 import re
 import sys
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -31,6 +32,15 @@ from gate_common import NEMERENO, OK, VADA, Gate, selftest_cli  # noqa: E402
 
 NAME = "check-render"
 DEFAULT_SNAPSHOT = ".cache/render/snapshot.png"
+# STALOST SNIMKU (doplneno 2026-10-12): `run-all.py` snimek NEGENERUJE - cte, co
+# je na disku. NamEReno: 12. 10. 2026 byl `.cache/render/snapshot.png` z 10:06,
+# ale `assets/stone-path/` (nova cesta v Britainu) vznikl ve 23:00 - G10 tedy
+# merila obraz, ktery uz ve hre nebyl, a tvarila se zelene. Vstup obrazu, ktery
+# je NOVEJSI nez snimek, je proto VADA: ma se vygenerovat snimek znovu
+# (`tools/gates/ci-godot.sh`, nebo `--write-movie`, viz HANDOFF).
+# Tolerantni okno je 2 s: soubory zapsane v temz behu maji casy blizko sebe a
+# "rozdil 0,3 s" nic neznamena.
+STARI_TOLERANCE_S = 2.0
 RENDER_GRAINS = ("render.chunk", "render.sort")
 # Data, bez kterych se nema co vykreslit (assets/uo/ je v .gitignore, takze
 # v cerstvem klonu nejsou). Chybejici DATA nejsou vada kódu - viz check().
@@ -269,6 +279,88 @@ def measure_image(path: Path, focus: tuple[int, int, int, int] | None, gate: Gat
             )
 
 
+def art_inputs(root: Path) -> list[Path]:
+    """Vstupy, ktere MENI obraz: konfigurace vlastniho artu, vsechno, na co
+    odkazuje (manifest, anim list, cely adresar vrstvy = atlas PNG), a UO art.
+
+    Proc cely adresar: atlas se prepece, i kdyz cesta v manifestu zustane stejna
+    (presne to se stalo 11. 10. 2026 - `assets/cobble/atlas/land_0.png` byl
+    prepsany sondou a manifest dal tvrdil neco jineho)."""
+    out: list[Path] = []
+    cfg = root / OWN_CONFIG
+    if cfg.exists():
+        out.append(cfg)
+        try:
+            data = json.loads(cfg.read_text(encoding="utf-8"))
+        except Exception:
+            data = {}
+        for vrstva in data.get("layers", []):
+            if not isinstance(vrstva, dict):
+                continue
+            for klic in ("manifest", "anim"):
+                rel = str(vrstva.get(klic) or "").replace("res://", "")
+                if rel == "":
+                    continue
+                p = root / rel
+                if p.exists():
+                    out.append(p)
+            rel = str(vrstva.get("manifest") or "").replace("res://", "")
+            if rel:
+                slozka = (root / rel).parent
+                if slozka.is_dir():
+                    out.extend(f for f in slozka.rglob("*") if f.is_file())
+    uo = root / "assets" / "uo"
+    if uo.is_dir():
+        out.extend(f for f in uo.rglob("*") if f.is_file())
+    return out
+
+
+def kod_obrazu(root: Path) -> list[Path]:
+    """Kod, ktery MUZE zmenit obraz (kreslici uzel a jeho zapojeni).
+
+    Neni to VADA, kdyz je novejsi nez snimek - kod se meni casto a obraz menit
+    nemusi. Je to POZNAMKA: "snimek muze byt ze starsiho obrazu, vygeneruj ho".
+    (Rozdil je schvalny: art je dukaz, kod je okolnost.)"""
+    out: list[Path] = []
+    render = root / "render"
+    if render.is_dir():
+        out.extend(p for p in render.rglob("*.gd") if p.is_file())
+    for rel in ("app/world_view.gd", "app/main.gd"):
+        p = root / rel
+        if p.exists():
+            out.append(p)
+    return out
+
+
+def check_stalost(root: Path, snapshot: Path, gate: Gate) -> None:
+    """Snimek musi byt NOVEJSI nez vstupy obrazu - jinak meri jiny obraz."""
+    if not snapshot.exists():
+        return
+    cas_snimku = snapshot.stat().st_mtime
+    gate.measure("snimek_stari_h", round((time.time() - cas_snimku) / 3600.0, 2))
+    vstupy = art_inputs(root)
+    if not vstupy:
+        return
+    nej = max(vstupy, key=lambda f: f.stat().st_mtime)
+    gate.measure("art_nejnovejsi", nej.relative_to(root).as_posix())
+    pozdejsi = [f for f in vstupy if f.stat().st_mtime > cas_snimku + STARI_TOLERANCE_S]
+    if pozdejsi:
+        jmena = sorted({f.relative_to(root).as_posix() for f in pozdejsi})
+        gate.error(
+            f"snímek {snapshot.name} je STARŠÍ než {len(pozdejsi)} vstupů obrazu "
+            f"(např. {', '.join(jmena[:3])}) - G10 by měřila obraz, který už ve hře "
+            "není; vygeneruj snímek znovu (tools/gates/ci-godot.sh)"
+        )
+    kod = [f for f in kod_obrazu(root) if f.stat().st_mtime > cas_snimku + STARI_TOLERANCE_S]
+    if kod:
+        jmena = sorted({f.relative_to(root).as_posix() for f in kod})
+        gate.note(
+            f"snímek je starší než kód kreslení ({len(kod)} souborů, např. "
+            f"{', '.join(jmena[:2])}) - obraz se mohl změnit; vygeneruj snímek znovu "
+            "(tools/gates/ci-godot.sh)"
+        )
+
+
 def check(root: Path, gate: Gate, snapshot: Path | None = None,
           focus: tuple[int, int, int, int] | None = None) -> None:
     sources = render_sources(root)
@@ -295,6 +387,10 @@ def check(root: Path, gate: Gate, snapshot: Path | None = None,
     if not path.exists():
         gate.pending(f"snímek {path} není - G10 měří pixely, bez snímku NEMĚŘENO")
         return
+    # STALOST: plati JEN pro vychozi snimek hry. Cizi snimek (`--snapshot`) je
+    # merici vstup pro A/B - u nej se stari neposuzuje (neni to obraz hry).
+    if snapshot is None:
+        check_stalost(root, path, gate)
     # KUZE: pro VYCHOZI snimek (ten z behu hry) se barva kuze VYZADUJE; kdyz
     # nekdo preda jiny snimek (--snapshot), jen se to ZMERI - brana nesmi tvrdit
     # vadu o obrazku, ktery nema postavu hrace.
@@ -318,6 +414,7 @@ def check(root: Path, gate: Gate, snapshot: Path | None = None,
 
 
 def selftest() -> int:
+    import os
     import shutil
 
     try:
@@ -407,6 +504,11 @@ def selftest() -> int:
                         "anim": "res://assets/own-lit/anim/anim-sheets.json",
                         "sprites": {"land": [1]}}],
         }), encoding="utf-8")
+        # Snimek v teto fixture vzniknul PRED artefakty vyse (fixture() ho pise
+        # posledni jen uvnitr sebe) - a kontrola stalosti by spravne rekla
+        # "snimek je starsi nez art". Ve skutecnosti se snimek porizuje az po
+        # sade, tak to fixture dorovna casem (nic se neprepisuje).
+        os.utime(root / DEFAULT_SNAPSHOT, None)
         return root
 
     cases = [
@@ -447,8 +549,33 @@ def selftest() -> int:
     print(f"[{NAME}] self-test kuze: paleta {len(paleta)} barev, barva -> {pocet_dobry} px, "
           f"seda -> {pocet_seda} px (hranice {KUZE_MIN}; "
           f"{'OK' if kuze_ok else 'CHYBA - mereni kuze nerozlisuje barvu od sedive'})")
+    # STALOST SNIMKU (2026-10-12): znamy spravny (snimek po artefaktech) i znamy
+    # chybny (snimek o hodinu starsi, nez je art). U chybneho se overuje I DUVOD
+    # - "VADA ze spatneho duvodu" je stejna slepota jako zelena (docs/08 §8.1).
+    stale = fixture("stale_snimek", "blob_center")
+    snimek = stale / DEFAULT_SNAPSHOT
+    stary_cas = time.time() - 3600.0
+    os.utime(snimek, (stary_cas, stary_cas))
+    os.utime(stale / "assets" / "uo" / "manifest.json", None)
+    g_stale = Gate(f"{NAME}/selftest:stale")
+    check(stale, g_stale)
+    duvod = " ".join(g_stale.errors)
+    stale_ok = (g_stale.verdict() == VADA and "STARŠÍ" in duvod
+                and "manifest.json" in duvod)
+    print(f"[{NAME}] self-test stalost: snimek o 1 h stary + cerstvy art -> "
+          f"{'VADA s duvodem (OK)' if stale_ok else 'CHYBA'}"
+          f"{'' if stale_ok else ': ' + duvod}")
+    # a druha strana: tyz strom s cerstvym snimkem je OK
+    os.utime(snimek, None)
+    g_cerstvy = Gate(f"{NAME}/selftest:cerstvy")
+    check(stale, g_cerstvy)
+    cerstvy_ok = g_cerstvy.verdict() == OK
+    print(f"[{NAME}] self-test stalost: tyz strom s cerstvym snimkem -> "
+          f"{'OK' if cerstvy_ok else 'CHYBA'}")
+    if not (kuze_ok and stale_ok and cerstvy_ok):
+        return VADA
     return selftest_cli(NAME, check, [(l, e) for l, _, e in cases],
-                        fixtures=[(l, f) for l, f, _ in cases]) if kuze_ok else VADA
+                        fixtures=[(l, f) for l, f, _ in cases])
 
 
 def main() -> int:

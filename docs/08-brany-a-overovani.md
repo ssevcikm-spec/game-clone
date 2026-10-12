@@ -93,6 +93,40 @@ hráč +5, takže ho překryly), a přitom byly testy, schéma i assety zelené.
 Chybu našel až **pohled na snímek**. Proto G10 měří „je postava vidět"
 přímo v pixelech a G13 se na snímek **dívá** (vision / `read_image`).
 
+#### 8.3.1 Snímek je VSTUP — a musí být dnešní (DOPLNĚNO 2026-10-12)
+
+`run-all.py` snímek **negeneruje**; G10 čte, co je na disku
+(`.cache/render/snapshot.png`). Naměřeno 12. 10. 2026: ten snímek byl
+z **10:06 předchozího dne** (26,4 h), zatímco `assets/own-lit/` i vrstva
+`stone-path` byly přepsané večer — G10 tedy měřila obraz, který už ve hře
+nebyl, a byla **zelená**. Proto G10 od 2026-10-12:
+
+* **VADA**, když je snímek starší než kterýkoli **vstup obrazu**
+  (`assets/own-art.json`, vrstvy vlastního artu včetně atlasů, `assets/uo/**`),
+* **poznámka** (ne vada), když je starší než **kód kreslení**
+  (`render/*.gd`, `app/world_view.gd`, `app/main.gd`) — kód se mění často
+  a obraz měnit nemusí, ale má být vidět, že snímek může být ze staršího obrazu,
+* u **cizího** snímku (`--snapshot`) se stáří neposuzuje (je to vstup pro A/B).
+
+**Jak snímek vyrobit (kanonicky, od 2026-10-12):**
+
+```bash
+tools/gates/ci-godot.sh                        # v CI i lokálně (Xvfb na Linuxu)
+# nebo ručně:
+godot --path . --rendering-driver opengl3 --fixed-fps 60 \
+      --write-movie .cache/render/chuze/frame.png \
+      --script res://tools/gates/snapshot-walk.gd
+cp .cache/render/chuze/frame00000150.png .cache/render/snapshot.png
+```
+
+**Proč z chůze a proč `--fixed-fps`:** vlastní postavu kreslí hra jen
+v některých animacích (v klidu padá na UO art), takže snímek ve stoje nemá
+**ani jeden** pixel vlastní postavy a G10 správně hlásí vadu o hře, která je
+v pořádku (naměřeno: frame 130 = 0 px, frame 150 = 366 px přesně / 267 po
+erozi). Bez `--fixed-fps` není obraz reprodukovatelný (naměřeno na témž stavu:
+0,17 % rozdílu s `--fixed-fps`, 3,14 % bez něj u scény bez řidiče, 71 % u běhu
+bez `--fixed-fps` s pohybujícími se mobily) — a každé „A/B" by pak měřilo šum.
+
 ## 8.4 CI vs. lokálně (a co v CI není)
 
 | Věc | Lokálně | V CI |
