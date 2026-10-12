@@ -45,6 +45,10 @@ ORDER = [
     # kontrola `sim/**`, ale hlida invariantu z docs/01 §1.5 bodu 3, ktera do
     # 2026-10-10 nemela vlastni branu. Pridano 2026-10-10 (rozhodnuti M1).
     ("G14", "check-state-float.py"),
+    # G18 (cesta k datum je PARAMETR, ne zapeena konstanta) patri k statickym
+    # kontrolam kodu: meri `sim/**` a `app/**` bez spusteni. Pridano 2026-10-12
+    # (S1b - mod fungoval "zdanlive", kdyz si modul cetl konstantu sam).
+    ("G18", "check-data-paths.py"),
     ("G4", "check-wiring.py"),
     ("G6", "check-assets.py"),
     # G15 (vlastni art se prepina po kusech) patri HNED za G6: G6 meri assety
@@ -65,6 +69,12 @@ ORDER = [
     # ktery stoji na `sim.scheduler` + `sim.save` (milnik MK).
     ("F1", "check-world-clock.py"),
     ("G11", "smoke.py"),
+    # G19 (zvuk se OPRAVDU prehraje) je druha brana, ktera spousti hru: G11 meri,
+    # ze hra nespadne a tickuje; G19 meri, ze udalost -> zvuk doopravdy zahraje
+    # (`prehrano > 0` a vsech pet zvuku). Pridano 2026-10-12 (ZADANI-27 P3):
+    # modul byl zapojeny a pritom nehral, protoze znal hrace 0 - zelene testy
+    # to nechytily (sonda na zive scene ano).
+    ("G19", "check-sound.py"),
     ("G10", "check-render.py"),
 ]
 TESTS_GATE = "G3"

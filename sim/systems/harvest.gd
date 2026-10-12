@@ -329,6 +329,13 @@ func _harvest(kind: String, m: int, x: int, y: int) -> Dictionary:
 		bank["next_ms"] = now + _rng.range_i(int(p["respawn_min"]), int(p["respawn_max"])) * MS_PER_MINUTE
 	var item = _last_item
 	_message("You gather some " + str(_table(kind)[resource_index]["name"]) + ".")
+	# ZVUK TEZBY (P3, 2026-10-12): sim rika, ze se neco stalo (`sound`), klient
+	# to prehraje (`app/sound.gd`). Zvuk ma jen DRUH prace, ktery existuje:
+	# krumpac do rudy. Drevo a ryba by potrebovaly vlastni zvuk - zatim se
+	# nehlasi (viz HANDOFF, "co zbyva"), protoze "sekera zni jako krumpac" je
+	# horsi nez ticho.
+	if kind == KIND_ORE:
+		_sound(m, "mine", mob.pos)
 	return {"ok": true, "reason": "", "kind": kind, "skill": skill, "gained": zisk,
 		"success": true, "tile": tile, "art": art, "amount": amount, "hue": hue,
 		"serial": int(item.serial) if item != null else 0, "item": item,
@@ -602,3 +609,13 @@ func _fail_message(kind: String, reason: String) -> String:
 func _message(text: String) -> void:
 	if _events != null:
 		_events.push("message", {"text": text, "kind": "system"})
+
+
+func _sound(m: int, kind: String, pos: Vector3i) -> void:
+	# Zvuk je VSTUP pro klienta (docs/04 §4.4), ne stav: posila se
+	# `{serial, kind, x, y, z}` a klient si z toho dopocita hlasitost
+	# (`app/sound.gd`). POZICE JE V UDALOSTI naschval - klient si ji pozdeji
+	# nemusi umet dohledat (u smrti uz mobil v registru neni).
+	if _events != null:
+		_events.push("sound", {"serial": int(m), "kind": kind,
+			"x": int(pos.x), "y": int(pos.y), "z": int(pos.z)})

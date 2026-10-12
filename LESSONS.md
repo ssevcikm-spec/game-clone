@@ -55,6 +55,24 @@ z takového běhu označ jako „změřená se souběžným zápisem“.
 > v `assets/sounds/manifest.json`, důkaz C1 v `tools/gates/sound_probe.gd`.
 > ⚠ **V témže stromě pracovala paralelní session** (`ZADANI-27`: animace, dosah).
 
+### 2026-10-12 — Připravené a nezapojené = neexistuje (a pozice patří do události) (postup)
+**Co se stalo:** Dvě věci z téhož dne: (1) zvuky `mine` a `smith` byly
+v manifestu, v testech i v modulu — a přesto se **nikdy neozvaly**, protože je
+simulace neposílala; byly to mrtvé soubory se zeleným testem. (2) Zvuk smrti se
+nehrál ani potom, co událost `sound{kind:"death"}` existovala: mobil je v době
+doručení události **už odstraněný z registru**, takže si klient pozici nemohl
+dohledat a zvuk zahodil jako „moc daleko“. Smlouva `docs/04 §4.4` přitom
+od začátku psala, že událost nese **pozici**.
+**Doklad:** sonda `tools/gates/sound_probe.gd` — před: `ticho 1`, `podle_id`
+bez `death`; po: `{ "hit": 3, "hurt": 1, "death": 1, "mine": 1, "smith": 1 }`,
+`ticho 0`. Drží to dvě nové brány: **G18** (cesta k datům je parametr) a
+**G19** (zvuk se opravdu přehraje, všech pět).
+**Ponaučení:** „hotové“ bez konzumenta je **mrtvé** — u každé připravené věci
+se ptej, **kdo ji zavolá**; když nikdo, je to nedodělané (a test to nezachytí,
+protože test volá modul přímo). A co klient bude potřebovat, patří do
+**události**, ne do stavu, který může mezitím zmizet — pozice v `sound` je
+přesně ten případ.
+
 ### 2026-10-12 — Modul znal hráče 0, takže všechny zvuky utlumil na ticho (chyba)
 **Co se stalo:** `app/sound.gd` dostával serial hráče v `app/loop._ready()`,
 jenže ten doběhne **dřív**, než `app/main._setup_player()` nastaví

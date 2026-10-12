@@ -89,6 +89,10 @@ const LAYER_TWO_HANDED := 0x02
 # 2 = attack, 3 = death (`sim/systems/movement.gd:84-85` pro 0/1).
 const ACTION_ATTACK := 2
 const ACTION_DEATH := 3
+# DOBA, PO KTEROU SE KRESLI ANIMACE UTOKU (dokonceni P1, 2026-10-12): 5 framu
+# po 80 ms (`docs/05 §5.1.1` dava vsem framum 80 ms). Je to VYCHOZI hodnota
+# pro klienta - stav sveta to neni (viz `_anim_dir`).
+const ANIM_ATTACK_MS := 400
 
 # Vzorce (viz hlavicka; NEOPSANE - kazdy ma radek v reference).
 const DELAY_UNIT_MS := 500          # `0.5 s` v `BaseWeapon.cs:1609`
@@ -156,6 +160,9 @@ var _melee_range: int = MELEE_RANGE
 
 # Stav boje: serial -> {war, target, due_ms, delay_ms, started_ms}
 var _state: Dictionary = {}
+# Prezentacni okno animace utoku: serial -> cas (ms), do ktereho se kresli
+# utok. NENI soucasti `state()` (viz `_anim_dir`) - do hashe nepatri.
+var _anim_do: Dictionary = {}
 
 
 func _init(registry = null, weapons = null, items = null, equipment = null,
@@ -415,7 +422,11 @@ func resolve_swing(m: int, target: int) -> Dictionary:
 		# hrac nemel co sebrat. Presne to je "hráč zabije monstrum, loot jde
 		# sebrat" z prijimaciho kriteria.
 		_anim_dir(int(cil.serial), ACTION_DEATH)
-		_events_push("sound", {"serial": int(cil.serial), "kind": "death"})
+		# ⚠ PRES POMOCNOU FUNKCI (2026-10-12): primo psany slovnik nemel POZICI
+		# a `cil` je v tu chvili jeste v registru, ale za frame uz ne - klient
+		# pak zvuk smrti zahodil jako "moc daleko" (namEReno: `podle_id`
+		# bez "death", `ticho 1`). `_sound()` pozici doplní.
+		_sound(int(cil.serial), "death")
 		if _death != null and _death.has_method("die"):
 			# Telo, ducha a `mobile_removed` resi `sim.death` (jedno misto).
 			_death.die(int(cil.serial))
@@ -534,6 +545,9 @@ func state() -> Dictionary:
 
 func restore(d: Dictionary) -> void:
 	_state = {}
+	# Nactena hra nesmi kreslit "swing, ktery se stal pred ulozenim" - okno
+	# animace je casovani OBRAZU, takze se pri nacteni zahodi.
+	_anim_do = {}
 	if not (d is Dictionary):
 		return
 	for k in (d.get("combat", {}) as Dictionary).keys():
@@ -1045,6 +1059,27 @@ func _anim(m: int) -> void:
 func _anim_dir(m: int, akce: int) -> void:
 	_events_push("mobile_anim", {"serial": m, "action": akce,
 		"frame_ms": int(Const.TURN_MS)})
+	# PREZENTACNI STOPA PRO KLIENTA (dokonceni P1, 2026-10-12): udalost je
+	# JEDNORAZOVA, ale klient kresli kazdy frame a cte STAV - proto se okno
+	# animace zapisuje sem a klient se na nej pta pres `anim_of`.
+	# Do `state()` (save/hash) se to ZAMERNE nedostava: je to casovani obrazu,
+	# ne stav sveta - jinak by se zmenily replaye i ulozene hry.
+	if akce == ACTION_ATTACK:
+		_anim_do[int(m)] = _now() + ANIM_ATTACK_MS
+
+
+func anim_of(m: int) -> Dictionary:
+	# Kdo prave uderil: `{action, left_ms}` nebo prazdny slovnik. VEREJNE
+	# SCHVALNE - klient (`app/world_view`) i test se ptaji na TUTEZ hodnotu;
+	# kdyby si ji klient pocital sam z casu swingu, byla by to druha pravda.
+	var do_ms: int = int(_anim_do.get(int(m), 0))
+	if do_ms <= 0:
+		return {}
+	var zbyva: int = do_ms - _now()
+	if zbyva <= 0:
+		_anim_do.erase(int(m))
+		return {}
+	return {"action": ACTION_ATTACK, "left_ms": zbyva}
 
 
 func _sound(m: int, kind: String) -> void:

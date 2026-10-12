@@ -508,7 +508,7 @@ vybere jednou za frame.
 | `message` | `{text, kind:"system"|"say"|"combat"|"craft", hue, name?}` | všude |
 | `target_request` | `{cursor, kind:"object"|"ground"|"self", allow_ground:bool}` | interakce, magie, sběr |
 | `gump_open` | `{gump:"craft"|"vendor"|"container"|"spellbook"|"skills", data:{...}}` | interakce |
-| `sound` | `{id, x, y, z}` | kroky, boj, výroba |
+| `sound` | `{serial, kind, x, y, z}` (DOPLNĚNO 2026-10-12: v tabulce stálo `{id, x, y, z}`, ale kód posílal `{serial, kind}` — sjednoceno na to, co kód posílá, a **pozice se přidala**: u smrti je mobil v době doručení už z registru odstraněný a klient by ji nedohledal; naměřeno: zvuk smrti se kvůli tomu nehrál) | kroky, boj, výroba |
 | `music` | `{track:String}` | změna regionu |
 | `light_changed` | `{level:int}` | `world.time` |
 | `combat_state` | `{serial, target, war:bool}` | `sim.combat` |

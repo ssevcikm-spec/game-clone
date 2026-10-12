@@ -37,6 +37,7 @@ Spousteni: $env:PYTHONIOENCODING='utf-8'; python tools/check-data-paths.py
 
 from __future__ import annotations
 
+import argparse
 import json
 import re
 import sys
@@ -44,6 +45,8 @@ from pathlib import Path
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
+# Vychozi koren je repozitar; `--root` existuje kvuli self-testu brany G18
+# (fixture strom s jednim modulem, ktery konstantu cte primo).
 ROOT = Path(__file__).resolve().parents[1]
 KONST = re.compile(r'^\s*const\s+([A-Za-z0-9_]+)\s*(?::=\s*|:\s*String\s*=\s*)"(res://data/[A-Za-z0-9_.-]+\.json)"')
 
@@ -54,7 +57,8 @@ def bez_komentaru(text: str) -> str:
     return "\n".join(radek.split("#", 1)[0] for radek in text.splitlines())
 
 
-def main() -> int:
+def main(root: Path | None = None, out_path: Path | None = None) -> int:
+    ROOT = Path(root) if root is not None else Path(__file__).resolve().parents[1]
     # Signatury se hledaji PRES VICE RADKU: `func _init(registry, ...,\n
     #     weapons_path: String = WEAPONS_PATH, ...)` je jedna signatura.
     sygnatura = re.compile(r"func\s+[A-Za-z0-9_]+\s*\((?:[^()]|\([^()]*\))*\)", re.S)
@@ -114,7 +118,10 @@ def main() -> int:
         "vady_sim": vady_sim,
         "stav": "VADA" if vady_sim else "OK",
     }
-    report = ROOT / ".cache" / "check-data-paths.json"
+    # POZOR: lokalni `out` je SLOVNIK reportu - parametr cesty se jmenuje
+    # `out_path`, jinak `Path(out)` spadne na "argument should be ... not 'dict'"
+    # (namEReno 2026-10-12 hned pri prvnim spusteni brany G18).
+    report = Path(out_path) if out_path is not None else (ROOT / ".cache" / "check-data-paths.json")
     report.parent.mkdir(parents=True, exist_ok=True)
     report.write_text(json.dumps(out, ensure_ascii=False, indent=1), encoding="utf-8")
 
@@ -134,4 +141,9 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    ap = argparse.ArgumentParser(description="S1b: je cesta k datum parametr, nebo konstanta?")
+    ap.add_argument("--root", default=None, help="koren projektu (pro self-test brany G18)")
+    ap.add_argument("--json", default=None, help="kam zapsat report (vychozi <root>/.cache/)")
+    a = ap.parse_args()
+    raise SystemExit(main(Path(a.root) if a.root else None,
+                          Path(a.json) if a.json else None))

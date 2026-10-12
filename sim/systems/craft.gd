@@ -282,6 +282,7 @@ func craft(m: int, recipe_id: int, count: int = 1) -> Dictionary:
 	if int(vysledek["made"]) > 0:
 		vysledek["ok"] = true
 		vysledek["reason"] = ""
+		_sound(m, "smith", mob.pos)
 	return vysledek
 
 
@@ -329,6 +330,7 @@ func smelt(m: int, ore: int, forge: int) -> Dictionary:
 	var art: int = int(INGOT_ARTS.get(hu, INGOT_ART_DEFAULT))
 	var ingot = _add(mob, art, ingotu, hu)
 	_message("You smelt the ore and get %d ingots." % ingotu)
+	_sound(m, "smith", mob.pos)
 	return {"ok": true, "reason": "", "action": "smelt", "ingots": ingotu, "left": 0,
 		"serial": int(ingot.serial) if ingot != null else 0, "item": ingot,
 		"gained": bool(hod.get("gained", false)) if hod is Dictionary else false}
@@ -822,3 +824,13 @@ func _fail(reason: String) -> Dictionary:
 func _message(text: String) -> void:
 	if _events != null:
 		_events.push("message", {"text": text, "kind": "craft"})
+
+
+func _sound(m: int, kind: String, pos: Vector3i) -> void:
+	# ZVUK PRACE (P3, 2026-10-12): `sound {serial, kind, x, y, z}` je VSTUP pro
+	# klienta (docs/04 §4.4) - pozice je v udalosti, aby si ji klient nemusel
+	# dohledavat (u smrti uz mobil v registru neni). Vyroba i taveni jsou prace
+	# u vyhne/kovadliny, proto maji tyz zvuk "smith".
+	if _events != null:
+		_events.push("sound", {"serial": int(m), "kind": kind,
+			"x": int(pos.x), "y": int(pos.y), "z": int(pos.z)})

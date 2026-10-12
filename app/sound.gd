@@ -17,9 +17,12 @@ extends Node
 #   * `stats_changed {serial, hp, ...}` - z POKLESU hp hrace se odvozuje zvuk
 #     "hurt" ("dostali jsme zasah"). Udalost `sound` totiz nese jen utocnika,
 #     ne cil, takze z ni "my" poznat nelze.
-#   * ⚠ SMLOUVA vs KOD (nalezeno 2026-10-12): `docs/04 §4.4` pise u `sound`
-#     tvar `{id, x, y, z}`, ale kod posila `{serial, kind}`. Modul umi OBA
-#     tvary (kdyz `id`/`x` existuji, vezmou se), aby fungoval i po sjednoceni.
+#   * ⚠ TVAR UDALOSTI (2026-10-12): `docs/04 §4.4` melo `{id, x, y, z}`, kod
+#     posilal `{serial, kind}`. Sjednoceno na `{serial, kind, x, y, z}`:
+#     `serial` je identita (kdo to zpusobil), `kind` je druh zvuku a **pozice
+#     je v udalosti** - u smrti je mobil v dobe doruceni uz z registru
+#     odstraneny, takze by si ji klient nedohledal (namEReno: zvuk smrti se
+#     kvuli tomu nehral). Modul umi i stary tvar `{id, x, y, z}`.
 #
 # FORMAT ZVUKU: `assets/sounds/manifest.json` (generator `tools/audio/gen-sfx.py`,
 # 44,1 kHz stereo). Soubory jsou v repu BEZ `.import` (jako vlastni art), takze
@@ -37,6 +40,7 @@ var _prehravace: Array = []      # AudioStreamPlayer (pool)
 var _chyby: Array = []           # kazda vada se hlasi, ne tise zmizi
 var _prehrano: int = 0
 var _ticho: int = 0              # preskoceno (moc daleko / nezname id)
+var _podle_id: Dictionary = {}   # id -> kolikrat se prehral (doklad, KTERY zvuk)
 var _hp: Dictionary = {}         # serial -> posledni zname hp (jen pro "hurt")
 var _hrac: int = 0
 var _registr = null
@@ -116,6 +120,7 @@ func play(id: String, volume: float = 1.0) -> bool:
 	p.volume_db = linear_to_db(hlas)
 	p.play()
 	_prehrano += 1
+	_podle_id[id] = int(_podle_id.get(id, 0)) + 1
 	return true
 
 
@@ -222,6 +227,7 @@ func stats() -> Dictionary:
 		"streamu": _streamy.size(),
 		"prehravacu": _prehravace.size(),
 		"prehrano": _prehrano,
+		"podle_id": _podle_id.duplicate(),
 		"ticho": _ticho,
 		"chyb": _chyby.size(),
 	}

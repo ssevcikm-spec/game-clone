@@ -1,3 +1,58 @@
+# Předání — game-clone (2026-10-12, SESSION „Zvuk“ (pokračování): ZAPOJENO VŠE PŘIPRAVENÉ — a dvě nové brány)
+
+> **Co je tenhle soubor:** **stav projektu** pro další session agenta. Přepisuje
+> se celý; historie je v `git log`. Nový blok je vždy **nahoře**; starší bloky se
+> needitují (jen doplňují). **Současný stav se bere z tohoto bloku.**
+>
+> **Odkud brát detaily:** blok „Zvuk“ hned pod tímto (modul, zvuky, C1),
+> `docs/08` (nové brány **G18** a **G19**), `docs/04 §4.4` (tvar události
+> `sound`), `tools/gates/check-sound.py` a `tools/gates/check-data-paths.py`,
+> `LESSONS.md` 2026-10-12 (část „Zvuk“).
+
+## ✅ CO SE UDĚLALO (pokyn „zapoj vše, co už máš připravené“)
+
+| # | Co bylo připravené, ale nezapojené | Co se udělalo | Naměřeno |
+|---|---|---|---|
+| 1 | **Zvuky `mine` a `smith`** (v manifestu i v testu, ale sim je neposílal) | `sim/systems/harvest.gd` posílá `sound{kind:"mine"}` po úspěšné těžbě **rudy**; `sim/systems/craft.gd` posílá `sound{kind:"smith"}` po úspěšném **tavení** i **výrobě** | sonda na živé scéně: `podle_id { "hit": 3, "hurt": 1, "death": 1, "mine": 1, "smith": 1 }` |
+| 2 | **Zvuk smrti nehrál** (modul ho znal, ale dostal událost bez pozice) | `sim/systems/combat.gd`: `_sound()` doplňuje **pozici** (`{serial, kind, x, y, z}`) a zvuk smrti jde přes něj (byl psaný napřímo) | před: `podle_id` bez `death`, `ticho 1`; po: `death: 1`, `ticho 0` |
+| 3 | **Smlouva `sound` neseděla s kódem** (`{id, x, y, z}` vs `{serial, kind}`) | `docs/04 §4.4` sjednoceno na **`{serial, kind, x, y, z}`** s datem a důvodem; modul umí i starý tvar | — |
+| 4 | **Metrika cest k datům** (S1b) byla jen nástroj v `tools/` | nová brána **`G18` `check-data-paths.py`** + registrace v `run-all.py` + `docs/08`; nástroj dostal `--root`/`--json` kvůli self-testu | G18: self-test **2/0**, na repu `parametr 24 / primo 0 / smisene 0`, `exit 0` |
+| 5 | **C1 (zvuk se opravdu přehraje)** byla jen sonda | nová brána **`G19` `check-sound.py`** + registrace + `docs/08`; sonda rozšířena, aby vyvolala **všech pět** zvuků skutečnými systémy (souboj, smrt, těžba, tavení) | G19: self-test **5/0**, na živé scéně `prehrano 7 / ticho 0 / chyb 0`, `exit 0` |
+
+**Pořadí bran se změnilo** (`docs/08`, `run-all.py`):
+`G1 → G3 → G5 → G2 → G14 → **G18** → G4 → G6 → G15 → G16 → G17 → G7 → G8 → G9
+→ F1 → G11 → **G19** → G10` — **18 bran** místo 16.
+
+**Co sonda k C1 dělá (a proč je delší):** hráč útočí (`A`) → `hit`/`hurt`;
+sonda pak **nechá monstrum udeřit hráče** (hod se opakuje, dokud hp neklesne —
+jeden hod umí minout, naměřeno `hp 85 → 85`), **zabije** nejbližší monstrum
+(`resolve_swing`, dokud `killed`), **vytěží rudu** (`harvest.mine` na balvan
+vedle hráče) a **vytaví ingot** (`craft.smelt` u výhně). Běh trvá ~10 s.
+
+## ⚠ CO ZŮSTÁVÁ OTEVŘENÉ (nově)
+
+1. **Dřevo a ryba zvuk nemají** — `harvest` má tři druhy (`ore`, `wood`, `fish`)
+   a hlásí zvuk jen u rudy. Sekera znějící jako krumpác je horší než ticho;
+   vlastní zvuk pro dřevo/rybu je další asset (`tools/audio/gen-sfx.py`).
+2. **`music(id)` pořád chybí** (v repu nejsou volné skladby).
+3. **G18 i G19 jsou nové brány** = změna smlouvy `docs/08` (zapsaná, s datem
+   a self-testy). Kdo je nechce, smaže dva řádky v `run-all.py` a dvě sekce
+   v `docs/08`; nic jiného na nich nestojí.
+4. **G19 spouští hru** (~10 s) — `run-all.py` je tím delší. Je to cena za to,
+   že „zvuk se přehraje“ nejde změřit bez běžící scény.
+
+## 🔗 COMMITY TÉTO SESSION (pokračování)
+
+`C2` — `sim/systems/{harvest,craft,combat}.gd` (zvuky těžby/kakování + pozice
+v události), `tools/gates/check-data-paths.py` a `check-sound.py` (nové brány),
+`tools/gates/run-all.py` (registrace), `tools/gates/sound_probe.gd` (rozšířená
+sonda), `tools/check-data-paths.py` (`--root`/`--json`), `docs/04 §4.4`,
+`docs/08`, `app/sound.gd` (rozpad `podle_id` + tvar události), `LESSONS.md`,
+`HANDOFF.md` (tento blok).
+**Push ověřen živě:** _(doplněno v navazujícím commitu)_
+
+---
+
 # Předání — game-clone (2026-10-12, SESSION „Zvuk“: P3 — hra konečně vydává zvuk)
 
 > **Co je tenhle soubor:** **stav projektu** pro další session agenta. Přepisuje

@@ -40,6 +40,8 @@
 | G13 | `vision` (poradní) | **obsah vidí**: je na snímku město? je vidět postava se zbraní? | každý PR se snímkem | **neblokuje** — jen komentuje (falešný poplach je dražší) |
 | **F1** | `check-world-clock.py` — **čeká na `MK`** | **svět má vlastní čas**: bez jediného příkazu od hráče se stav světa změní, dvakrát totéž dá totéž, netiká při tom celý svět, doběh je idempotentní a nezávisí na dávkování | každý PR (až bude `sim.offline`) | svět se bez hráče nehýbe, dva běhy se rozejdou, tikne celý svět, nebo doběh závisí na dávkách |
 | **F4** | `check-no-waste.py` — **čeká na `MK`** | **nic není odpad**: každý výstup dosažitelný ve hře má konzumenta (recept / poptávku světa / propad) a odkaz na konzumenta vede na existující záznam | každý PR (až bude `data.vendors` a poptávka) | výstup bez konzumenta, **prázdný uzávěr** (nula měřených věcí), nebo konzument na neexistující id |
+| **G18** | `check-data-paths.py` (**přidáno 2026-10-12**) | **cesta k datům je PARAMETR, ne zapečená konstanta** (`S1b`): pouští `tools/check-data-paths.py` a v `sim/` (mimo `sim/content.gd`, kde je deklarace zakladu) požaduje **nula** konstant čtených v těle funkce; konstanta smí být **jen default parametru**. `app/` se měří a vypisuje jako „volající“, ale za vadu se nepovažuje. Self-test: dva fixture stromy (konstanta jen v parametru = OK, konstanta v těle = VADA) | každý PR | modul si čte konstantu sám → **mod ho nepřebije a funguje zdánlivě** (u `balance.json` ano, u `items.json` ne; naměřeno 2026-10-12: 11 „smíšených“ a jedna lež v `sim.poison.source()`) |
+| **G19** | `check-sound.py` (**přidáno 2026-10-12**) | **zvuk se OPRAVDU přehraje**: pouští `tools/gates/sound_probe.gd` na **živé scéně** a požaduje `prehrano > 0`, **všech pět zvuků** ve `podle_id` (`hit`, `hurt`, `death`, `mine`, `smith`) a `chyb == 0`. Sonda je vyvolává **skutečnými systémy** (souboj, smrt těla, těžba rudy, tavení u výhně), ne voláním modulu | každý PR | modul je zapojený, ale nic nehraje (naměřeno 2026-10-12: znal hráče `0` → `prehrano 0`, testy přitom zelené), nebo se některý zvuk po změně přestal ozývat |
 
 **Dvě brány z pocitu (`F1`, `F4`) jsou od 2026-10-09 součástí smlouvy**
 (rozhodnutí uživatele; návrh včetně kontrol a mutací:
@@ -51,8 +53,9 @@
 nezapomnělo, a do `run-all.py` se zapíše, až vznikne. Když brána nemá co měřit,
 vrací `2` (`NEMĚŘENO`) a **nikdy** se to netváří jako zelená (§8.9).
 
-**Pořadí v CI je závazné** (stav 2026-10-11, shodné s `run-all.py`):
-G1 → **G3** → G5 → G2 → **G14** → G4 → G6 → **G15** → **G16** → **G17** → G7 → G8 → G9 → **F1** → G11 → G10.
+**Pořadí v CI je závazné** (stav 2026-10-12, shodné s `run-all.py`):
+G1 → **G3** → G5 → G2 → **G14** → **G18** → G4 → G6 → **G15** → **G16** → **G17**
+→ G7 → G8 → G9 → **F1** → G11 → **G19** → G10.
 `G13` (vision) je **poradní** a jde mimo pořadí — nikdy neshodí běh, ale nesmí
 být ticho (když není implementovaná, hlásí se to). Schéma je první, protože je
 nejlevnější a rozpor v zadání zneplatňuje všechno ostatní. **`G15` jde hned za
