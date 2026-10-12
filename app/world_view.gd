@@ -35,6 +35,12 @@ const MeshScript = preload("res://render/chunk_mesh.gd")
 
 const VIEW_TILES_X: int = 64
 const VIEW_TILES_Y: int = 48
+# ABSTRAKTNI ID AKCE KLIENTA (P1, 2026-10-12) - PRESNE stejna cisla jako
+# `app/player_controller.gd` (0 = chuze, 1 = beh, 4 = postoj). Cislo SKUPINY
+# v `anim.mul` je jine; preklad dela `render/anim_player.sprite_group_for`.
+const ACTION_WALK: int = 0
+const ACTION_RUN: int = 1
+const ACTION_IDLE: int = 4
 # PRESTAVBA SEZNAMU SE ODDALUJE (namEReno 2026-10-07): `render.chunk.visible()`
 # stoji studeny ~44 ms (6 000 objektu) a puvodne se prestavoval pri KAZDEM kroku
 # chuze (`look_at_tile` -> `invalidate`), tedy 2,5x za sekundu -> uzivatel to
@@ -174,6 +180,11 @@ var _anim = null
 # Prazdny seznam = jen UO art, presne jako driv.
 var _own_layers: Array = []
 var _registry = null               # sim.entity_registry (pro `render.anim`)
+# P1 (2026-10-12): `sim.movement` pro ANIMACE CIZICH postav. Do teto chvile tu
+# nebyl a kazdy cizi mobil se kreslil s akci 4 (postoj) natvrdo - monstra se
+# SUNULA, protoze udalost `mobile_anim` v `app/` nikdo neodebiral. Stav (ne
+# event) je jedina pravda: `pending_step(serial)` vraci bezici krok.
+var _movement = null
 var _sort = null                   # render.sort (jedina funkce razeni)
 var _hues = null                   # render.hue (barva kuze; bez nej je postava seda)
 var _hue_cache_hit: bool = false   # tonovany sprite se pocita jen pri zmene
@@ -366,6 +377,17 @@ func set_mobily(registry, container, items) -> void:
 	_znovu_anim()
 
 
+func set_movement(movement) -> void:
+	# P1 (2026-10-12) - ODKUD bere kresleni CIZI postavy animaci: ze STAVU
+	# beziciho kroku (`sim.movement.pending_step`), stejne jako to dela hrac v
+	# `app/player_controller.update_step`. Klient zustava tenky (docs/01 §1.5
+	# bod 9: simulace rozhoduje, klient kresli) - neodebira se udalost
+	# `mobile_anim`, protoze udalost je jednorazova a stav je kazdy frame.
+	# `null` = presne stare chovani (vsechny cizi postavy v postoji); chybejici
+	# system se NESMI tvarit jako "animace funguji".
+	_movement = movement
+
+
 func nastav_decay(decay) -> void:
 	# `sim.decay` je JEDNO misto, kde je pravidlo "co je telo" - klient si ho
 	# neopisuje (`_je_telo` se ptá odsud). Bez nej plati `type == "corpse"`.
@@ -423,7 +445,12 @@ func _draw_mobily() -> void:
 
 
 func _draw_mobil(mob) -> bool:
-	var clip: Dictionary = _anim.play(int(mob.serial), _anim_idle(), int(mob.dir))
+	# ⚠⚠ P1 (2026-10-12): do teto chvile tu bylo `_anim_idle()` NATVRDO, takze
+	# se kazdy cizi mobil kreslil v postoji - a protoze se to tykalo vsech NPC,
+	# byl svet "mrtvy" jako celek. Akce i smer jdou ze stavu (`_akce_mobila`).
+	var akce: Dictionary = _akce_mobila(mob)
+	var clip: Dictionary = _anim.play(int(mob.serial), int(akce["action"]),
+		int(akce["dir"]))
 	if not bool(clip.get("ok", false)) or clip.get("texture") == null:
 		return false
 	var ground: Vector2 = _ground_of(Vector3i(int(mob.pos.x), int(mob.pos.y),
@@ -501,8 +528,38 @@ func _ground_of(pos: Vector3i) -> Vector2:
 		+ Vector2(Const.ISO_STEP, Const.TILE_H / 2.0))
 
 
-func _anim_idle() -> int:
-	return 4
+func animace_mobila(serial: int) -> Dictionary:
+	# VEREJNE SCHVALNE (P1): sonda i test se ptaji na TUTEZ hodnotu, kterou
+	# pouziva kresleni (`_draw_mobil` -> `_anim.play`) - vzor
+	# `render/anim_player.is_own_key`. Prazdny slovnik = serial v registru NENI
+	# (ne vymyslene "idle": nula a "nemereno" nejsou uspech).
+	var mob = null
+	if _draw_registry != null and _draw_registry.has_method("get_mobile"):
+		mob = _draw_registry.get_mobile(serial)
+	if mob == null:
+		return {}
+	return _akce_mobila(mob)
+
+
+func _akce_mobila(mob) -> Dictionary:
+	# AKCE CIZI POSTAVY ZE STAVU (P1, 2026-10-12). Vyslo z mereni: udalost
+	# `mobile_anim` vzniká v `sim.movement`/`sim.combat`, ale v `app/` ji NIKDO
+	# neodebiral - vsechny cizi postavy se tedy kreslily s akci 4 (postoj) a ve
+	# svete se "sunuly". Bere se proto stav, ne event (viz `set_movement`).
+	#
+	# SMER: `mob.dir` se prepise az na KONCI kroku (`sim.movement.apply_step`),
+	# takze behem kroku plati smer ZAMERU z `pending_step` - jinak by postava
+	# 400 ms "klouzala do strany". Je to TATAZ vada V2, jakou u hrace resi
+	# `_view_dir` v `app/player_controller.gd`.
+	var dir: int = ((int(mob.dir) % 8) + 8) % 8
+	if _movement == null or not _movement.has_method("pending_step"):
+		return {"action": ACTION_IDLE, "dir": dir}
+	var krok: Dictionary = _movement.pending_step(int(mob.serial))
+	if krok.is_empty():
+		return {"action": ACTION_IDLE, "dir": dir}
+	var smer: int = int(krok.get("dir", dir))
+	return {"action": ACTION_RUN if bool(krok.get("run", false)) else ACTION_WALK,
+		"dir": ((smer % 8) + 8) % 8}
 
 
 func _hued(texture: Texture2D, hue: int) -> Texture2D:

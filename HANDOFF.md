@@ -1,3 +1,104 @@
+# Předání — game-clone (2026-10-12, SESSION „P1“: ANIMACE CIZÍCH POSTAV — simulace je posílala, klient neodebíral)
+
+> **Co je tenhle soubor:** **stav projektu** pro další session agenta. Přepisuje
+> se celý; historie je v `git log`. Nový blok je vždy **nahoře**; starší bloky se
+> needitují (jen doplňují). **Současný stav se bere z tohoto bloku.**
+>
+> **Odkud brát detaily:** zadání [`ZADANI-27-POCIT.md`](ZADANI-27-POCIT.md) §3 P1,
+> sonda `_analyza/p1-animace-snimek.gd` (gitignorovaná) a `LESSONS.md`
+> 2026-10-12 (**čtyři ponaučení** z této session). Rozcestník:
+> [`DALSI-SESSION.md`](DALSI-SESSION.md) §G.
+> ⚠ **V témže stromě pracovaly paralelní session** („G10 a sada v3“ a modding E) —
+> jejich soubory jsem needitoval a do svého commitu vzal **jen svoje**.
+
+## ✅ CO SE UDĚLALO (a proč právě to)
+
+Z `ZADANI-27-POCIT.md` je hotová **P1** (animace cizích postav). Uživatel 12. 10.
+řekl, že svět je „mrtvý, postavy nemají animace“ — a měření ukázalo, že to není
+chybějící art ani chybějící data: simulace událost `mobile_anim` **posílá**
+(`sim/systems/movement.gd:196`, `sim/systems/combat.gd:987`) a v `app/` ji
+**nikdo neodebíral** (jediný výskyt byl komentář v `app/player_controller.gd:20`).
+`app/world_view.gd:426` proto kreslil **každého cizího mobila** s akcí 4 (postoj)
+natvrdo. Oprava bere akci ze **stavu**, stejně jako to u hráče dělá
+`app/player_controller`.
+
+| Věc | Soubor | Naměřeno |
+|---|---|---|
+| Akce i směr ze stavu | `app/world_view.gd` (`set_movement`, `_akce_mobila`, `animace_mobila`, `ACTION_WALK/RUN/IDLE`) | `pending_step(serial)` → `walk`/`run` + směr ZÁMĚRU; bez kroku `idle`; **`_anim_idle()` natvrdo smazáno** |
+| Zapojení ve hře | `app/main.gd` (`view.set_movement(movement)`) | `has_method` jako u `set_mobily` — starší `world_view` dostane přesně staré chování |
+| Test, který kód ZAVOLÁ | `tests/cases/world_view.gd` **sekce 7e** + tři fake třídy | 6 kontrol: postoj → chůze (akce 0, směr ZÁMĚRU 5) → běh (1) → postoj; bez `movement` postoj; neznámý serial = **prázdný slovník** |
+| Mutační důkaz | `tools/gates/mutace-tests.py` (nový vzor) | `19 z 19 chyceno; smlouva vstupu: OK` — včetně „cizi postava se kresli v postoji natvrdo (P1 vracena)“ → **CHYCENA** |
+| Důkaz pohledem | `_analyza/p1-animace-snimek.gd` (gitignorováno) | akce **4 → 0 → 4**, frame **0 → 4**, **39 px z 3136** ve výřezu postavy |
+| Snímky (nejsou v gitu) | `p20b-obrazky/p1-animace-{a,b}.png` | dva sousední framy téhož monstra |
+
+**Změna je aditivní** (`docs/01` §1.5 bod 10): `set_movement` je nový setter,
+`_anim_idle()` byla soukromá a nikde jinde se nepoužívala.
+
+## 📊 NAMĚŘENO (2026-10-12, tato session)
+
+| Co | Hodnota | Doklad |
+|---|---|---|
+| **Testy** | **2 811 kontrol / 0 selhání**, `exit 0` | `godot --headless --path . --script res://tests/run_tests.gd` (`.tmp/p1-testy.log`) |
+| **Mutační harness (modul `world_view`)** | **19 z 19 chyceno**, `smlouva vstupu: OK` | `python tools/gates/mutace-tests.py --only world_view` (`.tmp/p1-mutace.log`) |
+| **Brány** | **16 měřeno / 0 čeká / 0 chyb** (G13 poradní) | `python tools/gates/run-all.py` (`.tmp/p1-brany.log`) |
+| **Smoke (G11)** | `exit 0`, 120 framů, **166 `.gd` souborů hry**, 0 script / 0 parse error | tamtéž |
+| **Replaye a determinismus** | **beze změny hashů** (G9 i G8 OK) | tamtéž — P1 je klientská, hash stavu se pohnout nesmí |
+| **Viditelný důkaz** | akce `pred=4 behem=0 po=4`, `frame A=0 B=4`, `39/3136 px` | `_analyza/p1-animace-snimek.gd` (`.tmp/p1-snimek.log`) |
+
+## 🚧 CO ODHALILA PRÁCE (vady a meze, pojmenované)
+
+1. **Událost bez odběratele.** `mobile_anim` má **dva producenty a nula
+   konzumentů** — v kódu to vypadá jako hotová funkce. Stejný druh vady je
+   `sim.interaction.context_menu`, který simulace spočítá a UI nekreslí (G4 to
+   hlásí jako „volá ho jen tests/“).
+2. **Dvě chyby v mé vlastní sondě** (obojí v `LESSONS.md`): měřila „akce před
+   krokem“ až **po** zadání kroku (vypsala 0 a tvářila se to jako „před“),
+   a rozdíl snímků počítala na **celé obrazovce** a přes **vzdálené** framy
+   (553 323 px místo 39). Opraveno: stav se čte před voláním, rozdíl ve výřezu
+   a na sousedních framech.
+3. **Správnost ≠ viditelnost.** Na kryse (tělo 238) je rozdíl okem slabý a mé
+   `read_image` ho **nepotvrdilo jako jednoznačné** — doložená je čísly
+   (frame 0 → 4) a mutací, ne okem. Kdo bude P1 posuzovat pohledem, ať vezme
+   **větší subjekt** (člověk/monstrum zblízka), ne krysu.
+
+## ⚠ CO ZŮSTÁVÁ OTEVŘENÉ (pojmenované, ne zamlčené)
+
+1. **Útok a smrt se u cizích postav ještě NEanimují** — `sim.combat.state_of()`
+   nenese čas posledního swingu, takže by si je klient domýšlel (a to
+   `docs/01` §1.5 bod 9 zakazuje). Je to **druhý krok P1**, ne opomenutí.
+2. **Postavy se ve světě pořád jen sunou po dlaždicích** — plynulý posun mezi
+   dlaždicemi má zavedený jen hráč (`_player_offset`); u cizích mobilů se kreslí
+   `mob.pos`. Animace je správná, ale „šoupání“ zůstává.
+3. **Populace světa:** v Britainu na startu jsou **3 monstra a prodejci**
+   (`stojicich lidi=0 stojicich monster=3 jdoucich=0`) — i s opravenou animací
+   není na kom ji vidět. Patří do `M7`/`data.spawns`, ne do P1.
+4. **V repu je trackovaný snímek s mapou z instalace UO** (`p20b-obrazky/m5-souboj.png`),
+   i když pravidlo projektu říká „snímky nejsou v gitu“. Nové snímky jsem
+   **necommitoval** a složku jsem přidal do `.gitignore`; co už v gitu je, jsem
+   **nemazal** (patří uživateli).
+5. **P2 a P3 ze `ZADANI-27-POCIT.md` nejsou udělané** — dosah interakce (útok
+   a `use` bez kontroly vzdálenosti) a zvuk (0× `AudioStream` v repu).
+
+## 🧍 CO ČEKÁ NA TEBE
+
+1. **Má se pokračovat P2 (dosah), nebo P1 dotáhnout** (útok/smrt + plynulý
+   posun cizích postav)? Doporučení: **P2** — je levnější na ověření a sahá na
+   koherenci, kterou jsi pojmenoval druhou.
+2. **Smí být dosah v datech** (`data/balance.json`), nebo stačí konstanta
+   s odkazem na referenci? (Otázka ze `ZADANI-27-POCIT.md` §6, pořád otevřená.)
+3. **Smazat `p20b-obrazky/m5-souboj.png` z gitu?** Obsahuje mapu z instalace UO;
+   smazání je nevratné pro ten strom, proto to nedělám sám.
+4. **Zobrazení zdraví** zůstává odložené (`docs/01` §1.8) — až po P1–P3.
+
+## 🔗 COMMITY TÉTO SESSION
+
+**`<doplnit po commitu>`** — `app/world_view.gd`, `app/main.gd`,
+`tests/cases/world_view.gd`, `tools/gates/mutace-tests.py`, `.gitignore`,
+`LESSONS.md`, `HANDOFF.md` (tento blok). Snímky a sonda v `_analyza/`
+**nejsou v gitu** (obsahují UO mapu / jsou gitignorované).
+
+---
+
 # Předání — game-clone (2026-10-12, SESSION „G10 A SADA v3“: hra bere `own-v3`, brána už nemůže měřit včerejší snímek)
 
 > **Co je tenhle soubor:** **stav projektu** pro další session agenta. Přepisuje

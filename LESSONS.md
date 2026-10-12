@@ -24,6 +24,61 @@ Typy: `chyba` (moje vada) · `past-nástroje` (prostředí/nástroj, ne logika) 
 
 ---
 
+# 2026-10-12 — SESSION „P1“: ANIMACE CIZÍCH POSTAV (UKÁZALA SE MRTVÁ SLOVNÍ ZÁSOBA)
+
+> **Zadání:** `ZADANI-27-POCIT.md` §3 P1 (uživatel: „svět není koherentní a je
+> mrtvý — postavy nemají animace“). Co se udělalo a čím je to doložené, je
+> v `HANDOFF.md` (blok nahoře); tady jsou jen ponaučení.
+> ⚠ **V témže stromě pracovaly paralelní session** (G10/art v3 a modding E) —
+> jejich soubory jsem needitoval.
+
+### 2026-10-12 — Událost se publikovala a NIKDO ji neodebíral (chyba)
+**Co se stalo:** `mobile_anim` vznikalo v `sim/systems/movement.gd:196` i
+`sim/systems/combat.gd:987` (dva producenti) a v celém `app/` ji nečetl
+**nikdo** (nula konzumentů) — jediný výskyt byl komentář
+v `app/player_controller.gd:20`. `app/world_view.gd:426` proto kreslil každého
+cizího mobila s akcí 4 (postoj) natvrdo: monstra se ve světě sunula.
+Nebyla to „chybějící animace“, ale **chybějící odběratel**.
+**Doklad:** grep `mobile_anim` nad `*.gd` = 2 producenti / 0 konzumentů; nový
+test `tests/cases/world_view.gd` sekce 7e; mutace „cizi postava se kresli
+v postoji natvrdo (P1 vracena)“ → CHYCENA.
+**Ponaučení:** u každé události se ptej **kdo ji čte**, ne kdo ji posílá.
+Publikovaný event bez konzumenta vypadá v kódu jako hotová funkce a v chování
+jako mrtvá slovní zásoba — stejný druh vady jako `context_menu`, který simulace
+spočítá a nikdo nekreslí.
+
+### 2026-10-12 — Sonda měřila „stav před krokem“ až PO zadání kroku (chyba)
+**Co se stalo:** první verze `_analyza/p1-animace-snimek.gd` četla akci až po
+`request_step`, takže vypsala „PRED krokem: action 0 (chuze)“ — a vypadalo to
+jako důkaz, že postava šla už předtím. Oprava: stav se čte **před** voláním,
+které ho mění (a u nouzové větve se řekne slovem, že „před“ je jiný stav).
+**Doklad:** `.tmp/p1-snimek.log` — před opravou `akce pred=0`, po opravě `pred=4`.
+**Ponaučení:** měřidlo musí pojmenovat **okamžik**, ve kterém stav čte. Když
+volání stav mění, „před“ a „po“ jsou dva různé důkazy a nesmí se zaměnit.
+
+### 2026-10-12 — Rozdíl snímků na CELÉ obrazovce měří stěhování kamery (past-nástroje)
+**Co se stalo:** první verze ukládala každou další framu, takže A a B od sebe
+byly sekundy; rozdíl pixelů vyšel **553 323** (půl obrazovky) — měnilo se
+dostavování okolí a žurnál, ne animace. Správně: **dvě sousední framy** a rozdíl
+**ve výřezu** kolem postavy (39 px z 3136).
+**Doklad:** `.tmp/p1-snimek.log` (553 323 → 39), `p20b-obrazky/p1-animace-{a,b}.png`.
+**Ponaučení:** vizuální rozdíl měř na **výřezu** a na **sousedních** framech;
+jinak „prokážeš“, že se hýbe celý svět.
+
+### 2026-10-12 — Správnost animace ≠ viditelnost animace (vada-zadani)
+**Co se stalo:** P1 je doložená čísly (akce 4 → 0 → 4, frame 0 → 4), ale na
+**kryse** (tělo 238, 39 px ve výřezu) je rozdíl okem slabý. A v Britainu na
+startu nejsou **žádné stojící lidské postavy** — jen tři monstra a prodejci
+(ti stojí), takže „postavy nemají animace“ je i otázka **populace světa**, ne
+jen klientského kódu.
+**Doklad:** sonda vypsala `stojicich lidi=0 stojicich monster=3 jdoucich=0`;
+snímky `p20b-obrazky/p1-animace-{a,b}.png`.
+**Ponaučení:** u kritéria „je to vidět“ měř i **velikost subjektu** a napiš,
+na čem to vidět je. Malý sprite neutáhne tvrzení „je to vidět“ — a chybějící
+populaci nevyřeší klientská oprava (patří do `M7` / `data.spawns`).
+
+---
+
 # 2026-10-12 — SESSION „G10 A SADA v3“: BRÁNA MĚŘILA VČEREJŠÍ SNÍMEK (A SNÍMEK VE STOJE NEMÁ VLASTNÍ POSTAVU)
 
 > **Zadání:** „Pokračuj“ — session si sama vybrala podle stavu: dokončit otevřenou

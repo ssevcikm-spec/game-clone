@@ -1072,6 +1072,13 @@ func _setup_player(view) -> void:
 		# Kresleni ostatnich mobili, tela a jmen (M5) - bez toho by monstrum
 		# existovalo v simulaci, ale na obrazovce nebylo.
 		view.set_mobily(registry, container, items)
+	if view.has_method("set_movement"):
+		# P1 (2026-10-12): animace CIZICH postav. Kresleni bere bezici krok ze
+		# STAVU (`sim.movement.pending_step`), stejne jako hrac - do teto chvile
+		# se kazdy cizi mobil kreslil s akci 4 (postoj) a monstra se SUNULA.
+		# `has_method` je tu ze stejneho duvodu jako u `set_mobily`: kdo ma
+		# starsi `world_view`, dostane presne stare chovani (a je to videt).
+		view.set_movement(movement)
 	if view.has_method("nastav_decay"):
 		view.nastav_decay(decay)
 	# ROZPAD PREDMETU NA ZEMI (M5): kdo predmety poklada, musi to OHLAST

@@ -33,6 +33,12 @@ tools/artgen/raw/
 tools/artgen/*.png
 tools/artgen/_*
 tools/artgen/blend/*.blend1
+# --- snímky hry (obsahují mapu z instalace UO) ---
+# Pravidlo projektu je "snímky nejsou v gitu" (HANDOFF, ZADANI-25), ale složka
+# ignorovaná nebyla: namEReno 2026-10-12 session P1, že `p20b-obrazky/` obsahuje
+# TRACKOVANY `m5-souboj.png` s mapou z instalace. Nové snímky sem nesmí; co už
+# v gitu je, se z tohohle místa needituje (rozhodnutí patří uživateli).
+p20b-obrazky/
 # --- Godot ---
 .godot/
 *.import

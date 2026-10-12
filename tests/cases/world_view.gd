@@ -129,6 +129,36 @@ class FakeAnim:
 		return ImageTexture.create_from_image(img)
 
 
+class FakeMobil:
+	# Cizi postava pro P1 (2026-10-12): `_draw_mobil` z ni cte serial, pos,
+	# dir a hue. Jmena/HP se needituji - `_jmena` se pro tuhle vetev vypne.
+	var serial: int = 99
+	var pos: Vector3i = Vector3i(10, 20, 0)
+	var dir: int = 0
+	var hue: int = 0
+
+
+class FakeMobilRegistry:
+	# `animace_mobila()` saha jen na `get_mobile`; `all()` je tu proto, aby
+	# fixture nebyla uzavrena na jedinou metodu registru.
+	var mobily: Dictionary = {}
+
+	func get_mobile(serial: int):
+		return mobily.get(serial)
+
+	func all() -> Array:
+		return mobily.values()
+
+
+class FakeMovement:
+	# Nahrazuje `sim.movement` v testu animace CIZICH postav: vraci jen to, co
+	# klient opravdu cte (`dir`, `run`). Prazdny slovnik = zadny krok v letu.
+	var kroky: Dictionary = {}       # serial -> {dir, run}
+
+	func pending_step(serial: int) -> Dictionary:
+		return (kroky.get(serial, {}) as Dictionary).duplicate()
+
+
 func _arg(name: String, fallback: String) -> String:
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--" + name + "="):
@@ -587,6 +617,61 @@ func run(t) -> void:
 		"app.world_view: _draw_player kresli SMER KRESLENI, ne `player.dir` "
 		+ "(namEReno %d, mobil %d, cekano 2)" % [falesny.dir, int(hrac.dir)])
 	view.set_view_dir(0)
+
+	# 7e) ⚠⚠ P1 (2026-10-12) - ANIMACE CIZICH POSTAV. NamERena vada: udalost
+	#     `mobile_anim` vzniká v `sim.movement`/`sim.combat`, ale v `app/` ji
+	#     NIKDO neodebiral, takze `_draw_mobil` kreslil KAZDEHO ciziho mobila
+	#     s akci 4 (postoj) natvrdo - monstra se ve svete SUNULA.
+	#     Test meri OBA konce: (a) verejne `animace_mobila()` (to, na co se ptá
+	#     sonda), (b) `_draw_mobil` s falesnym animatorem (to, co se opravdu
+	#     kresli). Bez kroku v letu plati `mob.dir`; s krokem plati smer ZAMERU
+	#     (V2: `mob.dir` se prepise az na konci kroku).
+	var cizi := FakeMobil.new()
+	cizi.serial = 99
+	cizi.dir = 0
+	var cizi_reg := FakeMobilRegistry.new()
+	cizi_reg.mobily[99] = cizi
+	var kroky := FakeMovement.new()
+	var jmena_zaloha = view.get("_jmena")
+	var falesny_mob := FakeAnim.new()
+	view.set("_draw_registry", cizi_reg)
+	view.set("_jmena", null)          # jen animacni vetev, ne `render.names`
+	view.set("_anim", falesny_mob)
+	view.set_movement(kroky)
+	# (a) zadny krok v letu -> postoj a smer z mobila
+	var stoji: Dictionary = view.animace_mobila(99)
+	t._check(int(stoji.get("action", -1)) == 4 and int(stoji.get("dir", -1)) == 0,
+		"app.world_view: cizi postava bez kroku kresli POSTOJ 4 (namEReno %s)" % str(stoji))
+	# (b) CHUZE smerem 5: mobil stoji na `dir 0`, takze se MUSI kreslit smer
+	#     ZAMERU - a kreslici cesta to musi predat animatoru (`play`).
+	kroky.kroky[99] = {"dir": 5, "run": false}
+	var nakresleno: bool = view.call("_draw_mobil", cizi)
+	t._check(nakresleno and falesny_mob.akce == 0 and falesny_mob.dir == 5,
+		"app.world_view: cizi postava v chuzi se kresli akci 0 a smerem ZAMERU 5 "
+		+ "(namEReno akce %d, smer %d, mobil.dir %d, nakresleno %s)"
+			% [falesny_mob.akce, falesny_mob.dir, int(cizi.dir), str(nakresleno)])
+	# (c) BEH -> akce 1 (u lidi skupina 2 v `anim.mul` - viz `render/anim_player`)
+	kroky.kroky[99] = {"dir": 2, "run": true}
+	var bezi: Dictionary = view.animace_mobila(99)
+	t._check(int(bezi.get("action", -1)) == 1 and int(bezi.get("dir", -1)) == 2,
+		"app.world_view: cizi postava v behu kresli akci 1 (namEReno %s)" % str(bezi))
+	# (d) po dobehnuti kroku zpet postoj
+	kroky.kroky.erase(99)
+	var zpet: Dictionary = view.animace_mobila(99)
+	t._check(int(zpet.get("action", -1)) == 4,
+		"app.world_view: po dobehnuti kroku se cizi postava vraci do postoje (namEReno %s)"
+			% str(zpet))
+	# (e) BEZ `sim.movement` zustava STARE chovani (postoj) - a je to VIDET;
+	#     "chybejici system" se nesmi tvarit jako "animace funguji".
+	view.set_movement(null)
+	var bez_systemu: Dictionary = view.animace_mobila(99)
+	t._check(int(bez_systemu.get("action", -1)) == 4,
+		"app.world_view: bez sim.movement zustava postoj 4 (namEReno %s)" % str(bez_systemu))
+	# (f) nezname serial = PRAZDNY slovnik (ne vymysleny postoj)
+	var neznamy_serial: Dictionary = view.animace_mobila(12345)
+	t._check(neznamy_serial.is_empty(),
+		"app.world_view: nezname serial vraci prazdny slovnik (namEReno %s)" % str(neznamy_serial))
+	view.set("_jmena", jmena_zaloha)
 
 	# 8) ⚠ 18. session: klic hrace SEDI MEZI STATIKY sveho pruchodU. Pri STEJNEM
 	#    `z` jako hrac: statiky na blizsi diagonale (29) jsou pred nim, statiky

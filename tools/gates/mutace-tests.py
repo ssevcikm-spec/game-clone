@@ -915,6 +915,16 @@ MODULY = {
              "\t\t_mesh.vymena = nahrady\n", ""),
             ("prazdna vymena dávku nevypne (stare nahrady zustanou)",
              "\tvymena_textur = nahrady\n", "\tvymena_textur = {}\n"),
+            # --- P1 (2026-10-12): ANIMACE CIZICH POSTAV --------------------
+            # Vada, kterou uzivatel videl jako "svet je mrtvy, postavy nemaji
+            # animace": `mobile_anim` sice vzniká v `sim.movement`/`sim.combat`,
+            # ale v `app/` ji nikdo neodebiral, takze se KAZDY cizi mobil kreslil
+            # s akci 4 (postoj) natvrdo. Tahle mutace vraci presne ten stav:
+            # kdyby ji `tests/cases/world_view.gd` (sekce 7e) nevidel, je ta
+            # sekce slepa a "monstra se sunou" se muze vratit.
+            ("cizi postava se kresli v postoji natvrdo (P1 vracena)",
+             "_anim.play(int(mob.serial), int(akce[\"action\"]),\n\t\tint(akce[\"dir\"]))",
+             "_anim.play(int(mob.serial), ACTION_IDLE, int(mob.dir))"),
         ],
     },
     # M9 (15. session): davkove kresleni. Mutace miri na GEOMETRII, PORADI
