@@ -109,12 +109,17 @@ nástroj, který vyrábí jeho vstup.
 
 ## 🔗 COMMITY TÉTO SESSION (a ověřený push)
 
-`C1` — `assets/own-art.json` (vrstva `own-v3` místo `own-lit` + `own`),
+`18efae6` — `assets/own-art.json` (vrstva `own-v3` místo `own-lit` + `own`),
 `tools/gates/check-render.py` (kontrola stáří snímku + poznámka o kódu),
 `tools/gates/ci-godot.sh` (snímek přes řidiče), `tools/gates/snapshot-walk.gd`
 (nový, v repu), `docs/08 §8.3.1`, `LESSONS.md` (2026-10-12), `HANDOFF.md`
 (tento blok, **nad** blokem paralelní session).
-**Push ověřen živě:** _(doplněno v navazujícím commitu)_
+**Push ověřen živě:** `3d7d778..18efae6 main -> main`,
+`git rev-list --count origin/main..HEAD` → **0**, `origin/main` = `HEAD` =
+`18efae6`.
+⚠ **Necommitoval jsem práci paralelní session** (`app/main.gd`,
+`app/world_view.gd`, `tests/cases/world_view.gd`, `tools/gates/mutace-tests.py`,
+`assets/cobble/`) — zůstala v pracovním stromě tak, jak byla.
 
 ---
 
