@@ -53,6 +53,17 @@ a `check-sound.py` (nové brány **G18**, **G19**), `tools/gates/run-all.py`
 `git rev-list --count origin/main..HEAD` → **0**, `origin/main` = `HEAD` =
 `b7d8064`.
 
+⚠ **PŘIZNANÁ CHYBA TOHOTO COMMITU:** staged jsem `sim/systems/combat.gd` **celý**
+a paralelní session v něm měla **rozpracovaný** přírůstek k P1 (okno animace
+útoku: `ANIM_ATTACK_MS`, `_anim_do`, ~16 řádků). Ty jsem tím **commitnul pod
+svou zprávou** — jejich práce se neztratila (je v `b7d8064` a strom je po ní
+čistý), ale **neměl jsem ji commitovat** a není mou prací. Ověřeno, že
+v ostatních mých souborech (`harvest`, `craft`, `run-all`, `app/sound.gd`) cizí
+hunk **není**. Historie se nepřepisuje (commit je pushnutý); kdo na P1 naváže,
+ať ví, že tenhle přírůstek přišel odsud a kdo ho psal. Poučení: **stageuj
+soubory po jednom a před commitem zkontroluj `git diff --cached`, jestli
+neobsahuje cizí změny** — „staged celý soubor" je u sdíleného stromu past.
+
 ---
 
 # Předání — game-clone (2026-10-12, SESSION „Zvuk“: P3 — hra konečně vydává zvuk)
