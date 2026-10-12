@@ -90,6 +90,7 @@ dokud žádný cizí mod neexistuje:
 |---|---|---|
 | **id modu je jmenný prostor s tečkou** (`autor.mod`); `base` tečku mít nemusí | `sim/content.gd` | mod s id bez tečky se **odmítne s důvodem**; test to měří |
 | **Kdo co přebil, je VIDĚT** (mod smí měnit, ale ne tiše) | `sim/content.gd` (`overrides()`), `app/main.gd` | při startu se vypíše každý soubor, který poskytuje víc vrstev, **i s pořadím** |
+| **UO art jen jako ZÁLOHA** („UO art používat jen pokud není rozhodnutý náš“) — náš art, který se nevykresluje, je **vada**, ne nedodělek | `tools/check-art-fallback.py` (**nová metrika v repu**), pravidlo `docs/01 §1.2.1`, kontrakt modu `docs/04 §4.9` | naměřeno: deklarováno **9 (kind,id)** + **40 anim framů** postavy, aktivní sady nabízejí **9** → **0 vad**; mimo kontrolu zůstávají sady `cobble, own, own-lit, own2x` (varování, ne vada); vada umí nastat: `_analyza/p70-art-fallback-mutace.py` **3/3** (fixture „nabízené bez deklarace“ → exit 1) |
 | Testy a E2E na nová pravidla | `tests/cases/content.gd`, `_analyza/p63-mod-e2e.py` | case **59 kontrol / 0 selhání**; E2E **3 běhy hry, 0 vad** (mod `e2e.test`: `uvod 7 → 8 → 7`) |
 | Mutační důkaz | `_analyza/p62-mutace-content.py` | **8 z 8 chyceno** |
 | Nic se nerozbilo | `tests/run_tests.gd`, `run-all.py` | testy **2805/0** (89 souborů), brány **16/0** |

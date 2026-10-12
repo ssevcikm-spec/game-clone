@@ -827,6 +827,14 @@ soubory, které poskytuje víc než jedna vrstva, `providers(rel)` řekne **kdo 
 v jakém pořadí**, a `app/main` to **vypisuje při startu**. Kdo se ptá „proč se
 to chová jinak“, to musí dostat pojmenované.
 
+**ART NENÍ součástí vrstev obsahu** (jen `data/*.json`) — a platí pro něj
+pravidlo z `docs/01 §1.2.1`: **UO art je jen záložní, kde je rozhodnutý náš**
+(rozhodnutí uživatele 2026-10-12). Pro moddera z toho plyne: **mod s sebou
+nesmí nést art z instalace UO** (nedistribuuje se) a **kde máme vlastní
+rozhodnutý sprite, platí náš**. Vlastní art modu (vrstva artu, ne dat) je
+**otevřený bod S4** — dnes se deklaruje v `assets/own-art.json`, což je
+konfigurace hry, ne modu.
+
 **Rozhraní modulu** (kanonicky v `§4.2`): `discover(decl_path, mods_dir)` načte
 deklaraci a mody a vrátí počet přidaných vrstev; `path_for(rel)` vrátí vítěze
 nebo `""`; `path_or_default(rel)` vrátí základní `res://` cestu, když o souboru

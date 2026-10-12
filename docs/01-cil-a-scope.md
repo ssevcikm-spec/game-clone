@@ -121,6 +121,21 @@ data a engine fungovaly) a **tvary/vzhledem** (co je volné):
 4. **Pozor na věci, které vypadají jako vzhled, ale jsou kontrakt** — dlaždice
    a kotvy jsou příklad: změna je možná, ale je to **koordinovaná změna
    s bránou `G1`**, ne svoboda jednoho souboru.
+5. **UO art je jen ZÁLOHA (rozhodnutí uživatele 2026-10-12: „UO art používat jen
+   pokud není rozhodnutý náš").** Kde je náš art **rozhodnutý**, kreslí se **náš**;
+   UO se použije **jen tam, kde náš rozhodnutý není**. Dvě věci z toho plynou:
+   * **náš art, který existuje a nevykresluje se, je vada** (ne „nedodělek") —
+     protože hráč vidí UO tam, kde už máme svůj. Měří to
+     [`tools/check-art-fallback.py`](../tools/check-art-fallback.py)
+     (exit 1 = náš sprite v aktivní sadě chybí v `assets/own-art.json`),
+   * **UO art se nedistribuuje** (`assets/uo/` je mimo git) a **mod s ním
+     nesmí přijít** — v moddingu je to pravidlo, ne technické vynucení
+     (`NAVRH-MODDING-2026-10-11.md` R5).
+
+   „Není rozhodnutý" znamená **konkrétně**: pro to (kind, id) nemáme vlastní
+   sprite v aktivní sadě. Naměřeno 2026-10-12: našich (kind, id) je **9**
+   + **40 anim framů** postavy; všechno ostatní (tisíce dlaždic, předmětů
+   a monster) je UO **právem** — náš art pro ně rozhodnutý není.
 
 ## 1.3 Hlavní herní smyčka, která musí fungovat celá
 
