@@ -101,11 +101,17 @@ jeden `AudioStream`).
 
 ## 🔗 COMMITY TÉTO SESSION (a ověřený push)
 
-`C1` — `assets/sounds/` (5 WAV + manifest), `tools/audio/gen-sfx.py` (nový),
-`app/sound.gd` (nový), `app/loop.gd` (zapojení), `tests/cases/sound.gd` (nový),
-`tools/gates/sound_probe.gd` (nový, důkaz C1), `CREDITS.md` (nový),
-`LESSONS.md` (část „Zvuk“), `HANDOFF.md` (tento blok).
-**Push ověřen živě:** _(doplněno v navazujícím commitu)_
+`C1` = **`89bf412`** — `assets/sounds/` (5 WAV + manifest),
+`tools/audio/gen-sfx.py` (nový), `app/sound.gd` (nový), `app/loop.gd`
+(zapojení), `tests/cases/sound.gd` (nový), `tools/gates/sound_probe.gd` (nový,
+důkaz C1), `CREDITS.md` (nový), `LESSONS.md` (část „Zvuk“), `HANDOFF.md`
+(tento blok).
+**Push ověřen živě:** `9901c9a..89bf412 main -> main`,
+`git rev-list --count origin/main..HEAD` → **0**, `origin/main` = `HEAD` =
+`89bf412`.
+⚠ **Necommitoval jsem práci paralelní session** (`P1` a `P2` commitovala sama:
+`92decd6`, `db0378e` a jejich předání) — v pracovním stromě zůstalo jen
+`assets/cobble/` (mimo obě session).
 
 ---
 
