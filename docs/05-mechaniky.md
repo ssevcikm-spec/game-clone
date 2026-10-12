@@ -151,6 +151,17 @@ test):
 | tělo (corpse) | otevři loot |
 | **neznámý předmět** | hláška „You see nothing special." — **nikdy ticho** |
 
+**DOSAH „use" (DOPLNĚNO 2026-10-12, `P2` ze `ZADANI-27`):** `use` na **cizí
+objekt** (dveře, kontejner, vendor) vyžaduje hráče do **`range.use` dlaždic**
+(Chebyshev, `data/balance.json`, výchozí **2** — stejná hodnota jako
+`LOOT_RANGE` a `VENDOR_RANGE`, aby svět neměl tři různá čísla); mimo dosah vrací
+`{ok:false, reason:"too_far"}` **a hlášku** (ne ticho). Větve, jejichž cíl je ve
+**vlastním batohu** (nástroj, svitek, lektvar, zbraň), dosah **nemají** — plošná
+kontrola by hráči zakázala použít jeho vlastní majetek. Do tohoto data `use`
+vzdálenost **neměřil**: dveře, truhla i obchodní okno se otevřely z druhého konce
+mapy. Kdo je „hráč" a kde stojí, se bere z registru (`sim.entity_registry`);
+**neznámá pozice = „nevím", a to NENÍ „na dosah"** (stejné pravidlo jako u lootu).
+
 ### 5.2.3 „Použij na cíl" (use-on) — párové kombinace
 
 Tohle je **kontrolní seznam z `Tilehelp.enu`** (originální nápověda klienta).
@@ -252,6 +263,7 @@ větev **a** test. Když větev chybí, hra na použití odpoví hláškou
 | **Archery** | stání na místě 1000/500/250 ms dle éry, munice se spotřebuje **při každém** výstřelu, 40 % návratnost, dostřel 7–10. **DOPLNĚNO 2026-10-10 (`M2`): zásah se počítá v okamžiku výstřelu, let šípu je jen VIZUÁLNÍ efekt** — přesně tak to dělá reference (`_src/servuo/Scripts/Items/Equipment/Weapons/BaseRanged.cs:91-102` = `Swing` → `OnFired` → `CheckHit` → `OnHit`, let je `MovingEffect` na `:221`). Projektil, který rozhoduje o zásahu, je **odchylka** (nová smlouva, +3–6 granulí) |
 | **Healing obvazy** | vzorce AoS i klasika + prodlevy + podmínky `60/60` pro vyléčení a `80/80` pro vzkříšení (v `research/03`) |
 | **Zvláštní útoky** | 31 útoků s přesnou cenou many a branami 70/90 skillu |
+| **Dosah melee** | **DOPLNĚNO 2026-10-12 (`P2`): `range.melee` dlaždic** (Chebyshev, `data/balance.json`, výchozí **1**); mimo dosah `attack` vrací `{ok:false, reason:"too_far"}` **a hlášku**, swing se neplánuje. Do tohoto data `attack` vzdálenost **neměřil** (hráč zasáhl cíl na druhém konci mapy, kdežto monstrum muselo být na dosah ruky — `sim/systems/ai.gd` `MELEE_RANGE = 1`). Dosah **zbraně** (luky, oštěpy) zůstává věcí zbraně a do dat půjde s nimi |
 
 **Proč AoS a ne klasika:** klon má věrné **rozhraní** (AoS UI, kontextová
 menu) a **soubojové vzorce AoS**, protože data z instalace jsou moderní

@@ -24,6 +24,51 @@ Typy: `chyba` (moje vada) · `past-nástroje` (prostředí/nástroj, ne logika) 
 
 ---
 
+# 2026-10-12 — SESSION „P2“: DOSAH INTERAKCE JE V DATECH (A TŘI POUČENÍ Z FIXTUR)
+
+> **Zadání:** `ZADANI-27-POCIT.md` §3 P2 (uživatel: „neřeší vzdálenost pro
+> interakci“). Co se udělalo a čím je to doložené, je v `HANDOFF.md` (blok
+> nahoře); tady jsou ponaučení.
+> ⚠ **V témže stromě pracovaly paralelní session** — jejich soubory jsem needitoval.
+
+### 2026-10-12 — DOSAH BYL V KÓDU DVAKRÁT A PODE DVANÁCTÉ NIKDE (chyba)
+**Co se stalo:** `use` na dveře, truhlu a otevření obchodu vzdálenost **neměřil
+vůbec**, kdežto `attack` taky ne — a přitom AI měla `MELEE_RANGE = 1`, loot
+`LOOT_RANGE = 2`, obchod `VENDOR_RANGE = 2` a výroba `STATION_RANGE = 2`. Svět
+tedy byl **přísný na monstra a benevolentní k hráči**: hráč otevřel obchod
+z druhého konce mapy, ale monstrum muselo být na dostřel ruky.
+**Doklad:** `grep RANGE` v `sim/systems/combat.gd` = 0 nálezů; `_run_use` bez
+kontroly pozice; nové sekce testů (interaction O, combat B2) a dvě mutace.
+**Ponaučení:** „koherence“ se neměří dojmem — měří se **tabulka dosahů**:
+vezmi každý systém, který sahá na cizí objekt, a napiš k němu číslo (nebo
+„nemá“). Chybějící číslo je vada i tehdy, když nikdo neprotestuje.
+
+### 2026-10-12 — Fixtura bez hráče v registru je po zavedení dosahu „správné odmítnutí“ (past-nástroje)
+**Co se stalo:** tři testy volaly `use(HRAC, …)`, ale hráče v registru **neměly**
+(`interaction.gd`, `trade_path.gd`). Dokud se dosah neměřil, bylo to jedno; po
+zavedení dosahu je „nevím, kde hráč je“ = „není na dosah“ — tedy **správné
+chování**, které test hlásil jako vadu. Oprava je ve fixtuře (hráč se registruje),
+ne v kódu.
+**Doklad:** `tests/cases/interaction.gd`, `tests/cases/trade_path.gd` (komentáře
+u registrace); běh před opravou: 7 selhání, po opravě 0.
+**Ponaučení:** když zavádíš novou podmínku, **projdi fixtury, které ji nesplňují**,
+a rozhoduj u každé: je to vada kódu, nebo nerealistická fixtura? Většinou to druhé
+— a patří to do komentáře, ne do tiše upraveného čísla.
+
+### 2026-10-12 — `_mobil(registry, serial, 100, 100, 100)` nejsou souřadnice (chyba)
+**Co se stalo:** první verze sekce B2 v `tests/cases/combat.gd` předala „pozici“
+do helperu `_mobil(registry, serial, sila, obratnost, inteligence)` — další tři
+argumenty jsou **staty**, pozice je uvnitř natvrdo `(10,10,0)`. Všechny mobily
+tedy stály na sobě, „cíl o dlaždici dál“ vyšel jako **zásah** a test měřil něco
+jiného, než tvrdil.
+**Doklad:** běh před opravou: `FAIL combat: cil o dlazdici dal vraci too_far`
+(`ok: true`); po opravě (pozice se nastavuje výslovně) test prochází.
+**Ponaučení:** než začneš měřit vzdálenost, **ověř, kde mobily opravdu stojí**
+(např. výpisem `pos`) — jinak měřidlo ticha měří nulu, protože všechny objekty
+jsou na jednom místě.
+
+---
+
 # 2026-10-12 — SESSION „P1“: ANIMACE CIZÍCH POSTAV (UKÁZALA SE MRTVÁ SLOVNÍ ZÁSOBA)
 
 > **Zadání:** `ZADANI-27-POCIT.md` §3 P1 (uživatel: „svět není koherentní a je

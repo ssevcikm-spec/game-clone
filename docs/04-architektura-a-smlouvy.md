@@ -656,6 +656,13 @@ swing: resolve_swing(m, t) → hit chance (zbraňový skill vs zbraňový skill)
    damage (vzorec dle éry), obrana (parry/AR nebo resisty), efekty
    → event message + mobile_anim + sound + stats_changed + případně death
 ```
+**DOPLNĚNO 2026-10-12 (`P2` ze `ZADANI-27`) — DOSAH:** `attack` vyžaduje cíl do
+**`range.melee` dlaždic** (Chebyshev, `data/balance.json`, výchozí **1**; stejná
+hodnota jako `sim/systems/ai.gd` `MELEE_RANGE`); mimo dosah vrací
+`{ok:false, reason:"too_far"}` **a hlášku** a **swing se neplánuje** (odmítnutý
+příkaz nesmí změnit stav boje). Do tohoto data `attack` vzdálenost **neměřil**.
+Dosah **zbraně** (luky) je věc zbraně, ne tohoto pravidla.
+
 **Přijímací kritérium:** se zbraní a `tactics=100` dá 20 swingů na cíl s `hp`
 > 0 alespoň 5 zásahů (nenulový damage) a cíl ztratí hp; **bez zbraně**
 (wrestling) funguje útok dál.

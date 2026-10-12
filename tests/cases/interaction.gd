@@ -33,6 +33,9 @@ const EVENTS_SCRIPT := "res://core/events.gd"
 const ITEMS_PATH := "res://data/items.json"
 const SKILLS_PATH := "res://data/skills.json"
 const DOCS05_PATH := "res://docs/05-mechaniky.md"
+# P2 (2026-10-12): dosah na predmet je DATA - test cte TUTEZ cestu jako modul
+# (kdyby se modul ptal jinam, kontrola "hodnota je z dat" to vidi).
+const BALANCE_PATH := "res://data/balance.json"
 
 const ART := 0x4000                 # tiledata id -> art id (item.gd, hlavicka)
 const MAX_STACK := 60000
@@ -221,6 +224,13 @@ func run(t) -> void:
 	var registry = registry_script.new()
 	var items := StubItems.new()
 	var modul = script.new(world, events, doors, containers, registry, items)
+	# ⚠ P2 (2026-10-12): HRÁČ MUSÍ BÝT V REGISTRU. Do tohoto datumu tu žádný
+	# mobil hráče nebyl (registr se plnil až pro kontrolu prodejce) a `use`
+	# vzdálenost neřešil. Dnes je dosah kontrakt (`data/balance.json: range.use`)
+	# a "nevím, kde hráč je" = "není na dosah" (stejné pravidlo jako u lootu) -
+	# tedy SPRÁVNÉ odmítnutí, které by test bez téhle fixtury měřil jako vadu.
+	# Hráč stojí v Britainu, kam patří i cíle níž (dveře, truhla, prodejce).
+	registry.register(mobile_script.new(HRAC, 400, Vector3i(1495, 1630, 0)))
 
 	# A) TABULKY: §5.2.2 ma 9 vetvi (a konci "unknown"), §5.2.3 tabulka neni prazdna
 	var druhy: Array = []
@@ -267,7 +277,12 @@ func run(t) -> void:
 		t._pending("sim.interaction NEMERENO: v data/items.json neni role 'anvil'")
 
 	# D) DVEŘE: `use` projde pres `world.doors.toggle` (konvence z 8. session)
-	items.predmety = {502: item_script.new(502, DOOR_TILE, 1)}
+	# ⚠ P2 (2026-10-12): dveře mají POZICI na dosah. Fixtura je dřív neměla
+	# (výchozí `pos` je `(0,0,0)`), protože `use` vzdálenost neřešil; dnes by
+	# test měřil správné odmítnutí jako vadu.
+	var dvere_item = item_script.new(502, DOOR_TILE, 1)
+	dvere_item.pos = Vector3i(1496, 1630, 0)
+	items.predmety = {502: dvere_item}
 	t._check(str(modul.describe(502).get("kind", "")) == "door",
 		"sim.interaction: art %d z doors.txt je dvere" % DOOR_TILE)
 	events.clear()
@@ -298,7 +313,10 @@ func run(t) -> void:
 		var kserial: int = 504
 		var vnitrek = item_script.new(77, int(role_tiles.get("iron ore", 0)) + ART, 3)
 		containers.add(kserial, vnitrek)
-		items.predmety = {kserial: item_script.new(kserial, kat_kontejner + ART, 1)}
+		# ⚠ P2: truhla má pozici na dosah (viz komentář u dveří výš).
+		var truhla_item = item_script.new(kserial, kat_kontejner + ART, 1)
+		truhla_item.pos = Vector3i(1497, 1630, 0)
+		items.predmety = {kserial: truhla_item}
 		t._check(str(modul.describe(kserial).get("kind", "")) == "container",
 			"sim.interaction: predmet kategorie 'container' je kontejner")
 		events.clear()
@@ -516,3 +534,59 @@ func run(t) -> void:
 		t._check(v_dok or v_extra,
 			"sim.interaction: par %s -> %s je dohledatelny v docs/05 §5.2.3 nebo v §5.2.2"
 			% [str(par.get("od", "")), str(par.get("na", ""))])
+
+	# O) DOSAH (P2, 2026-10-12): `use` na CIZI objekt ma dosah Z DAT.
+	#    Do tohoto datumu vzdalenost NEMERIL - dvere, truhla i obchod se
+	#    otevřely z druheho konce mapy, kdezto monstrum muselo byt na dosah
+	#    ruky. Meri se TRI veci: (1) hodnota je z `data/balance.json`,
+	#    (2) na dosah projde a o dlazdici dal vraci `too_far` S HLASKOU,
+	#    (3) vetve s cilem ve VLASTNIM batohu (nastroj) dosah NEMENI - kdyby
+	#    se kontrola aplikovala plosne, hrac by nemohl pouzit ani svuj majetek.
+	var dosah: int = modul.use_range()
+	var dosah_z_dat = Lib.json_at(BALANCE_PATH)
+	var ocekavany: int = -1
+	if dosah_z_dat is Dictionary and dosah_z_dat.get("range") is Dictionary:
+		ocekavany = int((dosah_z_dat["range"] as Dictionary).get("use", -1))
+	t._check(ocekavany > 0 and dosah == ocekavany,
+		"sim.interaction: use_range() je z %s (kod %d, data %d)" % [BALANCE_PATH, dosah, ocekavany])
+	# (2a) NA DOSAH: dvere presne na hranici dosahu (HRAC stoji na 1495,1630)
+	var blizke = item_script.new(777, DOOR_TILE, 1)
+	blizke.pos = Vector3i(1495 + dosah, 1630, 0)
+	items.predmety = {777: blizke}
+	events.clear()
+	var ok_blizko: Dictionary = modul.use(HRAC, 777)
+	t._check(bool(ok_blizko.get("ok", false))
+			and str(ok_blizko.get("action", "")) == "toggle_door",
+		"sim.interaction: dvere na hranici dosahu (%d dlazdic) se otevrou (vyslo %s)"
+			% [dosah, str(ok_blizko)])
+	# (2b) MIMO DOSAH: o jednu dlazdici dal -> `too_far` a HLASKA (ne ticho)
+	var daleke = item_script.new(778, DOOR_TILE, 1)
+	daleke.pos = Vector3i(1495 + dosah + 1, 1630, 0)
+	items.predmety = {778: daleke}
+	events.clear()
+	var ok_daleko: Dictionary = modul.use(HRAC, 778)
+	var hlaska_dosah: Dictionary = _ma(events, "message")
+	t._check(not bool(ok_daleko.get("ok", true))
+			and str(ok_daleko.get("reason", "")) == "too_far",
+		"sim.interaction: dvere o dlazdici dal vraci `too_far` (vyslo %s)" % str(ok_daleko))
+	t._check(not hlaska_dosah.is_empty()
+			and str(hlaska_dosah.get("text", "")).find("far") >= 0,
+		"sim.interaction: `too_far` posle HLASKU, ne ticho (vyslo %s)" % str(hlaska_dosah))
+	# (2c) TRUHLA: stejna hranice (dosah plati pro vsechny tri vetve)
+	var truhla_daleko = item_script.new(781, kat_kontejner + ART, 1)
+	truhla_daleko.pos = Vector3i(1495 + dosah + 1, 1630, 0)
+	containers.add(781, [])
+	items.predmety = {781: truhla_daleko}
+	var truhla_vysledek: Dictionary = modul.use(HRAC, 781)
+	t._check(not bool(truhla_vysledek.get("ok", true))
+			and str(truhla_vysledek.get("reason", "")) == "too_far",
+		"sim.interaction: truhla mimo dosah vraci `too_far` (vyslo %s)" % str(truhla_vysledek))
+	# (3) VLASTNI MAJETEK: nastroj v batohu je daleko a presto projde
+	var nastroj_daleko = item_script.new(782, hammer_tile, 1)
+	nastroj_daleko.pos = Vector3i(1600, 1700, 0)
+	items.predmety = {782: nastroj_daleko}
+	var ok_nastroj: Dictionary = modul.use(HRAC, 782)
+	t._check(bool(ok_nastroj.get("ok", false))
+			and str(ok_nastroj.get("action", "")) == "target",
+		"sim.interaction: nastroj (cil ve VLASTNIM batohu) dosah NEMENI (vyslo %s)"
+			% str(ok_nastroj))

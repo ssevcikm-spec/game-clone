@@ -100,6 +100,11 @@ const HIT_MIN_CHANCE := 0.02        # `:1530-1532`
 const DIRECT_DAMAGE_CAP := 35       # `AOS.cs:213`
 const ARMOR_MIN_DAMAGE := 1         # `AOS.cs:205-206`
 const ARMOR_SCALE := 10000          # `AOS.cs:177`
+# DOSAH MELEE (P2, 2026-10-12): VYCHOZI hodnota, kdyz data nejsou; rozhoduje
+# `data/balance.json: range.melee`. Stejna hodnota, jakou uz ma AI
+# (`sim/systems/ai.gd` MELEE_RANGE = 1) - kdyby se rozesly, monstrum by muselo
+# byt bliz nez hrac, a to je presne nekoherence, kterou P2 odstranuje.
+const MELEE_RANGE := 1
 
 # Damage bonusy: scalar + offset, prah 100.0 skillu (`BaseWeapon.cs:3788-3791`,
 # `GetBonus` `:3663-3673`).
@@ -144,6 +149,10 @@ var _hci_cap: int = HCI_CAP
 var _dci_cap: int = DCI_CAP
 var _ssi_cap: int = SSI_CAP
 var _direct_cap: int = DIRECT_DAMAGE_CAP
+# DOSAH MELEE (P2, 2026-10-12): hodnota je DATA (`data/balance.json: range.melee`),
+# ne zapeena konstanta - `_melee_range` je jen vychozi hodnota pro pripad, ze data
+# nejsou. Do tohoto datumu `attack` vzdalenost VUBEC neresil.
+var _melee_range: int = MELEE_RANGE
 
 # Stav boje: serial -> {war, target, due_ms, delay_ms, started_ms}
 var _state: Dictionary = {}
@@ -190,6 +199,14 @@ func attack(m: int, target: int) -> Dictionary:
 		return _fail("no_target")
 	if not cil.alive():
 		return _fail("target_dead")
+	# DOSAH (P2, 2026-10-12): do tohoto datumu `attack` vzdalenost NEMERIL,
+	# takze hrac zasahl cil na druhem konci mapy, kdezto monstrum muselo byt na
+	# dosah ruky (`sim/systems/ai.gd` MELEE_RANGE). Hodnota je data
+	# (`data/balance.json: range.melee`); `push_warning` tu neni - je to bezny
+	# stav hry, ne vada - ale NENI to ticho: hrac dostane hlasku.
+	if not _na_dosah(mob, cil):
+		_message("You are too far away to attack.")
+		return _fail("too_far")
 	if _skill_atk(_weapon(mob)) < 0:
 		# Skill zbrane, ktery v datech neni, je VADA DAT - a je videt uz tady,
 		# ne az tise ve swingu (ticha nahrada wrestlingu by z jine zbrane
@@ -899,13 +916,46 @@ func _read_balance(path: String) -> void:
 	var d = _read_json(path)
 	if not (d is Dictionary):
 		return
+	_read_range(d)
 	var c = (d as Dictionary).get("combat")
 	if not (c is Dictionary):
+		# ⚠ POZOR (P2, 2026-10-12): tady byl `return`, ktery preskocil VSECHNO
+		# ostatni v souboru. Kdyz se cte vic klicu nez jeden, nesmi jeden
+		# chybejici klicek vzit sebou ostatni - dosah by se pak tise nenasel.
 		return
 	_hci_cap = int((c as Dictionary).get("hci_cap", _hci_cap))
 	_dci_cap = int((c as Dictionary).get("dci_cap", _dci_cap))
 	_ssi_cap = int((c as Dictionary).get("ssi_cap", _ssi_cap))
 	_direct_cap = int((c as Dictionary).get("direct_damage_cap", _direct_cap))
+
+
+func _read_range(d) -> void:
+	# P2 (2026-10-12): dosah je v SAMOSTATNEM klice `range`, ne uvnitr `combat` -
+	# cte ho i `sim.interaction` (dosah na predmet), takze dva moduly nemaji
+	# dva ruzne zdroje. Chybejici klic = vychozi hodnota z hlavicky.
+	var r = (d as Dictionary).get("range")
+	if r is Dictionary:
+		_melee_range = int((r as Dictionary).get("melee", _melee_range))
+
+
+func melee_range() -> int:
+	# VEREJNE SCHVALNE (P2): sonda i test se ptaji na TUTEZ hodnotu, kterou
+	# pouziva `attack` - kdyby si ji test pocital sam z dat, meril by data,
+	# ne chovani (`docs/09` §9.4).
+	return _melee_range
+
+
+func _na_dosah(a, b) -> bool:
+	# Chebyshev (dlazdicova) vzdalenost - stejna, jakou pouziva AI
+	# (`sim/systems/ai.gd:440`) a loot (`sim/systems/interaction.gd:416`).
+	# Chybejici pozice = "nevim", a to NENI "na dosah".
+	if a == null or b == null:
+		return false
+	var pa = a.get("pos")
+	var pb = b.get("pos")
+	if pa == null or pb == null:
+		return false
+	return maxi(absi(int(pa.x) - int(pb.x)), absi(int(pa.y) - int(pb.y))) <= _melee_range
 
 
 func _read_json(path: String):

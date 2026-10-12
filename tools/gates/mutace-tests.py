@@ -570,6 +570,25 @@ MODULY = {
             ("batoh se otevre i bez `backpack`",
              "\t\t\tif mob == null or int(mob.backpack) <= 0:",
              "\t\t\tif mob == null or int(mob.backpack) < 0:"),
+            # --- P2 (2026-10-12): DOSAH NA PREDMET -------------------------
+            # Vada, kterou uzivatel pojmenoval jako "neni koherentni": dvere,
+            # truhla i obchodni okno se otevřely z druheho konce mapy. Kdyby se
+            # kontrola vypnula, `tests/cases/interaction.gd` (sekce O) to musi
+            # videt - jinak je ta sekce slepa.
+            ("dosah na predmet se nekontroluje (P2 vracena)",
+             "and not _na_dosah_use(m, cil):", "and false:"),
+        ],
+    },
+    # P2 (2026-10-12): DOSAH MELEE. Do tohoto datumu `attack` vzdalenost
+    # NEMERIL (hrac zasahl cil na druhem konci mapy, monstrum muselo byt na
+    # dosah ruky) - hodnota je od P2 v `data/balance.json: range.melee`.
+    "combat": {
+        "soubor": ROOT / "sim" / "systems" / "combat.gd",
+        "prefix": "combat",
+        "prepinac": "--combat-script",
+        "mutace": [
+            ("dosah melee se nekontroluje (P2 vracena)",
+             "if not _na_dosah(mob, cil):", "if false:"),
         ],
     },
     "skill_gain": {

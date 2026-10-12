@@ -180,6 +180,53 @@ func run(t) -> void:
 	t._check(bool(stop.get("ok", false)) and bool(stop.get("had_state", false)),
 		"stop_combat vraci, ze stav mel")
 
+	# -- B2) DOSAH MELEE (P2, 2026-10-12) ---------------------------------
+	# Do tohoto datumu `attack` vzdalenost NEMERIL: hrac zasahl cil na druhem
+	# konci mapy, kdezto monstrum muselo byt na dosah ruky (`sim.ai` MELEE_RANGE).
+	# Meri se: (1) hodnota je z `data/balance.json`, (2) na hranici dosahu
+	# projde, (3) o dlazdici dal vraci `too_far` S HLASKOU, (4) stav boje se
+	# pritom NEROZJEDNA (odmitnuty prikaz nesmi naplanovat swing).
+	var melee: int = combat.melee_range()
+	var data_balance = Lib.json_at("res://data/balance.json")
+	var melee_z_dat: int = -1
+	if data_balance is Dictionary and data_balance.get("range") is Dictionary:
+		melee_z_dat = int((data_balance["range"] as Dictionary).get("melee", -1))
+	t._check(melee_z_dat > 0 and melee == melee_z_dat,
+		"combat: melee_range() je z data/balance.json (kod %d, data %d)" % [melee, melee_z_dat])
+	combat.stop_combat(SERIAL_A)
+	# ⚠ POZOR NA `_mobil`: 3.-5. argument jsou STATY (sila/obratnost/inteligence),
+	# ne pozice - pozice je uvnitr VZDY `(10,10,0)`. Prvni verze teto sekce
+	# predala "pozici" a meritila tim neco jineho (vsechny mobily staly na sobe,
+	# takze "mimo dosah" vyslo jako zasah). Pozice se proto nastavuje VYSLOVNE.
+	var blizky = _mobil(registry, 0x4000000B, 100, 100, 100)
+	blizky.pos = Vector3i(10 + melee, 10, 0)
+	var r_blizko: Dictionary = combat.attack(SERIAL_A, 0x4000000B)
+	t._check(bool(r_blizko.get("ok", false)),
+		"combat: cil na hranici dosahu (%d dlazdice) jde utocit (vyslo %s)" % [melee, str(r_blizko)])
+	var cas_po_blizkem: int = int(combat.state_of(SERIAL_A).get("next_swing_ms", -1))
+	var daleky = _mobil(registry, 0x4000000C, 100, 100, 100)
+	daleky.pos = Vector3i(10 + melee + 1, 10, 0)
+	events.drain()
+	var r_daleko: Dictionary = combat.attack(SERIAL_A, 0x4000000C)
+	t._check(not bool(r_daleko.get("ok", true))
+			and str(r_daleko.get("reason", "")) == "too_far",
+		"combat: cil o dlazdici dal vraci `too_far` (vyslo %s)" % str(r_daleko))
+	var hlasky_dosah: Array = []
+	for e in events.drain():
+		if str(e.get("name", "")) == "message":
+			hlasky_dosah.append(str(e.get("data", {}).get("text", "")))
+	var ma_hlasku: bool = false
+	for text in hlasky_dosah:
+		if text.find("far") >= 0:
+			ma_hlasku = true
+	t._check(ma_hlasku, "combat: `too_far` posle HLASKU, ne ticho (vyslo %s)" % str(hlasky_dosah))
+	t._check(int(combat.state_of(SERIAL_A).get("next_swing_ms", -1)) == cas_po_blizkem,
+		"combat: odmitnuty utok NEMENI naplanovany swing (byl %d, ted %d)"
+			% [cas_po_blizkem, int(combat.state_of(SERIAL_A).get("next_swing_ms", -1))])
+	t._check(int(combat.state_of(SERIAL_A).get("target", 0)) == 0x4000000B,
+		"combat: odmitnuty utok NEPREPNE cil (vyslo %d)"
+			% int(combat.state_of(SERIAL_A).get("target", 0)))
+
 	# -- C) 20 SWINGU -> ALESPON 5 ZASAHU (prijimaci kriterium §4.6.4) ----
 	# Kazdy swing ma cil PLNÝ (hp se pred kazdym obnovi), aby se merilo
 	# "trefi se", ne "cil uz je mrtvy".

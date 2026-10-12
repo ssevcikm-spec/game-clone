@@ -1,3 +1,103 @@
+# Předání — game-clone (2026-10-12, SESSION „P2“: DOSAH INTERAKCE JE V DATECH)
+
+> **Co je tenhle soubor:** **stav projektu** pro další session agenta. Přepisuje
+> se celý; historie je v `git log`. Nový blok je vždy **nahoře**; starší bloky se
+> needitují (jen doplňují). **Současný stav se bere z tohoto bloku.**
+>
+> **Odkud brát detaily:** zadání [`ZADANI-27-POCIT.md`](ZADANI-27-POCIT.md) §3 P2,
+> tři ponaučení v `LESSONS.md` (2026-10-12, session P2), smlouvy
+> `docs/05` §5.2.2 + §5.5.1 a `docs/04` §4.6.4.
+> ⚠ **V témže stromě pracovaly paralelní session** — jejich soubory jsem needitoval
+> a do svého commitu vzal jen svoje.
+
+## ✅ CO SE UDĚLALO (a proč právě to)
+
+Z `ZADANI-27-POCIT.md` je hotová **P2** (dosah interakce). Uživatel 12. 10. řekl,
+že hra „neřeší vzdálenost pro interakci“ — a měření to potvrdilo v té nejhorší
+podobě: **`attack` ani `use` na cizí objekt vzdálenost neměřily vůbec**, kdežto
+AI měla `MELEE_RANGE = 1`, loot `LOOT_RANGE = 2`, obchod `VENDOR_RANGE = 2`
+a výroba `STATION_RANGE = 2`. Svět byl **přísný na monstra a benevolentní
+k hráči**: hráč otevřel obchod z druhého konce mapy, monstrum muselo být na dostřel.
+
+**Hodnoty jsou DATA** (rozhodnutí uživatele 12. 10.: „Data (`data/balance.json`)“):
+
+| Věc | Soubor | Naměřeno |
+|---|---|---|
+| `range.melee` = 1, `range.use` = 2 + `sources` | `data/balance.json` | melee = stejná hodnota jako AI, use = stejná jako loot/vendor („svět nesmí mít tři různá čísla“) |
+| Klíče ve SCHEMA | `app/config.gd` | G2 kontroluje data proti schématu — bez toho 2 chyby (odhalil test `app.config`) |
+| Dosah melee | `sim/systems/combat.gd` | `MELEE_RANGE` (výchozí), `_melee_range`, `_read_range`, `melee_range()`, `_na_dosah()`, kontrola v `attack()` → `too_far` + hláška, **swing se neplánuje** |
+| Dosah na předmět | `sim/systems/interaction.gd` | `USE_RANGE` (výchozí), `_use_range`, `use_range()`, `_na_dosah_use()`, kontrola v `_run_use` pro `toggle_door`/`open_container`/`open_vendor`; **cíl ve vlastním batohu dosah nemá** |
+| Cesta je PARAMETR (S1b) | `sim/systems/interaction.gd` + `app/main.gd` | nový 8. argument `balance_path`; `python tools/check-data-paths.py` = **OK** |
+| Kontroly | `tests/cases/interaction.gd` (sekce O), `tests/cases/combat.gd` (B2) | oba konce: na hranici dosahu projde, o dlaždici dál `too_far` **s hláškou**; hodnota se čte z DAT; nástroj v batohu dosahem **není** omezen |
+| Mutace | `tools/gates/mutace-tests.py` | **nový modul `combat`** + vzor v `interaction`; běh `--only interaction,combat` = **14 z 14 chyceno** |
+
+**Navíc (vadou na cestě):** `_read_balance` v `sim.combat` měl `return` u chybějícího
+klíče `combat` — kdyby zůstal, **ticho by přeskočil i čtení dosahu** (hodnota by se
+„nenašla“, ale kód by vypadal správně). Opraveno a okomentováno.
+
+## 📊 NAMĚŘENO (2026-10-12, tato session)
+
+| Co | Hodnota | Doklad |
+|---|---|---|
+| **Testy** | **2 823 kontrol / 0 selhání**, `exit 0` (před P2 2 811) | `godot --headless --path . --script res://tests/run_tests.gd` (`.tmp/p2-testy2.log`) |
+| **Testy PŘED opravou fixtur** | **7 selhání** — a všechna byla správná (viz níže) | `.tmp/p2-testy.log` |
+| **Mutace (`--only interaction,combat`)** | **14 z 14 chyceno**, `smlouva vstupu: OK`, baseline 2823/0 | `.tmp/p2-mutace.log` |
+| **Brány** | **16 měřeno / 0 čeká / 0 chyb** (G13 poradní) | `python tools/gates/run-all.py` (`.tmp/p2-brany.log`) |
+| **Snímek G10 (regenerován)** | `snimek_stari_h 0.01`, `vlastni_pixelu_po_erozi 267`, OK | `python tools/gates/check-render.py` — G10 sám hlásil, že snímek je starší než `app/main.gd` (past z paralelní session), takže se vygeneroval znovu |
+| **Datová metrika (S1b)** | `parametr / primo 0 / smisene 0 / nepouzita 0`, **OK** | `python tools/check-data-paths.py` |
+| **Replaye a determinismus** | **beze změny hashů** (G9 i G8 OK) | `run-all.py` |
+
+## 🚧 CO ODHALILA PRÁCE (a co je potřeba si z toho vzít)
+
+1. **Tři fixtury nebyly realistické, ne tři vady kódu.** `interaction.gd`
+   a `trade_path.gd` volaly `use(HRAC, …)` s hráčem, který **v registru vůbec
+   nebyl**; `combat.gd` měl „cíl o dlaždici dál“ zadaný do helperu, jehož 3.–5.
+   argument jsou **staty**, ne souřadnice (všechny mobily pak stály na sobě).
+   Bez opravy by test měřil **správné odmítnutí jako vadu**. Všechny tři opravy
+   jsou v testech okomentované (ne tiché přepsání čísla).
+2. **Návratový důvod je `too_far`, ne `out_of_range`.** `ZADANI-27` §3 psalo
+   `out_of_range`, ale projekt má pro tuhle podmínku **už jedno slovo** —
+   `sim.interaction.loot_all` vrací `too_far` od M5. Dva názvy pro totéž by byla
+   nová nekonzistence, takže se sjednotilo na `too_far` (a je to zapsané níž).
+3. **`loot_all` byl při „moc daleko“ TICHE** (jen `reason`, žádná hláška) —
+   doplněna hláška, protože ticho je přesně třetí věc, kterou uživatel pojmenoval.
+
+## ⚠ CO ZŮSTÁVÁ OTEVŘENÉ (pojmenované, ne zamlčené)
+
+1. **Dosah se kontroluje při ZADÁNÍ (`attack`), ne při samotném swingu.** Když cíl
+   během swingu uteče, zásah se pořád vyhodnotí; reference kontroluje i v okamžiku
+   swingu. Je to **vědomá mez** (menší zásah, snadno měřitelná), ale je potřeba ji
+   zavřít, než bude luk/útěk.
+2. **`range.melee` platí na VŠECHNY útoky** — dosah zbraně (luky, oštěpy, dostřel
+   7–10 z `docs/05` §5.5.1) do dat půjde **s nimi**, ne s tímhle klíčem.
+3. **P3 (zvuk) není udělaná** — v repu je pořád **0× `AudioStream`**.
+4. **Z P1 zůstává:** útok/smrt se u cizích postav neanimují a cizí postavy se
+   pořád „šoupou“ po dlaždicích (plynulý posun má zavedený jen hráč).
+5. **V repu je trackovaný snímek s mapou z instalace UO**
+   (`p20b-obrazky/m5-souboj.png`) — nové snímky se necommitují (`.gitignore`),
+   co už v gitu je, jsem nemazal.
+
+## 🧍 CO ČEKÁ NA TEBE
+
+1. **Má se pokračovat P3 (zvuk), nebo zavřít otevřené věci z P2** (kontrola
+   v okamžiku swingu)? Doporučení: **P3** — zvuk je třetí věc, kterou jsi
+   pojmenoval, a je to největší skok v pocitu.
+2. **Smazat `p20b-obrazky/m5-souboj.png` z gitu?** (Obsahuje mapu z instalace UO;
+   nevratné pro ten strom, proto to nedělám sám.)
+3. **Zobrazení zdraví** zůstává odložené (`docs/01` §1.8) — až po P3.
+4. **Z minulých session pořád platí:** S2 vs. S3 (modding), brána `G18` pro
+   `tools/check-data-paths.py`, dovézt sondy `p67/p68` do repa, co s `assets/cobble/`.
+
+## 🔗 COMMITY TÉHLE SESSION
+
+**`<doplnit po commitu>`** — `data/balance.json`, `app/config.gd`, `app/main.gd`,
+`sim/systems/combat.gd`, `sim/systems/interaction.gd`,
+`tests/cases/interaction.gd`, `tests/cases/combat.gd`, `tests/cases/trade_path.gd`,
+`tools/gates/mutace-tests.py`, `docs/04 §4.6.4`, `docs/05 §5.2.2 + §5.5.1`,
+`LESSONS.md`, `HANDOFF.md` (tento blok).
+
+---
+
 # Předání — game-clone (2026-10-12, SESSION „P1“: ANIMACE CIZÍCH POSTAV — simulace je posílala, klient neodebíral)
 
 > **Co je tenhle soubor:** **stav projektu** pro další session agenta. Přepisuje

@@ -926,7 +926,7 @@ func _setup_player(view) -> void:
 	# `app/main` (kvuli ceste z vrstev), se SEM predavaji TYTÉŽ instance.
 	# Kdyby tu zustalo `null`, mod i zaklad by meli dvoje dvere.
 	interaction = InteractionScript.new(sim, sim.events(), doors, container, registry, items,
-		_cesta("res://data/skills.json"))
+		_cesta("res://data/skills.json"), _cesta("res://data/balance.json"))
 	sim.systems["interaction"] = interaction
 	# MERENI PRO MODY (S1b): co si hra OPRAVDU nacetla - cisla se meni, kdyz mod
 	# prebije `data/doors.json` / `data/stairs.json` / `data/recipes.json`, a

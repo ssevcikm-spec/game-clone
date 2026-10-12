@@ -81,6 +81,12 @@ const Const = preload("res://core/const.gd")
 const ItemScript = preload("res://sim/entity/item.gd")
 
 const SKILLS_PATH := "res://data/skills.json"
+# DOSAH NA PREDMET (P2, 2026-10-12): cesta k datum je PARAMETR (S1b) a hodnota
+# je DATA (`data/balance.json: range.use`) - `USE_RANGE` je jen vychozi hodnota
+# pro pripad, ze data nejsou. Do tohoto datumu `use` vzdalenost NEMERIL: dvere,
+# truhla i obchodni okno se otevřely z druheho konce mapy.
+const BALANCE_PATH := "res://data/balance.json"
+const USE_RANGE := 2
 const ITEM_OFFSET := 0x4000               # tiledata id -> art id (item.gd)
 
 const MESSAGE_NOTHING := "You see nothing special."
@@ -150,10 +156,14 @@ var _cursor: int = 0
 # Cesta k datum je PARAMETR konstruktoru (NAVRH-MODDING §4 S1b), ne zapeena
 # konstanta: mod prebiji `data/skills.json` a modul to musi videt.
 var _skills_path: String = ""
+# P2 (2026-10-12): dosah na predmet z DATA (viz hlavicka konstant vyse).
+var _balance_path: String = ""
+var _use_range: int = USE_RANGE
 
 
 func _init(world = null, events = null, doors = null, containers = null,
-		registry = null, items = null, skills_path: String = SKILLS_PATH) -> void:
+		registry = null, items = null, skills_path: String = SKILLS_PATH,
+		balance_path: String = BALANCE_PATH) -> void:
 	_world = world
 	_events = events
 	_doors = doors
@@ -162,7 +172,10 @@ func _init(world = null, events = null, doors = null, containers = null,
 	_items = items
 	# CESTA JE PARAMETR (NAVRH-MODDING §4 S1b): mod prebiji `data/skills.json`.
 	_skills_path = skills_path
+	# CESTA JE PARAMETR (S1b): mod prebiji i `data/balance.json`.
+	_balance_path = balance_path
 	_load_skills()
+	_read_range()
 
 
 # -- rozhrani podle smlouvy ------------------------------------------------
@@ -357,6 +370,9 @@ func loot_all(m: int, serial: int) -> Dictionary:
 	if str(cil.get("kind", "")) != "container":
 		return _fail("not_container")
 	if not _na_dosah(mob, cil):
+		# P2 (2026-10-12): hlaska i tady - "moc daleko" bylo do teto chvile
+		# TICHE (jen `reason`), takze hrac nevedel, proc se loot nesebere.
+		_message("You are too far away.")
 		return _fail("too_far")
 	if _containers == null:
 		return _fail("not_available")
@@ -514,6 +530,19 @@ func cursor() -> int:
 # -- vnitrni: vetve `use` --------------------------------------------------
 
 func _run_use(m: int, serial: int, cil: Dictionary, akce: String) -> Dictionary:
+	# DOSAH (P2, 2026-10-12): kontroluje se JEN u vetvi, ktere sahaji na CIZI
+	# objekt ve svete (dvere, truhla, otevreni obchodu). `equip`/`light`/
+	# `cast_scroll`/`target` maji cil ve VLASTNIM batohu - dosah by tam byl
+	# nesmysl. `attack_or_talk` ma vlastni kontrolu v `sim.combat` (melee), aby
+	# svet nemel dve cisla pro jednu vec.
+	if akce in ["toggle_door", "open_container", "open_vendor"] \
+			and not _na_dosah_use(m, cil):
+		# ⚠ DUVOD JE `too_far`, NE `out_of_range`: projekt ma pro tuhle podminku
+		# uz JEDNO slovo (`loot_all` ho vracia od M5) - dva nazvy pro totéž by
+		# byla nova nekonzistence. Hlaska je tu proto, ze `loot_all` ji nemel
+		# (ticha nemoznost) - doplneno nize i tam.
+		_message("You are too far away.")
+		return _fail("too_far")
 	match akce:
 		"toggle_door":
 			return _toggle_door(cil)
@@ -757,3 +786,42 @@ func _load_skills() -> void:
 	for rec in parsed:
 		if rec is Dictionary and rec.has("name") and rec.has("id"):
 			_skills[str(rec["name"])] = int(rec["id"])
+
+
+func use_range() -> int:
+	# VEREJNE SCHVALNE (P2): test i sonda se ptaji na TUTEZ hodnotu, kterou
+	# pouziva `_na_dosah_use` - kdyby si ji test pocital sam z dat, meril by
+	# data, ne chovani (`docs/09` §9.4).
+	return _use_range
+
+
+func _na_dosah_use(m: int, cil: Dictionary) -> bool:
+	# Chebyshev na `USE_RANGE` dlazdic (z DAT) - stejne pravidlo jako loot
+	# (`_na_dosah` vyse): chybejici pozice = "nevim", a to NENI "na dosah"
+	# (radsi odmitnout nez sahat na predmet pres celou mapu).
+	var mob = _mobile(m)
+	if mob == null:
+		return false
+	var cil_obj = cil.get("mobile")
+	if cil_obj == null:
+		cil_obj = cil.get("item")
+	if cil_obj == null:
+		return false
+	var p = cil_obj.get("pos")
+	if p == null:
+		return false
+	return maxi(absi(int(p.x) - int(mob.pos.x)), absi(int(p.y) - int(mob.pos.y))) \
+		<= _use_range
+
+
+func _read_range() -> void:
+	# Dosah je DATA (`data/balance.json: range.use`), cesta je PARAMETR (S1b).
+	# Chybejici klic = vychozi hodnota z konstanty vyse (a je to videt v testu).
+	var parsed = null
+	if FileAccess.file_exists(_balance_path):
+		parsed = JSON.parse_string(FileAccess.get_file_as_string(_balance_path))
+	if not (parsed is Dictionary):
+		return
+	var r = (parsed as Dictionary).get("range")
+	if r is Dictionary:
+		_use_range = int((r as Dictionary).get("use", _use_range))

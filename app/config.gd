@@ -63,6 +63,12 @@ const SCHEMA := {
 	# presne to same chovani jako dosud.
 	"movement.walk_ms": {"type": TYPE_INT, "default": 400, "min": 50, "max": 2000},
 	"movement.run_ms": {"type": TYPE_INT, "default": 200, "min": 50, "max": 2000},
+	# DOSAH INTERAKCE (P2, 2026-10-12): hodnoty v DLAZDICICH (Chebyshev).
+	# Cte je `sim.combat` (`range.melee`, vychozi 1 = MELEE_RANGE) a
+	# `sim.interaction` (`range.use`, vychozi 2 = USE_RANGE). Kdo klice z dat
+	# smaze, dostane presne vychozi hodnoty z hlavicek obou modulu.
+	"range.melee": {"type": TYPE_INT, "default": 1, "min": 0, "max": 10},
+	"range.use": {"type": TYPE_INT, "default": 2, "min": 0, "max": 10},
 	"ggs_on": {"type": TYPE_BOOL, "default": true},
 	"insurance_on": {"type": TYPE_BOOL, "default": false},
 	"anti_macro": {"type": TYPE_BOOL, "default": false},

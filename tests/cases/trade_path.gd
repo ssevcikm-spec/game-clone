@@ -92,6 +92,11 @@ func run(t) -> void:
 	kovar.hp = 100
 	kovar.ai = {"state": "vendor"}
 	registry.register(kovar)
+	# ⚠ P2 (2026-10-12): HRÁČ MUSÍ BÝT V REGISTRU. Do tohoto datumu tu byl jen
+	# prodejce a `use` vzdálenost neřešil. Dnes je dosah kontrakt
+	# (`data/balance.json: range.use`) a "nevím, kde hráč je" = "není na dosah" -
+	# tedy SPRÁVNÉ odmítnutí, které by test bez hráče měřil jako vadu.
+	registry.register(mobile_script.new(HRAC, 400, Vector3i(1495, 1630, Z)))
 	var iso = iso_script.new()
 	var dlazdice := Vector2i(int(kovar.pos.x), int(kovar.pos.y))
 	var svet: Vector2 = iso.to_screen(dlazdice.x, dlazdice.y, Z)
