@@ -43,13 +43,15 @@ vedle hráče) a **vytaví ingot** (`craft.smelt` u výhně). Běh trvá ~10 s.
 
 ## 🔗 COMMITY TÉTO SESSION (pokračování)
 
-`C2` — `sim/systems/{harvest,craft,combat}.gd` (zvuky těžby/kakování + pozice
-v události), `tools/gates/check-data-paths.py` a `check-sound.py` (nové brány),
-`tools/gates/run-all.py` (registrace), `tools/gates/sound_probe.gd` (rozšířená
-sonda), `tools/check-data-paths.py` (`--root`/`--json`), `docs/04 §4.4`,
-`docs/08`, `app/sound.gd` (rozpad `podle_id` + tvar události), `LESSONS.md`,
-`HANDOFF.md` (tento blok).
-**Push ověřen živě:** _(doplněno v navazujícím commitu)_
+`C2` = **`b7d8064`** — `sim/systems/{harvest,craft,combat}.gd` (zvuky
+těžby/kování + pozice v události), `tools/gates/check-data-paths.py`
+a `check-sound.py` (nové brány **G18**, **G19**), `tools/gates/run-all.py`
+(registrace), `tools/gates/sound_probe.gd` (rozšířená sonda), 
+`tools/check-data-paths.py` (`--root`/`--json`), `docs/04 §4.4`, `docs/08`,
+`app/sound.gd` (rozpad `podle_id` + tvar události), `LESSONS.md`, `HANDOFF.md`.
+**Push ověřen živě:** `ab5758d..b7d8064 main -> main`,
+`git rev-list --count origin/main..HEAD` → **0**, `origin/main` = `HEAD` =
+`b7d8064`.
 
 ---
 
