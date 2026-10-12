@@ -92,10 +92,12 @@ natvrdo. Oprava bere akci ze **stavu**, stejně jako to u hráče dělá
 
 ## 🔗 COMMITY TÉTO SESSION
 
-**`<doplnit po commitu>`** — `app/world_view.gd`, `app/main.gd`,
-`tests/cases/world_view.gd`, `tools/gates/mutace-tests.py`, `.gitignore`,
-`LESSONS.md`, `HANDOFF.md` (tento blok). Snímky a sonda v `_analyza/`
-**nejsou v gitu** (obsahují UO mapu / jsou gitignorované).
+**`92decd6`** — kód, test, mutace a dokumenty: `app/world_view.gd`, `app/main.gd`,
+`tests/cases/world_view.gd` (sekce 7e + fake třídy), `tools/gates/mutace-tests.py`
+(nový vzor), `.gitignore` (`p20b-obrazky/`), `LESSONS.md`, `HANDOFF.md` (tento blok).
+**Push ověřen živě:** `88de7e1..92decd6 main -> main`,
+`git rev-list --count origin/main..HEAD` → **0**.
+Snímky a sonda v `_analyza/` **nejsou v gitu** (obsahují UO mapu / jsou gitignorované).
 
 ---
 
