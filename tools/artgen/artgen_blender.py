@@ -298,15 +298,19 @@ def postav_krumpac():
     x = OSA_X
     posun = -0.055
     stred = lambda t: (x[0] * t + posun, x[1] * t, 0.030)
-    valec("krumpac_topurko", drevo, 0.021, 0.74, stred(0.16),
+    valec("krumpac_topurko", drevo, 0.021, 0.873, stred(0.2265),
           rot=(math.radians(90), math.radians(-45), math.radians(90)))
-    # nos: dve ramena do stran (koleno krumpace) + kratky trn
-    krabice("krumpac_nos", ocel, (0.055, 0.22, 0.045), stred(-0.24),
-            rot=(0, 0, math.radians(45)))
-    krabice("krumpac_nos2", ocel, (0.055, 0.16, 0.042), stred(-0.28),
-            rot=(0, 0, math.radians(-25)))
-    kuzel("krumpac_trn", ocel, 0.030, 0.0, 0.09, stred(-0.33),
-          rot=(0, math.radians(-90), 0))
+    # hlava: tenka tyc NAPRIC na osu topurka (osa Y) + hrot na obe strany.
+    # Puvodni verze mela dve krabice (0,22/0,16) a trn 0,09 rotovany po ose X -
+    # hrot tedy miril PO TOPURKU a siluetu urcovaly dve tlusté krabice (kladivo).
+    # Vadu naslo jen oko uzivatele; vsechna mereni byla zelena.
+    # Duklad: `_analyza/p54-nalez-krumpac.md`.
+    hx = stred(-0.255)[0]
+    krabice("krumpac_tyc", ocel, (0.046, 0.27, 0.042), (hx, 0.0, 0.030))
+    kuzel("krumpac_hrot", ocel, 0.040, 0.0, 0.27, (hx, 0.27, 0.030),
+          rot=(math.radians(-90), 0, 0))
+    kuzel("krumpac_hrot2", ocel, 0.038, 0.0, 0.13, (hx, -0.20, 0.030),
+          rot=(math.radians(90), 0, 0))
 
 
 def postav_rudu():

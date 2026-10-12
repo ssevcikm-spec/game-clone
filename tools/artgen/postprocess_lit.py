@@ -524,7 +524,7 @@ def sestav(pripravene: list[dict], s: float, druh: str,
                 # posunuty o `okraj` - takze se vklada na (okraj, okraj), ne na
                 # (vloz_x, vloz_y). Kdyz se vkladala na vloz_x, stin "ujel"
                 # presne o okraj a vyslo 0 px.
-                platno.alpha_composite(stin_img, (recepce_okraj(recept_stinu()),
+                platno.alpha_composite(stin_img, (vloz_x, vloz_y) if recept_stinu()["verze"] == "v2" else (recepce_okraj(recept_stinu()),
                                                   recepce_okraj(recept_stinu())))
             platno.alpha_composite(telo, (vloz_x, vloz_y))
         if druh == "land":
