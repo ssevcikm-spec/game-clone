@@ -90,11 +90,17 @@ klíče `combat` — kdyby zůstal, **ticho by přeskočil i čtení dosahu** (h
 
 ## 🔗 COMMITY TÉHLE SESSION
 
-**`<doplnit po commitu>`** — `data/balance.json`, `app/config.gd`, `app/main.gd`,
+**`db0378e`** — `data/balance.json`, `app/config.gd`, `app/main.gd`,
 `sim/systems/combat.gd`, `sim/systems/interaction.gd`,
 `tests/cases/interaction.gd`, `tests/cases/combat.gd`, `tests/cases/trade_path.gd`,
 `tools/gates/mutace-tests.py`, `docs/04 §4.6.4`, `docs/05 §5.2.2 + §5.5.1`,
 `LESSONS.md`, `HANDOFF.md` (tento blok).
+**Push ověřen živě:** `a9ac4b3..db0378e main -> main`,
+`git rev-list --count origin/main..HEAD` → **0**.
+⚠ **Měření proběhlo v souběžném stromě:** paralelní session už rozjela **P3 (zvuk)**
+(`app/loop.gd`, `app/sound.gd`, `assets/sounds/`, `tests/cases/sound.gd`) — do
+svého commitu jsem ji nevzal a čísla výš jsou změřená s její rozdělanou prací
+ve stromě (proto se po jejím dokončení mají přeměřit).
 
 ---
 
