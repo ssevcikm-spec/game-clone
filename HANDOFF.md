@@ -1,3 +1,114 @@
+# Předání — game-clone (2026-10-12, SESSION „Zvuk“: P3 — hra konečně vydává zvuk)
+
+> **Co je tenhle soubor:** **stav projektu** pro další session agenta. Přepisuje
+> se celý; historie je v `git log`. Nový blok je vždy **nahoře**; starší bloky se
+> needitují (jen doplňují). **Současný stav se bere z tohoto bloku.**
+>
+> **Odkud brát detaily téhle práce:** `assets/sounds/manifest.json` (5 zvuků,
+> formát a `sha256`), generátor `tools/audio/gen-sfx.py` (včetně `--check`),
+> modul `app/sound.gd` (`rozhodni()`/`play()`/`stats()`), zapojení
+> `app/loop.gd._deliver_events()`, test `tests/cases/sound.gd` (21 kontrol),
+> **důkaz C1** `tools/gates/sound_probe.gd`, licence `CREDITS.md`,
+> `LESSONS.md` 2026-10-12 (**část „Zvuk“**, čtyři záznamy s čísly).
+>
+> ⚠ **V tomtéž stromě pracovala PARALELNÍ SESSION** (`ZADANI-27` P1 a P2 —
+> animace postav, dosah interakce). Její **rozpracované** soubory:
+> `app/main.gd`, `app/world_view.gd`, `tests/cases/world_view.gd`,
+> `sim/systems/{combat,interaction}.gd`, `tools/gates/mutace-tests.py`,
+> `app/config.gd`, `docs/05`. **Nesahal jsem na ně** a necommitoval je.
+
+## ✅ CO SE UDĚLALO (a proč právě to)
+
+**Zadání:** `ZADANI-27-POCIT.md` §3 **P3** — „odezva (zvuk, pak vizuál)“.
+Uživatel si 12. 10. zvolil směr „POCIT: odezva + zvuk“; `P1` (animace) a `P2`
+(dosah) dělala souběžná session, takže **P3 byla volná kolej** a zvuk byl
+jediná věc z celého projektu, kterou hráč **vůbec neslyšel** (v repu nebyl ani
+jeden `AudioStream`).
+
+| Věc | Soubor | Naměřeno |
+|---|---|---|
+| **5 volných zvuků** (hit, hurt, mine, smith, death) | `assets/sounds/*.wav` + `manifest.json` | **44 100 Hz / 2 kan. / 16 b.**, 160/240/220/420/750 ms, peak `0,708`; ověřeno **nezávisle** knihovnou `wave` i enginem (`AudioStreamWAV.load_from_file` → `44100 Hz, stereo`) |
+| **Generátor (reprodukovatelný)** | `tools/audio/gen-sfx.py` | `--check` = soubor musí být bajtově ten z manifestu; **mutační důkaz**: přepsaný bajt → `VADA (exit 1)`, regenerace → `OK` |
+| **Modul** | `app/sound.gd` | `rozhodni()` (čisté rozhodnutí), `play()`/`play_at()`, `stats()`, `errors()`; zná **oba** tvary události `sound` |
+| **Zapojení** | `app/loop.gd._deliver_events()` | zvuk dostává **týž proud událostí** jako žurnál; hráč se čte **každý frame** (viz past níž) |
+| **Test** | `tests/cases/sound.gd` | **21 kontrol** (mapování, pokles hp, vzdálenost, oba tvary, neznalý zvuk, „mimo scénu“) |
+| **Důkaz C1 (živá scéna)** | `tools/gates/sound_probe.gd` | hráč útočí (`A`) → **`prehrano: 3`, `ticho: 0`, `chyb: 0`**; před opravou zapojení `prehrano: 0` |
+| **Mutační důkaz (P3)** | `_analyza/p77-diag-zvuk.gd` | `rozhodni()` vráceno jako `{}` → **4 kontroly spadly**; po navrácení **21/0** |
+| **Licence** | `CREDITS.md` (nový, granule `docs.credits`) | co je naše (art, zvuky), co je z UO a **nedistribuuje se** |
+
+**Rozhodnutí, která byla potřeba (a proč):**
+
+1. **Zvuky se GENERUJÍ, nestahují.** `ZADANI-27` §5 dovoluje jen volné zvuky
+   (CC0/CC-BY) a zakazuje zvuk z UO. Generátor = žádná cizí licence, žádné
+   dohledávání původu a `--check` umí dokázat, že soubor je ten z manifestu.
+   Kdo chce nahraný zvuk, vymění soubor a v manifestu `license`/`source` —
+   kontrakt (`id` → soubor, 44,1 kHz stereo) zůstává.
+2. **Modul je rozdělený na `rozhodni()` a `play()`.** Přehrání nelze měřit
+   v testu bez běžící scény (`AudioStreamPlayer` mimo strom neprehraje a Godot
+   to hlásí chybou), ale **rozhodnutí** měřit lze. C1 („zvuk se opravdu
+   přehraje“) proto měří sonda na živé scéně, ne case.
+3. **Zapojení je v `app/loop.gd`, ne v `app/main.gd`.** Smyčka je jediné místo,
+   kde klient odebírá `sim.snapshot()["events"]` — zvuk se připojí tam, takže
+   nevzniká druhá cesta k událostem (a nesahá se do souboru, na kterém pracuje
+   paralelní session).
+4. **„Dostali jsme zásah“ se odvozuje z poklesu hp hráče** (`stats_changed`):
+   událost `sound` nese jen **útočníka**, ne cíl, takže z ní „my“ poznat nelze.
+5. **Hudba (`music(id)`) se nedělá** — v repu nejsou volné skladby a UO hudbu
+   použít nelze; radši pojmenovaná mezera než tichý stub.
+
+## 📊 NAMĚŘENO (2026-10-12, tato session)
+
+| Co | Hodnota | Doklad (příkaz / soubor) |
+|---|---|---|
+| **Zvuky a formát** | 5 souborů, `44100 Hz`, 2 kanály, 16 bitů, 160–750 ms, peak `0,708` | `python tools/audio/gen-sfx.py`; nezávisle `wave`; `_analyza/p75-zvuk-sonda.gd` |
+| **Reprodukovatelnost** | `--check` → `OK (exit 0)`; po mutaci bajtu → `VADA (exit 1)` | `python tools/audio/gen-sfx.py --check` |
+| **C1 (zvuk se přehraje)** | `prehrano 3 / ticho 0 / chyb 0` na živé scéně | `godot --headless --path . --fixed-fps 60 --script res://tools/gates/sound_probe.gd` |
+| **Test modulu** | **21 kontrol / 0 selhání** (izolovaně) | `_analyza/p77-diag-zvuk.gd` |
+| **Mutační důkaz** | 4 kontroly spadnou s vrácenou vadou, po navrácení 21/0 | tamtéž |
+| **Testy a brány (ve stromě s prací paralelní session)** | viz „Commity“ — běh proběhl **před** mým commitem, strom nebyl jen můj | `tests/run_tests.gd`, `tools/gates/run-all.py` |
+
+## ⚠ CO ZŮSTÁVÁ OTEVŘENÉ (pojmenované, ne zamlčené)
+
+1. **Těžba a kování zatím zvuk NEDOSTANOU** — `sim` událost `sound` pro ně
+   neposílá (posílá ji jen `sim.combat`: `kind` `"hit"` a `"death"`).
+   Zvuky `mine` a `smith` jsou **hotové a otestované** (modul je mapuje), stačí
+   je vyslat: `sim/systems/harvest.gd` (úspěch `mine`/`chop`, kolem řádku 332)
+   a `sim/systems/craft.gd` (`smelt` řádek 332, `craft` řádek 233) přes
+   `_events.push("sound", {"serial": m, "kind": "mine"|"smith"})`. **Do `sim/`
+   jsem nesahal** — pracuje v něm paralelní session (P2).
+2. **Smlouva vs kód u události `sound`:** `docs/04 §4.4` píše `{id, x, y, z}`,
+   `sim.combat` posílá `{serial, kind}`. Modul umí **oba** tvary; sjednotit to
+   má smysl až s krokem, kdy se bude `sim` měnit.
+3. **Zvuky jsou syntetizované (placeholdery).** Formát, hlasitost a délka jsou
+   změřené; **jestli znějí dobře, je na uživateli** — výměna je jeden soubor.
+4. **Nová brána nevznikla.** C1 je **sonda** (`tools/gates/sound_probe.gd`),
+   ne zapsaná brána v `run-all.py` — nová brána je změna `docs/08`.
+5. **Vizuální odezva (plovoucí číslo damage) se nedělala** — patří do klienta
+   (`app/world_view.gd`), kde pracuje paralelní session; `ZADANI-27` ji řadí
+   až za zvuk.
+6. **`mine`/`smith` zvuky jsou zatím nepoužité soubory** (dokud je sim nepošle):
+   manifest je vede, test je mapuje — ale ve hře se neozvou.
+
+## 🧍 CO ČEKÁ NA TEBE (rozhodnutí, která agent nemá dělat za tebe)
+
+1. **Poslechni si to** (`HRA.cmd`) a řekni, jestli jsou generované zvuky
+   použitelné, nebo chceš nahrávané (CC0). Výměna = jeden soubor + `license`
+   a `source` v `assets/sounds/manifest.json`.
+2. **Má se doplnit zvuk pro těžbu a kování** (dva řádky v `sim/`, viz výš)?
+   Dnes se ozve jen boj (zásah, zásah dostaneme, smrt).
+3. **Má se C1 stát bránou** v `run-all.py` (zápis do `docs/08`), nebo zůstat
+   sondou, kterou pouští ten, kdo na zvuku pracuje?
+
+## 🔗 COMMITY TÉTO SESSION (a ověřený push)
+
+`C1` — `assets/sounds/` (5 WAV + manifest), `tools/audio/gen-sfx.py` (nový),
+`app/sound.gd` (nový), `app/loop.gd` (zapojení), `tests/cases/sound.gd` (nový),
+`tools/gates/sound_probe.gd` (nový, důkaz C1), `CREDITS.md` (nový),
+`LESSONS.md` (část „Zvuk“), `HANDOFF.md` (tento blok).
+**Push ověřen živě:** _(doplněno v navazujícím commitu)_
+
+---
+
 # Předání — game-clone (2026-10-12, SESSION „P2“: DOSAH INTERAKCE JE V DATECH)
 
 > **Co je tenhle soubor:** **stav projektu** pro další session agenta. Přepisuje

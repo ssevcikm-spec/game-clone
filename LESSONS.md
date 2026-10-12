@@ -24,6 +24,70 @@ Typy: `chyba` (moje vada) · `past-nástroje` (prostředí/nástroj, ne logika) 
 
 ---
 
+# 2026-10-12 (část „Zvuk“) — SESSION P3: PRVNÍ ZVUK VE HŘE (A PROČ SE NEPŘEHRÁVAL)
+
+> **Zadání:** `ZADANI-27-POCIT.md` §3 **P3** (volná kolej — `P1` a `P2` dělala
+> souběžná session): „ozve se zásah, zásah dostaneme, těžba/kování, smrt“.
+> Co je hotové a naměřené, je v `HANDOFF.md` (blok nahoře); kontrakt zvuku je
+> v `assets/sounds/manifest.json`, důkaz C1 v `tools/gates/sound_probe.gd`.
+> ⚠ **V témže stromě pracovala paralelní session** (`ZADANI-27`: animace, dosah).
+
+### 2026-10-12 — Modul znal hráče 0, takže všechny zvuky utlumil na ticho (chyba)
+**Co se stalo:** `app/sound.gd` dostával serial hráče v `app/loop._ready()`,
+jenže ten doběhne **dřív**, než `app/main._setup_player()` nastaví
+`sim.player_serial` (nula). Modul tedy měl hráče `0`, počítal vzdálenost od
+`(0,0)` a každý zvuk utlumil pod prah ticha. Sonda hlásila
+`prehrano: 0, ticho: 2, chyb: 0` — což vypadá jako „zvuky jsou rozbité“,
+ale modul i soubory byly v pořádku.
+**Doklad:** `tools/gates/sound_probe.gd` na živé scéně: **před opravou
+`prehrano 0`** (a `ticho` rostlo), **po přesunu čtení do `_deliver_events()`
+`prehrano 3`**. Test `tests/cases/sound.gd` (21 kontrol) i `run_tests.gd`
+byly zelené v obou případech — proto je C1 sonda na živé scéně, ne jen case.
+**Ponaučení:** kdo si modul bere **identitu** (kdo je hráč) nebo **stav světa**
+z kompozičního kořene, nesmí ji číst v `_ready()` — pořadí inicializace je
+součást kontraktu. A „nic se nestalo“ musí být vidět v číslech (`ticho`,
+`chyb`), jinak se z vady prostředí stane hledání vady v modulu.
+
+### 2026-10-12 — `AudioStreamPlayer` mimo běžící strom NIC nepřehraje (past-nástroje)
+**Co se stalo:** první verze testu vkládala modul do `t.root` v `SceneTree`
+harnessu a čekala, že `play()` „něco udělá“. Godot odpověděl chybou
+`Playback can only happen when a node is inside the scene tree` — a `play()`
+přesto **nespadl** a modul mohl tvrdit, že zvuk hraje. Test, který měří
+přehrání uvnitř `_initialize()` harnessu, tedy neměří nic.
+**Doklad:** `_analyza/p76-debug-zvuk.gd` (chyba v logu + `play(hit)=true`
+přitom `prehrano 1`); po rozdělení modulu na `rozhodni()` (čisté rozhodnutí)
+a `play()` (potřebuje scénu) je test bez stromu smysluplný: **21 kontrol**.
+**Ponaučení:** **odděl rozhodnutí od provedení.** Rozhodnutí (která událost,
+jaký zvuk, jak hlasitě) se měří bez zvukovky; že zvuk doopravdy hraje, dokaž
+na **živé scéně** (`prehrano > 0`). Když modul zjistí, že hrát nemůže, musí
+to **říct** (`errors()`, `stats()['ticho']`), ne mlčet.
+
+### 2026-10-12 — Smlouva `sound` a kód se rozešly ve tvaru události (vada-zadani)
+**Co se stalo:** `docs/04 §4.4` píše u události `sound` tvar `{id, x, y, z}`,
+ale `sim.combat` posílá `{serial, kind}` (`combat.gd:392` `"hit"`, `:409`
+`"death"`). Kdo by psal konzumenta podle smlouvy, dostal by u obou polí `null`
+a nehrálo by nic.
+**Doklad:** volání `_sound(` v `sim/` (dva výskyty, obě v `combat.gd`) vs
+řádek 511 v `docs/04`; modul proto umí **oba** tvary (`_rozhodni_zvuk`)
+a v testu jsou ověřené obě cesty.
+**Ponaučení:** než začneš odebírat událost, **přečti ji z běhu** — smlouva
+může popisovat tvar, který kód nikdy neposlal. A rozdíl zapiš jako otevřený
+bod, ne jako „modul si poradí“ (jinak se na to zapomene).
+
+### 2026-10-12 — Počet vzorků WAV: mono vs stereo (chyba v číslech manifestu)
+**Co se stalo:** generátor počítal `duration_ms` z **mono** seznamu vzorků, ale
+dělil počtem kanálů → do manifestu zapsal **poloviční** délky (`hit` 80 ms
+místo 160 ms). Čísla vypadala jako čísla a nikdo by je neověřil — přitom by
+podle nich někdo „ladil“ délku zvuku.
+**Doklad:** nezávislé čtení souborů knihovnou `wave` (`44100 Hz, 2 kan., …`)
+proti manifestu; po opravě `160/240/220/420/750 ms` a `--check` souhlasí.
+**Ponaučení:** u binárního formátu **měř jiným nástrojem, než kterým zapisuješ**
+(tady `wave` proti vlastnímu zápisu). A `sum` je v Pythonu vestavěná funkce —
+pojmenovat si vlastní funkci `sum` znamená, že `premer()` spadne
+(`TypeError: sum() missing 1 required positional argument`) až za běhu.
+
+---
+
 # 2026-10-12 — SESSION „P2“: DOSAH INTERAKCE JE V DATECH (A TŘI POUČENÍ Z FIXTUR)
 
 > **Zadání:** `ZADANI-27-POCIT.md` §3 P2 (uživatel: „neřeší vzdálenost pro

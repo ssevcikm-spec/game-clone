@@ -9,6 +9,7 @@ extends Node
 # Herni pravidla tu NEJSOU - jen pumpovani tiku a prevod vstupu na Command.
 
 const Const = preload("res://core/const.gd")
+const SoundScript = preload("res://app/sound.gd")
 
 const MAX_CATCHUP_TICKS: int = 5
 const REPORT_EVERY_TICKS: int = 20   # 1x za sekundu herniho casu (M0: "simulace tickuje")
@@ -16,6 +17,11 @@ const REPORT_EVERY_TICKS: int = 20   # 1x za sekundu herniho casu (M0: "simulace
 var sim = null
 var input_map = null
 var journal = null              # `ui.journal` (16. session): zpravy dostava VSTUPEM
+# ZVUK (`app.sound`, granule `audio.playback`; P3 ze `ZADANI-27`): dostava tyz
+# proud udalosti jako zurnal, jen jinou vrstvou. Je INJEKTOVATELNY (test/sonda
+# muze dat stub); kdo ho neda, dostane funkci - bez toho by "hra je ticha"
+# vypadalo stejne jako "zvuk nikdo nezapojil".
+var sound = null
 # ⚠ 20. session: okna, ktera chteji i JINE udalosti nez `message` (okno vyroby
 # dostava `gump_open`). Kazdy prvek musi mit `apply_event(event) -> bool`;
 # smycka o nich nic nevi - jen jim udalost preda (UI je tenky klient).
@@ -64,12 +70,33 @@ func tick_count() -> int:
 	return _ticks
 
 
+func _ready() -> void:
+	# Zvuk se zaklada TADY, kdyz ho kompozicni koren nepredal: smycka je misto,
+	# ktere uz udalosti dostava, takze modul nepotrebuje druhou cestu k nim.
+	if sound == null:
+		sound = SoundScript.new()
+		add_child(sound)
+	if sim != null:
+		sound.nastav_hrace(int(sim.player_serial))
+		sound.nastav_registr(sim.registry)
+
+
 func _deliver_events() -> void:
 	# Udalosti si klient vybere jednou za frame (docs/04 §4.4). Zpravy dostava
 	# zurnal VSTUPEM (`ui.journal` je tenky klient, docs/04 §4.1); `print`
 	# zustava, protoze je to jedine mereni, ktere je videt v CI (G11).
 	var snapshot: Dictionary = sim.snapshot()
+	# ⚠ HRAC SE CTE KAZDY FRAME (namEReno 2026-10-12): `_ready()` smycky bezi
+	# PRED `_setup_player()` v `app/main`, takze v tu chvili je `sim.player_serial`
+	# jeste 0. Zvuk pak hrace neznal, vsechno utlumil podle vzdalenosti od nuly
+	# a neprehralo se NIC (`prehrano: 0`, `ticho: 2`) - a vypadalo to jako vada
+	# zvuku. Cteni tady stoji jeden preklad intu.
+	if sound != null:
+		sound.nastav_hrace(int(sim.player_serial))
+		sound.nastav_registr(sim.registry)
 	for event in snapshot.get("events", []):
+		if sound != null:
+			sound.apply_event(event)
 		if journal != null:
 			journal.apply_event(event)
 		for okno in gump_okna:
