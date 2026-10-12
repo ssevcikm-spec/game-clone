@@ -74,7 +74,7 @@ zůstaly dvě věci, které jsou vidět ještě víc:
 
 ## 🔗 COMMITY TÉHLE SESSION
 
-**`<doplnit po commitu>`** — `app/world_view.gd`, `app/main.gd`,
+**`2dd24a4`** — `app/world_view.gd`, `app/main.gd`,
 `tests/cases/world_view.gd`, `tools/gates/mutace-tests.py`,
 `docs/04 §4.6.4`, `docs/05 §5.5.1 + §5.5.2`, `LESSONS.md`, `HANDOFF.md`.
 ⚠ **`sim/systems/combat.gd` v tomhle commitu NENÍ:** souběžná zvuková session ho
@@ -82,6 +82,8 @@ zabrala do svého commitu **`b7d8064`** (a v `d6bba36` to sama přiznala jako
 „cizi hunk v combat.gd“). Kód je v HEAD, jen pod cizím commitem — ověřeno:
 `git show HEAD:sim/systems/combat.gd` obsahuje `ANIM_ATTACK_MS` i `func anim_of`.
 Sonda a snímky **nejsou v gitu** (`_analyza/`, `p20b-obrazky/`).
+**Push ověřen živě:** `d6bba36..2dd24a4 main -> main`,
+`git rev-list --count origin/main..HEAD` → **0**.
 
 ---
 
