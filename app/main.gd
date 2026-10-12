@@ -359,6 +359,12 @@ func _nacti_obsah() -> void:
 	if not chybejici.is_empty():
 		push_warning("app.main: obsah: " + str(chybejici.size())
 			+ " deklarovanych souboru neexistuje: " + ", ".join(chybejici))
+	# KDO CO PREBIL (rozhodnuti uzivatele 2026-10-11: mod SMI menit, co ve hre
+	# je - ale nesmi se to dit tise). Vypisuje se kazdy soubor, ktery poskytuje
+	# vic vrstev, i s poradim, takze "proc se to chova jinak" je videt v logu.
+	for rel in content.overrides():
+		print("[main] obsah: ", rel, " poskytuje vic vrstev: ",
+			", ".join(content.providers(rel)), " (vyhrava posledni)")
 	items_data = content.path_or_default("data/items.json")
 	skills_data = content.path_or_default("data/skills.json")
 	help_data = content.path_or_default("data/help.json")

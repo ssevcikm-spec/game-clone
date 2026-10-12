@@ -271,27 +271,42 @@ cizích práv).
 |---|---|---|---|
 | **R1** | **Mod je OBSAH, ne kód** — mody nespouštějí žádné skripty. Kdo chce novou mechaniku, musí ji mít ve hře (nebo je to samostatné zadání). | Godot GDScript **sandbox nemá** („bezpečný skript“ není volba) a bez stabilních ID záznamů by skript ani neměl na co sahat | nulová dnes (skripty neexistují); kdyby bylo potřeba, doporučená cesta je **omezený DSL**, ne GDScript |
 | **R2** | **Mod smí přidávat i přebíjet, ale VYŘČENĚ** — u každého souboru `mod.json` řekne `replace` (přebít) nebo `add` (přidat záznamy). Kolize = **chyba s výpisem obou stran**, nikdy „poslední vyhrál“ | je to technická volba, vratná; dnešní S1 už přebíjení má na úrovni souboru | kdyby se ukázalo, že dva mody se perou, omezí se `add` bez kolizí |
-| **R3** | **Save: nic se neděje tiše.** O tom, jestli save „patří“ k obsahu, rozhoduje **manifest** (id + verze vrstvy); změna obsahu se **ohlásí jmenovitě** (hash řekne „co se liší“) a `--strict-content` obnoví dnešní odmítání. Neznámý záznam v save (předmět, který mod odebral) se **nevypustí tiše** — hlásí se | mění to dnešní záruku, ale **směrem k víc informace**, ne k míň; a je to přesně to, co dělá mod použivatelný | jeden přepínač navíc; `--strict-content` = dnešní chování |
+| **R3** | **Save: nic se neděje tiše.** O tom, jestli save „patří“ k obsahu, rozhoduje **manifest** (id + verze vrstvy); změna obsahu se **ohlásí jmenovitě** (hash řekne „co se liší“) a `--strict-content` obnoví dnešní odmítání. Neznámý záznam v save (předmět, který mod odebral) se **nevypustí tiše** — hlásí se. ⚠ **Změněno 2026-10-12 uživatelem:** místo hlášení do žurnálu **DOTAZ s výčtem rozdílů** a načtení až po potvrzení (§6.2, odpověď 3) | mění to dnešní záruku, ale **směrem k víc informace**, ne k míň; a je to přesně to, co dělá mod použivatelný | `--strict-content` = dnešní chování; dotaz lze vypnout přepínačem pro dávky |
 | **R4** | **Žádná nová brána teď.** S1 měří testy a sondy; bránu dostane až S2/S3, až bude co hlídat (nová brána = změna `docs/08`) | brána, která nemá co měřit, je horší než žádná (naměřeno v projektu víckrát) | bránu lze přidat kdykoli, je to přírůstek |
 | **R5** | **UO art v modu: pravidlo pro moddery, bez technického vynucení.** Hra sama UO assety nedistribuuje (platí dál); detektor „tenhle mod veze odvozený art“ se spolehlivě postavit nedá, takže by to bylo falešné bezpečí | technická část je moje (co jde a co ne); **právní rámec se nemění** | kdykoli lze přidat varování v dokumentaci pro moddery |
 | **R6** | **Pořadí prací: S1b → S2 → S3.** Nejdřív aby mod fungoval **všude** (ne jen u 2 souborů z 20), pak aby **nerozbil rozehranou hru**, pak aby **mohl přidat obsah** | vyplývá z naměřených mezer; pořadí je vratné | dá se přeskočit, ale S3 bez S1b znamená „mod funguje zdánlivě“ |
 
-### 6.2 Potřebuju od tebe (a proč to není moje)
+### 6.2 Rozhodl uživatel (2026-10-12) — a co z toho plyne
 
-1. **Kdo má hru rozšiřovat?** (a) ty sám, (b) i cizí lidé bez programování,
-   (c) i cizí lidé s vlastní logikou. *(Určuje, jestli R1 zůstane navždy.)*
-2. **Má mod smět MĚNIT to, co už ve hře je** (cena předmětu, recept, monstrum),
-   nebo jen přidávat nové? *(Dva mody, které mění totéž, se mohou poprat.)*
-3. **Co se má stát s rozehranou hrou, když si přidáš mod?** Návrh R3: načte se
-   a hra to napíše. Alternativa: odmítnout a říct proč.
-4. **Čím mám pokračovat** (návrh R6: S1b → S2 → S3)?
-   > **Stav 2026-10-11:** S1b **hotové** (session „S1b“). Otázka tedy dnes zní
-   > **„S2, nebo S3?“** — S2 (verzované ukládání vázané na obsah) mění smlouvu
-   > save `docs/04 §4.7`; S3 (stabilní ID záznamů a slučování) je větší a mění
-   > datové smlouvy. Body 1–3 výš na to pořád čekají — do odpovědi se nic
-   > nerozhoduje samo.
+> **Stav S1b:** ✅ **hotové** (session „S1b“, commit `cb3b072` — cesta k datům je
+> parametr u 12 modulů, metrika `tools/check-data-paths.py` hlásí
+> **23 parametr / 0 přímo**). Body 1–3 níž tedy už nejsou „otázky před prací“,
+> ale **rozhodnutí, která určují S2 a S3**.
 
-### 6.3 Co zůstává na tobě i po R1–R6 (neměním to sám)
+| Otázka | Odpověď uživatele | Co to mění |
+|---|---|---|
+| **1) Kdo má hru rozšiřovat?** | **i cizí lidé** — „až se dostane do světa, aby si ji mohli upravit“; **„prozatím jen úprava obsahu, jak píšeš“** | **R1 potvrzeno** (mod = obsah, ne kód). Nově ale platí: **formát modu je veřejný kontrakt** → identita a pravidla se musí zmrazit **před** prvními cizími mody (R7) a **S6 (dokumentace pro moddery) přestává být „na konec“** — bez ní si mod nikdo nenapíše |
+| **2) Smí mod měnit, co ve hře je?** | **ano** — „mod může měnit, co je ve hře“ | **R2 potvrzeno** (`replace` je legitimní mód) + **R8**: kdo co přebil, musí být **vidět**, ne jen „poslední vyhrál“ |
+| **3) Rozehraná hra + mod** | **načte se po odsouhlasení hráčem / adminem / správcem** | **R3 se MĚNÍ:** nestačí hlášení do žurnálu — musí být **dotaz s výčtem rozdílů** a načte se až po potvrzení. Když není kdo potvrdit (headless/dávka), **nenačte se** (nic se neděje tiše). Kdo potvrzuje, je **vlastník uložené hry** — dnes hráč, v hostované hře správce (D9) |
+
+**R7 (nové) — pravidla identity se zmrazují TEĎ, dokud žádný cizí mod neexistuje.**
+Změnit id modu nebo jeho pravidla později znamená **rozbít mody, které už jsou
+venku**. Proto platí už dnes:
+* **id modu je jmenný prostor s tečkou** (`autor.mod`) — dva autoři si nemůžou
+  vybrat stejné jméno; základ `base` tečku mít nemusí. *(Provedeno 2026-10-11,
+  měřeno testem i E2E.)*
+* `version` v modu je **verze jeho obsahu**, ne verze hry; co je jednou venku, se
+  **nepřepisuje, jen rozšiřuje**.
+
+**R8 (nové) — kdo co přebil, je VIDĚT.** `overrides()` vypíše soubory, které
+poskytuje víc vrstev, `providers(rel)` řekne **kdo a v jakém pořadí** a hra to
+vypisuje při startu. *(Provedeno 2026-10-11, měřeno testem.)*
+
+**Co z odpovědí plyne pro pořadí (R6):** **S1b ✅ → S2 (rozšířené) → S3**.
+S2 se rozšiřuje o **potvrzovací dotaz** (odpověď 3) a o ochranu proti tichému
+vypuštění záznamu, který v save je a v obsahu už ne.
+
+### 6.3 Co zůstává na uživateli i po R1–R8 (neměním to sám)
 
 5. **Nové granule v `.forge/roadmap.json`** — plán je tvůj (`docs/07` §7.1 bod 5).
    Až budu chtít zapsat S1b/S2/S3 jako granule, řeknu si.

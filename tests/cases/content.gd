@@ -134,16 +134,18 @@ func run(t) -> void:
 	# -- 7) discover(): zaklad z repa + mody z adresare ---------------------
 	_smaz(TEST_MODS)
 	t._check(_zapis(TEST_MODS + "/dobry/mod.json", JSON.stringify({
-		"id": "dobry", "version": 3, "order": 100, "files": ["data/help.json"]})),
+		"id": "test.dobry", "version": 3, "order": 100, "files": ["data/help.json"]})),
 		"fixture: dobry/mod.json zapsan")
 	t._check(_zapis(TEST_MODS + "/dobry/data/help.json", "{\"uvod\": []}"),
 		"fixture: dobry/data/help.json zapsan")
 	_zapis(TEST_MODS + "/rozbit/mod.json", "{ to neni json")
-	_zapis(TEST_MODS + "/bez-order/mod.json", "{\"id\": \"bez\", \"version\": 1, \"files\": []}")
+	_zapis(TEST_MODS + "/bez-order/mod.json", "{\"id\": \"mod.bez\", \"version\": 1, \"files\": []}")
+	_zapis(TEST_MODS + "/bez-tecky/mod.json",
+		"{\"id\": \"bez\", \"version\": 1, \"order\": 5, \"files\": []}")
 	_zapis(TEST_MODS + "/s-root/mod.json",
-		"{\"id\": \"sroot\", \"version\": 1, \"order\": 5, \"root\": \"res://\", \"files\": []}")
+		"{\"id\": \"test.sroot\", \"version\": 1, \"order\": 5, \"root\": \"res://\", \"files\": []}")
 	_zapis(TEST_MODS + "/preklep/mod.json",
-		"{\"id\": \"prek\", \"version\": 1, \"order\": 5, \"files\": [], \"ordr\": 5}")
+		"{\"id\": \"test.prek\", \"version\": 1, \"order\": 5, \"files\": [], \"ordr\": 5}")
 	DirAccess.make_dir_recursive_absolute(TEST_MODS + "/bez-modjson")
 	DirAccess.make_dir_recursive_absolute(TEST_MODS + "/.skryty")
 
@@ -151,21 +153,34 @@ func run(t) -> void:
 	var pridano: int = nacteny.discover(BASE_DECL, TEST_MODS)
 	t._check(pridano == 2,
 		"sim.content: discover pridal zaklad + 1 dobry mod (namEReno %d)" % pridano)
-	t._check(nacteny.layer_ids() == ["base", "dobry"],
-		"sim.content: vrstvy po discover jsou base a dobry (namEReno %s)" % str(nacteny.layer_ids()))
+	t._check(nacteny.layer_ids() == ["base", "test.dobry"],
+		"sim.content: vrstvy po discover jsou base a test.dobry (namEReno %s)"
+			% str(nacteny.layer_ids()))
 	t._check(nacteny.path_for("data/help.json") == TEST_MODS + "/dobry/data/help.json",
 		"sim.content: mod prebil `help.json` (namEReno %s)" % nacteny.path_for("data/help.json"))
 	t._check(nacteny.path_for("data/items.json") == "res://data/items.json",
 		"sim.content: neprebity soubor zustava ze zakladu")
-	t._check(nacteny.errors().size() == 5,
-		"sim.content: rozbit/bez-order/s-root/preklep/bez-modjson = 5 chyb (namEReno %d)"
+	t._check(nacteny.errors().size() == 6,
+		"sim.content: rozbit/bez-order/bez-tecky/s-root/preklep/bez-modjson = 6 chyb (namEReno %d)"
 			% nacteny.errors().size())
 	var text_chyb: String = "\n".join(PackedStringArray(nacteny.errors()))
-	for jmeno in ["rozbit", "bez-order", "s-root", "preklep", "bez-modjson"]:
+	for jmeno in ["rozbit", "bez-order", "bez-tecky", "s-root", "preklep", "bez-modjson"]:
 		t._check(text_chyb.contains(jmeno),
 			"sim.content: chyba JMENUJE vinny adresar '%s' (jinak se to hleda tezko)" % jmeno)
+	t._check(text_chyb.contains("jmenny prostor"),
+		"sim.content: mod s id bez tecky se odmitne S DUVODEM (jmenny prostor)")
 	t._check(not nacteny.layer_ids().has(".skryty"),
 		"sim.content: adresar zacinajici teckou se preskoci")
+
+	# -- 7b) kdo co prebil je VIDET (mod muze menit, ale ne tise) ----------
+	t._check(nacteny.overrides() == ["data/help.json"],
+		"sim.content: `overrides()` pojmenuje soubor, ktery poskytuje vic vrstev (namEReno %s)"
+			% str(nacteny.overrides()))
+	t._check(nacteny.providers("data/help.json") == ["base", "test.dobry"],
+		"sim.content: `providers()` u prebileho souboru vi, kdo ho prebil (namEReno %s)"
+			% str(nacteny.providers("data/help.json")))
+	t._check(not nacteny.overrides().has("data/items.json"),
+		"sim.content: neprebity soubor v `overrides()` NENI")
 
 	# -- 8) zakladni deklarace v repu odpovida `data/` ----------------------
 	var zaklad = script.new()

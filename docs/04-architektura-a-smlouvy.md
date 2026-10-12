@@ -94,7 +94,7 @@ v `.forge/roadmap.json`.
 |---|---|---|
 | `sim.commands` | `sim/commands.gd` | `parse(d:Dictionary)->Dictionary`, `validate(c:Dictionary)->Dictionary` (`{ok, reason}`), `dispatch(sim, c:Dictionary)->void` |
 | `sim.world_loop` | `sim/sim_world.gd` | `new(seed:int, data:Dictionary)`, `enqueue(c:Dictionary)->void`, `tick(ms:int)->void`, `snapshot()->Dictionary` (read-only pro UI), `state_hash()->String`, `save(path:String)->bool`, `load(path:String)->bool`; **pořadí v `tick` je pravidlo: hodiny → systémové ticky → dispatch příkazů** (2026-10-07) — kdyby se příkazy dispatchovaly první, krok, který je v tomto ticku na řadě, vrací `busy` a kadence kroku se zdvojnásobí (`REVIZE-POHYB` §2.1) |
-| `sim.content` | `sim/content.gd` | **DOPLNĚNO 2026-10-11** (modding, S1): `add(id, version, order, files, root, required)->bool`, `path_for(rel)->String` (`""` = žádná vrstva soubor neposkytuje), `path_or_default(rel)->String`, `providers(rel)->Array`, `declared_files()->Array`, `missing_files()->Array`, `override_count()->int`, `manifest()->Array`, `manifest_hash()->String`, `layers()/layer_ids()/layer_count()`, `errors()->Array`, `report()->Dictionary`, `discover(decl_path, mods_dir)->int`; kontrakt je v **§4.9** |
+| `sim.content` | `sim/content.gd` | **DOPLNĚNO 2026-10-11** (modding, S1): `add(id, version, order, files, root, required)->bool`, `path_for(rel)->String` (`""` = žádná vrstva soubor neposkytuje), `path_or_default(rel)->String`, `providers(rel)->Array`, `overrides()->Array` (soubory, které poskytuje víc vrstev), `declared_files()->Array`, `missing_files()->Array`, `override_count()->int`, `manifest()->Array`, `manifest_hash()->String`, `layers()/layer_ids()/layer_count()`, `errors()->Array`, `report()->Dictionary`, `discover(decl_path, mods_dir)->int`; kontrakt je v **§4.9** |
 
 ### ui (klient) — kompaktně
 
@@ -803,7 +803,7 @@ ber odsud".
 
 | Prvek | Pravidlo |
 |---|---|
-| `id` | **stabilní ID zdroje**: malé ASCII `[a-z0-9_.-]`, např. `base`, `mod.example`; musí být **unikátní**. Je to ID **zdroje**, ne záznamu v datech (klíč předmětu je dnes `tile` = art UO) |
+| `id` | **stabilní ID zdroje**: malé ASCII `[a-z0-9_.-]`, např. `base`, `mod.example`; musí být **unikátní**. Je to ID **zdroje**, ne záznamu v datech (klíč předmětu je dnes `tile` = art UO). **U MODU musí obsahovat tečku** (jmenný prostor, `autor.mod`) — mody píšou cizí lidé a id je stabilní identita, takže pravidlo zavedené později by rozbilo mody, které už jsou venku (rozhodnutí 2026-10-11) |
 | `version` | `int >= 1`; verze **obsahu té vrstvy** (použije ji save v S2) |
 | `order` | `int >= 0`, **povinný**; **vyšší vyhrává**. Při shodě rozhoduje `id` **vzestupně** — výsledek tedy nezávisí na pořadí vložení ani na pořadí složek v adresáři |
 | `files` | relativní cesty (`data/items.json`), bez `..`, `:` a `\`; soubor, který v `root` **není**, se přeskočí a je vidět v `missing_files()` |
@@ -818,14 +818,21 @@ ber odsud".
   by „nefungoval" u nového souboru).
 * `user://mods/<jmeno>/mod.json` — **mod**: `{id, version, order, files}`.
   Neznámý klíč je **chyba** (preklep se neignoruje), chybějící `order` je
-  **chyba**, rozbitý `mod.json` se přeskočí a **ohlásí jménem modu**.
+  **chyba**, `id` **bez tečky** je **chyba** (jmenný prostor — viz tabulka),
+  rozbitý `mod.json` se přeskočí a **ohlásí jménem modu**.
+
+**Mod SMI měnit, co už ve hře je** (rozhodnutí uživatele 2026-10-11: „mod může
+měnit, co je ve hře“), ale **nesmí se to dít tiše**: `overrides()` vrátí
+soubory, které poskytuje víc než jedna vrstva, `providers(rel)` řekne **kdo a
+v jakém pořadí**, a `app/main` to **vypisuje při startu**. Kdo se ptá „proč se
+to chová jinak“, to musí dostat pojmenované.
 
 **Rozhraní modulu** (kanonicky v `§4.2`): `discover(decl_path, mods_dir)` načte
 deklaraci a mody a vrátí počet přidaných vrstev; `path_for(rel)` vrátí vítěze
 nebo `""`; `path_or_default(rel)` vrátí základní `res://` cestu, když o souboru
-nikdo nic neví; `providers(rel)` je doklad „kdo to přebil"; `manifest()` nese
-**jen identitu** (`id, version, order, required`), **žádné cesty** — save nesmí
-záviset na umístění instalace.
+nikdo nic neví; `providers(rel)` a `overrides()` jsou doklad „kdo co přebil";
+`manifest()` nese **jen identitu** (`id, version, order, required`), **žádné
+cesty** — save nesmí záviset na umístění instalace.
 
 **Kdo to používá:** `app/main` (kompoziční kořen) — `_nacti_obsah()` se volá
 **před** `_load_data()` a překládá cesty přes `_cesta(rel)`; přepínač

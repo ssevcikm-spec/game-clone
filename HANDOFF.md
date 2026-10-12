@@ -1,3 +1,70 @@
+# Předání — game-clone (2026-10-12, SESSION E (pokračování): ROZHODNUTÍ O MODECH + IDENTITA MODU)
+
+> **Co je tenhle soubor:** **stav projektu** pro další session agenta. Přepisuje
+> se celý; historie je v `git log`. Nový blok je vždy **nahoře**; starší bloky se
+> needitují (jen doplňují). **Současný stav se bere z tohoto bloku.**
+>
+> **Odkud brát detaily téhle práce:** `NAVRH-MODDING-2026-10-11.md` **§6.1**
+> (rozhodnutí agenta R1–R8) a **§6.2** (odpovědi uživatele), `docs/04 §4.9`
+> (kontrakt vrstev obsahu), `sim/content.gd`, `tests/cases/content.gd`.
+> ⚠ V tomhle stromě **pracovaly souběžně dvě session** (viz níž) — čísla jsou
+> proto vždy označená tím, na kterém stromu vznikla.
+
+## ✅ CO SE UDĚLALO (a proč právě tohle)
+
+**Nejdřív dialog, pak práce.** Uživatel dostal vysvětlení (co je dnes „mod“,
+tři úrovně rozšiřitelnosti, co která volba stojí) a **rozhodl**:
+
+| Otázka | Odpověď uživatele |
+|---|---|
+| Kdo má hru rozšiřovat? | **i cizí lidé** („až se dostane do světa“); **„prozatím jen úprava obsahu“** |
+| Smí mod měnit, co ve hře je? | **ano** |
+| Rozehraná hra + mod? | **načte se po odsouhlasení hráčem / adminem / správcem** |
+
+**Co jsem z toho udělal hned** (a proč právě to): z odpovědi „i cizí lidé“ plyne,
+že **id modu a pravidla jeho formátu jsou stabilní identita** — kdyby se pravidlo
+zavedlo později, **rozbije mody, které už jsou venku**. Proto se **zmrazují teď**,
+dokud žádný cizí mod neexistuje:
+
+| Věc | Soubor | Naměřeno |
+|---|---|---|
+| **id modu je jmenný prostor s tečkou** (`autor.mod`); `base` tečku mít nemusí | `sim/content.gd` | mod s id bez tečky se **odmítne s důvodem**; test to měří |
+| **Kdo co přebil, je VIDĚT** (mod smí měnit, ale ne tiše) | `sim/content.gd` (`overrides()`), `app/main.gd` | při startu se vypíše každý soubor, který poskytuje víc vrstev, **i s pořadím** |
+| Testy a E2E na nová pravidla | `tests/cases/content.gd`, `_analyza/p63-mod-e2e.py` | case **59 kontrol / 0 selhání**; E2E **3 běhy hry, 0 vad** (mod `e2e.test`: `uvod 7 → 8 → 7`) |
+| Mutační důkaz | `_analyza/p62-mutace-content.py` | **8 z 8 chyceno** |
+| Nic se nerozbilo | `tests/run_tests.gd`, `run-all.py` | testy **2805/0** (89 souborů), brány **16/0** |
+
+## ⚠ SOUBĚŽNÁ SESSION — co NENÍ moje práce
+
+**Odpověď „kdo udělal S1b“:** **jiná session** (`cb3b072`, „S1b: cesta k datům je
+parametr (12 modulů) — mod už nefunguje zdánlivě“, 2026-10-12 00:14). Ta session
+přidala i **metriku do repa** (`tools/check-data-paths.py` → *23 parametr /
+0 přímo*) a novou smlouvu `docs/04 §4.9.1`. **Nepřipisuju si to**; můj příspěvek
+je jen identita modu a výpis přebití (tabulka výš).
+
+**Důsledek pro čtení čísel:** testy šly **2751 → 2800 (S1b) → 2805 (tato
+session)**, bran 15 → **16**. Kdo vidí jiné číslo v jiném dokumentu, čte **jiný
+strom** — v tomhle projektu se to už stalo (viz starší blok „CO SE V TÉTO SESSION
+POKAZILO“).
+
+## ➡ CO JE DALŠÍ KROK (rozhodnuto, ne otázka)
+
+Podle R6 a odpovědí uživatele: **S2 — verzované ukládání vázané na identitu
+obsahu**, rozšířené o **potvrzovací dotaz** (odpověď 3): když se obsah od
+uložení liší, hra **vypíše rozdíly a zeptá se**; bez koho se zeptat
+(headless/dávka) se **nenačte**. Pak **S3** (mod přidá záznam: u monster,
+receptů, skillů, zbraní a zbrojí **už stabilní `id` je**; u předmětů ne, tam je
+jediné jednoznačné ID `tile` = art z UO — naměřeno `_analyza/p66-id-zaznamu.py`).
+
+**Otevřené a neměnné:** R1 (**mod je obsah, ne kód** — Godot sandbox nemá),
+**S6 (dokumentace pro moddery) se posouvá z „na konec“ na „s prvními cizími
+mody“**, nové granule v `.forge/roadmap.json` = **uživatel**, UO art v modech =
+pravidlo, ne technické vynucení (R5).
+
+---
+
+
+
 # Předání — game-clone (2026-10-11, SESSION „S1b“: CESTA K DATŮM JE PARAMETR — mod přestal fungovat zdánlivě)
 
 > **Co je tenhle soubor:** **stav projektu** pro další session agenta. Přepisuje

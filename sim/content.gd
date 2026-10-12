@@ -23,6 +23,9 @@ extends RefCounted
 # STABILNI ID: `id` vrstvy je male ASCII (`[a-z0-9_.-]`), napr. `base` nebo
 # `mod.example`. Je to ID ZDROJE obsahu, NE ID zaznamu v datech (klic
 # predmetu je dnes `tile`; stabilni string ID zaznamu je dalsi krok, §4 S3).
+# **Mod MUSI mit id jako jmenny prostor s teckou** (rozhodnuti 2026-10-11:
+# mody pisou cizi lide a id je stabilni identita - pravidlo zavedene pozdeji
+# by rozbilo mody, ktere uz jsou venku). Zakladni `base` tecku mit nemusi.
 #
 # PORADI: `order` je INT a je POVINNY; vyssi vyhrava. Pri shode `order`
 # rozhoduje `id` vzestupne, takze vysledek nezalezi na poradi vlozeni ani na
@@ -33,7 +36,8 @@ extends RefCounted
 #   * neslucuje zaznamy - mod umi soubor PREBIT, ne do nej pridat radek
 #     (slucovani je §4 S3 navrhu),
 #   * nedrzi hash obsahu souboru - to je dnes `data_version` v `sim.save`,
-#   * nespousti zadny skript modu (sandbox je §4 S5 a ceka na rozhodnuti).
+#   * nespousti zadny skript modu (R1: mod je OBSAH, ne kod - rozhodnuti
+#     agenta 2026-10-11, uzivatel potvrdil "prozatim jen uprava obsahu").
 #
 # CHYBY SE VRACI SEZNAMEM (`errors()`), ne vyjimkou: rozbity mod nesmi shodit
 # start hry, ale musi byt VIDET (`docs/08 §8.6`).
@@ -194,14 +198,23 @@ func missing_files() -> Array:
 
 
 func override_count() -> int:
+	return overrides().size()
+
+
+func overrides() -> Array:
+	# Soubory, ktere poskytuje VIC NEZ JEDNA vrstva - tedy "kdo co prebil".
+	# Mod, ktery meni, co je ve hre, je legitimni (rozhodnuti uzivatele
+	# 2026-10-11), ale NESMI se to stat tise: kdo se ptá "proč se to chová
+	# jinak", to musi dostat pojmenovane (`providers(rel)`).
 	var pocty: Dictionary = {}
 	for l in _layers:
 		for rel in (l["files"] as Array):
 			pocty[rel] = int(pocty.get(rel, 0)) + 1
-	var out: int = 0
+	var out: Array = []
 	for rel in pocty.keys():
 		if int(pocty[rel]) > 1:
-			out += 1
+			out.append(str(rel))
+	out.sort()
 	return out
 
 
@@ -310,6 +323,16 @@ func _add_from_record(rec: Dictionary, root: String, kde: String, je_mod: bool) 
 		# rict.
 		_error("%s: mod nesmi mit vlastni 'root' (bere se adresar modu)" % kde)
 		return false
+	if je_mod:
+		# ID MODU JE JMENNY PROSTOR (alespon jedna tecka). Duvod je casovy:
+		# mody pisou CIZI lide a id je STABILNI identita - kdyby se pravidlo
+		# zavedlo pozdeji, rozbije to mody, ktere uz jsou venku. Zakladni
+		# vrstva (`base`) tecku mit nemusi - neni to cizi jmeno.
+		var id_modu: String = str(rec.get("id", ""))
+		if not id_modu.contains("."):
+			_error("%s: id modu musi byt jmenny prostor s teckou (napr. 'autor.mod'), namEReno '%s'"
+				% [kde, id_modu])
+			return false
 	if not rec.has("order"):
 		_error("%s: chybi 'order' - poradi nacitani musi byt VYRECENE" % kde)
 		return false
