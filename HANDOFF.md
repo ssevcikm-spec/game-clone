@@ -1,3 +1,63 @@
+# Předání — game-clone (2026-10-12, PLÁNOVACÍ BLOK: uživatel zvolil směr „POCIT“ — tři měřené vady)
+
+> **Co je tenhle soubor:** **stav projektu** pro další session agenta. Přepisuje
+> se celý; historie je v `git log`. Nový blok je vždy **nahoře**; starší bloky se
+> needitují (jen doplňují). **Současný stav se bere z tohoto bloku.**
+>
+> ⚠ **Tenhle blok nemění kód** — je to **záznam rozhodnutí uživatele** (12. 10.)
+> a měření, ze kterého vzniklo zadání. Kód, testy a brány zůstávají tam, kde je
+> popisuje blok **S1b** níž (naposledy naměřeno 12. 10. 00:15: testy **2800/0**,
+> brány **16 měřeno / 0 chyb**). **V době zápisu běžela souběžná session E
+> (modding — blok hned pod tímhle), takže nic z její práce tenhle blok nemění.**
+>
+> **Odkud brát detaily:** zadání [`ZADANI-27-POCIT.md`](ZADANI-27-POCIT.md)
+> (naměřená čísla, tři granule, brány, pasti) a rozcestník
+> [`DALSI-SESSION.md`](DALSI-SESSION.md) §G (+ paste-ready „Blok G“).
+
+## ✅ CO SE ROZHODLO (a proč)
+
+**Uživatel 12. 10. 2026** na otázku „co je dalšího v plánu“ řekl, že hru přes
+obchodníka, kovadlinu a souboj **nepovažuje za příjemnou**, a pojmenoval tři
+věci: *„svět není koherentní a je mrtvý — postavy nemají animace, neřeší
+vzdálenost pro interakci, nevidím zpětnou vazbu.“* Na nabídku směrů zvolil
+**„POCIT: odezva + zvuk“**. **`M6` (magie) se tím odkládá, ne ruší** — podle
+pořadí v `docs/07` by byla další.
+
+## 📊 NAMĚŘENO (2026-10-12, měřeno v této session; každý bod je v kódu dohledatelný)
+
+| # | Vada | Doklad |
+|---|---|---|
+| 1 | **Animace: simulace je posílá, klient je neodebírá.** `mobile_anim` vzniká v `sim/systems/movement.gd:196` i `sim/systems/combat.gd:987`; v celém `app/` ji nikdo nečte (jediný výskyt je **komentář** `app/player_controller.gd:20-21`). `app/world_view.gd:426` proto kreslí **každého cizího mobila** s `_anim_idle()`, a ta vrací **natvrdo 4** (`:504-505`) = postoj: monstra se sunou. Animovaný je jen hráč (`:1310`, z lokálního vstupu) | grep `mobile_anim` nad `*.gd` = 2 producenti, **0 konzumentů** |
+| 2 | **Dosah interakce hlídá jen část systémů.** Hlídají: `craft` (2/2), `harvest` (2/2/4 z dat), loot (2), vendor (2). **Nehlídá:** `sim/systems/combat.gd:175` `attack()` (v celém souboru není porovnání pozice) a `sim/systems/interaction.gd:516` `_run_use` (dveře, truhla, otevření obchodu, equip, světlo, svitek); `sim/commands.gd:77-95` validuje jen `dir` a `action`. AI přitom má `MELEE_RANGE = 1` — svět je **přísný na monstra a benevolentní k hráči** | grep `RANGE`/`absi(` v `combat.gd` = **0** |
+| 3 | **Zvuk: 0× `AudioStream` v celém repu** (grep nad `*.gd` bez nálezu); `app/sound.gd` i `tools/uoextract/sounds.py` neexistují. Textová odezva **existuje** (`_fail()` hlásí, `sim/commands.gd:101` hlásí), vizuální odezva na úspěch ne | `plan-status.py`: `audio.playback` = chybí |
+
+**Plán (měřeno `tools/plan-status.py`, 2026-10-12):** 122 granulí, **87 hotových**,
+5 bez testu, **30 chybí**; `M5` **10/1/0**, `MK` **9/0/0**, `M9` **3/0/0**;
+`M6` 0/0/3, `M7` 0/0/4, `M8` 0/0/3, `MP` 0/0/4; v `M2` chybí **11** granulí
+(tooltip, kontextové menu, drag & drop, kurzor cíle, paperdoll, nastavení, …).
+
+## 🚧 CO JE ROZPRACOVANÉ (a co NENÍ)
+
+* **Nic se neimplementovalo** — tenhle blok je zadání a měření; kód v pracovním
+  stromě je nedotčený. Nové jsou dokumenty `ZADANI-27-POCIT.md` a §G
+  v `DALSI-SESSION.md`.
+* Ve stromě běží **cizí soak** (`_analyza/p43-souboj-sonda.gd`, Godot z 11. 10.
+  07:28, log `.cache/p43.txt` přes 89 MB) — **žádné FPS z téhle doby není izolované**.
+
+## 🧍 CO ČEKÁ NA TEBE
+
+1. **Sedí rozsah a pořadí `P1 → P2 → P3`** ze `ZADANI-27-POCIT.md`? (Zvuk je
+   z trojice nejdražší.)
+2. **Smí být dosah interakce v datech** (`data/balance.json`), nebo stačí
+   konstanta s odkazem na referenci? Obě cesty jsou v projektu zastoupené.
+3. **Zobrazení zdraví** zůstává odložené (`docs/01 §1.8`) — rozhodnutí **až po
+   P1–P3**, až si to uživatel zahraje.
+4. **Z minulých session pořád platí:** S2 vs. S3 (modding, `NAVRH-MODDING` §6.2),
+   zda má být `tools/check-data-paths.py` brána `G18`, zda dovézt sondy `p67/p68`
+   do repa, a co s `assets/cobble/`.
+
+---
+
 # Předání — game-clone (2026-10-12, SESSION E (pokračování): ROZHODNUTÍ O MODECH + IDENTITA MODU)
 
 > **Co je tenhle soubor:** **stav projektu** pro další session agenta. Přepisuje

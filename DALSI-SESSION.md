@@ -10,6 +10,12 @@
 
 ## 0. Co je hotové (odkud se startuje)
 
+> ⚠ **Tabulka níž je snapshot z 2026-10-10.** Novější stav je v `HANDOFF.md`
+> (nejnovější blok) a v `.forge/roadmap.json`; **naměřeno 2026-10-12**:
+> `M5` (souboj, monstra, smrt, loot) **hotové**, `MK` **9/9**, modding `S1`+`S1b`
+> hotové, vlastní art ve hře (`G15`–`G17`), tři sady (`assets/own/`, `own2x/`,
+> `own-lit/`) — a **30 granulí zbývá**. Aktuální rozcestník je oddíl **G** níž.
+
 | Hotovo | Důkaz |
 |---|---|
 | Krátká smyčka je hratelná: těžba → výroba → **prodej** | commit `d8e2a14`, HANDOFF 2026-10-10/2 |
@@ -172,6 +178,42 @@ odstraní s odůvodněním v komentáři.
 
 ---
 
+## G) POCIT — animace postav, dosah interakce, odezva
+
+> **Vzniklo 2026-10-12** z odpovědi uživatele („svět není koherentní a je mrtvý —
+> postavy nemají animace, neřeší vzdálenost pro interakci, nevidím zpětnou vazbu“)
+> a z měření v téže session. Plné znění s čísly a branami:
+> [`ZADANI-27-POCIT.md`](ZADANI-27-POCIT.md). **Uživatel 12. 10. zvolil tenhle
+> směr** („POCIT: odezva + zvuk“) — `M6` magie se tím **odkládá, ne ruší**.
+
+**Tři naměřené vady (ne dojem):**
+
+1. **Animace:** simulace událost `mobile_anim` **posílá** (`sim/systems/movement.gd:196`,
+   `sim/systems/combat.gd:987`) a **klient ji neodebírá** (v `app/` je jen komentář,
+   `app/player_controller.gd:20-21`) → `app/world_view.gd:426` kreslí každého
+   cizího mobila s akcí **4 (postoj)** natvrdo. Monstra se sunou, nechodí.
+2. **Dosah:** útok (`sim/systems/combat.gd:175`) a `use` na dveře/truhlu/obchod
+   (`sim/systems/interaction.gd:516`) **nemají žádnou kontrolu vzdálenosti**,
+   kdežto AI má `MELEE_RANGE = 1` — svět je přísný na monstra a benevolentní k hráči.
+3. **Odezva:** **0× `AudioStream` v celém repu**; zvuk (`app/sound.gd`,
+   `tools/uoextract/sounds.py`) neexistuje a vizuální odezva na úspěch taky ne.
+
+**Rozsah zápisu:** `app/` (P1), `sim/` + `tests/cases/` (P2), `tools/uoextract/`
++ `app/` + nové zvukové assety (P3), `docs/` (smlouva), `LESSONS.md`, `HANDOFF.md`.
+**`tests/run_tests.gd` se needituje**; granule do `.forge/roadmap.json` doplňuje
+uživatel (`docs/07 §7.1 bod 5`).
+
+**Hotovo, když:** cizí postava při kroku vykáže jinou akci než 4 (a je to vidět
+na dvou snímcích), dosah platí v obou směrech a je krytý **mutací**, zvuk se
+opravdu přehraje (počet streamů > 0), a testy, brány, replaye i determinismus
+zůstanou **beze změny hashů**.
+
+**Co NEDĚLAT:** nesahat kvůli animaci na `sim/` (klientská věc, `docs/01 §1.5
+bod 9`); nepoužít zvuk ani art z instalace UO (licence); nezavádět „jistotu“
+(`docs/01 §1.8`); neměnit geometrii ani `G1`; nepřidávat float do stavu (`G14`).
+
+---
+
 ## Jak to zadat (zkopíruj do nové session)
 
 **Postup, který funguje (ověřeno z druhé strany — z session vidím jen workspace):**
@@ -325,6 +367,38 @@ Pravidla: nic nemaž bez odůvodnění v komentáři; vzor, který už nemá co 
 se odstraní s vysvětlením. Na konci LESSONS.md + HANDOFF.md + commit a push.
 ```
 
+### Blok G — POCIT (animace postav, dosah interakce, odezva)
+
+```text
+Pracovní složka: E:\Workspaces\game-clone
+
+Než začneš: přečti ZADANI-27-POCIT.md (celé — jsou tam naměřená čísla, brány
+i pasti), HANDOFF.md (stav), docs/01 §1.8 (feel) a §1.5 bod 8 (co QoL smí
+a nesmí), u P2 pak docs/05 (dosahy) a docs/04 (smlouva interakce).
+
+Úkol: tři vady, které uživatel pojmenoval — v tomhle pořadí:
+P1 (klient) animace VŠECH postav: simulace posílá `mobile_anim` a klient ji
+neodebírá, takže app/world_view.gd kreslí každého cizího mobila s akcí 4
+(postoj) natvrdo. Akci ber ze STAVU (sim.movement.pending_step) a movement
+předá world_view novým aditivním setterem. Útok a smrt jsou druhý krok.
+P2 (sim) dosah: útok 1 dlaždice (jako ai.MELEE_RANGE), `use` na cizí objekt
+2 dlaždice (jako LOOT_RANGE/VENDOR_RANGE), vlastní batoh/výbava bez dosahu;
+mimo dosah = {ok:false, reason:"out_of_range"} + hláška, NIKDY ticho.
+P3 zvuk: tools/uoextract/sounds.py + app/sound.gd s volnými (CC0/CC-BY) zvuky
+na zásah, zásah dostaneme, těžbu/kování a smrt; pak teprve vizuální odezva.
+
+Hotovo, když: cizí postava při kroku vykáže jinou akci než 4 a je to vidět na
+dvou snímcích; dosah platí v obou směrech a MUTACE ho shodí (bez mutace je to
+slepá brána); zvuk se opravdu přehraje (počet streamů > 0, ne "soubor je");
+testy, tools/gates/run-all.py, replaye a determinismus zůstanou beze změny
+hashů (P1 je klientská, hash stavu se nesmí pohnout).
+
+Pravidla: nesahat kvůli animaci na sim/ (UI nikdy nemění stav, docs/01 §1.5
+bod 9); tests/run_tests.gd needituje; zvuk ani art z instalace UO; nezavádět
+jistotu (docs/01 §1.8); float do stavu ne (G14); granule do .forge/roadmap.json
+doplňuje uživatel. Na konci LESSONS.md + HANDOFF.md + commit a push.
+```
+
 ### Blok „nevím co dál" (když chceš jen pokračovat)
 
 ```text
@@ -342,6 +416,10 @@ nejbližší krok, proč, a co to bude stát — a teprve pak to dělej.
 **A a B paralelně nejdou** (obojí píše do `tools/artgen/` a do artu).
 **D a E** mají smysl až po A (jinak se ladí čitelnost něčeho, co se ještě
 bude předělávat).
+
+**G (POCIT) jde paralelně s artem** (`tools/artgen/`, `assets/`) — píše do
+`app/`, `sim/`, `tests/cases/` a `tools/uoextract/`, tedy disjunktně.
+**G a C paralelně NEJDOU** (obojí sahá na `sim/` a na smlouvu souboje).
 
 ## Co tenhle soubor NEDĚLÁ
 
