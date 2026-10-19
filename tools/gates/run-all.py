@@ -75,6 +75,14 @@ ORDER = [
     # modul byl zapojeny a pritom nehral, protoze znal hrace 0 - zelene testy
     # to nechytily (sonda na zive scene ano).
     ("G19", "check-sound.py"),
+    # G20 (hrac PROJDE kratkou smyckou na realne scene) je INTEGRACNI brana:
+    # meri tezit -> vyrobit -> prodat jako JEDEN celek pres command cestu
+    # klienta. Patri az ZA vsechny podsoucasti (G1-G19), protoze jejich vady
+    # by ji jinak shodily z duvodu, ktery uz ma vlastni branu; a hned za G19,
+    # protoze obe spousti REALNOU scenu (drzi se u sebe). Pridano 2026-10-12:
+    # kazda podsoustava mela zeleny test, ale "projde to cely" nemeril nikdo -
+    # a presne tak prosla vada "okno obchodu neumi prodat" (session D).
+    ("G20", "check-loop.py"),
     ("G10", "check-render.py"),
 ]
 TESTS_GATE = "G3"

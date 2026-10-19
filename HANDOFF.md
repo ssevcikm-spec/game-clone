@@ -1,3 +1,86 @@
+# Předání — game-clone (2026-10-12, SESSION „P1c“: BRÁNA G20 — KRÁTKÁ SMYČKA END-TO-END)
+
+> **Co je tenhle soubor:** **stav projektu** pro další session agenta. Přepisuje
+> se celý; historie je v `git log`. Nový blok je vždy **nahoře**; starší bloky se
+> needitují (jen doplňují). **Současný stav se bere z tohoto bloku.**
+>
+> **Odkud brát detaily:** sonda `tools/gates/loop_probe.gd`, brána
+> `tools/gates/check-loop.py`, smlouva `docs/08 §8.2` (řádek G20) a `§8.3.2`
+> (jak je postavená), `LESSONS.md` 2026-10-12 (dvě nová ponaučení).
+
+## ✅ CO SE UDĚLALO (a proč právě to)
+
+Projekt uměl měřit **podsoučásti** (těžba, tavení, výroba, prodej), ale
+**žádná brána neměřila, že hráč projde celou krátkou smyčku** na reálné scéně.
+Přesně tak už jednou prošla vada: okno obchodu nemělo přepínač na prodej, prodej
+uměla jen sonda, ne hra — a zelené testy to nechytily, protože volají systémy
+`sim/` přímo. G20 to měří **cestou hráče**.
+
+| Věc | Soubor | Co měří / naměřeno |
+|---|---|---|
+| **Sonda reálné scény** | `tools/gates/loop_probe.gd` | spustí `app/main.tscn` a jde kroky hráče: `interact` vyrábí **klient** (`app.input_map.interact_command`, stejná cesta jako E/T), okna výroby a obchodu obsluhuje **jejich veřejné API** a požadavek si vyzvedne **hra sama** ve svém framu (`app.main._process` → `Command{t:"craft"}` / `{t:"vendor"}`). Sonda **nikdy** nevolá `sim.harvest.mine`, `sim.craft.smelt` ani `sim.vendor.sell` |
+| **Brána** | `tools/gates/check-loop.py` | G20: `exit 0` = všechny 4 kroky PASS s hodnotami; `exit 1` = vada; `exit 2` = NEMĚŘENO. Po každém kroku požaduje **hráčem viditelný následek**: novou zprávu v žurnálu + očekávané slovo (`gather`/`smelt`/`create`/`sell`), inventář a zlato |
+| **Zapojení** | `tools/gates/run-all.py` | G20 zařazena **za G19 a před G10** — je to integrační brána, takže patří až za všechny podsoučásti; s G19 se drží u sebe (obě pouští reálnou scénu), `G10` zůstává poslední (čte snímek, nic nespouští) |
+| **Smlouva** | `docs/08 §8.2`, `§8.3.2`, `§8.8` | řádek G20 v tabulce bran, popis obou režimů (headless vs. `--snimky`) a dva mutační důkazy |
+| **Plán** | `docs/07` (řádek MK) | milník **MK** má v seznamu bran nově i **G20** — jeho kritérium „vyková a PRODÁ výrobek“ teď má vlastní bránu |
+| **Ponaučení** | `LESSONS.md` 2026-10-12 | dvě: „podsoučásti zelené, smyčka rozbitá“ a „headless neumí snímek, a musí to říct“ |
+
+## 📊 NAMĚŘENO (2026-10-12, tato session)
+
+| Co | Hodnota | Doklad |
+|---|---|---|
+| **Testy (C)** | **2 856 kontrol / 0 selhání**, `exit 0` | `godot --headless --path . --script res://tests/run_tests.gd` (`.tmp/g20-testy.log`) |
+| **Brány (D)** | **19 měřeno / 0 čeká / 0 chyb**, G20 mezi nimi (`G20 OK`) | `python tools/gates/run-all.py` (`.tmp/g20-run-all-final.txt`) |
+| **G20 (A)** | `exit 0`, kroky **PASS** s hodnotami: **ruda 0 → 8**, **ingoty 0 → 7**, **dýka 0 → 1**, **zlato 60 → 70**, **žurnál 12 → 39** zpráv; každý krok přidal aspoň jednu zprávu a očekávané slovo v ní | `python tools/gates/check-loop.py` (`.tmp/g20-loop-headless.log`) |
+| **Brána umí selhat (B)** | `--mutace`: **2 sabotáže, obě `exit 1`** — vypnutý `sim.vendor.sell` („krok prodej neprošel“, „zlato se nezvýšilo“), vypnutý `sim.harvest._harvest` („krok tezba neprošel“) | `python tools/gates/check-loop.py --mutace` (`.tmp/g20-mutace.log`) |
+| **Offline self-test** | **9 případů, 0 chyb** (známý správný i známý vadný vstup; spouští ho i `run-all.py --self-test`) | `.tmp/g20-selftests.log` |
+| **Důkaz pohledem (F)** | **4 snímky** 1280×720 ze smyčky (těžba, tavení, výroba, prodej) + **`zurnal.txt`** (39 zpráv) | `.tmp/g20-brana-snimky/loop/` (`python tools/gates/check-loop.py --snimky`), log `.tmp/g20-snimky-brana.log` |
+| **Determinismus a replaye (E)** | **beze změny hashů** — G8 i G9 `OK`; `sim/` jsem needitoval, sonda jen čte a zvedá skilly hráče ve své scéně | `run-all.py` |
+
+## 🚧 CO ODHALILA PRÁCE (obojí naměřeno, obojí v `LESSONS.md`)
+
+1. **Headless neumí snímek.** `root.get_texture().get_image()` v `--headless`
+   vrací `null` (`ERROR: Parameter "t" is null`) — vizuální důkaz v CI nevznikne.
+   Řešení: brána má dva režimy; headless vypíše `snímky: NEMĚŘENO (headless)`
+   a snímky dělá jen `--snimky` (okno + `opengl3`).
+2. **Cesty ze sondy jsou `res://`, ne souborové.** První verze kontroly snímků
+   brala `res://.tmp/...` jako cestu na disku → všechny čtyři „neexistují“ a
+   brána spadla na správném běhu. Opraveno převodem `res://` → kořen projektu.
+
+## ⚠ CO ZŮSTÁVÁ OTEVŘENÉ (pojmenované, ne zamlčené)
+
+1. **G20 měří jen jednu cestu** — těžit → vytavit → vykovat → prodat. **Nákup**
+   u obchodníka (`vendor.buy`) a prodej jiného výrobku neměří; stejně tak
+   nesahá na smrt, loot ani offline doběh (ty mají jiné brány).
+2. **Sonda zvedá skill Mining/Blacksmithy na 1000** — měří **průchodnost** smyčky,
+   ne balance. S výchozím skillem umí tavení i výroba náhodně selhat; kdo chce
+   měřit balance, potřebuje jinou sondu (a je to jiná otázka).
+3. **Vizuální důkaz není v CI** — `--snimky` otevírá okno; v CI (headless) se
+   snímky neměří a brána to říká. Kdo je chce, spustí `--snimky` lokálně.
+4. **`prekryv` cílů interakce se jen vypisuje** (naměřeno 0) — kdyby se dlaždice
+   překryly, kroky spadnou na hodnotách; samostatná kontrola to není.
+5. **V pracovním stromě zůstalo 71 untracked souborů** z předchozích session
+   (`.uid`, `assets/cobble/`…). Nemažu, nestaguji, needituji — můj commit obsahuje
+   jen soubory této session.
+
+## 🧍 CO ČEKÁ NA TEBE
+
+1. **Zahrát si to.** G20 dokazuje, že cesta existuje a je průchozí — **ne že to
+   člověka baví**. Až si to zahraješ, řekni, co v smyčce chybí (nákup krumpáče,
+   jiný výrobek, cena, kterou hráč pozná).
+2. **Chceš G20 rozšířit o nákup?** Dnes smyčka začíná u balvanu; varianta
+   „koupit krumpáč → … → prodat“ je o jeden krok delší a má smysl, až bude
+   nákupní cesta taky takhle bezpečná.
+
+## 🔗 COMMITY TÉHLE SESSION
+
+**`<HASH>`** — `tools/gates/loop_probe.gd`, `tools/gates/check-loop.py`,
+`tools/gates/run-all.py`, `docs/07-granule-a-milniky.md`,
+`docs/08-brany-a-overovani.md`, `LESSONS.md`, `HANDOFF.md`.
+Push ověřen: `git rev-list --count origin/main..HEAD` = **0**.
+
+---
+
 # Předání — game-clone (2026-10-12, SESSION „P1b“: DOKONČENÍ P1 — ÚTOK SE KRESLÍ A CIZÍ POSTAVY UŽ NEŠOUPU)
 
 > **Co je tenhle soubor:** **stav projektu** pro další session agenta. Přepisuje

@@ -24,6 +24,34 @@ Typy: `chyba` (moje vada) · `past-nástroje` (prostředí/nástroj, ne logika) 
 
 ---
 
+### 2026-10-12 — PODSOUČÁSTI ZELENÉ, SMYČKA ROZBITÁ (postup/nástroj)
+**Co se stalo:** každá podsoučást měla zelený test (těžba, tavení, výroba,
+prodej) a přesto se hráč k prodeji nedostal — okno obchodu nemělo přepínač na
+„sell“. Prodej uměla jen sonda `_analyza/p34-smycka.gd`, ne hra. Testy to
+nemohly chytit: volají systémy `sim/` přímo, takže **cesta hráče v nich není**.
+**Doklad:** `tools/gates/check-loop.py --mutace` (`.cache/gates/loop-mutace/
+{prodej_vypnuty,tezba_vypnuta}.log`) — sabotáž „vypni `vendor.sell`“ i „vypni
+`harvest._harvest`“ dá `exit 1` s konkrétní hodnotou (zlato 60 → 60, ruda 0 → 0),
+zelený běh dává `exit 0` s rudou 0 → 8, ingoty 0 → 7, dýkou 0 → 1, zlatem 60 → 70.
+**Ponaučení:** integrační brána se píše **cestou klienta** (`app.input_map` →
+`sim.enqueue` → `sim.tick` → dispatch) a po každém kroku se ptá na **hráčem
+viditelný důsledek** (žurnál, inventář, zlato) — jinak měří totéž co testy.
+**Kde:** `tools/gates/loop_probe.gd`, `tools/gates/check-loop.py`, `docs/08 §8.3.2`.
+
+### 2026-10-12 — HEADLESS NEUMÍ SNÍMEK, A MUSÍ TO ŘÍCT (past-nástroje)
+**Co se stalo:** sonda smyčky chtěla uložit snímky po krocích, ale v `--headless`
+vrací `root.get_texture().get_image()` **null** (`ERROR: Parameter "t" is null`)
+— `save_png` nemá co zapsat. Kdyby to sonda zamlčela, „0 snímků“ by vypadalo
+jako úspěch a vizuální důkaz by nikdy nevznikl.
+**Doklad:** `python tools/gates/check-loop.py` vypíše `snímky: NEMĚŘENO
+(headless)`; `python tools/gates/check-loop.py --snimky` běží **v okně**
+(`--rendering-driver opengl3 --resolution 1280x720`) a uloží 4 PNG
+(`.tmp/g20-brana-snimky/loop/`), které brána zkontroluje (velikost, hlavička,
+≥ 2 různé).
+**Ponaučení:** co v headless nejde, se **nevydává za splněné** — buď to řekni
+jako NEMĚŘENO, nebo to změř jiným režimem a ten popiš.
+**Kde:** `tools/gates/loop_probe.gd` (`_snimek`), `check-loop.py` (`--snimky`).
+
 ### 2026-10-12 — MUTACE ODHALILA SLEPOU KONTROLU KRESLENÍ (chyba, ale ta užitečná)
 **Co se stalo:** dokončení P1 přidalo posun mezi dlaždicemi i cizím postavám.
 První verze testu měřila `_posun_mobila()` (matematiku) a u kreslení kontrolovala

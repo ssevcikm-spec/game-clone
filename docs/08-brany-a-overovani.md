@@ -42,6 +42,7 @@
 | **F4** | `check-no-waste.py` — **čeká na `MK`** | **nic není odpad**: každý výstup dosažitelný ve hře má konzumenta (recept / poptávku světa / propad) a odkaz na konzumenta vede na existující záznam | každý PR (až bude `data.vendors` a poptávka) | výstup bez konzumenta, **prázdný uzávěr** (nula měřených věcí), nebo konzument na neexistující id |
 | **G18** | `check-data-paths.py` (**přidáno 2026-10-12**) | **cesta k datům je PARAMETR, ne zapečená konstanta** (`S1b`): pouští `tools/check-data-paths.py` a v `sim/` (mimo `sim/content.gd`, kde je deklarace zakladu) požaduje **nula** konstant čtených v těle funkce; konstanta smí být **jen default parametru**. `app/` se měří a vypisuje jako „volající“, ale za vadu se nepovažuje. Self-test: dva fixture stromy (konstanta jen v parametru = OK, konstanta v těle = VADA) | každý PR | modul si čte konstantu sám → **mod ho nepřebije a funguje zdánlivě** (u `balance.json` ano, u `items.json` ne; naměřeno 2026-10-12: 11 „smíšených“ a jedna lež v `sim.poison.source()`) |
 | **G19** | `check-sound.py` (**přidáno 2026-10-12**) | **zvuk se OPRAVDU přehraje**: pouští `tools/gates/sound_probe.gd` na **živé scéně** a požaduje `prehrano > 0`, **všech pět zvuků** ve `podle_id` (`hit`, `hurt`, `death`, `mine`, `smith`) a `chyb == 0`. Sonda je vyvolává **skutečnými systémy** (souboj, smrt těla, těžba rudy, tavení u výhně), ne voláním modulu | každý PR | modul je zapojený, ale nic nehraje (naměřeno 2026-10-12: znal hráče `0` → `prehrano 0`, testy přitom zelené), nebo se některý zvuk po změně přestal ozývat |
+| **G20** | `check-loop.py` (**přidáno 2026-10-12**) | **hráč projde krátkou smyčkou na REÁLNÉ scéně** (těžit → vytavit → vykovat → prodat) a **přes command cestu klienta**: `interact` z `app.input_map`, `craft` z okna výroby, `vendor` z okna obchodu — všechny příkazy jdou do sim **jednou branou** (`sim.enqueue` → `sim.tick` → `sim.commands.dispatch`), žádné volání systémů `sim/`. Sonda `tools/gates/loop_probe.gd` u **každého** kroku požaduje **hráčem viditelný následek**: novou zprávu v žurnálu a v ní očekávané slovo (`gather`, `smelt`, `create`, `sell`), plus hodnoty: ruda 0 → >0, ingoty 0 → ≥3, dýka 0 → >0, zlato 60 → 70 a dýka z batohu zmizí. Bez `--snimky` se snímky **neměří** a brána to řekne; `--snimky` spustí sondu **v okně** a zkontroluje 3–4 PNG (velikost, hlavička PNG, aspoň 2 různé) | každý PR | některý krok neprojde, hráč nevidí zprávu, hodnoty se nezmění (naměřeno 2026-10-12: vypnutý prodej i vypnutá těžba = `exit 1`), nebo sonda nic nenahlásí |
 
 **Dvě brány z pocitu (`F1`, `F4`) jsou od 2026-10-09 součástí smlouvy**
 (rozhodnutí uživatele; návrh včetně kontrol a mutací:
@@ -55,13 +56,17 @@ vrací `2` (`NEMĚŘENO`) a **nikdy** se to netváří jako zelená (§8.9).
 
 **Pořadí v CI je závazné** (stav 2026-10-12, shodné s `run-all.py`):
 G1 → **G3** → G5 → G2 → **G14** → **G18** → G4 → G6 → **G15** → **G16** → **G17**
-→ G7 → G8 → G9 → **F1** → G11 → **G19** → G10.
+→ G7 → G8 → G9 → **F1** → G11 → **G19** → **G20** → G10.
 `G13` (vision) je **poradní** a jde mimo pořadí — nikdy neshodí běh, ale nesmí
 být ticho (když není implementovaná, hlásí se to). Schéma je první, protože je
 nejlevnější a rozpor v zadání zneplatňuje všechno ostatní. **`G15` jde hned za
 `G6`**: `G6` měří assety jako soubory, `G15` měří, že je hra **opravdu bere**.
 **`G17` jde za `G15`/`G16`**: `G15` měří, KTERÁ vrstva sprite dodává, `G16`, JAK
 vypadá, a `G17`, že se sprity **střídají podle buňky** (a nepravidelně).
+**`G20` jde za `G19` a před `G10`**: je to **integrační** brána — měří celou
+smyčku, takže patří až za všechny podsoučásti (G1–G19); jejich vada by ji jinak
+shodila z důvodu, který už má vlastní bránu. S `G19` se drží u sebe, protože
+obě pouští **reálnou scénu**; `G10` zůstává poslední (čte snímek, nic nespouští).
 
 ## 8.3 Tři brány, které mají největší cenu
 
@@ -129,6 +134,54 @@ v pořádku (naměřeno: frame 130 = 0 px, frame 150 = 366 px přesně / 267 po
 erozi). Bez `--fixed-fps` není obraz reprodukovatelný (naměřeno na témž stavu:
 0,17 % rozdílu s `--fixed-fps`, 3,14 % bez něj u scény bez řidiče, 71 % u běhu
 bez `--fixed-fps` s pohybujícími se mobily) — a každé „A/B" by pak měřilo šum.
+
+#### 8.3.2 G20 — smyčka se měří CELÁ, ne po dílech (PŘIDÁNO 2026-10-12)
+
+Naměřeno (session D, 2026-10-11): každá podsoučást měla zelený test — těžba,
+tavení, výroba i prodej — a přesto se hráč k **prodeji nedostal**, protože okno
+obchodu nemělo přepínač na „sell". Prodej uměla jen sonda, ne hra. Zelené testy
+to nechytily, protože volají systémy `sim/` přímo a **cesta hráče v nich není**.
+
+Co G20 dělá:
+
+* `tools/gates/loop_probe.gd` spustí **reálnou scénu** (`app/main.tscn`) a jde
+  kroky hráče: `interact` vyrábí **klient** (`app.input_map.interact_command`,
+  stejná cesta jako klávesa E/T) a posílá ho `sim.enqueue`; okno výroby a okno
+  obchodu obsluhuje **jejich veřejné API** a požadavek si vyzvedne **hra sama**
+  ve svém framu (`app.main._process` → `Command{t:"craft"}` / `{t:"vendor"}`).
+  Sonda **nikdy** nevolá `sim.harvest.mine`, `sim.craft.smelt` ani
+  `sim.vendor.sell` — jinak by měřila totéž co testy.
+* Po každém kroku se měří **důsledek pro hráče**, ne „systém vrátil ok": nová
+  zpráva v žurnálu (`ui.journal`) a v ní očekávané slovo, inventář
+  (`container.contents` + `Item.type_of`) a zlato (`sim.vendor.gold_of`).
+  Naměřeno 2026-10-12: ruda 0 → 8, ingoty 0 → 7, dýka 0 → 1, zlato 60 → 70,
+  žurnál 12 → 39 zpráv; každý krok přidal aspoň jednu zprávu.
+* Sonda **zvedá skill Mining a Blacksmithy na 1000**. Měří průchodnost smyčky,
+  ne balance: s výchozím skillem umí tavení i výroba náhodně selhat („failed")
+  a z měření by se stalo měření hodu kostkou (stejná mez jako u
+  `sound_probe.gd`).
+* `prekryv` (kolize cílů interakce) se **vypisuje, ale nehlídá** — kdyby se
+  dlaždice překryly, kroky samy spadnou na hodnotách.
+
+Dva režimy (a proč):
+
+* **headless** (CI, `run-all.py`): měří kroky, žurnál a hodnoty. Snímky
+  v headless **nejdou** — naměřeno 2026-10-12: `root.get_texture().get_image()`
+  vrátí `null` (`ERROR: Parameter "t" is null`) a `save_png` nemá co uložit.
+  Brána to napíše (`snímky: NEMĚŘENO (headless)`), nikdy netvrdí úspěch.
+* **`--snimky`** (vizuální důkaz): spustí sondu **v okně**
+  (`--rendering-driver opengl3 --resolution 1280x720`) a zkontroluje 3–4 PNG:
+  existenci, > 10 kB, platnou hlavičku PNG, rozměr ≥ 320×200 a **aspoň dvě různé
+  velikosti** (jinak je to jeden a týž obraz). Snímky se ukládají mimo git
+  (`.tmp/` nebo `.cache/`).
+
+Mutační důkaz (`python tools/gates/check-loop.py --mutace`): vytvoří **kopii
+projektu s hardlinky** (data se nekopírují) a v ní vypne jeden krok —
+`return _fail(...)` na začátku `sim.vendor.sell`, podruhé
+`sim.harvest._harvest`. Naměřeno 2026-10-12: **obě sabotáže daly `exit 1`**
+(„krok prodej neprošel" + „zlato se nezvýšilo" / „krok těžba neprošel").
+Offline `--self-test` má 9 případů (známý správný i známý vadný vstup) a
+`run-all.py --self-test` ho pouští spolu s ostatními branami.
 
 ## 8.4 CI vs. lokálně (a co v CI není)
 
@@ -205,6 +258,8 @@ Když nespadne, brána je slabá — oprav bránu, ne test.
 | G8 | použij `randf()` v `sim/craft.gd` | rozdílný hash mezi běhy |
 | G10 | nastav všem dlaždicím `z_index` nad postavou | chyba „postava není vidět" |
 | G11 | zavolej Godot 3 API (`margin_left`) | `SCRIPT ERROR` |
+| G20 | vypni `sim.vendor.sell` (early `return _fail(...)`) — dělá `check-loop.py --mutace` | „krok prodej neprošel", „zlato se nezvýšilo", „dýka zůstala v batohu" |
+| G20 | vypni `sim.harvest._harvest` (early `return _fail(...)`) — dělá `check-loop.py --mutace` | „krok tezba neprošel", „v žurnálu není 'gather'" |
 | každá | **odeber vstup** (smaž soubor, vyprázdni seznam) | `NEMĚŘENO` + nenulový exit |
 
 ## 8.9 Co znamená „zelená"
