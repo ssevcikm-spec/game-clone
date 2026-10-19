@@ -144,6 +144,18 @@ def chyby_z_mereni(d: dict, snimky_zadano: bool = False) -> list[str]:
     if _cislo(v1, "svih_max") < 1:
         chyby.append("B1_hrac: utok nema kresleny svih (0 ctverecku) - utok by byl "
                      "jen jina chuze")
+    # R1 (oprava po verifikaci 2026-10-19): GEOMETRIE z `_svih_info` neni dukaz,
+    # ze se svih nakreslil. Verifikator vratil do kopie `_kresli_svih ->
+    # if true: return 0` a G21 dala exit 0 - sonda se ptala jen na `kusu`.
+    # Ted se cte pocet skutecnych `draw_rect` z posledniho dokonceneho framu.
+    if _cislo(b1, "svih_draw_framu") < 1:
+        chyby.append("B1_hrac: sonda nevidela ani jeden dokonceny frame kresleni "
+                     f"(svih_draw_framu={_cislo(b1, 'svih_draw_framu')}) - mereni "
+                     "kresleni je SLEPE, ne 'svih se nekresli'")
+    if _cislo(b1, "svih_nakresleno_max") < 1:
+        chyby.append("B1_hrac: svih se NENAKRESLIL (0 nakreslenych ctverecku, i kdyz "
+                     f"geometrie ma {_cislo(v1, 'svih_max')}) - hrac by pri utoku "
+                     "nevidel nic")
 
     # -- B1: animace utoku cizich postav ---------------------------------
     b1c = vysledky.get("B1_cizi", {})
@@ -168,6 +180,9 @@ def chyby_z_mereni(d: dict, snimky_zadano: bool = False) -> list[str]:
                      f"(namereno {_cislo(v2, 'ruznych_framu')})")
     if _cislo(v2, "svih_max") < 1:
         chyby.append("B2: prace nema kresleny svih (0 ctverecku) - hrac by jen stal")
+    if _cislo(b2, "svih_nakresleno_max") < 1:
+        chyby.append("B2: pri praci se svih NENAKRESLIL (0 nakreslenych ctverecku, "
+                     f"i kdyz geometrie ma {_cislo(v2, 'svih_max')})")
 
     # -- B3: klik na KRESLENOU stanici -----------------------------------
     b3 = vysledky.get("B3", {})
@@ -189,6 +204,20 @@ def chyby_z_mereni(d: dict, snimky_zadano: bool = False) -> list[str]:
                      f"{b3.get('tile_vyhen')}, vyhen je na {b3.get('vyhen_tile')}")
     if not bool(b3.get("craft_api_zavri", False)) or not bool(b3.get("craft_tlacitko_close", False)):
         chyby.append("B3/B4: okno vyroby nema zavreni (API a/nebo tlacitko 'Close')")
+    # R2 (oprava po verifikaci 2026-10-19): existence tlacitka a pripojeneho
+    # signalu nic nedokazuje - `connect(func(): pass)` projde obema a okno
+    # zustane otevrene. Meri se STISKNUTI tlacitka a jeho nasledek.
+    if not bool(b3.get("craft_signal_close", False)):
+        chyby.append("B3/B4: tlacitko 'Close' v okne vyroby nema pripojeny signal "
+                     "`pressed`")
+    if not bool(b3.get("craft_zavreno_klikem", False)):
+        chyby.append("B3/B4: stisknuti tlacitka 'Close' v okne vyroby okno NEZAVRELO "
+                     f"(videt po zavreni={b3.get('craft_videt_po_zavreni')}) - signal "
+                     "je odpojeny nebo dela neco jineho")
+    if bool(b3.get("craft_videt_po_zavreni", False)):
+        chyby.append("B3/B4: okno vyroby je po stisknuti 'Close' porad VIDET")
+    if not bool(b3.get("craft_znovu_otevreno", False)):
+        chyby.append("B3/B4: zavrene okno vyroby nejde znovu otevrit")
 
     # -- B4: zavreni okna obchodu ----------------------------------------
     b4 = vysledky.get("B4", {})
@@ -321,7 +350,9 @@ def _vystup_pro_gate(gate: Gate, d: dict) -> None:
             gate.note(f"B1 hrac: akce {z.get('hrac', {}).get('action')}, "
                       f"fallback {z.get('hrac', {}).get('fallback')}, "
                       f"list {z.get('hrac', {}).get('soubor')}, framy "
-                      f"{v.get('ruznych_framu')}, svih {v.get('svih_max')}")
+                      f"{v.get('ruznych_framu')}, svih geometricky {v.get('svih_max')}, "
+                      f"svih NAKRESLENO {z.get('svih_nakresleno_max')} "
+                      f"(framu kresleni {z.get('svih_draw_framu')})")
         elif vada == "B1_cizi":
             v = z.get("vzorky", {})
             gate.note(f"B1 cizi: serial {z.get('serial')}, telo "
@@ -331,14 +362,17 @@ def _vystup_pro_gate(gate: Gate, d: dict) -> None:
             v = z.get("vzorky", {})
             gate.note(f"B2: harvest.anim_of {z.get('harvest_anim_of')}, pracovni akce "
                       f"{z.get('pracovni_akce')}, framy {v.get('ruznych_framu')}, "
-                      f"svih {v.get('svih_max')}, ruda {z.get('ruda_pred')} -> "
+                      f"svih geometricky {v.get('svih_max')}, svih NAKRESLENO "
+                      f"{z.get('svih_nakresleno_max')}, ruda {z.get('ruda_pred')} -> "
                       f"{z.get('ruda_po')}")
         elif vada == "B3":
             gate.note(f"B3: klik na obraz -> dlazdice {z.get('tile_obraz')} "
                       f"(stanice {z.get('kovadlina_tile')}), okno "
                       f"{z.get('okno_po_kliku_na_obraz')}, vyhen -> "
                       f"{z.get('tile_vyhen')} (stanice {z.get('vyhen_tile')}), "
-                      f"ingoty {z.get('ingot_pred')} -> {z.get('ingot_po')}")
+                      f"ingoty {z.get('ingot_pred')} -> {z.get('ingot_po')}, "
+                      f"close klikem {z.get('craft_zavreno_klikem')}, znovu otevreno "
+                      f"{z.get('craft_znovu_otevreno')}")
         elif vada == "B4":
             gate.note(f"B4: okno {z.get('okno_otevrene')}, api_zavri {z.get('api_zavri')}, "
                       f"tlacitko {z.get('tlacitko_close')}, signal {z.get('signal_zavrit')}, "
@@ -443,6 +477,9 @@ def selftest() -> int:
                          "soubor": "res://assets/own-v3/anim/ownv3-400-0-1.png"},
                 "ok_hrac": True,
                 "vzorky": {"ruznych_framu": 7, "ruznych_akci": 1, "svih_max": 8},
+                # R1: geometrie + SKUTECNE nakresleno (pocet `draw_rect`)
+                "svih_nakresleno_max": 3, "svih_draw_framu": 40, "svih_framu": 6,
+                "svih_vzorku": 30,
                 "ok": True,
             },
             "B1_cizi": {"serial": 27, "anim_of": '{ "action": 2, "left_ms": 200 }',
@@ -451,12 +488,16 @@ def selftest() -> int:
                         "vzorky": {"ruznych_framu": 4, "svih_max": 0}},
             "B2": {"harvest_anim_of": True, "pracovni_akce": True,
                    "ruda_pred": 0, "ruda_po": 1, "ok": True,
+                   "svih_nakresleno_max": 2,
                    "vzorky": {"ruznych_framu": 8, "svih_max": 4}},
             "B3": {"okno_po_kliku_na_obraz": True, "okno_po_kliku_na_dlazdici": True,
                    "tile_obraz": "1495,1631", "kovadlina_tile": "1495,1631",
                    "tile_vyhen": "1496,1630", "vyhen_tile": "1496,1630",
                    "ingot_pred": 0, "ingot_po": 6, "vytaveno": True,
-                   "craft_api_zavri": True, "craft_tlacitko_close": True, "ok": True},
+                   "craft_api_zavri": True, "craft_tlacitko_close": True,
+                   "craft_signal_close": True, "craft_zavreno_klikem": True,
+                   "craft_videt_po_zavreni": False, "craft_znovu_otevreno": True,
+                   "ok": True},
             "B4": {"okno_otevrene": True, "api_zavri": True, "api_toggle": True,
                    "tlacitko_close": True, "tlacitko_zavrit_uzel": True,
                    "signal_zavrit": True, "zavreno_klikem": True,
@@ -485,12 +526,23 @@ def selftest() -> int:
         ("B1 bez fallbacku", lambda d: d["data"]["vysledky"]["B1_hrac"]["hrac"].update({"soubor": ""})),
         ("B1 jeden frame", lambda d: d["data"]["vysledky"]["B1_hrac"]["vzorky"].update({"ruznych_framu": 1})),
         ("B1 bez svihu", lambda d: d["data"]["vysledky"]["B1_hrac"]["vzorky"].update({"svih_max": 0})),
+        # R1: svih se SPOCITA, ale NENAKRESLI (vracena vada verifikatora)
+        ("B1 svih se nekresli", lambda d: d["data"]["vysledky"]["B1_hrac"].update({"svih_nakresleno_max": 0})),
+        # R1: kresleni vubec neprobehlo -> mereni je slepe, ne "nula"
+        ("B1 kresleni neprobehlo", lambda d: d["data"]["vysledky"]["B1_hrac"].update({"svih_draw_framu": 0})),
+        ("B1 chybi API kresleni", lambda d: d["data"]["vysledky"]["B1_hrac"].update({"svih_draw_framu": -1})),
         ("B1 cizi bez framu", lambda d: d["data"]["vysledky"]["B1_cizi"]["vzorky"].update({"ruznych_framu": 1})),
         ("B2 bez anim_of", lambda d: d["data"]["vysledky"]["B2"].update({"harvest_anim_of": False})),
         ("B2 bez svihu", lambda d: d["data"]["vysledky"]["B2"]["vzorky"].update({"svih_max": 0})),
+        ("B2 svih se nekresli", lambda d: d["data"]["vysledky"]["B2"].update({"svih_nakresleno_max": 0})),
         ("B3 okno neotevrene", lambda d: d["data"]["vysledky"]["B3"].update({"okno_po_kliku_na_obraz": False})),
         ("B3 spatna dlazdice", lambda d: d["data"]["vysledky"]["B3"].update({"tile_obraz": "1497,1631"})),
         ("B3 nevytaveno", lambda d: d["data"]["vysledky"]["B3"].update({"vytaveno": False})),
+        # R2: tlacitko Close existuje a signal je pripojeny, ale okno nezavre
+        ("B3 close odpojeny", lambda d: d["data"]["vysledky"]["B3"].update({"craft_zavreno_klikem": False})),
+        ("B3 close bez signalu", lambda d: d["data"]["vysledky"]["B3"].update({"craft_signal_close": False})),
+        ("B3 po zavreni videt", lambda d: d["data"]["vysledky"]["B3"].update({"craft_videt_po_zavreni": True})),
+        ("B3 zavrene nejde otevrit", lambda d: d["data"]["vysledky"]["B3"].update({"craft_znovu_otevreno": False})),
         ("B4 bez tlacitka", lambda d: d["data"]["vysledky"]["B4"].update({"tlacitko_close": False})),
         ("B4 zavrene prijima vstup", lambda d: d["data"]["vysledky"]["B4"].update({"vstup_odmitnut": False})),
         ("B4 nejde znovu otevrit", lambda d: d["data"]["vysledky"]["B4"].update({"znovu_otevreno": False})),
@@ -577,6 +629,23 @@ MUTACE: list[tuple[str, list[tuple[str, str, str]]]] = [
         "sim/systems/harvest.gd",
         "\tif int(item.amount) <= 0:\n\t\titem = _hromada_v_batohu(mob, item)",
         "\tif false:\n\t\titem = _hromada_v_batohu(mob, item)",
+    )]),
+    # R1 (verifikace 2026-10-19): svih se SPOCITA (`_svih_info` vraci geometrii),
+    # ale NENAKRESLI - presne vada, kterou prvni verze G21 nevidela (exit 0).
+    # ⚠ `hledat` NESMI byt soucasti `nahradit`: jinak po vlozeni zustane v textu
+    # a `_zasad_vadu` vadu hlasí jako "nezapsanou" (namEReno pri psani teto
+    # sabotaze). Proto se prepisuje podminka kresleni, ne hlavicka funkce.
+    ("R1_svih_se_nekresli", [(
+        "app/world_view.gd",
+        '\tif not _svih_videt or not bool(info.get("kresli", false)):\n\t\treturn 0',
+        "\tif true:\n\t\treturn 0",
+    )]),
+    # R2 (verifikace 2026-10-19): tlacitko "Close" v okne vyroby je odpojene -
+    # signal existuje, ale po stisknuti se nic nestane (okno zustane otevrene).
+    ("R2_odpojeny_close", [(
+        "ui/craft_gump.gd",
+        "\t\t_close.pressed.connect(zavri)",
+        "\t\t_close.pressed.connect(func(): pass)",
     )]),
 ]
 

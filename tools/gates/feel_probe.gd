@@ -1,4 +1,4 @@
-﻿extends SceneTree
+extends SceneTree
 # feel_probe.gd — SONDA VAD Z REALNEHO HRANI (ZADANI-28-HRAC-2026-10-19: B1-B6).
 #
 # PROC TO NENI `tests/cases/*`: pet vad nasel hrac pri hrani a zadna z nich
@@ -30,6 +30,20 @@
 # SNIMKY: `--snimky=<cesta>` (user args, napr. `-- --snimky=res://.tmp/beh2`).
 # V headless se snimek ULOZIT NEDA; sonda to REKNE (`snimky_chyba`), nikdy
 # nemlci (stejna past jako u G20).
+#
+# ⚠ SNIMEK JE O FRAME POZDEJ (R3, oprava po verifikaci 2026-10-19): obraz z
+# `root.get_texture()` je obraz POSLEDNIHO dokonceneho framu, ne toho, ktery
+# prave bezi. Prvni verze delala `_b4_esc()` a `_snimek("b4-po-esc")` ve STEJNEM
+# framu -> snimek ukazal frame PRED Escape a byl bajtove shodny s
+# `b4-okno-vendora.png` (verifikator: sha 315f6960...). Proto se snimek dela
+# o 2 framy pozdeji, nez se okno zavre.
+#
+# KRESLENY SVIH SE MERI DVEMA CISLY (R1, oprava po verifikaci 2026-10-19):
+#   * `svih_max` = GEOMETRIE z `_svih_info` (kolik ctverecku by se kreslilo),
+#   * `svih_nakresleno_max` = kolik ctverecku se SKUTECNE nakreslilo
+#     (`world_view.svih_nakresleno()`, pocita se u `draw_rect`).
+# Druhe cislo je jedine, ktere vypnute kresleni odliší od funkčního: prvni
+# verze G21 umela dat exit 0 i s `_kresli_svih -> if true: return 0`.
 #
 # Spousteni (cisla, headless):
 #   godot --headless --path . --fixed-fps 60 --script res://tools/gates/feel_probe.gd
@@ -63,6 +77,12 @@ var _vysledky: Dictionary = {}
 var _monstrum: int = 0
 var _duvod: String = ""
 var _esc_odeslan: bool = false
+# R1: mereni SKUTECNE nakresleneho svihu. Sonda cte `world_view.svih_nakresleno()`
+# na zacatku kazdeho framu - to je hodnota z POSLEDNIHO dokonceneho `_draw`, takze
+# "po framu" je splneno. Maxima se drzi po fazich (B1 hrac / B2 prace).
+var _svih_faze: String = ""
+var _svih_vzorku: int = 0
+var _svih_max_faze: Dictionary = {}
 
 
 func _initialize() -> void:
@@ -92,6 +112,10 @@ func _process(_delta: float) -> bool:
 			quit(0)
 			return true
 		return false
+	# R1: vzorek SKUTECNE nakresleneho svihu z POSLEDNIHO dokonceneho framu.
+	# Cte se na zacatku framu (draw tohoto framu jeste neprobehl), takze kazda
+	# hodnota odpovida jednomu hotovemu obrazu - zadny prepis "co se chysta".
+	_vzorkuj_svih()
 	if _f == 40:
 		_start()
 	if _f == 44:
@@ -114,29 +138,40 @@ func _process(_delta: float) -> bool:
 					_scena.registry.get_mobile(int(_scena.prodejce)))),
 			" | viewport ", _scena.world_view.viewport_size())
 	if _f == 51:
-		_snimek("b1-utok-bez-svihu")
+		# R3: snimek "bez svihu" musi byt skutecne bez svihu. Vypne se KRESLENI
+		# (`nastav_svih(false)`), ne mereni - utok same zustava, takze rozdil
+		# dvou snimku je jen svih (a to je mereny doklad, zadny popis).
+		_scena.world_view.nastav_svih(false)
 	if _f == 52:
+		_snimek("b1-utok-bez-svihu")
+	if _f == 53:
+		_scena.world_view.nastav_svih(true)
+	if _f == 54:
 		_b1_utok_ciziho()
-	if _f == 56:
-		_b2_tezba()
 	if _f == 58:
+		_b2_tezba()
+	if _f == 60:
 		_snimek("b2-tezba")
-	if _f == 62:
-		_b6_ruda()
 	if _f == 64:
+		_b6_ruda()
+	if _f == 66:
 		_snimek("b6-ruda-na-dlazdici")
-	if _f == 68:
-		_b3_klik_na_stanici()
 	if _f == 70:
+		_b3_klik_na_stanici()
+	if _f == 72:
 		_snimek("b3-klik-na-kovadlinu")
-	if _f == 74:
-		_b4_okna()
 	if _f == 76:
+		_b4_okna()
+	if _f == 78:
 		_snimek("b4-okno-vendora")
-	if _f == 80:
+	if _f == 82:
 		_b4_esc()
-		_snimek("b4-po-esc")
 	if _f == 84:
+		# R3: o 2 framy pozdeji, nez se okno zavrelo (obraz z `get_texture()`
+		# je obraz POSLEDNIHO dokonceneho framu - ve stejnem framu by snimek
+		# ukazal okno jeste otevrene a byl by shodny s "b4-okno-vendora").
+		_snimek("b4-po-esc")
+	if _f == 88:
 		_souhrn()
 		quit(0)
 		return true
@@ -160,6 +195,25 @@ func _doruc() -> void:
 	# Preda udalosti klientu BEZ tiku (zurnal, okna). Tik posouva sim cas, a ten
 	# by zavrel prezentacni okno, ktere jeste potrebujeme na snimek.
 	_scena.loop._deliver_events()
+
+
+func _vzorkuj_svih() -> void:
+	# R1 (oprava po verifikaci, 2026-10-19): KOLIK CTVERECKU SVIHU SE OPRAVDU
+	# NAKRESLILO. Sonda se ptá `app.world_view.svih_nakresleno()` - to je pocet
+	# skutecnych `draw_rect` z POSLEDNIHO dokonceneho framu (funkce pro kresleni
+	# i pro mereni je tataz). Maxima se drzi po fazich, aby slo rict, jestli se
+	# svih kreslil PRAVE pri utoku (B1) a PRAVE pri praci (B2).
+	if _scena == null or _scena.get("world_view") == null:
+		return
+	var wv = _scena.world_view
+	if not wv.has_method("svih_nakresleno"):
+		return
+	var n: int = int(wv.svih_nakresleno())
+	_svih_vzorku += 1
+	if _svih_faze == "":
+		return
+	if n > int(_svih_max_faze.get(_svih_faze, 0)):
+		_svih_max_faze[_svih_faze] = n
 
 
 func _cas() -> int:
@@ -469,6 +523,10 @@ func _vzorky(n: int, hrac: bool, serial: int = 0, ocekavana_akce: int = -1) -> D
 func _b1_utok_hrace() -> void:
 	var m: Dictionary = {}
 	var p = _scena.player
+	# R1: pocitadla nakresleneho svihu se nuluji PRED oknem utoku, aby maximum
+	# nemohlo pochazet z neceho jineho (a aby bylo videt, ze kresleni zilo).
+	_scena.world_view.svih_reset_pocitadel()
+	_svih_faze = "B1_hrac"
 	# MONSTRUM VEDLE HRACE: aby utok prosel kontrolou dosahu. Je to priprava
 	# SCENY (ne herni pravidlo) - stejna trida zasahu jako zvyseni skillu.
 	if _monstrum > 0:
@@ -517,6 +575,7 @@ func _b1_utok_hrace() -> void:
 
 func _b1_utok_ciziho() -> void:
 	var m: Dictionary = {"serial": _monstrum}
+	_svih_faze = "B1_cizi"
 	if _monstrum <= 0:
 		_vysledky["B1_cizi"] = {"ok": false, "duvod": "zadne monstrum"}
 		return
@@ -548,6 +607,7 @@ func _b1_utok_ciziho() -> void:
 
 func _b2_tezba() -> void:
 	var m: Dictionary = {}
+	_svih_faze = "B2"
 	m["harvest_anim_of"] = _scena.harvest.has_method("anim_of") if _scena.harvest != null else false
 	var balvan: int = _balvan_serial()
 	m["balvan_serial"] = balvan
@@ -667,9 +727,25 @@ func _b3_klik_na_stanici() -> void:
 	m["okno_po_kliku_na_obraz"] = bool(_scena.craft_gump.je_otevreny())
 	m["zurnal_po_obraz"] = _zurnal_nove(zurnal)
 	# Okno vyroby: ma cestu zavrit? (B4 meri okno obchodu, tohle je druhe okno.)
+	# R2 (oprava po verifikaci, 2026-10-19): POUHA EXISTENCE tlacitka a
+	# pripojeneho signalu nic nedokazuje - `connect(func(): pass)` projde obema
+	# kontrolami a okno zustane otevrene (namEReno verifikatorem: G21 exit 0).
+	# Tlacitko se proto STISKNE (signal `pressed`, presne to, co udela klik) a
+	# meri se, ze okno zmizelo a ze jde znovu otevrit.
 	m["craft_api_zavri"] = _scena.craft_gump.has_method("zavri")
-	m["craft_tlacitko_close"] = _najdi_tlacitko(_scena.craft_gump,
-		"Zavrit", "") != null
+	var close_btn: Button = _najdi_tlacitko(_scena.craft_gump, "Zavrit", "")
+	m["craft_tlacitko_close"] = close_btn != null
+	m["craft_signal_close"] = _signal_pripojen(close_btn) if close_btn != null else false
+	if close_btn != null and bool(m["craft_signal_close"]):
+		_stiskni(close_btn)
+	m["craft_zavreno_klikem"] = not bool(_scena.craft_gump.je_otevreny())
+	m["craft_videt_po_zavreni"] = bool(_scena.craft_gump.visible)
+	# ZNOVU OTEVRIT: klik doprostred kreslene kovadliny (cesta klienta).
+	_interact_na_obrazek(kovadlina)
+	_tiky(4)
+	_scena.craft_gump.flush()
+	m["craft_znovu_otevreno"] = bool(_scena.craft_gump.je_otevreny())
+	# Uklid: okno zavrit, aby mereni vyhne (3) nezavislelo na nem.
 	if _scena.craft_gump.has_method("zavri"):
 		_scena.craft_gump.zavri()
 	else:
@@ -703,7 +779,9 @@ func _b3_klik_na_stanici() -> void:
 	m["vendor_gump_po_vyhni"] = bool(_scena.vendor_gump.je_otevreny())
 	m["vytaveno"] = int(m["ingot_po"]) > int(m["ingot_pred"])
 	m["ok"] = bool(m["okno_po_kliku_na_obraz"]) and bool(m["vytaveno"]) \
-		and bool(m["craft_api_zavri"]) and bool(m["craft_tlacitko_close"])
+		and bool(m["craft_api_zavri"]) and bool(m["craft_tlacitko_close"]) \
+		and bool(m["craft_signal_close"]) and bool(m["craft_zavreno_klikem"]) \
+		and not bool(m["craft_videt_po_zavreni"]) and bool(m["craft_znovu_otevreno"])
 	print("[feel] B3 klik na stanici: ", JSON.stringify(m))
 	_vysledky["B3"] = m
 
@@ -823,6 +901,23 @@ func _souhrn() -> void:
 	for k in ["B1_hrac", "B1_cizi", "B2", "B3", "B4", "B4_esc", "B5", "B6"]:
 		if not _vysledky.has(k):
 			chyby.append("NEMERENO: " + k)
+	# R1: doklad o SKUTECNEM kresleni svihu. `draw_framu` je kontrola, ze sonda
+	# vubec videla kresleni (`-1` = world_view API chybi -> NEMERENO, ne nula).
+	var wv = _scena.world_view if _scena != null else null
+	var ma_api: bool = wv != null and wv.has_method("svih_draw_framu") \
+		and wv.has_method("svih_framu")
+	var draw_framu: int = int(wv.svih_draw_framu()) if ma_api else -1
+	var se_svihem: int = int(wv.svih_framu()) if ma_api else -1
+	if _vysledky.has("B1_hrac"):
+		_vysledky["B1_hrac"]["svih_nakresleno_max"] = int(_svih_max_faze.get("B1_hrac", 0))
+		_vysledky["B1_hrac"]["svih_draw_framu"] = draw_framu
+		_vysledky["B1_hrac"]["svih_framu"] = se_svihem
+		_vysledky["B1_hrac"]["svih_vzorku"] = _svih_vzorku
+	if _vysledky.has("B2"):
+		_vysledky["B2"]["svih_nakresleno_max"] = int(_svih_max_faze.get("B2", 0))
+	print("[feel] svih nakresleny: max B1_hrac=", _svih_max_faze.get("B1_hrac", 0),
+		" max B2=", _svih_max_faze.get("B2", 0), " | framu kresleni=", draw_framu,
+		" s svihem=", se_svihem, " vzorku=", _svih_vzorku)
 	var souhrn: Dictionary = {
 		"vysledky": _vysledky,
 		"snimky": _snimky,

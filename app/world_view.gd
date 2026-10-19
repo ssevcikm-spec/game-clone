@@ -1,4 +1,4 @@
-﻿extends Node2D
+extends Node2D
 # Kreslici uzel sveta: JEDINE misto, kde se seznam z `render.chunk` meni na
 # pixely (docs/02 §2.4). Kresli se v poradi ze `render.sort` (painter's
 # algorithm) - `z_index` na to nejde pouzit (docs/02 past P21).
@@ -226,6 +226,15 @@ var _jmena = null                  # render.names (injekce v `setup()`)
 var _telesa_videt: bool = true
 # ZADANI-28 (B1/B2): prepinac kresleneho svihu - jen pro dukaz snimkem.
 var _svih_videt: bool = true
+# R1 (oprava po verifikaci, 2026-10-19): POCITADLA SKUTECNE NAKRESLENEHO SVIHU.
+# `_svih_info` vraci GEOMETRII ("co by se kreslilo") a sonda ji umela precist i
+# s vypnutym kreslenim - namEReno verifikatorem: `_kresli_svih -> if true: return 0`
+# a G21 presto exit 0. Tahle cisla vznikaji az u `draw_rect`, takze kdyz se
+# nekresli, jsou NULA. Nuluji se na zacatku kazdeho `_draw`.
+var _svih_kresleno: int = 0          # ctverecku v POSLEDNIM dokoncenem framu
+var _svih_kresleno_max: int = 0      # maximum od `svih_reset_pocitadel()`
+var _svih_framu: int = 0             # kolik framu melo aspon 1 ctverecek
+var _svih_draw_framu: int = 0        # kolik `_draw` vubec probehlo (kontroly)
 var _mesh = null                   # render.chunk_mesh (M9) - null = puvodni cesta
 var _mesh_seznam: Array = []       # seznam, pro ktery je mesh postaveny
 var _mesh_klic: int = -2147483647
@@ -451,6 +460,38 @@ func nastav_svih(videt: bool) -> void:
 
 func svih_videt() -> bool:
 	return _svih_videt
+
+
+func svih_nakresleno() -> int:
+	# R1 (oprava po verifikaci, 2026-10-19): kolik ctverecku svihu se doopravdy
+	# NAKRESLILO v poslednim dokoncenem `_draw`. Neni to geometrie z `_svih_info`
+	# (`kusu`), ale pocet skutecnych `draw_rect` - vypnute/odpojene kresleni da 0.
+	return _svih_kresleno
+
+
+func svih_nakresleno_max() -> int:
+	# Maximum z `svih_nakresleno()` od posledniho resetu - sonda tim doklada, ze
+	# se svih opravdu kreslil, i kdyz ho v okamziku dotazu zrovna nevidet.
+	return _svih_kresleno_max
+
+
+func svih_framu() -> int:
+	# V kolika framech se aspon jeden ctverecek nakreslil.
+	return _svih_framu
+
+
+func svih_draw_framu() -> int:
+	# V kolika framech vubec probehlo `_draw`. Nula = mereni je SLEPE (kresleni
+	# se nespustilo), ne "svih se nekresli" - sonda to musi rozlisit.
+	return _svih_draw_framu
+
+
+func svih_reset_pocitadel() -> void:
+	# Reset meridel pred merenim (sonda si tak vymezuje okno).
+	_svih_kresleno = 0
+	_svih_kresleno_max = 0
+	_svih_framu = 0
+	_svih_draw_framu = 0
 
 
 func mobily_videt() -> int:
@@ -709,6 +750,8 @@ func _kresli_svih(ground: Vector2, serial: int, akce: Dictionary) -> int:
 	for kus in kusy:
 		var r: Rect2 = kus
 		draw_rect(Rect2(ground + r.position, r.size), barva)
+		# R1: pocita se to, co se opravdu nakreslilo (ne geometrie z `_svih_info`).
+		_svih_kresleno += 1
 	return kusy.size()
 
 
@@ -1331,11 +1374,21 @@ func _draw() -> void:
 	# a vydavani davky) od GPU/casu prezentace. NamEReno: bez kresleni sveta je
 	# frame **0,46 ms**, s nim **30,6 ms** pri 1280x720 - a `cas_draw_ms` rekne,
 	# kolik z toho je CPU (kdyz je maly, je to fill rate na GPU).
+	# R1 (oprava po verifikaci): na zacatku framu se nuluje pocitadlo svihu;
+	# `_kresli_svih` do nej zapisuje az po skutecnem `draw_rect`.
+	_svih_kresleno = 0
 	if _textures == null:
 		return
 	var t0: int = Time.get_ticks_usec()
 	_draw_telo()
 	cas_draw_ms = float(Time.get_ticks_usec() - t0) / 1000.0
+	# R1: kniha meridel po dokoncenem framu. `_svih_draw_framu` je kontrola, ze se
+	# kresleni vubec spustilo - nula znamena NEMERENO, ne "svih se nekresli".
+	_svih_draw_framu += 1
+	if _svih_kresleno > 0:
+		_svih_framu += 1
+	if _svih_kresleno > _svih_kresleno_max:
+		_svih_kresleno_max = _svih_kresleno
 
 
 func _draw_telo() -> void:

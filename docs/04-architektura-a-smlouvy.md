@@ -768,9 +768,17 @@ ne stav světa (`docs/01 §1.5 bod 3`, G8/G9 beze změny hashů).
 
 **To, že se kreslí fallback, je VIDĚT:** `render/anim_player.pouzit_fallback()`
 vrací `true`, a klient k takovému útoku/praci kreslí **svih**
-(`render/swing.gd` — pruh 2×2 px po oblouku ve směru pohledu, vlastní kresba
-kódem, žádný art z instalace UO). Tělo, které skupinu útoku **má** (monstra:
-krysa 238 → skupina 5), kreslí svůj útok a svih nedostane.
+(`render/swing.gd` — **9 čtverečků 6×6 px** po oblouku o poloměru 26 px a
+rozsahu 120° ve směru pohledu, vlastní kresba kódem, žádný art z instalace UO;
+`VELIKOST = 6.0` a `KUSU = 9` jsou měřené konstanty, viz komentář v modulu).
+Tělo, které skupinu útoku **má** (monstra: krysa 238 → skupina 5), kreslí svůj
+útok a svih nedostane.
+
+**Dvě různá čísla o svihu (a proč obě).** `_svih_info()` vrací **geometrii**
+(kolik čtverečků by se kreslilo) a `_kresli_svih()` **skutečně kreslí**
+(přičítá do `world_view.svih_nakresleno()` až u `draw_rect`). Brána G21
+vyžaduje **obojí**: vypnuté kreslení (`if true: return 0`) dá geometrii
+nenulovou a nakresleno **0** — a to je vada (2026-10-19 to G21 neviděla).
 
 **KLIK NA KRESLENÝ OBJEKT (B3).** Klient posílá dál jen **dlaždici**
 (`{kind:"tile"}`), ale tu, na které stojí **nakreslený** objekt: art má offset
@@ -783,9 +791,17 @@ injektovaný do `app/input_map.hit_test`) v tomto pořadí:
 2. bytosti, jejichž kreslený obdélník obsahuje kurzor (shora dolů),
 3. pozemské předměty, jejichž kreslený obdélník obsahuje kurzor (shora dolů).
 
-**OKNA (B4).** Každé okno, které jde otevřít, musí jít **zavřít** — API
-`zavri()`/`toggle()`, tlačítko „Close“ v liště nad obsahem a klávesa
-`ui_cancel` (Escape) v `app.main._unhandled_input`. **Zavřené okno nepřijímá
+**OKNA (B4).** Okno, které jde otevřít **a které má `zavri()`**, musí jít
+**zavřít** — API `zavri()`/`toggle()`, tlačítko „Close“ v liště nad obsahem
+a klávesa `ui_cancel` (Escape) v `app.main._unhandled_input`. **Dnes to plní
+dvě okna:** `ui/vendor_gump.gd` a `ui/craft_gump.gd`. Okna `ui/backpack.gd`,
+`ui/skill_list.gd` a `ui/policy_panel.gd` `zavri()` **nemají** (backpack
+a policy_panel mají jen `toggle()`), takže je `app.main._zavri_okna()` svým
+`has_method("zavri")` **přeskočí** a Escape je nezavře — kdo jim zavírání
+přidá, musí přidat i `zavri()`. U okna výroby se **stiskne skutečné tlačítko**
+(`pressed.emit()` na `Button`): pouhá existence tlačítka a připojeného signálu
+vadu neodliší (`connect(func(): pass)` projde obojím, 2026-10-19 to G21
+neviděla). **Zavřené okno nepřijímá
 vstupy**: handlery tlačítek se ptají `ui.vendor_gump.prijima_vstup()`; veřejné
 API (`nastav_*`, `stiskni_*`) zůstává bez guardu, protože ho volá klient
 s daty a testy (vstup hráče = klik na uzel).
