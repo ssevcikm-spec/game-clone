@@ -171,6 +171,12 @@ const MESSAGE_BUSY := "You must wait to perform another action."
 const MESSAGE_EMPTY_ORE := "There is no metal left here."
 const MESSAGE_EMPTY_WOOD := "There are no logs left here."
 const MESSAGE_EMPTY_FISH := "The fish are not biting here."
+# PRACOVNI ANIMACE (ZADANI-28, B2): ABSTRAKTNI ID akce klienta, stejne jako
+# `sim.combat.ACTION_ATTACK = 2` (kontrakt M5 §2). Klient ho preklada na
+# skupinu v `anim.mul` (`render/anim_player.GROUP_KEY`); skupinu "prace"
+# export nema, takze se pouzije fallback na dostupne framy + kresleny svih
+# (`render/swing.gd`) - viz `docs/04 §4.6.8` (smlouva animaci).
+const ACTION_WORK := 5
 
 var _map = null
 var _tiledata = null
@@ -185,6 +191,12 @@ var _items = null                    # {serial: Item} - aby sel predmet dohledat
 var _banks: Dictionary = {}          # "kind:bx:by" -> bank
 var _busy_until: Dictionary = {}     # kind -> ms, do kdy system "pracuje"
 var _last_item = null                # posledni vydany predmet (do navratoveho slovniku)
+# PRACOVNI ANIMACE (ZADANI-28, B2): serial -> {do_ms, total_ms}. Je to
+# PREZENTACNI OKNO jako `sim.combat._anim_do`, ne stav sveta - do `state()`
+# (save/hash) se ZAMERNE nedostava, takze replaye a ulozene hry se nemeni.
+# Hrac jinak pri tezbe stoji v postoji a neni videt, ze pracuje (namEReno
+# 2026-10-19: vsech 10 vzorku pracovniho okna melo akci 4 = postoj).
+var _anim_do: Dictionary = {}
 
 
 func _init(map = null, tiledata = null, registry = null, rng = null, clock = null,
@@ -273,6 +285,23 @@ func busy_until(kind: String) -> int:
 	return int(_busy_until.get(kind, 0))
 
 
+func anim_of(m: int) -> Dictionary:
+	# PRACOVNI ANIMACE (ZADANI-28, B2): co ma klient kreslit, kdyz tenhle
+	# mobil prave pracuje - `{action, left_ms, total_ms}`, nebo prazdny slovnik.
+	# VEREJNE SCHVALNE (vzor `sim.combat.anim_of`): klient i test i brana se
+	# ptaji na TUTEZ hodnotu; kdyby si klient pocital okno z `busy_until`,
+	# vznikla by druha pravda o tom, jak dlouho animace trva.
+	# `action` je ABSTRAKTNI ID klienta (5 = prace), ne skupina v `anim.mul`.
+	var zaznam = _anim_do.get(int(m))
+	if not (zaznam is Dictionary):
+		return {}
+	var zbyva: int = int(zaznam["do_ms"]) - _now()
+	if zbyva <= 0:
+		_anim_do.erase(int(m))
+		return {}
+	return {"action": ACTION_WORK, "left_ms": zbyva, "total_ms": int(zaznam["total_ms"])}
+
+
 func stats() -> Dictionary:
 	var out: Dictionary = {}
 	for key in _banks:
@@ -312,6 +341,10 @@ func _harvest(kind: String, m: int, x: int, y: int) -> Dictionary:
 	var uspech: bool = bool(hod["success"])
 	var zisk: bool = bool(hod["gained"])
 	_busy_until[kind] = now + int(p["swing_ms"])
+	# PRACOVNI ANIMACE (ZADANI-28, B2): okno se otvira VE CHVILI, kdy postava
+	# opravdu zamachne - tedy i pri neuspechu (skill check rozhoduje o Rudě,
+	# ne o tom, jestli se hraje animace; reference ma animaci sberu taky).
+	_pracuj(m, int(p["swing_ms"]))
 	if not uspech:
 		# Neuspesny skill check nespotrebuje rudu ANI naradi (research §1.1 krok 8),
 		# ale skill pri nem ROSTE (`gained` jde z `sim.skill_gain`) - proto se
@@ -365,6 +398,16 @@ func _check(m: int, skill: int, difficulty: int, span: int) -> Dictionary:
 	return {"success": false, "gained": false}
 
 
+func _pracuj(m: int, trvani_ms: int) -> void:
+	# Nastavi PREZENTACNI okno prace (viz `anim_of`) + posle udalost
+	# `mobile_anim` stejne jako `sim.combat` (kontrakt M5 §2), aby ji mohl
+	# zpracovat i nekdo, kdo se na `anim_of` neptá.
+	_anim_do[int(m)] = {"do_ms": _now() + trvani_ms, "total_ms": trvani_ms}
+	if _events != null:
+		_events.push("mobile_anim", {"serial": int(m), "action": ACTION_WORK,
+			"frame_ms": int(Const.TURN_MS)})
+
+
 func _give(mob, art: int, amount: int, hue: int, x: int, y: int) -> bool:
 	# Predmet jde do batohu (`entity.container`); kdyz batoh neni, hlasi se to.
 	if _container == null or _serials == null or int(mob.backpack) <= 0:
@@ -376,12 +419,43 @@ func _give(mob, art: int, amount: int, hue: int, x: int, y: int) -> bool:
 		_last_item = null
 		_message(MESSAGE_FULL)
 		return false
+	# ⚠⚠ ZADANI-28 (2026-10-19, B6) - SLOUCENI DO HROMADY SPOTREBUJE OBJEKT.
+	# Kdyz uz v batohu hromada stejne veci je, `entity.container.add` do ni
+	# prevede kusy a TENHLE objekt necha s `amount == 0` a `parent == 0`
+	# ("objekt je spotrebovany"). Do tohoto datumu se pak zaregistroval do
+	# `_items` a kreslil se na dlazdici, kde se tezilo - hrac videl "obrazek
+	# zelezne rudy na dlazdici" (namEReno: 5 takovych objektu po 6 tezbach).
+	# Pozor na test: po USPESNEM `add` ma predmet `parent == batoh` (a
+	# `ve_svete()` je tim padem false - je v kontejneru, ne ve svete). Proto
+	# se spotrebovany objekt poznava podle MNOZSTVI: slouceni prevede kusy a
+	# necha `amount == 0` (testovaci dvojnik kontejneru `parent` vubec
+	# nenastavuje, takze na nej se spoléhat neda).
+	if int(item.amount) <= 0:
+		item = _hromada_v_batohu(mob, item)
+		if item == null:
+			push_warning("sim.harvest: slouceny predmet nema hromadu v batohu "
+				+ "(sber by vratil prazdny serial)")
+			_last_item = null
+			return true
 	# Registrace podle serialu: `sim.craft.smelt` hleda rudu podle serialu
 	# (predmety nikdo jiny nedrzi - otevrena vec 64).
 	if _items is Dictionary:
 		_items[int(item.serial)] = item
 	_last_item = item
 	return true
+
+
+func _hromada_v_batohu(mob, vzor):
+	# Hromada, do ktere se právě pridane kusy prevedly: hleda se v batohu
+	# stejnym pravidlem, jakym slucuje `entity.container` (`item.same_pile`),
+	# a musi mit obsah. `null` = hromada se nenasla (volajici to hlasi).
+	if _container == null:
+		return null
+	for serial in _container.contents(int(mob.backpack)):
+		var kandidat = _items.get(int(serial)) if _items is Dictionary else null
+		if kandidat != null and kandidat.same_pile(vzor):
+			return kandidat
+	return null
 
 
 # -- vnitrni: banky a zily -------------------------------------------------
@@ -533,7 +607,9 @@ func _item_tile(x: int, y: int, ranges: Array) -> int:
 		return -1
 	for serial in _items:
 		var item = _items[serial]
-		if item == null or int(item.parent) != 0:
+		# `ve_svete()` (ZADANI-28): spotrebovany objekt (`amount == 0`) NENI
+		# predmet ve svete - jinak by se z "prazdne hromady" stal uzel suroviny.
+		if item == null or not item.ve_svete():
 			continue
 		if int(item.pos.x) != x or int(item.pos.y) != y:
 			continue

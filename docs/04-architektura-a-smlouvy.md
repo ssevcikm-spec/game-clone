@@ -736,6 +736,67 @@ pohne (wander), při přiblížení hráče zaútočí (a hráč na něj dvojkli
 zabití je v jeho těle loot a do 10 minut herního času se obnoví; po
 `save → load` je stav mobilů i spawnu stejný (`state_hash`).
 
+### 4.6.8 Animace postavy a klik na kreslený objekt (PŘIDÁNO 2026-10-19)
+
+*(Vzniklo ze `ZADANI-28-HRAC-2026-10-19.md`: pět vad z reálného hraní, které
+prošly 2 856 zelenými kontrolami i G20. Smlouva je psaná tak, aby se dala
+**změřit** — měří ji brána `G21` (`tools/gates/check-feel.py`).)*
+
+**Kdo co vlastní:** *simulace rozhoduje, klient kreslí* (`docs/01 §1.5 bod 9`).
+Prezentační okno animace je proto **stav v simulaci**, ne dopočet v klientovi:
+
+```
+sim.combat.anim_of(serial)   -> {action: 2, left_ms, total_ms}   # útok
+sim.harvest.anim_of(serial)  -> {action: 5, left_ms, total_ms}   # práce (B2)
+```
+
+`action` je **abstraktní ID klienta** (0 chůze, 1 běh, 2 útok, 3 smrt,
+4 postoj, 5 práce). `render/anim_player.sprite_group_for` z něj dělá skupinu
+v `anim.mul`; **co v exportu není, se nahradí fallbackem** (viz níže).
+Ani jedno okno **není** ve `state()`/`state_hash()` — je to časování obrazu,
+ne stav světa (`docs/01 §1.5 bod 3`, G8/G9 beze změny hashů).
+
+**FALLBACK NA DOSTUPNÉ FRAMY (B1, B2).** Manifest animací má u těla 400
+`groups.attack = 9`, ale export `assets/uo/anim` skupinu 9 **nemá** — do
+2026-10-19 proto `play(400, 2, dir)` vracelo `ok:false` a hráč při útoku
+**zmizel** (400 ms nebyl nakreslený). Smlouva proto zavádí pořadí:
+
+| abstraktní akce | zkusí se v tomto pořadí | co to znamená |
+|---|---|---|
+| 2 (útok) | `attack` → `walk` | vlastní art je indexovaný první, takže vyhraje **vlastní chůze**, ne UO |
+| 5 (práce) | `attack` → `walk` | práce vlastní art nemá; používá se tělo v pohybu |
+
+**To, že se kreslí fallback, je VIDĚT:** `render/anim_player.pouzit_fallback()`
+vrací `true`, a klient k takovému útoku/praci kreslí **svih**
+(`render/swing.gd` — pruh 2×2 px po oblouku ve směru pohledu, vlastní kresba
+kódem, žádný art z instalace UO). Tělo, které skupinu útoku **má** (monstra:
+krysa 238 → skupina 5), kreslí svůj útok a svih nedostane.
+
+**KLIK NA KRESLENÝ OBJEKT (B3).** Klient posílá dál jen **dlaždici**
+(`{kind:"tile"}`), ale tu, na které stojí **nakreslený** objekt: art má offset
+a stojí nad dlaždicí, takže geometrický přepočet `screen → to_tile` minul
+kovadlinu o dvě pole. Hit-test dělá klient (`app/world_view.co_je_na_screen`,
+injektovaný do `app/input_map.hit_test`) v tomto pořadí:
+
+1. **bytost na geometrické dlaždici** (klik na dlaždici, kde stojí bytost,
+   míří na bytost — tělo ležící přes sousední dlaždici jinak „krade“ klik),
+2. bytosti, jejichž kreslený obdélník obsahuje kurzor (shora dolů),
+3. pozemské předměty, jejichž kreslený obdélník obsahuje kurzor (shora dolů).
+
+**OKNA (B4).** Každé okno, které jde otevřít, musí jít **zavřít** — API
+`zavri()`/`toggle()`, tlačítko „Close“ v liště nad obsahem a klávesa
+`ui_cancel` (Escape) v `app.main._unhandled_input`. **Zavřené okno nepřijímá
+vstupy**: handlery tlačítek se ptají `ui.vendor_gump.prijima_vstup()`; veřejné
+API (`nastav_*`, `stiskni_*`) zůstává bez guardu, protože ho volá klient
+s daty a testy (vstup hráče = klik na uzel).
+
+**CO JE VE SVĚTĚ (B6).** Jedna definice: `sim/entity/item.gd: ve_svete()` =
+`parent == 0` **a** `amount > 0`. Ptá se jí kreslení (`app/world_view`) i
+hledání cílů (`sim/harvest._item_tile`, `sim/craft.station_role_at`). Spotřebovaný
+objekt (po sloučení hromady nebo prodeji) **není** předmět ve světě — do
+2026-10-19 se kreslil na dlaždici, kde ležel naposledy („obrázek rudy na
+dlaždici“).
+
 ## 4.7 Uložení, načtení, determinismus
 
 | Věc | Rozhodnutí |

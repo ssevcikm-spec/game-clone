@@ -83,6 +83,13 @@ ORDER = [
     # kazda podsoustava mela zeleny test, ale "projde to cely" nemeril nikdo -
     # a presne tak prosla vada "okno obchodu neumi prodat" (session D).
     ("G20", "check-loop.py"),
+    # G21 (VADY Z REALNEHO HRANI: animace utoku/prace, klik na KRESLENOU stanici,
+    # zavreni okna, vendor mimo vyhen, ruda na dlazdici) je DRUHA integracni
+    # brana a stoji hned za G20: obe pousti REALNOU scenu a meri to, co hrac
+    # vidi (G20 dlazdice, G21 PIXELY a KLIKNUTI). Pridano 2026-10-19 po hrani:
+    # pet vad proslo vsemi zelenymi testy i G20, protoze zadna z nich neni
+    # o systemech `sim/` - vsechny jsou o obrazu a o tom, na co se klika.
+    ("G21", "check-feel.py"),
     ("G10", "check-render.py"),
 ]
 TESTS_GATE = "G3"

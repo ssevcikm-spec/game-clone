@@ -1,4 +1,4 @@
-extends Node2D
+﻿extends Node2D
 # Kreslici uzel sveta: JEDINE misto, kde se seznam z `render.chunk` meni na
 # pixely (docs/02 §2.4). Kresli se v poradi ze `render.sort` (painter's
 # algorithm) - `z_index` na to nejde pouzit (docs/02 past P21).
@@ -36,6 +36,10 @@ const NamePlates = preload("res://render/name_plates.gd")
 # (kruhova zavislost nehrozi: `app/player_controller` preloaduje jen `core/`).
 const PlayerCtrl = preload("res://app/player_controller.gd")
 const MeshScript = preload("res://render/chunk_mesh.gd")
+# KRESLENY SVIH (ZADANI-28, B1+B2): utok a prace nemaji v exportu animaci
+# skupinu, takze se kresli z fallbacku a k tomu svih - jinak by hrac nevidel,
+# ze se neco deje. Geometrie je v `render/swing.gd` (kresleni i mereni).
+const Swing = preload("res://render/swing.gd")
 
 const VIEW_TILES_X: int = 64
 const VIEW_TILES_Y: int = 48
@@ -45,6 +49,9 @@ const VIEW_TILES_Y: int = 48
 const ACTION_WALK: int = 0
 const ACTION_RUN: int = 1
 const ACTION_IDLE: int = 4
+# PRACOVNI AKCE (ZADANI-28, B2): stejne cislo jako `sim.harvest.ACTION_WORK`
+# a `render/anim_player.ACTION_WORK` - je to ID akce, ne skupina v `anim.mul`.
+const ACTION_WORK: int = 5
 # PRESTAVBA SEZNAMU SE ODDALUJE (namEReno 2026-10-07): `render.chunk.visible()`
 # stoji studeny ~44 ms (6 000 objektu) a puvodne se prestavoval pri KAZDEM kroku
 # chuze (`look_at_tile` -> `invalidate`), tedy 2,5x za sekundu -> uzivatel to
@@ -192,10 +199,15 @@ var _movement = null
 # sim.combat (dokonceni P1): animace UTOKU pro cizi postavy i hrace. Stav je
 # prezentační (`anim_of`), nikoli simulační - do hashe se nepočítá.
 var _combat = null
+# `sim.harvest` (ZADANI-28, B2): pracovni animace tezby/kaceni/rybareni.
+var _harvest = null
 # NASTENNY cas startu kroku CIZI postavy (serial -> {klic, start_ms}) - pro
 # plynuly posun (viz `_posun_mobila`). Neni to stav hry, jen casovani obrazu.
 var _wall_kroky: Dictionary = {}
 var _sort = null                   # render.sort (jedina funkce razeni)
+# `render.swing` (ZADANI-28, B1+B2): geometrie kresleneho svihu. Je to cisty
+# modul bez uzlu, takze se jedna instance da drzet tady.
+var _swing = Swing.new()
 var _hues = null                   # render.hue (barva kuze; bez nej je postava seda)
 var _hue_cache_hit: bool = false   # tonovany sprite se pocita jen pri zmene
 var _hue_last: Texture2D = null    # posledni prebarveny zaklad
@@ -212,6 +224,8 @@ var _items = null
 var _decay = null                  # sim.decay: kdo je telo (jedno pravidlo)
 var _jmena = null                  # render.names (injekce v `setup()`)
 var _telesa_videt: bool = true
+# ZADANI-28 (B1/B2): prepinac kresleneho svihu - jen pro dukaz snimkem.
+var _svih_videt: bool = true
 var _mesh = null                   # render.chunk_mesh (M9) - null = puvodni cesta
 var _mesh_seznam: Array = []       # seznam, pro ktery je mesh postaveny
 var _mesh_klic: int = -2147483647
@@ -405,6 +419,14 @@ func set_combat(combat) -> void:
 	_combat = combat
 
 
+func set_harvest(harvest) -> void:
+	# PRACOVNI ANIMACE (ZADANI-28, B2): `sim.harvest.anim_of(serial)` vraci, kdo
+	# prave pracuje (tezba/kaceni/rybareni). Zdroj pravdy je SIMULACE - klient
+	# si okno nepocita z `busy_until`, jinak by vznikla druha pravda o tom, jak
+	# dlouho animace trva. Kdyz system neni, kresli se chuze/postoj.
+	_harvest = harvest
+
+
 func nastav_decay(decay) -> void:
 	# `sim.decay` je JEDNO misto, kde je pravidlo "co je telo" - klient si ho
 	# neopisuje (`_je_telo` se ptá odsud). Bez nej plati `type == "corpse"`.
@@ -418,6 +440,17 @@ func nastav_telesa(videt: bool) -> void:	# Prepinac pro snímky: bez těl je obr
 
 func telesa_videt() -> bool:
 	return _telesa_videt
+
+
+func nastav_svih(videt: bool) -> void:
+	# PREPINAC SVIHU (ZADANI-28, B1/B2): slouzi k DUKAZU POHLEDEM - stejna scena
+	# se svih em a bez nej; rozdil pixelu je mereny doklad, ze se svih kresli
+	# (a kam). Vychozi je ZAPNUTO; vypnuti pouziva jen sonda, hra ho nepouziva.
+	_svih_videt = videt
+
+
+func svih_videt() -> bool:
+	return _svih_videt
 
 
 func mobily_videt() -> int:
@@ -485,6 +518,9 @@ func _draw_mobil(mob) -> bool:
 			ground.y - anchor.y), 0.0, Vector2(-1.0, 1.0))
 		draw_texture(texture, Vector2.ZERO)
 		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	# SVIH (ZADANI-28, B1+B2): kresli se, kdyz utok nema vlastni framy (fallback)
+	# nebo kdyz jde o praci - viz `_svih_info`. Meri se pocet ctverecku.
+	_kresli_svih(ground, int(mob.serial), akce)
 	drawn += 1
 	# JMENO + HP PRUH (docs/05 §5.5.2): klient jen zobrazuje, co je ve stavu.
 	# `_jmena` je hotovy modul `render.names` (injekce v `setup()`).
@@ -509,7 +545,12 @@ func _draw_tela() -> void:
 	serialy.sort()                       # deterministicke poradi kresleni
 	for serial in serialy:
 		var it = _items[serial]
-		if it == null or int(it.parent) != 0:
+		# ⚠ ZADANI-28 (B6): kresli se jen predmet, ktery VE SVETE opravdu je
+		# (`entity.item.ve_svete`: `parent == 0` a `amount > 0`). Do tohoto
+		# datumu se ptalo jen na `parent == 0`, takze spotrebovany objekt po
+		# slouceni hromady (ruda) nebo po prodeji zustal nakresleny na
+		# dlazdici, kde lezel naposledy - hrac videl "obrazek rudy na zemi".
+		if it == null or not it.ve_svete():
 			continue
 		if int(it.tile) <= 0:
 			continue
@@ -570,12 +611,13 @@ func _akce_mobila(mob) -> Dictionary:
 	# 400 ms "klouzala do strany". Je to TATAZ vada V2, jakou u hrace resi
 	# `_view_dir` v `app/player_controller.gd`.
 	var dir: int = ((int(mob.dir) % 8) + 8) % 8
-	# UTOK MA PREDNOST (dokonceni P1): kdyz mobil prave uderil, kresli se animace
-	# utoku - chuze by ji prebila. Stav dava `sim.combat.anim_of` (klient si ji
-	# NEDOMYSLI; docs/01 §1.5 bod 9).
-	var utok: Dictionary = _utok_animace(int(mob.serial))
-	if not utok.is_empty():
-		return {"action": int(utok.get("action", ACTION_IDLE)), "dir": dir}
+	# UTOK A PRACE MAJI PREDNOST (dokonceni P1 + ZADANI-28 B2): kdyz mobil
+	# prave uderil nebo pracuje, kresli se ta akce - chuze by ji prebila. Stav
+	# dava `sim.combat`/`sim.harvest` (klient si ji NEDOMYSLI; docs/01 §1.5 bod 9).
+	var prez: Dictionary = _prezencni(int(mob.serial))
+	if not prez.is_empty():
+		return {"action": int(prez.get("action", ACTION_IDLE)), "dir": dir,
+			"prezencni": prez}
 	if _movement == null or not _movement.has_method("pending_step"):
 		return {"action": ACTION_IDLE, "dir": dir}
 	var krok: Dictionary = _movement.pending_step(int(mob.serial))
@@ -586,8 +628,298 @@ func _akce_mobila(mob) -> Dictionary:
 		"dir": ((smer % 8) + 8) % 8}
 
 
+# --- MERENI KRESLENI (2026-10-19, ZADANI-28: vady z realneho hrani) ---------
+#
+# PROC TO TU JE: pet vad z hrani (B1 animace utoku, B2 tezba, B3 klik na
+# kreslenou vyhen/kovadlinu, B6 obrazek rudy na dlazdici) se neda overit
+# testem `tests/cases/*` - ten kresleni vubec nespousti. Sonda i brana musi
+# merit TOTEZ, co kresleni opravdu pouzije (vzor `animace_mobila` a
+# `ground_mobila`: jedna funkce pro kresleni i pro mereni, jinak by si mereni
+# pocitalo druhou pravdu a mohlo by projit na vade).
+#
+# Vsechny funkce nize jsou READ-ONLY: nic nemeni na stavu sveta ani na
+# animacnich casovacich. Vraci `ok:false` s `duvod`, kdyz merit nelze - nula
+# a "nemereno" nesmi vypadat jako uspech (docs/08 §8.6).
+
+func _akce_hrace() -> Dictionary:
+	# AKCE HRACE pro kresleni: stejna prednost jako u cizich postav - kdyz
+	# prave uderil (nebo pracuje), kresli se ta akce, ne chuze/postoj.
+	# Stav dava SIMULACE (`sim.combat.anim_of`, `sim.harvest.anim_of`);
+	# klient si ji NEDOMYSLI (docs/01 §1.5 bod 9).
+	var akce: int = _action
+	var prez: Dictionary = {}
+	if _player != null:
+		prez = _prezencni(int(_player.serial))
+		if not prez.is_empty():
+			akce = int(prez.get("action", akce))
+	return {"action": akce, "dir": _view_dir, "prezencni": prez}
+
+
+func _prezencni(serial: int) -> Dictionary:
+	# PREZENTACNI STAV ZE SIMULACE pro jeden serial: `{zdroj, action, left_ms,
+	# total_ms}` nebo prazdny slovnik. UTOK MA PREDNOST pred praci (kdo prave
+	# uderi, nema se kreslit jako "kope").
+	# `total_ms` je v obou systemech, takze klient nepocita okno sam.
+	if _combat != null and _combat.has_method("anim_of"):
+		var a = _combat.anim_of(int(serial))
+		if a is Dictionary and not (a as Dictionary).is_empty():
+			return {"zdroj": "combat", "action": int(a.get("action", ACTION_IDLE)),
+				"left_ms": int(a.get("left_ms", 0)),
+				"total_ms": maxi(1, int(a.get("total_ms", 1)))}
+	if _harvest != null and _harvest.has_method("anim_of"):
+		var w = _harvest.anim_of(int(serial))
+		if w is Dictionary and not (w as Dictionary).is_empty():
+			return {"zdroj": "harvest", "action": int(w.get("action", ACTION_WORK)),
+				"left_ms": int(w.get("left_ms", 0)),
+				"total_ms": maxi(1, int(w.get("total_ms", 1)))}
+	return {}
+
+
+func _svih_info(serial: int, akce: Dictionary) -> Dictionary:
+	# MA SE KRESLIT SVIH a jaky? Kresli se, kdyz jde o praci (ta nema vlastni
+	# art nikdy) nebo kdyz se utok kresli z FALLBACKU (`render.anim_player
+	# .pouzit_fallback`) - u tela, ktere ma vlastni framy utoku, se nekresli
+	# (jinak by jsme menili to, co uz funguje).
+	var prez: Dictionary = akce.get("prezencni", {})
+	if prez.is_empty() or _anim == null:
+		return {"kresli": false, "kusu": [], "duvod": "zadny prezentacni stav"}
+	var dir: int = int(akce["dir"])
+	var prace: bool = int(prez.get("action", -1)) == ACTION_WORK
+	# ⚠ `has_method`: testy davaji do `world_view` FAKE anim modul, ktery zna
+	# jen `play`/`frame_count` (`tests/cases/world_view.gd`). Kdo fallback
+	# nezna, dostane chovani bez svihu - presne to stare (a je to videt).
+	var telo: int = _anim.body_of(int(serial)) if _anim.has_method("body_of") else -1
+	var fallback: bool = _anim.pouzit_fallback(telo, int(prez.get("action", -1)), dir) \
+		if _anim.has_method("pouzit_fallback") else false
+	var kresli: bool = prace or fallback
+	var progres: float = 1.0 - float(prez.get("left_ms", 0)) / float(prez.get("total_ms", 1))
+	return {"kresli": kresli, "prace": prace, "fallback": fallback,
+		"zdroj": str(prez.get("zdroj", "")), "progres": progres,
+		"kusu": _swing.kusy(dir, progres, prace) if kresli else []}
+
+
+func _kresli_svih(ground: Vector2, serial: int, akce: Dictionary) -> int:
+	# Kresleni svihu (viz `_svih_info`). Vraci pocet ctverecku - mereni, ze se
+	# opravdu neco nakreslilo, ne jen "kod se provedl".
+	var info: Dictionary = _svih_info(int(serial), akce)
+	if not _svih_videt or not bool(info.get("kresli", false)):
+		return 0
+	var barva: Color = _swing.barva(bool(info.get("prace", false)))
+	var kusy: Array = info["kusu"]
+	for kus in kusy:
+		var r: Rect2 = kus
+		draw_rect(Rect2(ground + r.position, r.size), barva)
+	return kusy.size()
+
+
+func _klip(serial: int, akce: Dictionary, now_ms: int = -1) -> Dictionary:
+	# Klip z `render.anim` pro dvojici (akce, smer). Jedno misto, aby kresleni
+	# hrace i mereni slo pres TUTEZ volani.
+	# `now_ms` je VSTUP PRO MERENI (stejne jako u `ground_mobila`): kresleni ho
+	# nepredava (pouzije se nastenny cas v `render.anim.play`), sonda predava
+	# cas SIMULACE, aby se dva vzorky daly porovnat bez cekani na hodiny
+	# (sonda bezi v jednom framu, takze nastenny cas se mezi vzorky nezmeni).
+	if _anim == null:
+		return {}
+	return _anim.play(int(serial), int(akce.get("action", ACTION_IDLE)),
+		int(akce.get("dir", 0)), now_ms)
+
+
+func animace_hrace(now_ms: int = -1) -> Dictionary:
+	# Co se prave kresli u hrace: `{ok, action, dir, clip, skupina, soubor}`.
+	# `ok:false` = postava se NAKRESLIT NEDA (chybi sprite) - nikdy vymyslene
+	# "idle". `skupina`/`soubor` dokladaji PUVOD framu (skupina v `anim.mul`
+	# a anim list), takze je videt, kdy akce 2 skoncila na skupine, kterou
+	# export NEMA (B1: telo 400, skupina 9 = chuze/beh se necte).
+	# `now_ms` = cas pro vzorkovani framu (viz `_klip`).
+	if _player == null or _anim == null:
+		return {"ok": false, "duvod": "bez hrace nebo bez render.anim"}
+	var akce: Dictionary = _akce_hrace()
+	var clip: Dictionary = _klip(int(_player.serial), akce, now_ms)
+	var telo: int = _anim.body_of(int(_player.serial)) if _anim.has_method("body_of") else -1
+	return {"ok": bool(clip.get("ok", false)), "action": int(akce["action"]),
+		"dir": int(akce["dir"]), "clip": clip, "telo": telo,
+		"skupina": _skupina(_anim, telo, int(akce["action"]), int(akce["dir"])),
+		"skupina_akce": int(_anim.sprite_group_for(telo, int(akce["action"]))) \
+			if _anim.has_method("sprite_group_for") else -1,
+		"fallback": bool(_anim.pouzit_fallback(telo, int(akce["action"]), int(akce["dir"]))) \
+			if _anim.has_method("pouzit_fallback") else false,
+		"svih": _svih_info(int(_player.serial), akce),
+		"soubor": str(_anim.sheet_file(telo, int(akce["action"]), int(akce["dir"]))) \
+			if _anim.has_method("sheet_file") else ""}
+
+
+func _skupina(anim, telo: int, action: int, dir: int) -> int:
+	# Skupina, ktera se opravdu pouzije (po fallbacku); -1 kdyz to modul neumi
+	# (testovaci fake) - nikdy vymyslene cislo.
+	if anim == null or not anim.has_method("skupina_pro"):
+		return -1
+	return int(anim.skupina_pro(telo, action, dir))
+
+
+func klip_mobila(serial: int, now_ms: int = -1) -> Dictionary:
+	# Co se prave kresli u CIZI postavy: `{ok, action, dir, clip, skupina,
+	# soubor}`. Prazdny slovnik = serial v registru neni (zadna vymyslena "idle").
+	var mob = null
+	if _draw_registry != null and _draw_registry.has_method("get_mobile"):
+		mob = _draw_registry.get_mobile(int(serial))
+	if mob == null or _anim == null:
+		return {}
+	var akce: Dictionary = _akce_mobila(mob)
+	var clip: Dictionary = _klip(int(serial), akce, now_ms)
+	var telo: int = _anim.body_of(int(serial)) if _anim.has_method("body_of") else -1
+	return {"ok": bool(clip.get("ok", false)), "action": int(akce["action"]),
+		"dir": int(akce["dir"]), "clip": clip, "telo": telo,
+		"skupina": _skupina(_anim, telo, int(akce["action"]), int(akce["dir"])),
+		"skupina_akce": int(_anim.sprite_group_for(telo, int(akce["action"]))) \
+			if _anim.has_method("sprite_group_for") else -1,
+		"fallback": bool(_anim.pouzit_fallback(telo, int(akce["action"]), int(akce["dir"]))) \
+			if _anim.has_method("pouzit_fallback") else false,
+		"svih": _svih_info(int(serial), akce),
+		"soubor": str(_anim.sheet_file(telo, int(akce["action"]), int(akce["dir"]))) \
+			if _anim.has_method("sheet_file") else ""}
+
+
+func _rect_sprite(ground: Vector2, clip: Dictionary, texture: Texture2D) -> Rect2:
+	# OBALOVY OBDELNIK sprite, jak ho kresli `_draw_player`/`_draw_mobil`.
+	# Zrcadleny sprite zacina na `ground.x - mirror_x` (levy okraj je
+	# `w - cx`, viz hlavicka `render/anim_player.play`), nezrcadleny na
+	# `ground.x - anchor.x`; svisle je to `ground.y - anchor.y` v obou
+	# pripadech. Pouziva se pro hit-test (B3) i pro mereni prekryvu (B5).
+	var levy: float = float(clip["mirror_x"]) if bool(clip.get("mirror", false)) \
+		else float((clip["anchor"] as Vector2).x)
+	return Rect2(Vector2(ground.x - levy, ground.y - float((clip["anchor"] as Vector2).y)),
+		texture.get_size())
+
+
+func obraz_mobila(serial: int) -> Dictionary:
+	# KRESLENY obdelnik cizi postavy (to, co hrac vidi a na co klika):
+	# `{ok, ground, rect, action, dir}`. Bez registru/animace `ok:false`.
+	var mob = null
+	if _draw_registry != null and _draw_registry.has_method("get_mobile"):
+		mob = _draw_registry.get_mobile(int(serial))
+	if mob == null:
+		return {"ok": false, "duvod": "serial neni v registru"}
+	var klip: Dictionary = klip_mobila(int(serial))
+	if not bool(klip.get("ok", false)) or (klip.get("clip") as Dictionary).get("texture") == null:
+		return {"ok": false, "duvod": "mobil nema sprite"}
+	var ground: Vector2 = ground_mobila(mob)
+	return {"ok": true, "ground": ground,
+		"rect": _rect_sprite(ground, klip["clip"], klip["clip"]["texture"]),
+		"action": int(klip["action"]), "dir": int(klip["dir"])}
+
+
+func obraz_predmetu(serial: int) -> Dictionary:
+	# KRESLENY obdelnik pozemskeho predmetu - STEJNA matematika jako
+	# `_draw_tela` (ground - offset, velikost textury). `ok:false` = predmet
+	# neni na zemi / nema art; nikdy vymysleny obdelnik.
+	if _items == null or _textures == null:
+		return {"ok": false, "duvod": "bez itemu nebo textur"}
+	var it = _items.get(int(serial))
+	if it == null:
+		return {"ok": false, "duvod": "serial neni v itemech"}
+	if not it.ve_svete():
+		# Neni to predmet ve svete: bud je v kontejneru (`parent != 0`), nebo
+		# je to spotrebovany objekt (`amount <= 0`) - viz `entity.item.ve_svete`.
+		return {"ok": false, "duvod": "predmet neni ve svete (parent/amount)",
+			"parent": int(it.parent), "amount": int(it.amount)}
+	if int(it.tile) <= 0:
+		return {"ok": false, "duvod": "predmet nema art"}
+	var tex: Texture2D = _textures.texture(int(it.tile))
+	if tex == null:
+		return {"ok": false, "duvod": "art neni v atlase", "art": int(it.tile)}
+	var ground: Vector2 = _ground_of(Vector3i(int(it.pos.x), int(it.pos.y), int(it.pos.z)))
+	var off: Vector2i = _textures.offset(int(it.tile))
+	var rect := Rect2(ground - Vector2(float(off.x), float(off.y)), tex.get_size())
+	return {"ok": true, "serial": int(serial), "art": int(it.tile),
+		"amount": int(it.amount), "parent": int(it.parent),
+		"tile": Vector2i(int(it.pos.x), int(it.pos.y)), "ground": ground,
+		"rect": rect, "ofset": off}
+
+
+func pozemske_predmety() -> Array:
+	# CO BY SE KRESLILO NA ZEMI (`_draw_tela`): vsechny predmety s
+	# `parent == 0` a artem > 0, v deterministickem poradi serialu. Polozka
+	# nese i `amount` a `kresli_se` - "zbytek po spotrebovani" (`amount <= 0`)
+	# je presne to, co hrac vidi jako predmet, ktery ve svete uz neni (B6).
+	var out: Array = []
+	if _items == null:
+		return out
+	var serialy: Array = _items.keys()
+	serialy.sort()
+	for serial in serialy:
+		var it = _items[serial]
+		if it == null or not it.ve_svete() or int(it.tile) <= 0:
+			continue
+		var obraz: Dictionary = obraz_predmetu(int(serial))
+		out.append({"serial": int(serial), "art": int(it.tile),
+			"amount": int(it.amount), "tile": Vector2i(int(it.pos.x), int(it.pos.y)),
+			"kresli_se": bool(obraz.get("ok", false)),
+			"rect": obraz.get("rect", Rect2())})
+	return out
+
+
+func co_je_na_screen(world: Vector2, z: int = 0) -> Dictionary:
+	# HIT-TEST KRESLENYCH OBJEKTU (ZADANI-28, B3): co je pod kurzorem, kdyz
+	# `world` je SVETOVA souradnice (volajici ji ziska stejne jako
+	# `app.input_map._na_svet`: `screen / zoom + camera_offset`).
+	#
+	# ⚠⚠ CO BYLO NAMERENO: klik na KRESLENOU kovadlinu se poslal jako dlazdice
+	# o 2 pole jinde (`(1497,1631)` misto `(1495,1631)`), protoze se klik
+	# prekladal geometricky pres `iso.to_tile` - a art stoji NAD linkou zeme
+	# (`ground - offset`, vyska 46 px). Hrac tedy na kovadlinu klikl a dostal
+	# "You see nothing special."; pritom klik na STŘED DLAZDICE prosel (G20
+	# miri na stred, proto ji to minulo). Hit-test vraci DLAZDICI predmetu -
+	# `sim.interaction` pak rozhodne stejne jako u klika na dlazdici, takze se
+	# v SIMULACI nic nemeni (klient posila jen cil).
+	#
+	# PORADI = PORADI KRESLENI, ale SHORA: mobily se kresli PO zemi, takze maji
+	# prednost; uvnitr skupin vyhrava to, co je nakreslene POZDEJI (u predmetu
+	# pozdejsi serial, u mobilu pozdejsi v registru) - presne to hrac vidi
+	# navrchu. Prvni verze brala prvni nalezeny (nejnizsi serial), takze klik
+	# na balvan vratil kovadlinu, ktera je kreslena POD nim (namEReno).
+	var nalez: Dictionary = {}
+	# (1) BYTOST NA GEOMETRICKE DLAZDICI MA PREDNOST: sprite stoji NAD svou
+	# dlazdici a u nekterych artu je jeho obdelnik vysunuty (korba tela lezi
+	# pres sousedni dlazdici - namEReno: klik na stred dlazdice prodejce trefil
+	# telo krysky o 2 dlazdice dal). Kdo miri na dlazdici, na ktere stoji
+	# bytost, miri na tu bytost.
+	var geo := Vector2i(-9999, -9999)
+	if _iso != null:
+		geo = _iso.to_tile(world.x, world.y, z)
+	if _draw_registry != null:
+		for mob in _draw_registry.all():
+			if _player != null and int(mob.serial) == int(_player.serial):
+				continue
+			if int(mob.pos.x) == geo.x and int(mob.pos.y) == geo.y:
+				return {"serial": int(mob.serial), "druh": "mobil", "tile": geo,
+					"zpusob": "dlazdice"}
+	if _player != null and _draw_registry != null and _anim != null:
+		var mobily: Array = []
+		for mob in _draw_registry.all():
+			if int(mob.serial) != int(_player.serial):
+				mobily.append(mob)
+		for i in range(mobily.size() - 1, -1, -1):
+			var mob = mobily[i]
+			var o: Dictionary = obraz_mobila(int(mob.serial))
+			if bool(o.get("ok", false)) and (o["rect"] as Rect2).has_point(world):
+				nalez = {"serial": int(mob.serial), "druh": "mobil",
+					"tile": Vector2i(int(mob.pos.x), int(mob.pos.y))}
+				break
+	if not nalez.is_empty():
+		return nalez
+	var pozemske: Array = pozemske_predmety()
+	for i in range(pozemske.size() - 1, -1, -1):
+		var p: Dictionary = pozemske[i]
+		if not bool(p["kresli_se"]):
+			continue
+		if (p["rect"] as Rect2).has_point(world):
+			nalez = {"serial": int(p["serial"]), "druh": "predmet", "tile": p["tile"]}
+			break
+	return nalez
+
+
 func ground_mobila(mob, now_ms: int = -1) -> Vector2:
-	# KDE SE CIZI POSTAVA KRESLI (vcetne posunu mezi dlazdicemi). VEREJNE
 	# SCHVALNE: `_draw_mobil` pouziva TUTO funkci a test/sonda meri TUTEZ
 	# hodnotu. Duvod je namEReny: prvni verze testu mela posun jen ve
 	# `_posun_mobila` a kresleni kontrolovala poctem nakreslenych - a mutace
@@ -1457,11 +1789,11 @@ func _draw_player() -> void:
 	# UTOK MA PREDNOST i u hrace (dokonceni P1): `_action` z `player_controller`
 	# zna jen chuzi/beh/postoj - kdyz hrac uderi, bez tohohle by se tvaril, ze
 	# stoji. Stav dava `sim.combat` (klient si ji nedomysli).
-	var akce_hrace: int = _action
-	var utok_hrace: Dictionary = _utok_animace(int(_player.serial))
-	if not utok_hrace.is_empty():
-		akce_hrace = int(utok_hrace.get("action", akce_hrace))
-	var clip: Dictionary = _anim.play(int(_player.serial), akce_hrace, _view_dir)
+	# ⚠ 2026-10-19 (ZADANI-28): akce i klip jdou pres SPOLECNE funkce
+	# (`_akce_hrace`, `_klip`) - sonda a brana musi merit TUTEZ hodnotu, kterou
+	# kresleni opravdu pouzije, ne druhou kopii vypoctu.
+	var akce_hrace: Dictionary = _akce_hrace()
+	var clip: Dictionary = _klip(int(_player.serial), akce_hrace)
 	if not bool(clip.get("ok", false)) or clip.get("texture") == null:
 		player_missing = true
 		player_frame = 0
@@ -1484,6 +1816,9 @@ func _draw_player() -> void:
 		texture = player_hue(texture, int(_player.hue))
 	if not bool(clip.get("mirror", false)):
 		draw_texture(texture, ground - anchor)
+		# SVIH (ZADANI-28, B1+B2) - kresli se i pro nezrcadleny sprite, proto tu
+		# NENI `return` (driv tu byl a svih by u poloviny smeru chybel).
+		_kresli_svih(ground, int(_player.serial), akce_hrace)
 		return
 	# Zrcadleni: `draw_texture` neumi zaporny scale, proto se otoci rovina
 	# kresleni. Levy okraj zrcadleneho spritu je `ground.x - (w - cx)`.
@@ -1494,3 +1829,4 @@ func _draw_player() -> void:
 		0.0, Vector2(-1.0, 1.0))
 	draw_texture(texture, Vector2.ZERO)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	_kresli_svih(ground, int(_player.serial), akce_hrace)

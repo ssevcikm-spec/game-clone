@@ -1065,21 +1065,28 @@ func _anim_dir(m: int, akce: int) -> void:
 	# Do `state()` (save/hash) se to ZAMERNE nedostava: je to casovani obrazu,
 	# ne stav sveta - jinak by se zmenily replaye i ulozene hry.
 	if akce == ACTION_ATTACK:
-		_anim_do[int(m)] = _now() + ANIM_ATTACK_MS
+		# `total_ms` je v zaznamu proto, aby klient nemusel merit okno sam
+		# (ZADANI-28: svihem se kresli pruh, ktery potrebuje progres 0..1).
+		_anim_do[int(m)] = {"do_ms": _now() + ANIM_ATTACK_MS, "total_ms": ANIM_ATTACK_MS}
 
 
 func anim_of(m: int) -> Dictionary:
-	# Kdo prave uderil: `{action, left_ms}` nebo prazdny slovnik. VEREJNE
-	# SCHVALNE - klient (`app/world_view`) i test se ptaji na TUTEZ hodnotu;
-	# kdyby si ji klient pocital sam z casu swingu, byla by to druha pravda.
-	var do_ms: int = int(_anim_do.get(int(m), 0))
+	# Kdo prave uderil: `{action, left_ms, total_ms}` nebo prazdny slovnik.
+	# VEREJNE SCHVALNE - klient (`app/world_view`) i test se ptaji na TUTEZ
+	# hodnotu; kdyby si ji klient pocital sam z casu swingu, byla by to druha
+	# pravda.
+	var zaznam = _anim_do.get(int(m))
+	if not (zaznam is Dictionary):
+		return {}
+	var do_ms: int = int((zaznam as Dictionary).get("do_ms", 0))
 	if do_ms <= 0:
 		return {}
 	var zbyva: int = do_ms - _now()
 	if zbyva <= 0:
 		_anim_do.erase(int(m))
 		return {}
-	return {"action": ACTION_ATTACK, "left_ms": zbyva}
+	return {"action": ACTION_ATTACK, "left_ms": zbyva,
+		"total_ms": int((zaznam as Dictionary).get("total_ms", ANIM_ATTACK_MS))}
 
 
 func _sound(m: int, kind: String) -> void:

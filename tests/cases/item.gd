@@ -92,3 +92,18 @@ func run(t) -> void:
 	var holy = script.new()
 	t._check(holy.serial == 0 and holy.tile == 0 and holy.amount == 1,
 		"sim.entity.item: new() da serial 0, tile 0 a amount 1")
+
+	# 6) `ve_svete()` - JEDNA definice "predmet je ve svete" (ZADANI-28, B6).
+	# Do 2026-10-19 se kresleni ptalo jen na `parent == 0`, takze SPOTREBOVANY
+	# objekt (po slouceni hromady nebo po prodeji) zustal nakresleny na
+	# dlazdici, kde lezel naposledy - hrac videl "obrazek rudy na dlazdici".
+	var na_zemi = script.new(7, 0x59B8, 1)
+	t._check(na_zemi.is_on_ground() and na_zemi.ve_svete(),
+		"sim.entity.item: predmet na zemi s obsahem JE ve svete")
+	na_zemi.amount = 0
+	t._check(not na_zemi.ve_svete(),
+		"sim.entity.item: spotrebovany objekt (amount 0) NENI ve svete, i kdyz ma parent 0")
+	na_zemi.amount = 1
+	na_zemi.parent = 0x40000009
+	t._check(not na_zemi.is_on_ground() and not na_zemi.ve_svete(),
+		"sim.entity.item: predmet v kontejneru NENI ve svete (parent != 0)")

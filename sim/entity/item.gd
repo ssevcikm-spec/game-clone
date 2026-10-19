@@ -213,6 +213,25 @@ func is_on_ground() -> bool:
 	return parent == 0
 
 
+func ve_svete() -> bool:
+	# JE TENHLE OBJEKT PREDMET VE SVETE? `parent == 0` sam NESTACI.
+	#
+	# ⚠ ZADANI-28 (2026-10-19, hrac: "po uspesnem tezerni se objevi obrazek
+	# zelezne rudy na dlazdici"): kdyz se hromada slije do existujici
+	# (`entity.container.add`) nebo kdyz se hromada vyprazdni (`remove`),
+	# zustane po predmetu OBJEKT s `amount == 0` a `parent == 0`. Kresleni
+	# (`app/world_view._draw_tela`) se ptalo jen na `parent == 0`, takze
+	# SPOTREBOVANY predmet kreslilo na dlazdici, kde lezel naposledy - hrac
+	# videl rudu na zemi, i kdyz byla v batohu. Tohle je JEDNO misto, kde je
+	# definice "predmet ve svete"; ptá se ho kresleni i hledani cilu
+	# (`sim.harvest._item_tile`, `sim.craft.station_role_at`), aby se dve
+	# definice nemohly rozejit.
+	#
+	# NULA NENI PREDMET: `amount <= 0` je spotrebovany objekt, ne hromada
+	# o velikosti nula (hromada ma aspon 1 kus, `entity.container.add`).
+	return int(parent) == 0 and int(amount) > 0
+
+
 func pile_weight(unit_weight: int) -> int:
 	# Vaha hromady = jednotkova vaha x mnozstvi (viz hlavicka).
 	return unit_weight * amount

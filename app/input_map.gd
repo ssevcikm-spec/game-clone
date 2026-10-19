@@ -85,6 +85,12 @@ var always_run: bool = true
 # (RefCounted nema pristup k viewportu); kdyz zustane nulova, `run` rozhoduje
 # jen `always_run`.
 var view_size: Vector2 = Vector2.ZERO
+# HIT-TEST KRESLENYCH OBJEKTU (ZADANI-28, B3): `Callable(world: Vector2, z: int)
+# -> {tile, serial, druh}`. Injektuje `app/main` z `app/world_view.co_je_na_screen`;
+# kdyz neni (testy bez sceny), pouzije se geometricky prevod dlazdice.
+# Proc klient a ne SIM: jen kresleni vi, kam sprite saha (art ma offset) - a
+# vystup je porad jen DLAZDICE, takze herni pravidla zustavaji v `sim/`.
+var hit_test: Callable = Callable()
 # ⚠ 20. session: velikost CERNEHO PASU s GUI (vpravo, dole) - svet se do nej
 # nekresli, takze obecna interakce (E/T) se v nem nespousti (`is_over_gui`).
 # Plni ji `app/player_controller` z `world_view.gui_odsazeni * 2`.
@@ -348,10 +354,31 @@ func interact_command(screen: Vector2, camera_offset: Vector2, z: int = 0) -> Di
 	# dlazdici a sama zkusi uzel/stanici, a teprve kdyz tam nic neni, bytost
 	# (`sim.interaction._mobil_na_dlazdici`). Klient zustava hloupý - posila
 	# jen to, co je pod kurzorem.
-	var world: Vector2 = _na_svet(screen, camera_offset)
-	var tile: Vector2i = _iso.to_tile(world.x, world.y, z)
+	#
+	# ⚠ ZADANI-28 (2026-10-19, B3): "co je pod kurzorem" NENI to same jako
+	# "kterou dlazdici protina paprsek pod kurzorem". Kreslene predmety stoji
+	# NAD svou dlazdici (art ma offset), takze klik na ne vysel o 1-2 dlazdice
+	# jinam a interakce selhala. Hit-test dela KLIENT, ktery vi, co nakreslil
+	# (`hit_test`, injektuje `app/main` z `app/world_view.co_je_na_screen`);
+	# vystup je porad jen DLAZDICE, takze v SIMULACI se nic nemeni.
+	var tile: Vector2i = _tile_pod_kurzorem(screen, camera_offset, z)
 	return {"t": "interact",
 		"target": {"kind": "tile", "x": tile.x, "y": tile.y, "z": z}}
+
+
+func _tile_pod_kurzorem(screen: Vector2, camera_offset: Vector2, z: int) -> Vector2i:
+	# Dlazdice pod kurzorem: geometricky z projekce, a kdyz je pod kurzorem
+	# NAKRESLENY objekt (hit_test), vraci se dlazdice TOHO objektu.
+	# `hit_test` je Callable `(world: Vector2) -> {tile, serial, druh}`;
+	# kdyz neni (test bez sceny), zustava geometricky prevod - zadna ticha
+	# zmena chovani.
+	var world: Vector2 = _na_svet(screen, camera_offset)
+	var tile: Vector2i = _iso.to_tile(world.x, world.y, z)
+	if hit_test.is_valid():
+		var nalez = hit_test.call(world, z)
+		if nalez is Dictionary and (nalez as Dictionary).get("tile") is Vector2i:
+			return (nalez as Dictionary)["tile"]
+	return tile
 
 
 # -- UTOCENI MYSI (M5, 2026-10-10) -----------------------------------------
@@ -431,8 +458,9 @@ func nearest_lootable(player: int) -> int:	# Serial tela s lootem na dosah (0 = 
 func attack_command(player: Vector2i, screen: Vector2, camera_offset: Vector2,
 		z: int = 0) -> Dictionary:	# Klik mysi na svet -> utok, kdyz je tam nepritel. Jinak prazdny slovnik
 	# (zadny prikaz, zadny krok) - "nic tu neni" neni chyba vstupu.
-	var world: Vector2 = _na_svet(screen, camera_offset)
-	var tile: Vector2i = _iso.to_tile(world.x, world.y, z)
+	# ⚠ ZADANI-28 (B3): dlazdice se bere pres STEJNY hit-test jako interakce -
+	# klik na kreslenou postavu (jeji sprite je o 1-2 dlazdice vys) jinak minul.
+	var tile: Vector2i = _tile_pod_kurzorem(screen, camera_offset, z)
 	var cil: int = area_mobile(tile, 0)
 	if cil <= 0:
 		return {}

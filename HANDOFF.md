@@ -1,3 +1,110 @@
+# Předání — game-clone (2026-10-19, SESSION „BĚH 2“: PĚT VAD Z REÁLNÉHO HRANÍ — B1–B6 + BRÁNA G21)
+
+> **Co je tenhle soubor:** **stav projektu** pro další session agenta. Přepisuje
+> se celý; historie je v `git log`. Nový blok je vždy **nahoře**; starší bloky se
+> needitují (jen doplňují). **Současný stav se bere z tohoto bloku.**
+>
+> **Odkud brát detaily:** zadání `ZADANI-28-HRAC-2026-10-19.md`, sonda
+> `tools/gates/feel_probe.gd`, brána `tools/gates/check-feel.py` (G21), smlouva
+> animací a kliku `docs/04 §4.6.8`, řádek G21 v `docs/08 §8.2`, tři nová
+> ponaučení v `LESSONS.md` 2026-10-19 (nahoře).
+
+## ✅ CO SE UDĚLALO (a proč právě to)
+
+Hráč po hraní nahlásil **pět vad** (útok, těžba, klik na výheň/kovadlinu,
+zavření okna, vendor na výhni, ruda na dlaždici). Prošly **2 856 zelenými
+kontrolami** i **G20** — protože žádná z nich není o systémech `sim/`: všechny
+jsou o tom, **co je vidět** a **na co se kliká**. Opraveno všech pět a přidána
+**brána G21**, která je měří (a umí selhat: 7 sabotáží).
+
+| Vada | Co bylo naměřeno PŘED | Co je teď | Soubor |
+|---|---|---|---|
+| **B1** animace útoku | `anim_of {action:2}`, ale kreslení `ok:false`, `skupina 9`, `soubor ""` → **hráč na 400 ms zmizel** (tělo 400 má `groups.attack = 9`, export skupinu 9 nemá) | `ok:true`, fallback na **vlastní chůzi** (`assets/own-v3/…-400-0-1.png`), 8 framů, **kreslený svih** | `render/anim_player.gd` (`GROUP_FALLBACK`, `pouzit_fallback`, `skupina_pro`), `render/swing.gd` (nový), `app/world_view.gd` (`_svih_info`, `_kresli_svih`) |
+| **B2** animace těžby | `harvest.anim_of` **neexistovalo**; všech 10 vzorků pracovního okna = akce 4 (postoj), 1 frame | `sim.harvest.anim_of` = `{action:5,left_ms,total_ms}`, 8 framů, svih, okno **vyprší** | `sim/systems/harvest.gd` (`ACTION_WORK`, `_pracuj`, `anim_of`), `app/world_view.gd` (`set_harvest`, `_prezencni`) |
+| **B3** klik na výheň/kovadlinu | klik doprostřed **kreslené** kovadliny poslal `(1497,1631)` místo `(1495,1631)` → „You see nothing special.“; klik na **střed dlaždice** prošel (proto to G20 neviděla) | klik na kreslený předmět posílá **jeho dlaždici** (kovadlina → okno výroby, výheň → +6 ingotů), i s prodavačem poblíž | `app/world_view.gd` (`co_je_na_screen`), `app/input_map.gd` (`hit_test`), `app/main.gd` (injekce) |
+| **B4** zavření okna | `api_zavri false`, `api_toggle false`, `tlacitko_close false` (63 tlačítek, ani jedno „Close“) | `zavri()`/`toggle()`, tlačítko **„Close“** se signálem, **Escape** (`ui_cancel`) skutečnou událostí; zavřené okno **nepřijímá vstupy**, jde znovu otevřít | `ui/vendor_gump.gd`, `ui/craft_gump.gd`, `app/main.gd` (`_zavri_okna`, `_unhandled_input`) |
+| **B5** vendor na výhni | dlaždice se **nepřekrývaly** (`kolize 0`), ale **sprity ano**: `prekryv_vyhen_px = 799` | prodavač na **volné dlaždici** `player+(1,-1)`, `prekryv_vyhen_px = 0`, `prekryv_kovadlina_px = 0`; start to **hlídá** (`_zkontroluj_prekryv_stanic`) | `app/main.gd` (`_postav_vendora`, `_zkontroluj_prekryv_stanic`) |
+| **B6** ruda na dlaždici | po 6 těžbách **5 objektů** `iron_ore` s `amount: 0` a `parent: 0` na dlaždici zdroje (každé sloučení hromady nechalo „spotřebovaný“ objekt) | `entity.item.ve_svete()` = `parent == 0 && amount > 0`; `harvest._give` spotřebovaný objekt **neregistruje** a vrací **živou hromadu**; na zemi 0 | `sim/entity/item.gd`, `sim/systems/harvest.gd`, `sim/systems/craft.gd`, `app/world_view.gd` (`_draw_tela`, `obraz_predmetu`, `pozemske_predmety`) |
+
+**Smlouva (nová, měřitelná):** `docs/04 §4.6.8` — kdo vlastní prezentační okno
+(simulace), pořadí fallbacku (`attack` → `walk`, vlastní art první), kdy se
+kreslí svih, jak funguje hit-test (3 priority) a co je „předmět ve světě“.
+
+## 📊 NAMĚŘENO (2026-10-19, tato session)
+
+| Co | Hodnota | Doklad |
+|---|---|---|
+| **Testy (D)** | **2 874 kontrol / 0 selhání** (baseline před session 2 856; +18 nových) | `godot --headless --path . --script res://tests/run_tests.gd` (`.tmp/beh2-testy-8.log`) |
+| **Brány (E)** | **20 měřeno / 0 čeká / 0 chyb**, mezi nimi nová **G21 OK** | `python tools/gates/run-all.py` (`.tmp/beh2-runall-1.log`) |
+| **G21 self-test** | **25 případů, 0 chyb** (známý správný i 24 známých chybných vstupů) | `python tools/gates/check-feel.py --self-test` |
+| **G21 mutace (B)** | **7 sabotáží, všechny `exit 1`** (B1 fallback, B2 práce, B3 hit-test, B4 tlačítko, B4 Escape, B5 pozice vendora, B6 duch rudy) | `python tools/gates/check-feel.py --mutace` (`.tmp/beh2-g21-mutace.log`) |
+| **G21 měření (B1)** | hráč: `ok:true`, `fallback:true`, list `own-v3-400-0-1.png`, **8 různých framů**, svih 8; cizí (krysa 238): 5 framů, svih 0 (má vlastní art) | `python tools/gates/check-feel.py` |
+| **G21 měření (B2)** | `harvest.anim_of:true`, pracovní akce `true`, **8 framů**, svih 4, ruda 0 → 1 | tamtéž |
+| **G21 měření (B3)** | klik na kreslenou kovadlinu → dlaždice `1495,1631` = stanice, okno `true`; výheň → `1496,1630`, ingoty 0 → 6 | tamtéž |
+| **G21 měření (B4)** | okno `true`, `api_zavri:true`, tlačítko+signál `true`, zavřeno klikem `true`, vstup odmitnut `true`, znovu otevřeno `true`; **Escape** (skutečná událost) `po_udalosti_otevreno:false` | tamtéž |
+| **G21 měření (B5/B6)** | prodejce `(1496,1629)`, na stanici `false`, `kolize 0`, `prekryv 0/0 px²`; ruda 1 → 7, na zemi `0`, v registru `0` | tamtéž |
+| **Důkaz pohledem (C)** | **8 snímků** „po“ (útok se svíhem i bez, těžba, klik na kovadlinu, okno s „Close“, po Esc, vendor u výhně, dlaždice po těžbě) + **8 snímků „před“** ze stejné sondy na kopii se starým chováním | `.tmp/beh2-po/feel/`, `.tmp/beh2-pred/feel/` (`_b6-pred-po.png` = porovnání B6) |
+| **Determinismus a replaye (F)** | **beze změny hashů** — G8 i G9 `OK` v `run-all`; prezentační stavy (`anim_of`) nejsou ve `state()` | `run-all.py` |
+
+## 🚧 CO ODHALILA PRÁCE (obojí v `LESSONS.md`)
+
+1. **„Cesta hráče“ se dá změřit a přitom minout.** G20 ji měřila po
+   **dlaždicích** a kliknutích na tlačítka; hráč ale jde po **pixelech**
+   (kreslený sprite stojí NAD dlaždicí) a po **animacích**. Proto G21.
+2. **`ok:false` z animace nesmí znamenat „nekresli postavu“.** Chybějící
+   skupina v exportu shodila celou postavu na 400 ms — a nikdo si toho
+   nevšiml, protože se to dělo jen v okně útoku.
+
+## ⚠ CO ZŮSTÁVÁ OTEVŘENÉ (pojmenované, ne zamlčené)
+
+1. **Animace útoku není hotový art.** Vlastní sada má jen chůzi; útok je
+   **fallback (chůze) + kreslený svih** (`render/swing.gd`, 6×6 px bloky).
+   Kdo chce skutečnou animaci útoku, musí ji vyrobit (art pipeline) — je to
+   **vědomá náhrada**, ne hotová věc. Totéž práce (B2).
+2. **Svih je doložen recty z téže funkce + snímkem, ne pixelovou branou.**
+   G21 měří, že se svih počítá (`svih_max > 0`) a že se kreslí (dvojice
+   snímků se svíhem/vypnutým svíhem: 3 884 změněných pixelů), ale
+   **automatická pixelová kontrola v bráně není** — je to mezera.
+3. **Hit-test je heuristika.** Tři priority (bytost na dlaždici → kreslené
+   bytosti → kreslené předměty) pokrývají naměřené případy; překryv dvou
+   **vysokých** předmětů na sousedních dlaždicích rozhoduje „shora dolů“ a
+   nemusí vždy odpovídat tomu, co hráč myslel. Měřeno: kovadlina, výheň,
+   prodejce, balvan — všechny prošly.
+4. **G21 běží jen lokálně** (`--snimky` otevírá okno, v CI by nešlo). Měření
+   bez snímků je v `run-all`; snímky se dělají ručně.
+5. **V pracovním stromě zůstalo 71 untracked souborů** z předchozích session
+   (`.uid`, `assets/cobble/`…). Nemažu, nestaguji. Nové skripty této session
+   (`render/swing.gd`, `tools/gates/feel_probe.gd`) mají `.uid` vytvořené
+   Godem — **nestagované**, stejná praxe jako dřív.
+6. **`G10` upozorňuje, že snímek je starší než kód kreslení** (4 soubory
+   včetně `app/world_view.gd`). Brána prošla, ale snímek pro G10 je z
+   2026-10-12 — kdo chce čerstvý, spustí `tools/gates/ci-godot.sh`.
+
+## 🧍 CO ČEKÁ NA TEBE
+
+1. **Zahraj si to znovu.** Nové je: postava při útoku **nemizí** a má
+   světelný svih; při těžbě je vidět práce (žlutý svih); klik na **kreslenou**
+   výheň/kovadlinu funguje; okna jdou zavřít **tlačítkem i Escape**; prodavač
+   stojí **vedle** výhně; po těžbě **nezůstává** ruda na zemi.
+2. **Chceš skutečný art útoku a práce?** Dnes je to náhrada (fallback + svih).
+   Řekni, jestli má být další session na art pipeline (`tovarna-assetu`), nebo
+   to zatím stačí.
+
+## 🔗 COMMITY TÉHLE SESSION
+
+**`<HASH>`** — `app/main.gd`, `app/world_view.gd`, `app/input_map.gd`,
+`render/anim_player.gd`, `render/swing.gd`, `sim/entity/item.gd`,
+`sim/systems/harvest.gd`, `sim/systems/craft.gd`, `sim/systems/combat.gd`,
+`ui/vendor_gump.gd`, `ui/craft_gump.gd`, `tools/gates/feel_probe.gd`,
+`tools/gates/check-feel.py`, `tools/gates/run-all.py`, `tests/cases/item.gd`,
+`tests/cases/harvest.gd`, `tests/cases/render_anim.gd`,
+`tests/cases/vendor_gump.gd`, `tests/cases/craft_gump.gd`, `docs/04`,
+`docs/08`, `LESSONS.md`, `HANDOFF.md`,
+`ZADANI-28-HRAC-2026-10-19.md`. Push ověřen:
+`git rev-list --count origin/main..HEAD` = **0**.
+
+---
+
 # Předání — game-clone (2026-10-19, SESSION „P1c“ + OPRAVA PO VERIFIKACI: BRÁNA G20 — KRÁTKÁ SMYČKA END-TO-END)
 
 > **Co je tenhle soubor:** **stav projektu** pro další session agenta. Přepisuje

@@ -75,10 +75,33 @@ const ACTION_GROUP := {0: 0, 1: 2, 4: 4}
 # jsou nove pro boj (`sim.combat` je posila v `mobile_anim`):
 const ACTION_ATTACK := 2
 const ACTION_DEATH := 3
+# PRACOVNI AKCE (ZADANI-28, B2): tezba/kaceni/rybareni. Cislo je ABSTRAKTNI ID
+# klienta stejne jako 2/3 - skupinu v `anim.mul` pro praci NEMAME, takze se
+# pouzije fallback (viz `GROUP_FALLBACK`) + kresleny svih (`render/swing.gd`).
+const ACTION_WORK := 5
 # Abstraktni akce -> klic v `groups[telo]`. `run` sdili `walk`: u monster beh
 # neexistuje, takze se slusne pouzije chuze (a je to videt - klic `walk`).
 const GROUP_KEY := {
 	0: "walk", 1: "walk", ACTION_ATTACK: "attack", ACTION_DEATH: "die", 4: "idle",
+}
+
+# ⚠⚠ FALLBACK NA DOSTUPNE FRAMY (ZADANI-28, B1+B2, 2026-10-19).
+# CO BYLO NAMERENO: hrac (telo 400) ma v manifestu `groups["400"]["attack"] = 9`,
+# ale export `assets/uo/anim` skupinu 9 NEMA (`tools/uoextract/anim.py
+# --actions "0:walk,2:run,4:idle"` + bedna smrti). `play()` proto vratilo
+# `ok:false` a `app/world_view._draw_player` postavu VUBEC NEKRESLIL - hrac pri
+# utoku na 400 ms ZMIZEL (namEReno: `animace_hrace().ok == false`,
+# `skupina 9`, `soubor ""`). Totez pro praci (B2): skupina pro praci neexistuje.
+# OPRAVA: kdyz skupina abstraktni akce v exportu neni, zkusi se DALSI klic z
+# poradi; kresli se prvni, ktery framy MA. Vlastni art je prvni v `_sheets`
+# (indexuje se pred UO exportem), takze fallback vezme vlastni chuzi - a tim
+# zustava pravidlo "vlastni art je prioritni".
+# FALLBACK JE VIDET: `pouzit_fallback()` vraci true, kdyz se kresli fallback.
+# Klient k nemu kresli svih (`render/swing.gd`), aby utok nebyl jen "jina
+# chuze", a brana G21 meri, ze fallback nastal a ze je u nej svih nakresleny.
+const GROUP_FALLBACK := {
+	ACTION_ATTACK: ["attack", "walk"],
+	ACTION_WORK: ["attack", "walk"],
 }
 
 var _sheets: Dictionary = {}     # "telo/akce/smer" -> {file (PLNA cesta), frames}
@@ -178,9 +201,49 @@ func play(serial: int, action: int, dir: int, now_ms: int = -1) -> Dictionary:
 		"own": _own_keys.has(key)}
 
 func _key(body: int, action: int, dir: int) -> String:
-	# Nezname cislo akce se bere jako cislo skupiny (starsi chovani): vymyslene
-	# mapovani by u nove akce tise vybralo CIZI art.
-	return "%d/%d/%d" % [body, sprite_group_for(body, action), int(DIR_MAP[((dir % 8) + 8) % 8][0])]
+	# Klic spritu. Nezname cislo akce se bere jako cislo skupiny (starsi
+	# chovani): vymyslene mapovani by u nove akce tise vybralo CIZI art.
+	# U ZNAMYCH akci (utok, prace) se zkousi FALLBACK (viz `GROUP_FALLBACK`) -
+	# jinak by utok hrace nemel sprite a postava by pri nem ZMIZELA.
+	var sd: int = int(DIR_MAP[((dir % 8) + 8) % 8][0])
+	var kandidati: Array = GROUP_FALLBACK.get(action, [])
+	for klic in kandidati:
+		var skupina: int = _skupina_pro_klic(body, str(klic))
+		if skupina >= 0 and _sheets.has("%d/%d/%d" % [body, skupina, sd]):
+			return "%d/%d/%d" % [body, skupina, sd]
+	return "%d/%d/%d" % [body, sprite_group_for(body, action), sd]
+
+
+func _skupina_pro_klic(body: int, klic: String) -> int:
+	# Cislo skupiny pro NAZEV akce z manifestu; -1 = telo ten nazev nema.
+	var mapa = _groups.get(body)
+	if mapa is Dictionary and mapa.has(klic):
+		return int(mapa[klic])
+	return -1
+
+
+func skupina_pro(body: int, action: int, dir: int) -> int:
+	# KTERA skupina v `anim.mul` se nakonec pouzije (po fallbacku) - pro branu
+	# a sondu; -1 = klic nema ani jednu podobu.
+	var casti: PackedStringArray = _key(body, action, dir).split("/")
+	return int(casti[1]) if casti.size() == 3 else -1
+
+
+func ma_sprite(body: int, action: int, dir: int) -> bool:
+	# Ma tahle (telo, akce, smer) opravdu framy? `false` = kreslit se neda.
+	return _sheets.has(_key(body, action, dir))
+
+
+func pouzit_fallback(body: int, action: int, dir: int) -> bool:
+	# Kresli se FALLBACK? = skupina, kterou akce ZNAMENA (`groups[telo]`), nema
+	# framy, ale nejaka pozdejsi v poradi je ma. Klient podle toho kresli svih,
+	# aby utok/prace nebyly jen "jina chuze" (viz hlavicka).
+	if not GROUP_FALLBACK.has(action):
+		return false
+	var sd: int = int(DIR_MAP[((dir % 8) + 8) % 8][0])
+	var primarni: int = sprite_group_for(body, action)
+	return not _sheets.has("%d/%d/%d" % [body, primarni, sd]) \
+		and ma_sprite(body, action, dir)
 
 
 func sprite_group(action: int) -> int:

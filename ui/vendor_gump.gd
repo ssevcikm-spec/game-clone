@@ -19,6 +19,13 @@ extends Control
 const SIRKA: float = 240.0
 const VYSKA: float = 300.0
 const RADEK_VYSKA: float = 22.0
+# Vyska listy s tlacitkem "Close" nad seznamem (ZADANI-28, B4). Tlacitko je
+# NAD boxem, ne v nem: `tests/cases/vendor_gump.gd` meri, ze box ma presne
+# 3 uzly (popis + radek + potvrzeni) - a hlavne se tim nezavira zadny radek.
+const HEADER: float = 24.0
+const TLACITKO_SIRKA: float = 70.0
+const TLACITKO_VYSKA: float = 20.0
+const TEXT_ZAVRIT := "Close"
 
 # Text přepínače směru (session D): hráč musí z okna poznat, že se dá i prodávat.
 # Text je ZDE (ne v datech), protože je to popis TÉTO komponenty, ne obsah hry;
@@ -35,6 +42,7 @@ var _id: String = ""
 var _pozadavek: Dictionary = {}
 var _dirty: bool = true
 var _box: VBoxContainer = null
+var _close: Button = null
 var _prebaveni: int = 0
 
 
@@ -42,6 +50,7 @@ func _init() -> void:
 	# Nove okno je ZAVRENE (Control je v Godotu viditelny ve vychozim stavu);
 	# otevre ho az udalost `gump_open` - stejne jako `ui.craft_gump`.
 	visible = false
+	_ensure_close()
 
 
 func apply_event(event: Dictionary) -> bool:
@@ -61,6 +70,8 @@ func apply_event(event: Dictionary) -> bool:
 
 func nastav(vendor: int, id: String, buy, sell) -> void:
 	# Vstup ze SIM (jen zobrazujeme). Neznamy smer se vraci na "buy".
+	# Data znamenaji "ukaz je" - okno se tim otevre (jinak by kliknuti na uzly
+	# zavreneho okna nic nedelalo a `prijima_vstup()` by ho spravne ignoroval).
 	_vendor = vendor
 	_id = id
 	_buy = _radky(buy)
@@ -69,14 +80,73 @@ func nastav(vendor: int, id: String, buy, sell) -> void:
 	if _smer != "sell":
 		_smer = "buy"
 	_dirty = true
+	visible = true
 
 
 func je_otevreny() -> bool:
 	return visible
 
 
+func zavri() -> bool:
+	# ZAVRENI OKNA (ZADANI-28, B4). Do teto zmeny okno obchodu ZADNOU cestu
+	# zavrit nemelo - ani tlacitko, ani klavesu (namEReno 2026-10-19:
+	# `api_zavri false`, `tlacitko_close false`, box mel 63 tlacitek a ani
+	# jedno "Close"). Hrac se tedy z obchodu nemohl dostat.
+	# Vraci `true` JEN kdyz okno opravdu bylo otevrene - "zavreno" nesmi byt
+	# tiche (volajici pocita, kolik oken zavrel).
+	if not visible:
+		return false
+	visible = false
+	# Nevyrizeny pozadavek se ZAHAZUJE: klik na "Potvrdit" tesne pred zavrenim
+	# nesmi po zavreni odeslat prikaz (zavrene okno neprijima vstupy).
+	_pozadavek = {}
+	_vyber = {"buy": {}, "sell": {}}
+	return true
+
+
+func toggle() -> bool:
+	# Tlacitko/klavesa "zpet": otevrene okno zavre. Zavrene okno se TIMHLE
+	# NEOTEVIRA - k tomu je potreba udalost `gump_open` (data ma SIM).
+	return zavri()
+
+
+func je_zavreny() -> bool:
+	return not visible
+
+
+func text_zavrit() -> String:
+	# Text tlacitka na JEDNOM miste (test a sonda ho ctou odsud, ne z uzlu).
+	return TEXT_ZAVRIT
+
+
 func smer() -> String:
 	return _smer
+
+
+func prijima_vstup() -> bool:
+	# ZAVRENE OKNO NEPRIJIMA VSTUPY (ZADANI-28, B4): klik na radek, prepinac
+	# ani potvrzeni nesmi nic udelat, kdyz okno neni videt. Je to JEDNO misto
+	# rozhodnuti (ptaji se ho VSECHNY tri handlery tlacitek) - kdyby to melo
+	# kazde tlacitko svoje, jedna cesta by se zapomnela a zavrene okno by
+	# porad posilalo prikazy.
+	# ⚠ VEREJNE API (`nastav_smer`, `stiskni_*`) se ZAMERNE nekontroluje:
+	# vola je klient s DATY (a testy); "vstup hrace" je klik na uzel, tedy
+	# handlery nize.
+	return visible
+
+
+func _on_radek_pressed(smer: String, item: int) -> void:
+	# Klik na radek seznamu. Zavrene okno ho ignoruje (viz `prijima_vstup`).
+	if not prijima_vstup():
+		return
+	stiskni_radek(smer, item)
+
+
+func _on_potvrdit_pressed(smer: String) -> void:
+	# Klik na "Confirm". Zavrene okno ho ignoruje.
+	if not prijima_vstup():
+		return
+	stiskni_potvrzeni(smer)
 
 
 func nastav_smer(smer: String) -> bool:
@@ -190,6 +260,9 @@ func odeber_pozadavek() -> Dictionary:
 func _on_smer_pressed() -> void:
 	# Klik na přepínač = druhý směr. UI tím NEMĚNÍ stav `sim` (docs/04 §4.1) -
 	# jen si přepne, který seznam zobrazuje; příkaz vznikne až potvrzením.
+	# ZAVRENE OKNO KLIK IGNORUJE (ZADANI-28, B4).
+	if not prijima_vstup():
+		return
 	nastav_smer("sell" if _smer == "buy" else "buy")
 
 
@@ -229,13 +302,13 @@ func flush() -> bool:
 		var tlacitko := Button.new()
 		tlacitko.text = text_radku(radek, _smer)
 		tlacitko.custom_minimum_size = Vector2(SIRKA, RADEK_VYSKA)
-		tlacitko.pressed.connect(stiskni_radek.bind(_smer, int(radek["item"])))
+		tlacitko.pressed.connect(_on_radek_pressed.bind(_smer, int(radek["item"])))
 		box.add_child(tlacitko)
 	var potvrzeni := Button.new()
 	potvrzeni.name = "Potvrdit"
 	potvrzeni.text = "Confirm: " + text_vyberu(_smer)
 	potvrzeni.custom_minimum_size = Vector2(SIRKA, RADEK_VYSKA)
-	potvrzeni.pressed.connect(stiskni_potvrzeni.bind(_smer))
+	potvrzeni.pressed.connect(_on_potvrdit_pressed.bind(_smer))
 	box.add_child(potvrzeni)
 	return true
 
@@ -247,8 +320,27 @@ func _ensure_box() -> VBoxContainer:
 		# VELIKOST JE POVINNA (stejna past jako u `ui.journal` a `ui.craft_gump`).
 		_box.custom_minimum_size = Vector2(SIRKA, VYSKA)
 		_box.size = Vector2(SIRKA, VYSKA)
+		# Pod listou s "Close" (ZADANI-28, B4) - jinak by tlacitko lezelo na
+		# prvnim radku seznamu a hrac by ho nemohl zmacknout.
+		_box.position = Vector2(0.0, HEADER)
 		add_child(_box)
 	return _box
+
+
+func _ensure_close() -> Button:
+	# TLACITKO "Close" (ZADANI-28, B4): hrac se z okna obchodu nemohl dostat.
+	# Je to `Button` v liste NAD seznamem (ne v boxu) - box ma mit presne
+	# 3 uzly na radek a `tests/cases/vendor_gump.gd` to meri.
+	if _close == null:
+		_close = Button.new()
+		_close.name = "Zavrit"
+		_close.text = TEXT_ZAVRIT
+		_close.position = Vector2(SIRKA - TLACITKO_SIRKA, 2.0)
+		_close.custom_minimum_size = Vector2(TLACITKO_SIRKA, TLACITKO_VYSKA)
+		_close.size = Vector2(TLACITKO_SIRKA, TLACITKO_VYSKA)
+		_close.pressed.connect(zavri)
+		add_child(_close)
+	return _close
 
 
 func _process(_delta: float) -> void:

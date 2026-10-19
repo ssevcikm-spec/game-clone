@@ -74,3 +74,38 @@ func run(t) -> void:
 				text = str(child.text)
 	t._check(text == "(no recipes)",
 		"ui.craft_gump: prazdny seznam receptu rekne '(no recipes)' (namEReno '%s')" % text)
+
+	# 4) ZAVRENI OKNA (ZADANI-28, B4): hrac se z okna vyroby nemohl dostat -
+	# okno nemelo zavreni tlacitkem ani klavesou. Meri se API, tlacitko "Close"
+	# se signalem a to, ze ZAVRENE okno neprijima vstupy (klik na recept).
+	okno.nastav_recepty([{"id": 42, "name": "dagger", "min_skill": 1.0}])
+	okno.visible = true
+	okno.flush()
+	var zavrit: Button = null
+	for uzel in okno.get_children():
+		if uzel is Button and str(uzel.name) == "Zavrit":
+			zavrit = uzel
+	t._check(zavrit != null and str(zavrit.text) == "Close"
+			and not zavrit.get_signal_connection_list("pressed").is_empty(),
+		"ui.craft_gump: okno ma tlacitko 'Close' s pripojenym signalem (uzel %s)"
+			% str(zavrit != null))
+	t._check(okno.je_otevreny() and okno.zavri() and not okno.je_otevreny(),
+		"ui.craft_gump: `zavri()` okno zavre (otevrene %s)" % str(okno.je_otevreny()))
+	t._check(not okno.zavri(),
+		"ui.craft_gump: druhe `zavri()` vraci false (zavreni neni tiche)")
+	# Zavrene okno: klik na recept nesmi vytvorit pozadavek.
+	var recept_btn: Button = null
+	if box != null:
+		for uzel in box.get_children():
+			if uzel is Button:
+				recept_btn = uzel
+	if recept_btn != null:
+		recept_btn.pressed.emit()
+	t._check(okno.odeber_pozadavek().is_empty(),
+		"ui.craft_gump: ZAVRENE okno neprijima klik na recept (zadny pozadavek)")
+	# Znovu otevrit jde UDALOSTI (data ma SIM).
+	var znovu: bool = okno.apply_event({"name": "gump_open", "data": {
+		"gump": "craft", "data": {"skill": 7, "recipes": [{"id": 7, "name": "x", "min_skill": 0.0}]}}})
+	t._check(znovu and okno.je_otevreny(),
+		"ui.craft_gump: okno jde znovu otevrit udalosti `gump_open`")
+	okno.free()

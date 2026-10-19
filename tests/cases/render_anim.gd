@@ -201,6 +201,47 @@ func run(t) -> void:
 			and player.sprite_group_for(400, 4) == int(m400.get("idle", -1))
 	t._check(lide_ok, "render.anim: u lidi zustava chuze/beh/idle podle `groups`")
 
+	# 6b) FALLBACK UToku A PRACE (ZADANI-28, B1+B2, 2026-10-19).
+	# CO BYLO NAMERENO: lidske telo ma v `groups` utok = skupinu 9, ale export
+	# ji NEMA - `play(400, 2, dir)` vratilo `ok:false` a klient postavu pri
+	# utoku VUBEC NEKRESLIL (400 ms hrac zmizel). Oprava: kdyz skupina
+	# abstraktni akce v exportu neni, pouzije se dalsi klic z
+	# `GROUP_FALLBACK` - a klient k tomu kresli svih.
+	# Test se ptá MANIFESTU (ne opsaneho cisla), takze kdyby export skupinu
+	# utoku jednou MEL, ceka presny opak.
+	var fb_ok: bool = true
+	var fb_detail := ""
+	var m400_fb = (gr as Dictionary).get("400", {}) if gr is Dictionary else {}
+	for akce in [2, 5]:
+		var g_utok: int = int(m400_fb.get("attack", -1)) if m400_fb is Dictionary else -1
+		var ma_primarni: bool = g_utok >= 0 and sprites.has("400/%d/1" % g_utok)
+		var r_fb: Dictionary = player.play(400, int(akce), 0, 0)
+		if not bool(r_fb.get("ok", false)):
+			fb_ok = false
+			fb_detail += " akce %d: play ok=false;" % int(akce)
+			continue
+		if not ma_primarni:
+			if not player.pouzit_fallback(400, int(akce), 0):
+				fb_ok = false
+				fb_detail += " akce %d: fallback se nehlasi;" % int(akce)
+			if player.skupina_pro(400, int(akce), 0) != int(m400_fb.get("walk", -2)):
+				fb_ok = false
+				fb_detail += " akce %d: skupina %d neni chuze %d;" % [int(akce),
+					player.skupina_pro(400, int(akce), 0), int(m400_fb.get("walk", -2))]
+		else:
+			if player.pouzit_fallback(400, int(akce), 0):
+				fb_ok = false
+				fb_detail += " akce %d: fallback i kdyz skupina existuje;" % int(akce)
+		# Fallback musi vzit STEJNY list jako chuze tehoz tela a smeru - jinak
+		# by to nebyl "fallback na dostupne framy", ale cizi art.
+		if str(player.sheet_file(400, int(akce), 0)) != str(player.sheet_file(400, 0, 0)):
+			fb_ok = false
+			fb_detail += " akce %d: list %s neni list chuze %s;" % [int(akce),
+				player.sheet_file(400, int(akce), 0), player.sheet_file(400, 0, 0)]
+	t._check(fb_ok,
+		"render.anim: utok a prace maji framy i bez skupiny v exportu (fallback; vadne:%s)"
+		% fb_detail)
+
 	# 7) mapovani 8 smeru hry na 5 spritu anim.mul + zrcadleni (merena tabulka)
 	var mapa_ok := true
 	var mapa := ""

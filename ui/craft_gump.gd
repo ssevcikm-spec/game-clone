@@ -19,11 +19,18 @@ extends Control
 const SIRKA: float = 220.0
 const VYSKA: float = 280.0
 const RADEK_VYSKA: float = 22.0
+# Lista s tlacitkem "Close" nad seznamem receptu (ZADANI-28, B4) - stejne
+# reseni jako v `ui/vendor_gump.gd`, aby se okna chovala stejne.
+const HEADER: float = 24.0
+const TLACITKO_SIRKA: float = 70.0
+const TLACITKO_VYSKA: float = 20.0
+const TEXT_ZAVRIT := "Close"
 
 var _recepty: Array[Dictionary] = []
 var _pozadavek: Dictionary = {}
 var _dirty: bool = true
 var _box: VBoxContainer = null
+var _close: Button = null
 var _prebaveni: int = 0
 
 
@@ -31,6 +38,7 @@ func _init() -> void:
 	# Nove okno je ZAVRENE (Control je v Godotu viditelny ve vychozim stavu);
 	# otevre ho az udalost `gump_open`. Stejne jako `ui.backpack`.
 	visible = false
+	_ensure_close()
 
 
 func apply_event(event: Dictionary) -> bool:
@@ -52,6 +60,30 @@ func apply_event(event: Dictionary) -> bool:
 
 func je_otevreny() -> bool:
 	return visible
+
+
+func zavri() -> bool:
+	# ZAVRENI OKNA (ZADANI-28, B4): okno vyroby nemelo cestu zavrit. Vraci
+	# `true` jen kdyz bylo otevrene (volajici pocita, kolik oken zavrel).
+	if not visible:
+		return false
+	visible = false
+	_pozadavek = {}
+	return true
+
+
+func toggle() -> bool:
+	# Otevrene okno zavre; zavrene se timhle NEOTEVIRA (k tomu je `gump_open`).
+	return zavri()
+
+
+func je_zavreny() -> bool:
+	return not visible
+
+
+func text_zavrit() -> String:
+	# Text tlacitka na JEDNOM miste (test a sonda ho ctou odsud).
+	return TEXT_ZAVRIT
 
 
 func nastav_recepty(seznam) -> void:
@@ -97,6 +129,14 @@ func stiskni(recept_id: int) -> bool:
 	return false
 
 
+func _on_recept_pressed(recept_id: int) -> void:
+	# Klik na recept v okne. ZAVRENE OKNO KLIK IGNORUJE (ZADANI-28, B4) -
+	# "zavrene okno neprijima vstupy" je pozadavek hrace.
+	if not visible:
+		return
+	stiskni(recept_id)
+
+
 func text_receptu(rec: Dictionary) -> String:
 	# Text jednoho radku - jedine misto, kde se sklada (test ho cte odsud).
 	return "%s (%.1f)" % [str(rec.get("name", "")), float(rec.get("min_skill", 0.0))]
@@ -123,7 +163,7 @@ func flush() -> bool:
 		var tlacitko := Button.new()
 		tlacitko.text = text_receptu(rec)
 		tlacitko.custom_minimum_size = Vector2(SIRKA, RADEK_VYSKA)
-		tlacitko.pressed.connect(stiskni.bind(int(rec["id"])))
+		tlacitko.pressed.connect(_on_recept_pressed.bind(int(rec["id"])))
 		box.add_child(tlacitko)
 	return true
 
@@ -135,11 +175,28 @@ func _ensure_box() -> VBoxContainer:
 		# VELIKOST JE POVINNA (stejna past jako u `ui.journal` a `ui.backpack`).
 		_box.custom_minimum_size = Vector2(SIRKA, VYSKA)
 		_box.size = Vector2(SIRKA, VYSKA)
+		# Pod listou s "Close" (ZADANI-28, B4).
+		_box.position = Vector2(0.0, HEADER)
 		add_child(_box)
 		var popis := Label.new()
 		popis.text = "Crafting"
 		_box.add_child(popis)
 	return _box
+
+
+func _ensure_close() -> Button:
+	# TLACITKO "Close" (ZADANI-28, B4) - v liste NAD seznamem receptu, aby
+	# nezakrylo zadny radek a aby bylo v okne videt.
+	if _close == null:
+		_close = Button.new()
+		_close.name = "Zavrit"
+		_close.text = TEXT_ZAVRIT
+		_close.position = Vector2(SIRKA - TLACITKO_SIRKA, 2.0)
+		_close.custom_minimum_size = Vector2(TLACITKO_SIRKA, TLACITKO_VYSKA)
+		_close.size = Vector2(TLACITKO_SIRKA, TLACITKO_VYSKA)
+		_close.pressed.connect(zavri)
+		add_child(_close)
+	return _close
 
 
 func _process(_delta: float) -> void:

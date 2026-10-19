@@ -641,7 +641,9 @@ func station_role_at(x: int, y: int) -> String:
 	if _items is Dictionary:
 		for serial in _items:
 			var item = _items[serial]
-			if item == null or int(item.parent) != 0:
+			# `ve_svete()` (ZADANI-28): stanice je predmet VE SVETE - spotrebovany
+			# objekt (`amount == 0`, `parent == 0`) na sve posledni dlazdici neni.
+			if item == null or not item.ve_svete():
 				continue
 			if int(item.pos.x) != x or int(item.pos.y) != y:
 				continue
@@ -674,7 +676,7 @@ func _station_near(mob, role: String) -> bool:
 	if _items is Dictionary:
 		for serial in _items:
 			var item = _items[serial]
-			if item != null and _role_of_tile(int(item.tile)) == role \
+			if item != null and item.ve_svete() and _role_of_tile(int(item.tile)) == role \
 					and _near(mob, item, STATION_RANGE):
 				return true
 	return false

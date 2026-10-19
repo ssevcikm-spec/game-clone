@@ -347,4 +347,33 @@ func run(t) -> void:
 		t._check(int(tiledata.flags(0x5BDD)) & 0x800 != 0,
 			"sim.harvest: art logu 0x5BDD je stackovatelny (flags 0x%X)" % int(tiledata.flags(0x5BDD)))
 
+	# -- L) PRACOVNI ANIMACE (ZADANI-28, B2) ------------------------------
+	# Stav pro klienta: `anim_of(serial)` = `{action, left_ms, total_ms}`.
+	# Do 2026-10-19 tu NIC takoveho nebylo - hrac pri tezbe stoji v postoji
+	# a neni videt, ze pracuje (namEReno sondou `feel_probe.gd`: vsech 10
+	# vzorku melo akci 4). Meri se i to, ze okno VYPRSI - kdyby zustalo,
+	# kreslila by se prace navzdy.
+	var g := _sestav(t)
+	if g.is_empty():
+		return
+	var g_system = g[0]
+	var g_mapa = g[2]
+	var g_clock = g[6]
+	g_mapa.land[Vector2i(101, 100)] = HORA
+	t._check(g_system.anim_of(SERIAL).is_empty(),
+		"sim.harvest: pred praci neni zadna pracovni animace (prazdny slovnik)")
+	var g_ruda: Dictionary = g_system.mine(SERIAL, 101, 100)
+	var g_anim: Dictionary = g_system.anim_of(SERIAL)
+	t._check(bool(g_ruda.get("ok", false)) and int(g_anim.get("action", -1)) == 5,
+		"sim.harvest: po praci vraci `anim_of` akci 5 = prace (namEReno %s)" % str(g_anim))
+	t._check(int(g_anim.get("total_ms", 0)) > 0
+		and int(g_anim.get("left_ms", 0)) > 0
+		and int(g_anim.get("left_ms", 0)) <= int(g_anim.get("total_ms", 0)),
+		"sim.harvest: okno prace ma total_ms i left_ms (namEReno %s)" % str(g_anim))
+	# Cas se posune za konec prace (`swing_ms` = 1600) - okno musi zmizet.
+	var krok: int = int(g_anim.get("total_ms", 0)) + 50
+	g_clock.advance(krok)
+	t._check(g_system.anim_of(SERIAL).is_empty(),
+		"sim.harvest: pracovni animace po uplynuti okna ZMIZI (ne navzdy)")
+
 	t._check(true, "sim.harvest: case probehl cely (sentinel)")

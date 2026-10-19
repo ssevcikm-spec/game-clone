@@ -187,7 +187,42 @@ func run(t) -> void:
 	t._check(prazdny_text == "(nothing to sell)",
 		"ui.vendor_gump: prazdny seznam rekne '(nothing to sell)' (namEReno '%s')" % prazdny_text)
 
-	# -- G) uvolneni: po `free()` nesmi zustat zadny uzel -----------------
+	# -- G) ZAVRENI OKNA (ZADANI-28, B4) ---------------------------------
+	# Hrac se z okna obchodu NEMOHL DOSTAT: okno nemelo zavreni tlacitkem ani
+	# klavesou (namEReno 2026-10-19: `api_zavri false`, `tlacitko_close false`
+	# a v okne 63 tlacitek, ani jedno "Close"). Meri se API, tlacitko se
+	# signalem, to ze ZAVRENE okno neprijima vstupy a ze jde znovu otevrit.
+	var zavrit: Button = null
+	for uzel in druhe.get_children():
+		if uzel is Button and str(uzel.name) == "Zavrit":
+			zavrit = uzel
+	t._check(zavrit != null and str(zavrit.text) == "Close"
+			and not zavrit.get_signal_connection_list("pressed").is_empty(),
+		"ui.vendor_gump: okno ma tlacitko 'Close' s pripojenym signalem (uzel %s)"
+			% str(zavrit != null))
+	t._check(druhe.je_otevreny() and druhe.zavri() and not druhe.je_otevreny(),
+		"ui.vendor_gump: `zavri()` okno zavre (otevrene %s)" % str(druhe.je_otevreny()))
+	t._check(not druhe.zavri() and druhe.je_zavreny(),
+		"ui.vendor_gump: druhe `zavri()` vraci false (zavreni neni tiche)")
+	# ZAVRENE OKNO NEPRIJIMA VSTUPY: klik na prepinac nic neudela (klik se
+	# posila SIGNALEM tlacitka, presne jako to udela mys).
+	var smer_pred: String = str(druhe.smer())
+	var smer_btn: Button = null
+	for uzel in box.get_children():
+		if uzel is Button and str(uzel.name) == "Smer":
+			smer_btn = uzel
+	if smer_btn != null:
+		smer_btn.pressed.emit()
+	t._check(smer_btn != null and str(druhe.smer()) == smer_pred
+			and druhe.odeber_pozadavek().is_empty(),
+		"ui.vendor_gump: ZAVRENE okno neprijima klik na prepinac (smer '%s', uzel %s)"
+			% [druhe.smer(), str(smer_btn != null)])
+	# Znovu otevrit jde UDALOSTI (data ma SIM) - a data okno i otevrou.
+	var znovu: bool = _otevri(druhe, _buy(), _sell())
+	t._check(znovu and druhe.je_otevreny(),
+		"ui.vendor_gump: okno jde znovu otevrit udalosti `gump_open`")
+
+	# -- H) uvolneni: po `free()` nesmi zustat zadny uzel -----------------
 	var potomek = box.get_child(0)
 	okno.free()
 	druhe.free()

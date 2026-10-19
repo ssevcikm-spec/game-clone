@@ -1083,6 +1083,16 @@ func _setup_player(view) -> void:
 		# Dokonceni P1 (2026-10-12): animace UTOKU (`sim.combat.anim_of`) - bez
 		# toho by postava pri uderu dál jen stála nebo šla.
 		view.set_combat(combat)
+	if view.has_method("set_harvest"):
+		# ZADANI-28 (2026-10-19, B2): PRACOVNI animace tezby/kaceni/rybareni.
+		# Stav je v SIMULACI (`sim.harvest.anim_of`) - klient si okno nepocita
+		# sám (docs/01 §1.5 bod 9). Bez toho hrac pri praci stoji v postoji.
+		view.set_harvest(harvest)
+	if loop != null and loop.input_map != null and view.has_method("co_je_na_screen"):
+		# ZADANI-28 (B3): HIT-TEST kreslenych objektu. Klient posila porad jen
+		# DLAZDICI, ale tu, na ktere stoji NAKRESLENY predmet (art ma offset,
+		# takze geometricky klik na kovadlinu vysel o 2 dlazdice jinam).
+		loop.input_map.hit_test = view.co_je_na_screen
 	if view.has_method("nastav_decay"):
 		view.nastav_decay(decay)
 	# ROZPAD PREDMETU NA ZEMI (M5): kdo predmety poklada, musi to OHLAST
@@ -1099,6 +1109,10 @@ func _setup_player(view) -> void:
 			decay.register(it)
 			hlaseno += 1
 	print("[main] rozpad: registrovanych predmetu na zemi ", hlaseno)
+	# PREKRYV STANIC A PRODEJCE V OBRAZE (ZADANI-28, B5): dlazdice nestacila -
+	# hrac vidi SPRITY a kovar se s vyhni prekryval o 799 px^2. Meri se pri
+	# startu, takze posun stanice nebo zmena artu je VIDET hned.
+	_zkontroluj_prekryv_stanic()
 	controller = get_node_or_null("PlayerController")
 	if controller == null:
 		push_warning("app.main: ve scene chybi uzel PlayerController - hrac se nepohne")
@@ -1483,7 +1497,17 @@ func _postav_vendora(reg) -> int:
 	# Kovar je proto o dlazdici dal (dosah `VENDOR_RANGE` = 2, takze na nej
 	# hrac porad dosahne) a sonda `_analyza/p58-smycka-hracem.gd` meri, ze se
 	# cile interakce na jedne dlazdici NEPREKRYVAJI.
-	var pos := Vector3i(int(player.pos.x) + 2, int(player.pos.y), int(player.pos.z))
+	# ⚠⚠ ZADANI-28 (2026-10-19) - KOVAR PREKRYVAL VYHEN V OBRAZE.
+	# Session D ho posunula na `player.pos + (2, 0)`, cimz prestal stat na
+	# STEJNE DLAZDICI jako vyhen (+1,0) - ale kreslene sprity se porad
+	# PREKRYVALY: namEReno `prekryv_vyhen_px = 799` (kovar 22x61 px na
+	# (1497,1630), vyhen 44x55 px na (1496,1630); hrac to vidi jako "vendor
+	# stoji na vyhni"). Kovar je proto na `player.pos + (1, -1)`: dlazdice je
+	# volna (zadna stanice, zadny balvan, zadny predmet), je 1 dlazdice od
+	# hrace (`VENDOR_RANGE` = 2) a jeho sprite se s vyhni NEPREKRYVA (meri
+	# `_zkontroluj_prekryv_stanic()` pri startu a brana G21).
+	var pos := Vector3i(int(player.pos.x) + 1, int(player.pos.y) - 1,
+		int(player.pos.z))
 	var kovar = MobileScript.new(sim.next_serial(), PLAYER_BODY, pos)
 	kovar.name = "Blacksmith"
 	kovar.ai = {"state": "vendor"}
@@ -1878,7 +1902,9 @@ func _zkontroluj_cile_interakce() -> Array:
 	var zdroje: Array = []
 	for serial in items.keys():
 		var it = items[serial]
-		if it != null and int(it.parent) == 0:
+		# `ve_svete()` (ZADANI-28): "co je na dlazdici" je predmet VE SVETE, ne
+		# spotrebovany objekt po slouceni/prodeji (`amount == 0`).
+		if it != null and it.ve_svete():
 			var role: String = ItemScript.role_of(int(it.tile))
 			if role in ["forge", "anvil"]:
 				zdroje.append({"nazev": role, "tile": Vector2i(int(it.pos.x), int(it.pos.y))})
@@ -1898,6 +1924,86 @@ func _zkontroluj_cile_interakce() -> Array:
 		else:
 			_cile_interakce[klic] = str(z["nazev"])
 	return kolize
+
+
+func _zkontroluj_prekryv_stanic() -> Dictionary:
+	# MERENI PREKRYVU STANIC A PRODEJCE V OBRAZE (ZADANI-28, B5).
+	# Dve veci se musi merit zvlast, protoze hrac vidi obe:
+	#   (1) DLAZDICE (`_zkontroluj_cile_interakce`) - dve veci na jedne dlazdici
+	#       znamena, ze jedna z nich je mrtva (klient posle jen cil),
+	#   (2) SPRITY - i na RŮZNÝCH dlazdicích se kreslene obdelniky mohou
+	#       prekryvat, a presne to hrac videl jako "vendor stoji na vyhni"
+	#       (namEReno 2026-10-19: kovar 22x61 px, vyhen 44x55 px, prusecik
+	#       799 px^2).
+	# Vraci `{prekryv_px: {role: px}, celkem: px}` - nula je MERENA nula;
+	# `-1` znamena NEMERENO (chybi obraz) a nikdy se netvari jako uspech.
+	var out: Dictionary = {"prekryv_px": {}, "celkem": 0}
+	if world_view == null or int(prodejce) <= 0 or registry == null:
+		out["celkem"] = -1
+		print("[main] prekryv stanic: NEMERENO (chybi prodejce nebo world_view)")
+		return out
+	var kovar = registry.get_mobile(int(prodejce))
+	if kovar == null:
+		out["celkem"] = -1
+		return out
+	var o_kovar: Dictionary = world_view.obraz_mobila(int(prodejce))
+	if not bool(o_kovar.get("ok", false)):
+		out["celkem"] = -1
+		print("[main] prekryv stanic: NEMERENO (prodejce nema kresleny obraz: ",
+			str(o_kovar.get("duvod", "")), ")")
+		return out
+	var rect_kovar: Rect2 = o_kovar["rect"]
+	for serial in items.keys():
+		var it = items[serial]
+		if it == null or not it.ve_svete():
+			continue
+		var role: String = ItemScript.role_of(int(it.tile))
+		if not (role in TOOL_TARGET_ROLES):
+			continue
+		var obraz: Dictionary = world_view.obraz_predmetu(int(serial))
+		if not bool(obraz.get("ok", false)):
+			continue
+		var prusecik: Rect2 = rect_kovar.intersection(obraz["rect"] as Rect2)
+		var px: int = int(prusecik.size.x * prusecik.size.y)
+		if px > 0:
+			(out["prekryv_px"] as Dictionary)[role] = px
+			out["celkem"] = int(out["celkem"]) + px
+			push_warning("app.main: prodejce prekryva stanici '" + role + "' o "
+				+ str(px) + " px^2 (viz ZADANI-28 B5)")
+	print("[main] prekryv stanic: ", JSON.stringify(out))
+	return out
+
+
+func _zavri_okna() -> int:
+	# ZAVRENI OKEN (ZADANI-28, B4): hrac se z okna obchodu ani vyroby nemohl
+	# dostat - okna nemela zavreni tlacitkem ani klavesou (namEReno 2026-10-19:
+	# `api_zavri false`, `tlacitko_close false`). Vraci POCET zavrenych oken
+	# (0 = nebylo co zavrit); "zavreno" tak neni tiche.
+	var zavreno: int = 0
+	for okno in [vendor_gump, craft_gump, backpack, skill_list, policy_panel]:
+		if okno == null or not okno.has_method("zavri"):
+			continue
+		if okno.has_method("je_otevreny") and not bool(okno.je_otevreny()):
+			continue
+		if bool(okno.zavri()):
+			zavreno += 1
+	return zavreno
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	# KLAVESA PRO ZAVRENI OKEN (ZADANI-28, B4). `ui_cancel` je akce Godotu pro
+	# Escape (`project.godot` ji nemeni), takze klavesa je v DATEch enginu -
+	# hrac ji vidi v `InputMap` a nemuze se rozejit s kodem.
+	# Kdyz neni co zavrit, udalost se NESPOTREBUJE (Escape ma i jine vyznamy).
+	if not (event is InputEventKey):
+		return
+	var klavesa: InputEventKey = event
+	if not klavesa.pressed or klavesa.echo:
+		return
+	if not klavesa.is_action("ui_cancel"):
+		return
+	if _zavri_okna() > 0:
+		get_viewport().set_input_as_handled()
 
 
 func _hlaseni_do_zurnalu(text: String) -> void:

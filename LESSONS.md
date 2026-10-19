@@ -24,6 +24,67 @@ Typy: `chyba` (moje vada) · `past-nástroje` (prostředí/nástroj, ne logika) 
 
 ---
 
+### 2026-10-19 — PĚT VAD PROŠLO VŠEMI BRANAMI, PROTOŽE BYLY O OBRAZE (chyba)
+**Co se stalo:** hráč po hraní nahlásil pět vad (útok, těžba, klik na výheň
+a kovadlinu, zavření okna, vendor na výhni, ruda na dlaždici) — a **žádnou**
+z nich neviděla sada **2 856 zelených kontrol** ani integrační **G20**.
+Důvod je naměřený: testy volají systémy `sim/` přímo a **nekreslí**; G20 míří
+na **středy dlaždic** (`_mireni` počítá `iso.to_screen`), takže ji klik na
+**kreslený** předmět minul. Vady byly všechny ve vrstvě, kterou nikdo neměřil:
+co je vidět a na co se kliká.
+**Doklad:** sonda `tools/gates/feel_probe.gd` PŘED opravou (naměřeno
+2026-10-19): B1 `animace_hrace().ok = false`, `skupina 9`, `soubor ""` (hráč
+při útoku na 400 ms **zmizel**); B2 všech 10 vzorků pracovního okna s akcí 4
+(postoj) a 1 framem; B3 klik doprostřed kreslené kovadliny poslal
+`(1497,1631)` místo `(1495,1631)`; B4 `api_zavri false`, `tlacitko_close
+false`; B5 `prekryv_vyhen_px = 799` při `kolize 0`; B6 po 6 těžbách **5
+objektů** `iron_ore` s `amount: 0` na dlaždici. Brána G21 tytéž vady po
+opravě měří jako PASS (`tools/gates/check-feel.py`), `--mutace` má **7
+sabotáží** a všechny dávají `exit 1`.
+**Ponaučení:** brána, která měří **stav simulace**, nevidí vadu, která je
+o **obrazu**. Když hráč řekne „není vidět“, musí měřidlo sáhnout na **touž
+funkci, kterou kreslení opravdu používá** (`app.world_view.animace_hrace`,
+`obraz_predmetu`, `co_je_na_screen`) — ne na její domněnku. A klik se měří
+**na kreslený sprite**, ne na střed dlaždice.
+**Kde:** `tools/gates/feel_probe.gd`, `tools/gates/check-feel.py` (G21),
+`app/world_view.gd` (`animace_hrace`, `co_je_na_screen`, `_svih_info`),
+`docs/08 §8.2` (řádek G21), `ZADANI-28-HRAC-2026-10-19.md`.
+
+### 2026-10-19 — „PODSOUČÁSTI ZELENÉ“ SE OPRAVILO JEN PRO DLÁŽDICE (chyba)
+**Co se stalo:** G20 (2026-10-19) vznikla proto, že podsoučásti byly zelené
+a smyčka rozbitá — a opravila to **command cestou a klikem na tlačítka**.
+O hodinu později hráč našel pět vad, které prošly i jí. Chyba nebyla v tom,
+že by G20 byla špatná, ale v tom, že se „cesta hráče“ pochopila jako
+**dlaždice + tlačítka**, zatímco hráč jde po **pixelech, animacích a oknech**.
+**Doklad:** `tools/gates/loop_probe.gd:_mireni` počítá `iso.to_screen(tile)`
+(střed dlaždice) — naměřeno, že klik na kreslenou kovadlinu posílá o 2 dlaždice
+jinam; `.tmp/beh2-feel-1.log` (před opravou) vs `.tmp/beh2-feel-6.log` (po).
+**Ponaučení:** když se „cesta hráče“ přidá jako brána, musí se **vyjmenovat
+její vrstvy** (command / klik na uzel / klik na pixel / klávesa) a každá
+dostane svůj důkaz. Jinak vznikne dojem, že „cesta hráče je změřená“, a další
+vada projde stejně jako předtím.
+**Kde:** `docs/08 §8.2` (G20 vs G21 a proč jsou dvě), `tools/gates/`.
+
+### 2026-10-19 — CHYBĚJÍCÍ SKUPINA ANIMACE SE NESMÍ TVÁŘIT JAKO „NENÍ SPRITE“ (past-nástroje)
+**Co se stalo:** manifest `assets/uo/anim/anim-sheets.json` má u těla 400
+`groups.attack = 9`, ale export skupinu 9 **nemá** (exportuje 0/2/4/21).
+`render/anim_player.play()` proto vrátilo `ok:false`, `app/world_view._draw_player`
+nastavil `player_missing` a **postavu vůbec nenakreslil** — hráč to viděl jako
+„při útoku zmizím“ / „není animace útoku“.
+**Doklad:** `feel_probe.gd` před opravou: `animace_hrace()` = `{ok:false,
+skupina 9, soubor ""}`; po opravě `{ok:true, skupina 0, fallback true,
+soubor "assets/own-v3/anim/ownv3-400-0-1.png"}` a během 400 ms se vystřídá
+**7 framů** + kreslený svih (`.tmp/beh2-feel-6.log`). Test
+`tests/cases/render_anim.gd` 6b to měří **proti manifestu** (kdyby export
+skupinu jednou měl, čeká opak).
+**Ponaučení:** `ok:false` z animace nesmí znamenat „nekresli postavu“ — musí
+znamenat „zkus dostupné framy“. A fallback se musí **přiznat**
+(`pouzit_fallback()`), aby se k němu dalo něco dokreslit; jinak je z útoku
+„jiná chůze“ a hráč to nepozná.
+**Kde:** `render/anim_player.gd` (`GROUP_FALLBACK`, `pouzit_fallback`,
+`skupina_pro`), `render/swing.gd`, `app/world_view.gd` (`_svih_info`,
+`_kresli_svih`), `docs/04 §4.6.8`.
+
 ### 2026-10-19 — BRÁNA PROŠLA NA VADĚ, KVIRU VZNIKLA (chyba)
 **Co se stalo:** G20 vznikla proto, že se hráč nedostal k prodeji (okno obchodu
 nemělo přepínač na prodej). Sonda ale volala `vendor_gump.nastav_smer(...)`
