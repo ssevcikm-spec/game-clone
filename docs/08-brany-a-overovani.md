@@ -153,8 +153,13 @@ Co G20 dělá:
   * **KLIK** (kroky 3–4): sonda najde **skutečný `Button` uzel** v okně
     („Smer", řádek s výrobkem / řádek receptu, „Potvrdit"), ověří, že má
     připojený signál `pressed` (`get_signal_connection_list`), a **signál vyšle**
-    (`pressed.emit()`) — přesně to, co udělá kliknutí myší. **Handler se nikdy
-    nevolá přímo**; výsledek se čte z okna (`smer()`, `mnozstvi()`, počet řádků).
+    (`pressed.emit()`); **handler se nikdy nevolá přímo** a výsledek se čte
+    z okna (`smer()`, `mnozstvi()`, počet řádků). **Mez (naměřeno nezávislou
+    re-verifikací 2026-10-19):** sonda **nekontroluje klikatelnost** tlačítka
+    (viditelnost, `mouse_filter`, `disabled`, velikost) — na kopii s
+    `visible=false` i s `MOUSE_FILTER_IGNORE` brána prošla (`exit 0`).
+    Skutečná myš/`InputEventMouseButton` cesta se neměří; je to otevřený bod
+    **N1** v `HANDOFF.md`.
   * Sonda **nikdy** nevolá akční systémy `sim/` (`sim.harvest.mine`,
     `sim.craft.smelt`, `sim.vendor.sell`) — jinak by měřila totéž co testy.
     Ze `sim/` sahá jen na `sim.enqueue`, `sim.tick` (tikání) a čtení

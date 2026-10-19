@@ -69,6 +69,8 @@ opravené a znovu naměřené (tabulka výše):
 
 **Co zůstává otevřené:** G20 měří jednu cestu (ne nákup), `--snimky` není v CI,
 `prekryv` se nehlídá a sonda zvedá skilly na 1000 (průchodnost, ne balance).
+Navíc **N1–N5 z nezávislé re-verifikace** (2026-10-19) — viz oddíl
+„⚠ CO ZŮSTÁVÁ OTEVŘENÉ“ níž.
 
 ## 🚧 CO ODHALILA PRÁCE (obojí naměřeno, obojí v `LESSONS.md`)
 
@@ -95,6 +97,19 @@ opravené a znovu naměřené (tabulka výše):
 5. **V pracovním stromě zůstalo 71 untracked souborů** z předchozích session
    (`.uid`, `assets/cobble/`…). Nemažu, nestaguji, needituji — můj commit obsahuje
    jen soubory této session.
+6. **N1 (střední, mezera v důkazu kliku):** sonda vyšle signál `pressed`, ale
+   **nekontroluje klikatelnost** tlačítka (viditelnost, `mouse_filter`, `disabled`,
+   velikost). Naměřeno nezávislou re-verifikací 2026-10-19: na kopii s
+   `visible=false` i s `MOUSE_FILTER_IGNORE` brána prošla (`exit 0`). Skutečná
+   myš/`InputEventMouseButton` cesta se neměří. Doporučení: ověřit
+   `is_visible_in_tree()`/`mouse_filter`/`disabled`/rozměr před emitováním (nebo
+   poslat skutečný `InputEventMouseButton` do středu `get_global_rect()`).
+7. **N2/N3 (malé):** `tlacitko_chyba` se přepisuje (při víc chybějících tlačítkách
+   zůstane poslední zpráva); `zurnal_nove` nese jen prvních 12 zpráv, ale boolean
+   `zurnal_klice` se počítá ze všech → možné falešné červené, kdyby hledané slovo
+   bylo až za 12. zprávou (dnes neškodí — slovo je na pozicích 0–11).
+8. **N5 (nuance):** `tlacitko_*`/`signal_*` jsou v JSONu brány jen v `notes`, ne
+   v `measured` — strojový konzument čtoucí jen `measured` důkaz o kliku neuvidí.
 
 ## 🧍 CO ČEKÁ NA TEBE
 

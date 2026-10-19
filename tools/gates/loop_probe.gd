@@ -44,7 +44,7 @@ extends SceneTree
 #
 # SNIMKY: `--snimky=<cesta>` (user args, napr. `-- --snimky=res://.tmp/g20`).
 # V headless se snimek ULOZIT NEDA - `root.get_texture().get_image()` vrati null
-# (namEReno 2026-10-12: `ERROR: Parameter "t" is null`, obraz null). Sonda to
+# (namEReno 2026-10-19: `ERROR: Parameter "t" is null`, obraz null). Sonda to
 # REKNE (`snimky_chyba`), nez aby mlcela: "0 snimku" nesmi vypadat jako uspech.
 #
 # Spousteni (mereni bez snimku, to pouziva brana):
