@@ -107,7 +107,7 @@ takže číslo není stabilní. Proto se v tomhle bloku „3 884“ **nepoužív
 
 ## 🔗 COMMITY TÉHLE SESSION
 
-`<COMMIT>` — `app/world_view.gd`, `tools/gates/feel_probe.gd`,
+`06b3f31` — `app/world_view.gd`, `tools/gates/feel_probe.gd`,
 `tools/gates/check-feel.py`, `docs/04-architektura-a-smlouvy.md`,
 `docs/08-brany-a-overovani.md`, `ZADANI-28-HRAC-2026-10-19.md`, `HANDOFF.md`.
 Push ověřen: `git rev-list --count origin/main..HEAD` = **0**.
