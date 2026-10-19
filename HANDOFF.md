@@ -1,4 +1,4 @@
-# Předání — game-clone (2026-10-19, SESSION „BĚH 2“: PĚT VAD Z REÁLNÉHO HRANÍ — B1–B6 + BRÁNA G21)
+﻿# Předání — game-clone (2026-10-19, SESSION „BĚH 2“: PĚT VAD Z REÁLNÉHO HRANÍ — B1–B6 + BRÁNA G21)
 
 > **Co je tenhle soubor:** **stav projektu** pro další session agenta. Přepisuje
 > se celý; historie je v `git log`. Nový blok je vždy **nahoře**; starší bloky se
@@ -92,7 +92,7 @@ kreslí svih, jak funguje hit-test (3 priority) a co je „předmět ve světě�
 
 ## 🔗 COMMITY TÉHLE SESSION
 
-**`<HASH>`** — `app/main.gd`, `app/world_view.gd`, `app/input_map.gd`,
+**`2e3e329`** — `app/main.gd`, `app/world_view.gd`, `app/input_map.gd`,
 `render/anim_player.gd`, `render/swing.gd`, `sim/entity/item.gd`,
 `sim/systems/harvest.gd`, `sim/systems/craft.gd`, `sim/systems/combat.gd`,
 `ui/vendor_gump.gd`, `ui/craft_gump.gd`, `tools/gates/feel_probe.gd`,
