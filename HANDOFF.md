@@ -96,6 +96,19 @@ takže číslo není stabilní. Proto se v tomhle bloku „3 884“ **nepoužív
    nemažu, nestaguji (commit této session je jen 7 vyjmenovaných souborů).
 6. **`G10` upozorňuje, že snímek je starší než kód kreslení** — beze změny.
 
+## 🔁 PO RE-VERIFIKACI BĚHU 3 (2026-10-20) — otevřené body N-1…N-9
+
+Re-verifikátor potvrdil **R1–R4 = PASS** (nezávisle reprodukované; regrese 2 874/0, run-all 20/0/0, G8/G9 beze změny) a našel tyto další body. **Žádný nemění chování hry**, kromě **N-8** (viditelná vada hry). Nejsou opravené — jsou pojmenované pro další session.
+
+1. **N-1 (střední, doložená falešná zelená G21):** vypnuté `draw_texture` v `_draw_player` **jen pro akci 2** (útok — přesně původní B1 „hráč zmizel“) → G21 **`exit 0`** a hlásí „framy 8, svih NAKRESLENO 8“. Sprite hráče se v bráně neověřuje; `hrac.ok/soubor` se čte z `world_view.animace_hrace()` (modul), ne z kreslení. Totéž „nekreslí se vůbec“ → `exit 0`.
+2. **N-2 (střední):** střídání framů se měří **synteticky** — `_draw_player` se `_klip(...,0)` (zamrzlý frame 0) → G21 `exit 0` s „framy 8“; sonda vzorkuje `animace_hrace(t)` s budoucími časy bez tiku.
+3. **N-3 (latentní):** `svih_nakresleno_max` je součet **přes entity v jednom framu**, ne per-serial. Dnes neobejitelné (potlačení jen hráčova svihu dá 0/0), ale mělo by být pojmenované.
+4. **N-4/N-5 (dokumentace):** `docs/08` řádek G21 — „okno **vyprší**“ u B2 měří unit test, **ne G21**; jméno `svih_nakresleno()` vs. skutečné `svih_nakresleno_max()`. *(Opraveno v tomhle commitu.)*
+5. **N-6/N-7/N-9 (dokumentace):** „geometrie 3 / nakresleno 8“ jsou **různé okamžiky** (ne týž frame); panel barvy `(15,15,15)` je i v zavřeném snímku (2 287 px), ne „jen v otevřeném“; `svih_draw_framu = 0` vrací **VADA (exit 1)** s textem SLEPE, ne NEMĚŘENO (exit 2) — fail-closed, ale trojstavová sémantika nesedí.
+6. **N-8 (vada HRY, pre-existing):** mrtvola má jmenovku **„<null>“** — `app/world_view.gd:611` předává `str(it.get("name"))`, ale `sim/entity/item.gd` pole `name` nemá (`str(null) == "<null>"`), a `render/name_plates.gd:118-127` kreslí každé neprázdné jméno. Vidět na `.tmp/beh3/feel/b4-po-esc.png` nad mrtvolou krysy. Oprava: jméno těla brát z `sim.decay`/těla („corpse of rat“) nebo prázdné jméno nekreslit.
+
+**Doporučení pro další session (v tomto pořadí):** N-8 opravit + test (hráč to vidí) → N-1/N-2 doměřit (počítadlo nakresleného spritu + reálné střídání framů v čase) → N-3 pojmenovat/omezit → N-6/N-7/N-9 srovnat v dokumentaci.
+
 ## 🧍 CO ČEKÁ NA TEBE
 
 1. **Zahraj si to znovu** (chování hry se neměnilo, ale ověřit se má): útok
