@@ -74,9 +74,10 @@ uměla jen sonda, ne hra — a zelené testy to nechytily, protože volají syst
 
 ## 🔗 COMMITY TÉHLE SESSION
 
-**`<HASH>`** — `tools/gates/loop_probe.gd`, `tools/gates/check-loop.py`,
+**`193c8fd`** — `tools/gates/loop_probe.gd`, `tools/gates/check-loop.py`,
 `tools/gates/run-all.py`, `docs/07-granule-a-milniky.md`,
-`docs/08-brany-a-overovani.md`, `LESSONS.md`, `HANDOFF.md`.
+`docs/08-brany-a-overovani.md`, `LESSONS.md`, `HANDOFF.md` (hash doplněn
+navazujícím commitem `docs(handoff)` — vlastní hash v sobě mít nemůže).
 Push ověřen: `git rev-list --count origin/main..HEAD` = **0**.
 
 ---
