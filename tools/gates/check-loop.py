@@ -14,13 +14,19 @@ Brana spusti REALNOU scenu pres `tools/gates/loop_probe.gd` a pozaduje:
     v zurnalu A ocekavane slovo v ni ("gather", "smelt", "create", "sell"),
   * konkretni hodnoty: ruda 0 -> >0, ingoty 0 -> >=3, dyka 0 -> >0,
     zlato se ZVYSI a dyka z batohu ZMIZI,
-  * cesta pres klienta: prikaz kazdeho kroku je `interact` s cilem
-    `{kind:"tile"}` (ne prime volani systemu `sim/`).
+  * cestu hrace: prikaz tezby je `interact` s cilem `{kind:"tile"}` (ne prime
+    volani akcnich systemu `sim/`) a kroky 3 a 4 jdou KLIKEM na skutecne
+    `Button` uzly oken (`tlacitko_*`) se pripojenym signalem (`signal_*`);
+    bez nich krok neprojde - jinak by brana prosla i na kopye, kde je
+    `Button` nahrazeny `Label` (presne historicka vada, kvuli ktere vznikla).
 
-SNIMKY (vizualni dokaz, `--snimky`): sonda umi ulozit 3-4 PNG. V headless to
-NEJDE - `root.get_texture().get_image()` vrati null (namEReno 2026-10-12), proto
-`--snimky` spusti sondu v okne (`--rendering-driver opengl3`) a PNG zkontroluje
-(vic nez 10 kB, platna hlavicka PNG, aspon 2 ruzne snimky). Bez `--snimky` se
+SNIMKY (vizualni dokaz, `--snimky`): sonda umi ulozit 3-4 PNG; brana vyzaduje
+ALESPOŇ 2 ruzne (`MIN_SNIMKU`). V headless to NEJDE - `root.get_texture().
+get_image()` vrati null (namEReno 2026-10-19), proto `--snimky` spusti sondu
+v okne (`--rendering-driver opengl3`) a PNG zkontroluje (vic nez 10 kB, platna
+hlavicka PNG, aspon 2 ruzne snimky). Kdyz je `--snimky` pozadano, brana
+VYZADUJE `snimky_zadany == true`, prazdne `snimky_chyba` a >= MIN_SNIMKU
+snimku - jinak je to VADA (fail-closed, ne "nemereno"). Bez `--snimky` se
 snimky NEMERI a brana to rekne (`snimky: nemereno`), nikdy netvrdi uspech.
 
 NEMERENO (ne zelena): chybi-li sonda nebo Godot.
@@ -92,8 +98,28 @@ def _cislo(slovnik: dict, klic: str) -> int:
         return 0
 
 
-def chyby_z_mereni(d: dict) -> list[str]:
-    """Verdikt z jednoho mereni - pouziva ho brana, self-test i mutace."""
+def _tlacitko_chyba(krok: str, hodnoty: dict, jmeno: str, popis: str) -> str:
+    """Vada D1: krok musi projit KLIKEM na skutecne `Button` (a mit `pressed`).
+
+    Sonda hlasi `tlacitko_<jmeno>` (nasla Button uzel) a `signal_<jmeno>`
+    (má pripojeny `pressed`). Kdyz chybi kterekoli, hrac se ke kroku nedostane
+    kliknutim - i kdyby ho sonda umela zavolat bokem.
+    """
+    tl = bool(hodnoty.get(f"tlacitko_{jmeno}", False))
+    sg = bool(hodnoty.get(f"signal_{jmeno}", False))
+    if tl and sg:
+        return ""
+    return (f"{krok}: {popis} neni kliknute skutecne tlacitko "
+            f"(tlacitko_{jmeno}={tl}, signal_{jmeno}={sg}; "
+            f"sonda: {hodnoty.get('tlacitko_chyba', '') or 'bez udani'})")
+
+
+def chyby_z_mereni(d: dict, snimky_zadano: bool = False) -> list[str]:
+    """Verdikt z jednoho mereni - pouziva ho brana, self-test i mutace.
+
+    `snimky_zadano` = uzivatel pozadal o `--snimky`; pak se snimky VYZADUJI
+    (fail-closed). Bez toho se snimky nemeri a brana to jen poznamena.
+    """
     if not d.get("nalezeno", False):
         return ["ze sondy nelze precist SOUHRN (sonda neprobihla nebo spadla)"]
     data = d["data"]
@@ -121,10 +147,17 @@ def chyby_z_mereni(d: dict) -> list[str]:
         if _cislo(z, "zurnal_po") <= _cislo(z, "zurnal_pred"):
             chyby.append(f"krok {krok}: hrac nevidel ZADNOU zpravu v zurnalu "
                          f"({_cislo(z, 'zurnal_pred')} -> {_cislo(z, 'zurnal_po')})")
-        if not bool(z.get("zurnal_klice", False)):
-            chyby.append(f"krok {krok}: v zurnalu neni '{z.get('zurnal_hledany', '?')}' "
-                         f"(hrac nema jak poznat, co se stalo); zpravy: "
-                         + " | ".join(str(x) for x in (z.get("zurnal_nove") or [])[:3]))
+        # Slovo se overuje Z TEXTU zprav, ne z booleana sondy: boolean muze
+        # tvrdit `true` a text ho nemit (a naopak) - pak je to VADA.
+        hledany = str(z.get("zurnal_hledany", "")).strip().lower()
+        nove = [str(x) for x in (z.get("zurnal_nove") or [])]
+        textem = bool(hledany) and any(hledany in radek.lower() for radek in nove)
+        sonda_tvrdi = bool(z.get("zurnal_klice", False))
+        if not sonda_tvrdi or not textem:
+            chyby.append(f"krok {krok}: v zurnalu neni '{hledany or '?'}' "
+                         f"(textem: {'ano' if textem else 'ne'}, sonda tvrdi: "
+                         f"{sonda_tvrdi}); zpravy: "
+                         + " | ".join(nove[:3]))
 
     tezba = podle["tezba"].get("hodnoty", {})
     if str(tezba.get("prikaz", "")) != "interact":
@@ -153,6 +186,9 @@ def chyby_z_mereni(d: dict) -> list[str]:
     if not bool(vyroba.get("kliknuto", False)):
         chyby.append(f"vyroba: recept {vyroba.get('recept', '?')} v okne neni "
                      f"(receptu {vyroba.get('receptu', 0)})")
+    ch = _tlacitko_chyba("vyroba", vyroba, "recept", "radek receptu")
+    if ch:
+        chyby.append(ch)
 
     prodej = podle["prodej"].get("hodnoty", {})
     if _cislo(prodej, "zlato_po") <= _cislo(prodej, "zlato_pred"):
@@ -160,6 +196,12 @@ def chyby_z_mereni(d: dict) -> list[str]:
                      f"({_cislo(prodej, 'zlato_pred')} -> {_cislo(prodej, 'zlato_po')})")
     if not bool(prodej.get("prepnuto_na_sell", False)):
         chyby.append("prodej: okno obchodu neslo prepnout na 'sell'")
+    for jmeno, popis in (("smer", "prepinac 'Smer'"),
+                         ("radek", "radek s vyrobkem"),
+                         ("potvrdit", "tlacitko 'Potvrdit'")):
+        ch = _tlacitko_chyba("prodej", prodej, jmeno, popis)
+        if ch:
+            chyby.append(ch)
     if _cislo(prodej, "dyka_po") >= _cislo(prodej, "dyka_pred"):
         chyby.append(f"prodej: dyka zustala v batohu "
                      f"({_cislo(prodej, 'dyka_pred')} -> {_cislo(prodej, 'dyka_po')})")
@@ -172,11 +214,24 @@ def chyby_z_mereni(d: dict) -> list[str]:
     if _cislo(data, "zurnal_celkem") <= 0:
         chyby.append("zurnal: hrac nevidel ani jednu zpravu")
 
-    if bool(data.get("snimky_zadany", False)):
-        snimky = data.get("snimky") or []
+    snimky = data.get("snimky") or []
+    if snimky_zadano:
+        # FAIL-CLOSED (vada D3): `--snimky` je pozadavek na DUKAZ, takze sonda
+        # musi potvrdit, ze snimky chtela, nesmi mit chybu a musi jich byt
+        # aspon MIN_SNIMKU. Kdyz sonda adresar nevytvori, vynuluje `_snimky_dir`
+        # a posle `snimky_zadany:false` - to je VADA, ne "nemereno".
+        if not bool(data.get("snimky_zadany", False)):
+            chyby.append("snimky: pozadovany, ale sonda hlasi snimky_zadany=false "
+                         f"(sonda: {data.get('snimky_chyba', '') or 'bez udani'})")
+        if str(data.get("snimky_chyba", "")) != "":
+            chyby.append("snimky: sonda hlasi chybu: " + str(data["snimky_chyba"]))
         if len(snimky) < MIN_SNIMKU:
-            chyby.append(f"snimky: zadane, ale ulozeno {len(snimky)} "
-                         f"(chyba: {data.get('snimky_chyba', '')})")
+            chyby.append(f"snimky: pozadovany, ale ulozeno {len(snimky)} "
+                         f"(minimum {MIN_SNIMKU}; chyba: "
+                         f"{data.get('snimky_chyba', '')})")
+    elif bool(data.get("snimky_zadany", False)) and len(snimky) < MIN_SNIMKU:
+        chyby.append(f"snimky: sonda je vykazala, ale ulozeno {len(snimky)} "
+                     f"(minimum {MIN_SNIMKU}; chyba: {data.get('snimky_chyba', '')})")
     return chyby
 
 
@@ -234,6 +289,11 @@ def _vystup_pro_gate(gate: Gate, d: dict) -> None:
         gate.note(f"  zurnal {krok.get('zurnal_pred')} -> {krok.get('zurnal_po')}"
                   f" (hledany '{krok.get('zurnal_hledany')}' "
                   f"{'NALEZEN' if krok.get('zurnal_klice') else 'NENALEZEN'})")
+        hod = krok.get("hodnoty", {}) if isinstance(krok.get("hodnoty"), dict) else {}
+        tlacitka = {k: v for k, v in hod.items()
+                    if str(k).startswith(("tlacitko_", "signal_"))}
+        if tlacitka:
+            gate.note(f"  tlacitka: {json.dumps(tlacitka, ensure_ascii=False)}")
         for radek in (krok.get("zurnal_nove") or [])[:4]:
             gate.note(f"    zurnal: {radek}")
     inv = data.get("inv", {})
@@ -296,7 +356,7 @@ def check(root: Path, gate: Gate, snimky_dir: Path | None = None) -> None:
     _vystup_pro_gate(gate, d)
     if rc != 0:
         gate.error(f"sonda skončila s exit {rc} (výstup se čte i přesto)")
-    for ch in chyby_z_mereni(d):
+    for ch in chyby_z_mereni(d, snimky_zadano=snimky_dir is not None):
         gate.error(ch)
     if snimky_dir is not None:
         snimky = [str(s) for s in (d["data"].get("snimky") or [])]
@@ -318,74 +378,124 @@ def selftest() -> int:
         "inv": {"ruda": 1, "ingot": 4, "dyka": 0, "zlato": 70, "hp": 83, "hp_max": 87},
         "kroky": [
             {"id": "tezba", "ok": True, "zurnal_pred": 12, "zurnal_po": 33,
-             "zurnal_klice": True, "zurnal_hledany": "gather", "zurnal_nove": ["You gather some iron."],
+             "zurnal_klice": True, "zurnal_hledany": "gather",
+             "zurnal_nove": ["You gather some iron ore."],
              "hodnoty": {"ruda_pred": 0, "ruda_po": 8, "prikaz": "interact",
                          "cil": '{ "kind": "tile", "x": 1496, "y": 1631, "z": 10 }'}},
             {"id": "taveni", "ok": True, "zurnal_pred": 33, "zurnal_po": 35,
-             "zurnal_klice": True, "zurnal_hledany": "smelt", "zurnal_nove": [],
+             "zurnal_klice": True, "zurnal_hledany": "smelt",
+             "zurnal_nove": ["You smelt 2 iron ingots."],
              "hodnoty": {"ingot_pred": 0, "ingot_po": 7}},
             {"id": "vyroba", "ok": True, "zurnal_pred": 35, "zurnal_po": 38,
-             "zurnal_klice": True, "zurnal_hledany": "create", "zurnal_nove": [],
+             "zurnal_klice": True, "zurnal_hledany": "create",
+             "zurnal_nove": ["You create a dagger."],
              "hodnoty": {"dyka_pred": 0, "dyka_po": 1, "okno_otevrene": True,
-                         "kliknuto": True, "recept": 114, "receptu": 196}},
+                         "kliknuto": True, "recept": 114, "receptu": 196,
+                         "tlacitko_recept": True, "signal_recept": True,
+                         "tlacitko_chyba": ""}},
             {"id": "prodej", "ok": True, "zurnal_pred": 38, "zurnal_po": 39,
-             "zurnal_klice": True, "zurnal_hledany": "sell", "zurnal_nove": [],
+             "zurnal_klice": True, "zurnal_hledany": "sell",
+             "zurnal_nove": ["You sell a dagger for 10 gold."],
              "hodnoty": {"zlato_pred": 60, "zlato_po": 70, "dyka_pred": 1, "dyka_po": 0,
-                         "prepnuto_na_sell": True}},
+                         "prepnuto_na_sell": True,
+                         "tlacitko_smer": True, "signal_smer": True,
+                         "tlacitko_radek": True, "signal_radek": True,
+                         "tlacitko_potvrdit": True, "signal_potvrdit": True,
+                         "tlacitko_chyba": ""}},
         ],
     }
 
     def kopie():
         return json.loads(json.dumps(dobry))
 
-    pripady: list[tuple[str, dict, int]] = []
-    pripady.append(("vsechno_proslo", dobry, 0))
+    # (jmeno, mereni, ocekavany pocet chyb, zada se --snimky)
+    pripady: list[tuple[str, dict, int, bool]] = []
+    pripady.append(("vsechno_proslo", dobry, 0, False))
 
     z = kopie()
     z["kroky"][3]["hodnoty"]["zlato_po"] = 60          # prodej nic nevydelal
     z["kroky"][3]["hodnoty"]["dyka_po"] = 1            # a dyka zustala
     z["kroky"][3]["ok"] = False
-    pripady.append(("prodej_nefunguje", z, 3))
+    pripady.append(("prodej_nefunguje", z, 3, False))
 
     z = kopie()
     z["kroky"][0]["hodnoty"]["ruda_po"] = 0            # tezba nic nevytEZila
     z["kroky"][0]["ok"] = False
     z["kroky"][0]["zurnal_klice"] = False
-    pripady.append(("tezba_nefunguje", z, 3))
+    pripady.append(("tezba_nefunguje", z, 3, False))
 
     z = kopie()
     z["kroky"][2]["hodnoty"]["okno_otevrene"] = False   # okno vyroby se neotevrelo
     z["kroky"][2]["hodnoty"]["dyka_po"] = 0
     z["kroky"][2]["ok"] = False
-    pripady.append(("okno_vyroby_se_neotevrelo", z, 3))
+    pripady.append(("okno_vyroby_se_neotevrelo", z, 3, False))
 
     z = kopie()
     z["kroky"].pop(2)                                   # krok vubec chybi
-    pripady.append(("krok_chybi", z, 2))
+    pripady.append(("krok_chybi", z, 2, False))
 
     z = kopie()
     z["kroky"][1]["zurnal_po"] = z["kroky"][1]["zurnal_pred"]   # zadna zprava
     z["kroky"][1]["zurnal_klice"] = False
-    pripady.append(("zurnal_mlci", z, 2))
+    pripady.append(("zurnal_mlci", z, 2, False))
 
     z = kopie()
     z["kroky"][0]["hodnoty"]["prikaz"] = "mine"          # obchazeni klienta
-    pripady.append(("obchazeni_klienta", z, 1))
+    pripady.append(("obchazeni_klienta", z, 1, False))
+
+    # Vada D4: boolean tvrdi "slovo je v zurnalu", ale TEXT ho neobsahuje.
+    z = kopie()
+    z["kroky"][1]["zurnal_klice"] = True
+    z["kroky"][1]["zurnal_nove"] = ["Nothing happens here."]
+    pripady.append(("zurnal_boolean_lze", z, 1, False))
+
+    # Vada D1: tlacitko existuje, ale nema pripojeny signal -> klik nic neudela.
+    z = kopie()
+    z["kroky"][3]["hodnoty"]["signal_smer"] = False
+    z["kroky"][3]["hodnoty"]["tlacitko_chyba"] = "Button 'Smer' nema signal 'pressed'"
+    pripady.append(("tlacitko_odpojene", z, 1, False))
+
+    # Vada D1b: v okne neni Button vubec (historicka vada: Button -> Label).
+    z = kopie()
+    z["kroky"][3]["hodnoty"]["tlacitko_smer"] = False
+    z["kroky"][3]["hodnoty"]["signal_smer"] = False
+    z["kroky"][3]["hodnoty"]["tlacitko_chyba"] = "v okne obchodu neni Button 'Smer'"
+    pripady.append(("tlacitko_chybi", z, 1, False))
+
+    z = kopie()
+    z["kroky"][2]["hodnoty"]["tlacitko_recept"] = False
+    z["kroky"][2]["hodnoty"]["signal_recept"] = False
+    pripady.append(("recept_bez_tlacitka", z, 1, False))
+
+    # Vada D3: --snimky pozadano, ale sonda adresar nevytvorila -> vsechno false.
+    z = kopie()
+    z["snimky_zadany"] = False
+    z["snimky"] = []
+    z["snimky_chyba"] = "adresar pro snimky nejde vytvorit (19)"
+    pripady.append(("snimky_se_nevykazaly", z, 3, True))
+
+    z = kopie()
+    z["snimky_zadany"] = True
+    z["snimky"] = ["res://.tmp/a.png", "res://.tmp/b.png"]
+    z["snimky_chyba"] = "viewport nema obraz (headless)"
+    pripady.append(("snimky_hlasi_chybu", z, 1, True))
 
     z = kopie()
     z["snimky_zadany"] = True
     z["snimky"] = ["res://.tmp/a.png"]
-    pripady.append(("snimky_chybi", z, 1))
+    pripady.append(("snimky_chybi", z, 1, True))
 
     chyb = 0
-    for jmeno, mereni, ocekavano in pripady:
-        vyslo = len(chyby_z_mereni({"nalezeno": True, "data": mereni}))
+    for jmeno, mereni, ocekavano, snimky_zadano in pripady:
+        vyslo = len(chyby_z_mereni({"nalezeno": True, "data": mereni},
+                                   snimky_zadano=snimky_zadano))
         ok = vyslo == ocekavano
         chyb += 0 if ok else 1
         print(f"[{NAME}] self-test {jmeno}: ocekavano {ocekavano} chyb, vyslo {vyslo}"
               f" {'OK' if ok else 'CHYBA'}")
         if not ok:
-            for ch in chyby_z_mereni({"nalezeno": True, "data": mereni}):
+            for ch in chyby_z_mereni({"nalezeno": True, "data": mereni},
+                                     snimky_zadano=snimky_zadano):
                 print(f"[{NAME}]   duvod: {ch}")
     # Sonda, ktera nic nenahlasila, nesmi projit.
     vyslo = len(chyby_z_mereni({"nalezeno": False}))
@@ -399,16 +509,46 @@ def selftest() -> int:
 
 # -- mutace: dokaz, ze brana UMI selhat ---------------------------------------
 
-# Co se v sabotovane kopii rozbije. Kazda polozka = (jmeno, soubor, def main,
-# radek k vlozeni). Vkladany radek je EARLY RETURN, ktery system vypne - presne
-# to, co by udelala vada v kodu.
-SABOTAZE: list[tuple[str, str, str, str]] = [
-    ("prodej_vypnuty", "sim/systems/vendor.gd",
-     "func sell(m: int, v: int, lines: Array) -> Dictionary:",
-     '\treturn _fail("sabotaz")'),
-    ("tezba_vypnuta", "sim/systems/harvest.gd",
-     "func _harvest(kind: String, m: int, x: int, y: int) -> Dictionary:",
-     '\treturn _fail(kind, "sabotaz")'),
+SMAZ_FUNKCI = "<SMAZ_FUNKCI>"
+# Jedna sabotaz = jeden beh brany na kopii. Kdyz se brana na kopii zasekne,
+# je to chyba mutace (ne "vadu nevidela") a ceka se na ni jen takhle dlouho.
+MUTACE_TIMEOUT = 600
+
+# Co se v sabotovane kopii rozbije. Kazda sabotaz = seznam zmen
+# `(soubor, hledat, nahradit)`; prazdne `nahradit` znamena "smaz", sentinel
+# `SMAZ_FUNKCI` znamena "smaz celou funkci od radku s hlavickou".
+SABOTAZE: list[tuple[str, list[tuple[str, str, str]]]] = [
+    # 1) vypnuty system: early return na zacatku funkce
+    ("prodej_vypnuty", [(
+        "sim/systems/vendor.gd",
+        "func sell(m: int, v: int, lines: Array) -> Dictionary:",
+        "func sell(m: int, v: int, lines: Array) -> Dictionary:\n\treturn _fail(\"sabotaz\")",
+    )]),
+    ("tezba_vypnuta", [(
+        "sim/systems/harvest.gd",
+        "func _harvest(kind: String, m: int, x: int, y: int) -> Dictionary:",
+        "func _harvest(kind: String, m: int, x: int, y: int) -> Dictionary:\n"
+        "\treturn _fail(kind, \"sabotaz\")",
+    )]),
+    # 2) HISTORICKA VADA (session D): okno obchodu melo misto `Button` jen `Label`
+    # a prodej se dal udelat jen bokem pres API - presne vada, kvuli ktere G20
+    # vznikla. Sabotaz ji vraci: `Button` -> `Label` a odstranene handlery
+    # u vsech tri tlacitek (Smer, radek, Potvrdit) i u radku receptu.
+    # Sonda, ktera macka skutecna tlacitka, to MUSI videt (exit 1).
+    ("historicka_vada_button_label", [
+        ("ui/vendor_gump.gd", "var popis := Button.new()", "var popis := Label.new()"),
+        ("ui/vendor_gump.gd", "func _on_smer_pressed() -> void:", SMAZ_FUNKCI),
+        ("ui/vendor_gump.gd", "\tpopis.pressed.connect(_on_smer_pressed)\n", ""),
+        ("ui/vendor_gump.gd", "var tlacitko := Button.new()", "var tlacitko := Label.new()"),
+        ("ui/vendor_gump.gd",
+         '\t\ttlacitko.pressed.connect(stiskni_radek.bind(_smer, int(radek["item"])))\n', ""),
+        ("ui/vendor_gump.gd", "var potvrzeni := Button.new()", "var potvrzeni := Label.new()"),
+        ("ui/vendor_gump.gd",
+         "\tpotvrzeni.pressed.connect(stiskni_potvrzeni.bind(_smer))\n", ""),
+        ("ui/craft_gump.gd", "var tlacitko := Button.new()", "var tlacitko := Label.new()"),
+        ("ui/craft_gump.gd",
+         '\t\ttlacitko.pressed.connect(stiskni.bind(int(rec["id"])))\n', ""),
+    ]),
 ]
 KOPIRUJ = ("app", "core", "sim", "ui", "render", "data", "assets", "tools/gates", ".godot")
 
@@ -449,16 +589,48 @@ def _prepis(path: Path, text: str) -> None:
     path.write_text(text, encoding="utf-8", newline="\n")
 
 
-def _zasad_vadu(kopie: Path, soubor: str, hlavicka: str, vloz: str) -> str:
-    cesta = kopie / soubor
-    if not cesta.exists():
-        return f"soubor {soubor} v kopii neni"
-    text = cesta.read_text(encoding="utf-8")
-    if hlavicka not in text:
-        return f"v {soubor} neni radek '{hlavicka[:60]}'"
-    if vloz in text:
-        return f"vada uz v {soubor} je (mutace by se neprovedla)"
-    _prepis(cesta, text.replace(hlavicka, hlavicka + "\n" + vloz, 1))
+def _odstran_funkci(text: str, hlavicka: str) -> str:
+    """Smaze funkci od radku s hlavickou do dalsiho `func ` (vcetne tela)."""
+    out: list[str] = []
+    preskocit = False
+    for radek in text.splitlines(keepends=True):
+        if not preskocit and radek.startswith(hlavicka):
+            preskocit = True
+            continue
+        if preskocit:
+            if radek.startswith("func ") or radek.startswith("# --"):
+                preskocit = False
+                out.append(radek)
+            continue
+        out.append(radek)
+    return "".join(out)
+
+
+def _zasad_vadu(kopie: Path, zmeny: list[tuple[str, str, str]]) -> str:
+    """Vlozi vadu do kopie a OVERI, ze se opravdu zapsala (ticha mutace lze)."""
+    for soubor, hledat, nahradit in zmeny:
+        cesta = kopie / soubor
+        if not cesta.exists():
+            return f"soubor {soubor} v kopii neni"
+        text = cesta.read_text(encoding="utf-8")
+        if hledat not in text:
+            return f"v {soubor} neni '{hledat[:60]}'"
+        if nahradit == SMAZ_FUNKCI:
+            _prepis(cesta, _odstran_funkci(text, hledat))
+        elif nahradit == "":
+            _prepis(cesta, text.replace(hledat, "", 1))
+        else:
+            if nahradit in text:
+                return f"vada uz v {soubor} je (mutace by se neprovedla)"
+            _prepis(cesta, text.replace(hledat, nahradit, 1))
+    # Kontrola PO zapisu: co melo zmizet, zmizelo; co melo vzniknout, existuje.
+    for soubor, hledat, nahradit in zmeny:
+        text = (kopie / soubor).read_text(encoding="utf-8")
+        if nahradit == "" or nahradit == SMAZ_FUNKCI:
+            if hledat in text:
+                return f"v {soubor} zustalo '{hledat[:60]}' (vada se nezapsala)"
+        elif nahradit not in text:
+            return f"v {soubor} neni '{nahradit[:60]}' (vada se nezapsala)"
     return ""
 
 
@@ -470,26 +642,27 @@ def mutace(root: Path) -> int:
     zaklad = root / ".cache" / "gates" / "loop-mutace"
     chyb = 0
     print(f"[{NAME}] mutace: sabotovane kopie v {zaklad}")
-    for jmeno, soubor, hlavicka, vloz in SABOTAZE:
+    for jmeno, zmeny in SABOTAZE:
         kopie = zaklad / jmeno
         _postav_kopii(root, kopie)
-        problem = _zasad_vadu(kopie, soubor, hlavicka, vloz)
+        problem = _zasad_vadu(kopie, zmeny)
         if problem:
             # Vada, ktera se TISE neprovede, tvrdi totez co vada, ktera projde.
             print(f"[{NAME}] mutace {jmeno}: CHYBA - {problem}")
             chyb += 1
             continue
-        kontrolni = (kopie / soubor).read_text(encoding="utf-8")
-        zmeneno = vloz in kontrolni and kontrolni.count(hlavicka) == 1
-        if not zmeneno:
-            print(f"[{NAME}] mutace {jmeno}: CHYBA - vada se nezapsala")
+        try:
+            proc = subprocess.run(
+                [sys.executable, str(Path(__file__).resolve()), "--root", str(kopie)],
+                capture_output=True, text=True, encoding="utf-8", errors="replace",
+                timeout=MUTACE_TIMEOUT,
+            )
+        except subprocess.TimeoutExpired:
+            # Visici brana neni "vada, kterou nevidela" - je to chyba mutace.
+            print(f"[{NAME}] mutace {jmeno}: CHYBA - brana na kopii visela "
+                  f"({MUTACE_TIMEOUT}s)")
             chyb += 1
             continue
-        proc = subprocess.run(
-            [sys.executable, str(Path(__file__).resolve()), "--root", str(kopie)],
-            capture_output=True, text=True, encoding="utf-8", errors="replace",
-            timeout=1800,
-        )
         log = zaklad / f"{jmeno}.log"
         log.write_text(proc.stdout + ("\n--- stderr ---\n" + proc.stderr if proc.stderr else ""),
                        encoding="utf-8")

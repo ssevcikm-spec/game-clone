@@ -9,19 +9,33 @@ extends SceneTree
 # sondou, protoze okno obchodu nemelo prepinac na prodej; zelene testy to
 # nechytily. Presne tuhle tridu vady ma G20 merit.
 #
-# CESTA, KTEROU SONDA JDE (zadne primy volani systemu `sim/`):
+# CESTA, KTEROU SONDA JDE (zadne primy volani systemu `sim/` a zadne volani
+# handleru tlacitek):
 #   1. TEZBA   - `Command{t:"interact"}` z klienta (`app.input_map.interact_command`,
 #                stejna cesta jako klavesa E/T) na dlazdici balvanu,
 #   2. TAVENI  - `interact` na dlazdici vyhne (sim si sam vybere rudu z batohu),
-#   3. VYROBA  - `interact` na kovadlinu -> okno vyroby -> klik na recept
-#                (`ui.craft_gump.stiskni`) a pozadavek si vyzvedne HRA sama
-#                (`app.main._process` -> `_recept()` -> `Command{t:"craft"}`),
-#   4. PRODEJ  - `interact` na dlazdici prodejce -> okno obchodu -> prepinac
-#                "sell" -> radek s vyrobkem -> potvrzeni -> pozadavek si
-#                vyzvedne HRA sama (`app.main._process` -> `Command{t:"vendor"}`).
+#   3. VYROBA  - `interact` na kovadlinu -> okno vyroby -> KLIK na skutecne
+#                `Button` (radek receptu): sonda ho NAJDE v uzlech okna, overi,
+#                ze ma pripojeny signal `pressed`, a ten signal VYSLJE. Pozadavek
+#                si vyzvedne HRA sama (`app.main._process` -> `Command{t:"craft"}`),
+#   4. PRODEJ  - `interact` na dlazdici prodejce -> okno obchodu -> KLIK na
+#                `Button` "Smer" (prepinac buy/sell), pak na `Button` radku
+#                s vyrobkem a na `Button` "Potvrdit" - u kazdeho se overi
+#                pripojeny `pressed` a signal se VYSLJE. Pozadavek si vyzvedne
+#                HRA sama (`app.main._process` -> `Command{t:"vendor"}`).
 # Vsechny ctyri prikazy jdou do SIM JEDNOU branou (`sim.enqueue` -> `sim.tick`
 # -> `sim.commands.dispatch`). Sonda NIKDY nevola `_recept()`/`_prodejce_pozadavek()`
 # ani systemy `sim/` - kroky 3 a 4 dobehnou ve skutecnych framech hry.
+#
+# ⚠ CO JE "CESTA HRACE" (presne, bez zobecnovani): COMMAND cestu (od klienta do
+# SIM jednou branou) jde krok 1 a 2 (`interact` vyrábí `app.input_map`) a pak
+# pozadavky oken, ktere vyzvedne `app.main`; KLIK (signal `pressed` na realnem
+# `Button` uzlu) jde krok 3 a 4. Sonda pritom NEMACKA klavesnici ani mys - vysila
+# signal, ktery klavesa/mys vysle taky; handler se nikdy nevola primo.
+# Duvod je namEReny (2026-10-19, vraceno verifikatorem): prvni verze sondy volala
+# `vendor_gump.nastav_smer/stiskni_radek/stiskni_potvrzeni` a prosla i na kopii,
+# kde `Button` byl `Label` a handler `_on_smer_pressed` chybel - presne ta
+# historicka vada, kvuli ktere G20 vznikla.
 #
 # CO SONDA ZAMERNE ZVEDA: skill Mining a Blacksmithy na 1000. Meri se
 # PRUCHODNOST smycky, ne balance - s vychozim skillem umi taveni i vyroba
@@ -98,7 +112,11 @@ func _initialize() -> void:
 
 func _process(_delta: float) -> bool:
 	_f += 1
-	if _scena == null or _scena.loop == null or _scena.player == null:
+	if _scena == null or _scena.get("loop") == null or _scena.get("player") == null:
+		# `get()` (ne prima pristup `.loop`): kdyz scene nema skript (napr. se
+		# nezkompiloval kvuli rozbite UI), kazdy frame by spadl na runtime chybe
+		# a `_process` by se NIKDY nedostal k `return _f > 900` - sonda by visela
+		# (namEReno 2026-10-19 pri mutaci: 10+ minut misto chyby).
 		return _f > 900        # scena se nestaví - sonda nesmi viset vecne
 	# KROKY JSOU ROZDELENE DO FRAMU (ne jeden blok jako v `_analyza/p58`):
 	# mezi nimi dobiha skutecny frame hry (smycka tikuje, okna kresli, zurnal
@@ -235,7 +253,7 @@ func _krok(id: String, ok: bool, hodnoty: Dictionary, zurnal_pred: int) -> void:
 	var zaznam: Dictionary = {
 		"id": id, "ok": ok,
 		"zurnal_pred": zurnal_pred, "zurnal_po": _zurnal_pocet(),
-		"zurnal_nove": nove.slice(0, 8),
+		"zurnal_nove": nove.slice(0, 12),
 		"zurnal_klice": klice, "zurnal_hledany": hledany,
 		"hodnoty": hodnoty,
 	}
@@ -245,6 +263,53 @@ func _krok(id: String, ok: bool, hodnoty: Dictionary, zurnal_pred: int) -> void:
 		" | hledany '", hledany, "' ", ("NALEZEN" if klice else "NENALEZEN"))
 	for radek in nove:
 		print("[smycka]   zurnal: ", radek)
+
+
+# -- skutecna TLACITKA: hrac macka Button, nevola handler ----------------------
+# G20 ma merit CESTU HRACE. Prvni verze sondy volala `stiskni_*`/`nastav_smer`
+# primo, takze prošla i na kopii, kde byl `Button` nahrazeny `Label` a handler
+# `_on_smer_pressed` smazan (historicka vada, kvuli ktere G20 vznikla).
+# Sonda proto: (1) NAJDE Button uzel, (2) overi, ze ma pripojeny signal
+# `pressed`, (3) signal VYSLJE. Kdyz tlacitko chybi nebo je odpojene, krok to
+# rekne konkretni chybou - ticho by bylo stejne jako uspech.
+
+func _tlacitka(uzel: Node, out: Array) -> Array:
+	for child in uzel.get_children():
+		if child is Button:
+			out.append(child)
+		_tlacitka(child, out)
+	return out
+
+
+func _najdi_tlacitko(okno: Node, jmeno: String = "", text: String = "") -> Button:
+	# Hleda se v UZLECH okna (to, co hrac vidi a muze zmacknout), ne v datech.
+	for t in _tlacitka(okno, []):
+		if jmeno != "" and str(t.name) == jmeno:
+			return t
+		if text != "" and str(t.text) == text:
+			return t
+	return null
+
+
+func _signal_pripojen(tlacitko: Button) -> bool:
+	# Kliknuti neco udela JEN kdyz je `pressed` pripojeny k platnemu handleru.
+	for zaznam in tlacitko.get_signal_connection_list("pressed"):
+		if not (zaznam is Dictionary):
+			continue
+		var cb: Callable = zaznam.get("callable", Callable())
+		if cb.is_valid():
+			return true
+	return false
+
+
+func _stiskni(tlacitko: Button) -> bool:
+	# VYSLANI SIGNALU, ne volani handleru: presne to, co udela skutecny klik.
+	tlacitko.pressed.emit()
+	return true
+
+
+func _popis_tlacitek(okno: Node) -> int:
+	return _tlacitka(okno, []).size()
 
 
 # -- kroky smycky --------------------------------------------------------------
@@ -304,15 +369,19 @@ func _krok_taveni() -> void:
 
 
 func _akce_vyroba() -> void:
-	# Akce hrace: "pouzij" kovadlinu -> okno vyroby -> klik na recept.
-	# Pozadavek si vyzvedne az HRA ve svem framu (`app.main._process` ->
+	# Akce hrace: "pouzij" kovadlinu -> okno vyroby -> KLIK na Button radku
+	# receptu. Pozadavek si vyzvedne az HRA ve svem framu (`app.main._process` ->
 	# `_recept()` -> `Command{t:"craft", recipe, count}`).
 	var kovadlina: Vector2i = _tile_predmetu("anvil")
 	var stav: Dictionary = {"dyka_pred": _v_batohu("dagger"), "zurnal_pred": _zurnal_pocet()}
+	stav["tlacitko_recept"] = false
+	stav["signal_recept"] = false
+	stav["tlacitko_chyba"] = ""
 	_ceka["vyroba"] = stav
 	if kovadlina.x < 0:
 		_duvod = "ve scene neni kovadlina (role 'anvil' z data/items.json)"
 		stav["okno_otevrene"] = false
+		stav["tlacitko_chyba"] = "kovadlina chybi, okno vyroby nejde otevrit"
 		return
 	_interact(kovadlina)
 	_cekej(4)
@@ -321,9 +390,27 @@ func _akce_vyroba() -> void:
 	_scena.craft_gump.flush()
 	stav["okno_otevrene"] = bool(_scena.craft_gump.je_otevreny())
 	stav["receptu"] = int(_scena.craft_gump.pocet())
-	stav["kliknuto"] = bool(_scena.craft_gump.stiskni(RECEPT_DYKA))
+	var rec: Dictionary = {}
+	for r in _scena.craft_gump.recepty():
+		if int(r.get("id", -1)) == RECEPT_DYKA:
+			rec = r
+	var text: String = _scena.craft_gump.text_receptu(rec) if not rec.is_empty() else ""
+	var tlacitko: Button = _najdi_tlacitko(_scena.craft_gump, "", text)
+	stav["kliknuto"] = false
+	if tlacitko == null:
+		stav["tlacitko_chyba"] = ("v okne vyroby neni Button s textem '%s' (tlacitek %d, "
+			+ "receptu %d)") % [text, _popis_tlacitek(_scena.craft_gump), stav["receptu"]]
+	else:
+		stav["tlacitko_recept"] = true
+		stav["signal_recept"] = _signal_pripojen(tlacitko)
+		if not bool(stav["signal_recept"]):
+			stav["tlacitko_chyba"] = ("Button '%s' v okne vyroby existuje, ale nema "
+				+ "pripojeny signal 'pressed'") % text
+		else:
+			stav["kliknuto"] = _stiskni(tlacitko)
 	print("[smycka] vyroba: okno ", stav["okno_otevrene"], " receptu ", stav["receptu"],
-		" klik na recept ", RECEPT_DYKA, " = ", stav["kliknuto"])
+		" tlacitko receptu ", stav["tlacitko_recept"], " signal ", stav["signal_recept"],
+		" klik = ", stav["kliknuto"], " chyba '", stav["tlacitko_chyba"], "'")
 
 
 func _krok_vyroba() -> void:
@@ -335,40 +422,97 @@ func _krok_vyroba() -> void:
 	_krok("vyroba", dyka_po > dyka_pred and bool(stav.get("okno_otevrene", false)), {
 		"okno_otevrene": bool(stav.get("okno_otevrene", false)),
 		"receptu": int(stav.get("receptu", 0)), "kliknuto": bool(stav.get("kliknuto", false)),
+		"tlacitko_recept": bool(stav.get("tlacitko_recept", false)),
+		"signal_recept": bool(stav.get("signal_recept", false)),
+		"tlacitko_chyba": str(stav.get("tlacitko_chyba", "")),
 		"recept": RECEPT_DYKA, "dyka_pred": dyka_pred, "dyka_po": dyka_po,
 		"ingotu": _v_batohu("iron_ingot"),
 	}, zurnal_pred)
 
 
 func _akce_prodej() -> void:
-	# Akce hrace: "pouzij" prodejce -> okno obchodu -> prepinac "sell" ->
-	# radek s vyrobkem -> potvrzeni. Pozadavek si vyzvedne az HRA ve svem framu
+	# Akce hrace: "pouzij" prodejce -> okno obchodu -> KLIK na Button "Smer"
+	# (prepinac buy/sell), KLIK na Button radku s vyrobkem a KLIK na Button
+	# "Potvrdit". Pozadavek si vyzvedne az HRA ve svem framu
 	# (`app.main._process` -> `Command{t:"vendor", action:"sell"}`).
 	var kovar: Vector2i = _kovar_tile()
 	var stav: Dictionary = {"zlato_pred": _zlato(), "dyka_pred": _v_batohu("dagger"),
 		"zurnal_pred": _zurnal_pocet()}
+	for k in ["tlacitko_smer", "signal_smer", "tlacitko_radek", "signal_radek",
+			"tlacitko_potvrdit", "signal_potvrdit", "radek", "potvrzeno"]:
+		stav[k] = false
+	stav["tlacitko_chyba"] = ""
+	stav["prepnuto_na_sell"] = false
 	_ceka["prodej"] = stav
 	if kovar.x < 0:
 		_duvod = "ve scene neni prodejce (app/main.prodejce == 0)"
 		stav["okno_otevrene"] = false
+		stav["tlacitko_chyba"] = "prodejce chybi, okno obchodu nejde otevrit"
 		return
 	_interact(kovar)
 	_cekej(4)
 	_scena.vendor_gump.flush()
 	stav["okno_otevrene"] = bool(_scena.vendor_gump.je_otevreny())
-	# Prepinac na prodej je v okne TLACITKO (hra bez nej prodej neumela -
-	# namEReno v session D); sonda macka jeho verejnou cestu.
-	stav["prepnuto_na_sell"] = bool(_scena.vendor_gump.nastav_smer("sell"))
-	_scena.vendor_gump.flush()
+	# 1) PREPINAC SMERU je Button "Smer" (hra bez nej prodej neumela - namEReno
+	# v session D). Hrac na nej klikne; smer se cte z OKNA, ne z navratove
+	# hodnoty handleru - kdyz je handler odpojeny, smer zustane "buy".
+	var smer_btn: Button = _najdi_tlacitko(_scena.vendor_gump, "Smer")
+	if smer_btn == null:
+		stav["tlacitko_chyba"] = ("v okne obchodu neni Button 'Smer' (tlacitek %d)"
+			% _popis_tlacitek(_scena.vendor_gump))
+	else:
+		stav["tlacitko_smer"] = true
+		stav["signal_smer"] = _signal_pripojen(smer_btn)
+		if bool(stav["signal_smer"]):
+			_stiskni(smer_btn)
+			_scena.vendor_gump.flush()
+		else:
+			stav["tlacitko_chyba"] = ("Button 'Smer' v okne obchodu existuje, ale nema "
+				+ "pripojeny signal 'pressed'")
+	stav["prepnuto_na_sell"] = str(_scena.vendor_gump.smer()) == "sell"
+	# 2) RADEK S VYROBKEM je Button s textem, ktery sklada okno (`text_radku`).
 	var art: int = _dyka_art()
 	stav["art"] = art
-	stav["radek"] = false
-	stav["potvrzeno"] = false
-	if art > 0:
-		stav["radek"] = bool(_scena.vendor_gump.stiskni_radek("sell", art))
-		stav["potvrzeno"] = bool(_scena.vendor_gump.stiskni_potvrzeni("sell"))
+	if art > 0 and bool(stav["prepnuto_na_sell"]):
+		var radek: Dictionary = {}
+		for r in _scena.vendor_gump.radky("sell"):
+			if int(r.get("item", 0)) == art:
+				radek = r
+		var text: String = ""
+		if not radek.is_empty():
+			text = _scena.vendor_gump.text_radku(radek, "sell")
+		var radek_btn: Button = _najdi_tlacitko(_scena.vendor_gump, "", text)
+		if radek_btn == null:
+			stav["tlacitko_chyba"] = ("v okne obchodu neni Button radku '%s' (radek v "
+				+ "seznamu sell: %s)") % [text, not radek.is_empty()]
+		else:
+			stav["tlacitko_radek"] = true
+			stav["signal_radek"] = _signal_pripojen(radek_btn)
+			if bool(stav["signal_radek"]):
+				_stiskni(radek_btn)
+				_scena.vendor_gump.flush()
+			else:
+				stav["tlacitko_chyba"] = ("Button radku '%s' existuje, ale nema "
+					+ "pripojeny signal 'pressed'") % text
+	# 3) POTVRZENI je Button "Potvrdit".
+	var potvrdit_btn: Button = _najdi_tlacitko(_scena.vendor_gump, "Potvrdit")
+	if potvrdit_btn == null:
+		stav["tlacitko_chyba"] = ("v okne obchodu neni Button 'Potvrdit' (tlacitek %d)"
+			% _popis_tlacitek(_scena.vendor_gump))
+	else:
+		stav["tlacitko_potvrdit"] = true
+		stav["signal_potvrdit"] = _signal_pripojen(potvrdit_btn)
+		if bool(stav["signal_potvrdit"]):
+			stav["potvrzeno"] = _stiskni(potvrdit_btn)
+		else:
+			stav["tlacitko_chyba"] = ("Button 'Potvrdit' existuje, ale nema pripojeny "
+				+ "signal 'pressed'")
+	stav["radek"] = bool(stav["tlacitko_radek"]) and bool(stav["signal_radek"])
 	print("[smycka] prodej: okno ", stav["okno_otevrene"], " sell ", stav["prepnuto_na_sell"],
-		" radek ", stav["radek"], " potvrzeno ", stav["potvrzeno"], " art ", art)
+		" tlacitka smer/radek/potvrdit ", stav["tlacitko_smer"], "/",
+		stav["tlacitko_radek"], "/", stav["tlacitko_potvrdit"], " signaly ",
+		stav["signal_smer"], "/", stav["signal_radek"], "/", stav["signal_potvrdit"],
+		" potvrzeno ", stav["potvrzeno"], " art ", art, " chyba '", stav["tlacitko_chyba"], "'")
 
 
 func _krok_prodej() -> void:
@@ -382,6 +526,13 @@ func _krok_prodej() -> void:
 		"dyka_pred": dyka_pred, "dyka_po": _v_batohu("dagger"),
 		"okno_otevrene": bool(stav.get("okno_otevrene", false)),
 		"prepnuto_na_sell": bool(stav.get("prepnuto_na_sell", false)),
+		"tlacitko_smer": bool(stav.get("tlacitko_smer", false)),
+		"signal_smer": bool(stav.get("signal_smer", false)),
+		"tlacitko_radek": bool(stav.get("tlacitko_radek", false)),
+		"signal_radek": bool(stav.get("signal_radek", false)),
+		"tlacitko_potvrdit": bool(stav.get("tlacitko_potvrdit", false)),
+		"signal_potvrdit": bool(stav.get("signal_potvrdit", false)),
+		"tlacitko_chyba": str(stav.get("tlacitko_chyba", "")),
 		"radek": bool(stav.get("radek", false)),
 		"potvrzeno": bool(stav.get("potvrzeno", false)), "art": int(stav.get("art", 0)),
 	}, zurnal_pred)

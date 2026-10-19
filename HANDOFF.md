@@ -1,4 +1,4 @@
-# Předání — game-clone (2026-10-12, SESSION „P1c“: BRÁNA G20 — KRÁTKÁ SMYČKA END-TO-END)
+# Předání — game-clone (2026-10-19, SESSION „P1c“ + OPRAVA PO VERIFIKACI: BRÁNA G20 — KRÁTKÁ SMYČKA END-TO-END)
 
 > **Co je tenhle soubor:** **stav projektu** pro další session agenta. Přepisuje
 > se celý; historie je v `git log`. Nový blok je vždy **nahoře**; starší bloky se
@@ -6,7 +6,7 @@
 >
 > **Odkud brát detaily:** sonda `tools/gates/loop_probe.gd`, brána
 > `tools/gates/check-loop.py`, smlouva `docs/08 §8.2` (řádek G20) a `§8.3.2`
-> (jak je postavená), `LESSONS.md` 2026-10-12 (dvě nová ponaučení).
+> (jak je postavená), `LESSONS.md` 2026-10-19 (tři nová ponaučení).
 
 ## ✅ CO SE UDĚLALO (a proč právě to)
 
@@ -14,28 +14,61 @@ Projekt uměl měřit **podsoučásti** (těžba, tavení, výroba, prodej), ale
 **žádná brána neměřila, že hráč projde celou krátkou smyčku** na reálné scéně.
 Přesně tak už jednou prošla vada: okno obchodu nemělo přepínač na prodej, prodej
 uměla jen sonda, ne hra — a zelené testy to nechytily, protože volají systémy
-`sim/` přímo. G20 to měří **cestou hráče**.
+`sim/` přímo. G20 to měří **cestou hráče**: **command cesta** (`interact`
+vyrábí `app.input_map`, požadavky oken vyzvedne `app.main`) a **klik na skutečná
+tlačítka** oken — od opravy 2026-10-19 sonda `Button` **najde, ověří `pressed`
+a signál vyšle**; handlery nevolá (dřív je volala a prošla i s vadou, kvůli které
+G20 vznikla).
 
 | Věc | Soubor | Co měří / naměřeno |
 |---|---|---|
-| **Sonda reálné scény** | `tools/gates/loop_probe.gd` | spustí `app/main.tscn` a jde kroky hráče: `interact` vyrábí **klient** (`app.input_map.interact_command`, stejná cesta jako E/T), okna výroby a obchodu obsluhuje **jejich veřejné API** a požadavek si vyzvedne **hra sama** ve svém framu (`app.main._process` → `Command{t:"craft"}` / `{t:"vendor"}`). Sonda **nikdy** nevolá `sim.harvest.mine`, `sim.craft.smelt` ani `sim.vendor.sell` |
-| **Brána** | `tools/gates/check-loop.py` | G20: `exit 0` = všechny 4 kroky PASS s hodnotami; `exit 1` = vada; `exit 2` = NEMĚŘENO. Po každém kroku požaduje **hráčem viditelný následek**: novou zprávu v žurnálu + očekávané slovo (`gather`/`smelt`/`create`/`sell`), inventář a zlato |
+| **Sonda reálné scény** | `tools/gates/loop_probe.gd` | spustí `app/main.tscn` a jde kroky hráče: `interact` vyrábí **klient** (`app.input_map.interact_command`, stejná cesta jako E/T), v oknech výroby a obchodu **kliká na skutečné `Button` uzly** (ověří signál `pressed`, vyšle ho) a požadavek si vyzvedne **hra sama** ve svém framu (`app.main._process` → `Command{t:"craft"}` / `{t:"vendor"}`). Sonda **nikdy** nevolá `sim.harvest.mine`, `sim.craft.smelt` ani `sim.vendor.sell` |
+| **Brána** | `tools/gates/check-loop.py` | G20: `exit 0` = všechny 4 kroky PASS s hodnotami; `exit 1` = vada; `exit 2` = NEMĚŘENO. Po každém kroku požaduje **hráčem viditelný následek**: novou zprávu v žurnálu + očekávané slovo (`gather`/`smelt`/`create`/`sell`) **ověřené z textu**, inventář a zlato; u kroků 3–4 navíc `tlacitko_*` a `signal_*` (klik na skutečné tlačítko) |
 | **Zapojení** | `tools/gates/run-all.py` | G20 zařazena **za G19 a před G10** — je to integrační brána, takže patří až za všechny podsoučásti; s G19 se drží u sebe (obě pouští reálnou scénu), `G10` zůstává poslední (čte snímek, nic nespouští) |
-| **Smlouva** | `docs/08 §8.2`, `§8.3.2`, `§8.8` | řádek G20 v tabulce bran, popis obou režimů (headless vs. `--snimky`) a dva mutační důkazy |
+| **Smlouva** | `docs/08 §8.2`, `§8.3.2`, `§8.8` | řádek G20 v tabulce bran (včetně **boost skillů Mining/Blacksmithy na 1000**), popis obou režimů (headless vs. `--snimky`) a **tři** mutační důkazy |
 | **Plán** | `docs/07` (řádek MK) | milník **MK** má v seznamu bran nově i **G20** — jeho kritérium „vyková a PRODÁ výrobek“ teď má vlastní bránu |
-| **Ponaučení** | `LESSONS.md` 2026-10-12 | dvě: „podsoučásti zelené, smyčka rozbitá“ a „headless neumí snímek, a musí to říct“ |
+| **Ponaučení** | `LESSONS.md` 2026-10-19 | tři: „podsoučásti zelené, smyčka rozbitá“, „headless neumí snímek, a musí to říct“ a „brána prošla na vadě, kvůli které vznikla“ |
 
-## 📊 NAMĚŘENO (2026-10-12, tato session)
+## 📊 NAMĚŘENO (2026-10-19, po opravě verifikátoru)
 
 | Co | Hodnota | Doklad |
 |---|---|---|
-| **Testy (C)** | **2 856 kontrol / 0 selhání**, `exit 0` | `godot --headless --path . --script res://tests/run_tests.gd` (`.tmp/g20-testy.log`) |
-| **Brány (D)** | **19 měřeno / 0 čeká / 0 chyb**, G20 mezi nimi (`G20 OK`) | `python tools/gates/run-all.py` (`.tmp/g20-run-all-final.txt`) |
-| **G20 (A)** | `exit 0`, kroky **PASS** s hodnotami: **ruda 0 → 8**, **ingoty 0 → 7**, **dýka 0 → 1**, **zlato 60 → 70**, **žurnál 12 → 39** zpráv; každý krok přidal aspoň jednu zprávu a očekávané slovo v ní | `python tools/gates/check-loop.py` (`.tmp/g20-loop-headless.log`) |
-| **Brána umí selhat (B)** | `--mutace`: **2 sabotáže, obě `exit 1`** — vypnutý `sim.vendor.sell` („krok prodej neprošel“, „zlato se nezvýšilo“), vypnutý `sim.harvest._harvest` („krok tezba neprošel“) | `python tools/gates/check-loop.py --mutace` (`.tmp/g20-mutace.log`) |
-| **Offline self-test** | **9 případů, 0 chyb** (známý správný i známý vadný vstup; spouští ho i `run-all.py --self-test`) | `.tmp/g20-selftests.log` |
-| **Důkaz pohledem (F)** | **4 snímky** 1280×720 ze smyčky (těžba, tavení, výroba, prodej) + **`zurnal.txt`** (39 zpráv) | `.tmp/g20-brana-snimky/loop/` (`python tools/gates/check-loop.py --snimky`), log `.tmp/g20-snimky-brana.log` |
+| **Testy (C)** | **2 856 kontrol / 0 selhání**, `exit 0` | `godot --headless --path . --script res://tests/run_tests.gd` (`.tmp/g20o-testy.log`) |
+| **Brány (D)** | **19 měřeno / 0 čeká / 0 chyb**, G20 mezi nimi (`G20 OK`) | `python tools/gates/run-all.py` (`.tmp/g20o-run-all.txt`) |
+| **G20 (A)** | `exit 0`, kroky **PASS** s hodnotami: **ruda 0 → 8**, **ingoty 0 → 7**, **dýka 0 → 1**, **zlato 60 → 70**, **žurnál 12 → 39** zpráv; každý krok přidal aspoň jednu zprávu a očekávané slovo **v textu**; `tlacitko_smer/radek/potvrdit` i `signal_*` = **true**, `tlacitko_chyba` prázdné | `python tools/gates/check-loop.py` (`.tmp/g20o-loop-headless.log`) |
+| **Brána umí selhat (B)** | `--mutace`: **3 sabotáže, všechny `exit 1`** — vypnutý `sim.vendor.sell`, vypnutý `sim.harvest._harvest` a **historická vada** (`Button` → `Label` + smazané handlery v `ui/vendor_gump.gd` a `ui/craft_gump.gd`); skript ověřil, že se každá vada zapsala | `python tools/gates/check-loop.py --mutace` (`.tmp/g20o-mutace.log`) |
+| **Offline self-test** | **15 případů, 0 chyb** (včetně „boolean tvrdí slovo, text ho nemá“, „tlačítko existuje, signál chybí“ a „snímky se nevykázaly“; spouští ho i `run-all.py --self-test`) | `.tmp/g20o-selftest.log` |
+| **Důkaz pohledem (F)** | **4 snímky** 1280×720 ze smyčky (těžba, tavení, výroba, prodej) + **`zurnal.txt`** (39 zpráv) | `.tmp/g20o-snimky/loop/` (`python tools/gates/check-loop.py --snimky`), log `.tmp/g20o-snimky.log` |
+| **Fail-closed na snímky (G)** | headless sonda snímky nevykáže → `--snimky` **nesmí** dát `exit 0` (doloženo na kopii s vypnutým adresářem, `.tmp/g20o-d3-headless.log`) | `python tools/gates/check-loop.py --snimky --snimky-dir <headless cesta>` / `--self-test` |
 | **Determinismus a replaye (E)** | **beze změny hashů** — G8 i G9 `OK`; `sim/` jsem needitoval, sonda jen čte a zvedá skilly hráče ve své scéně | `run-all.py` |
+
+## 🔧 OPRAVA PO NEZÁVISLÉ VERIFIKACI (2026-10-19)
+
+Verifikátor vrátil G20 k opravě se čtyřmi doloženými vadami; všechny jsou
+opravené a znovu naměřené (tabulka výše):
+
+1. **D1 (kritická): brána prošla i s vadou, kvůli které vznikla.** Sonda volala
+   `vendor_gump.nastav_smer/stiskni_radek/stiskni_potvrzeni` přímo; na kopii
+   s `Button` → `Label` a smazaným `_on_smer_pressed` dávala `exit 0`. Nyní
+   sonda **hledá skutečný `Button` uzel**, ověří připojený `pressed` a **signál
+   vyšle**; JSON nese `tlacitko_*`/`signal_*` a brána **bez nich krok nenechá
+   projít**. `--mutace` má tuto vadu jako **třetí sabotáž** a čeká `exit 1`.
+2. **D2: datum nových záznamů** bylo 2026-10-12, ale commit je 2026-10-19 —
+   opraveno v `docs/08` (tab. G20, §8.3.2), `HANDOFF.md`, `LESSONS.md`
+   a `tools/gates/run-all.py`. Starší bloky z 10-12 zůstaly (jsou to záznamy).
+3. **D3: `--snimky` umělo projít s 0 PNG.** Když sonda adresář nevytvořila,
+   vynulovala `_snimky_dir` a brána kontrolu přeskočila. Nyní při `--snimky`
+   musí být `snimky_zadany:true`, prázdné `snimky_chyba` a ≥ `MIN_SNIMKU = 2`
+   PNG — jinak VADA. Self-test to měří (`snimky_se_nevykazaly`).
+4. **D4: brána věřila booleovi `zurnal_klice`.** Nyní slovo **ověřuje z textu**
+   `zurnal_nove` a nesoulad s booleanem je vada (`zurnal_boolean_lze`).
+5. **D5: dokumentace** — „žádné **akční** systémy `sim/`“ (sonda volá
+   `sim.enqueue`, `sim.tick`, `sim.vendor.gold_of`), v tabulce G20 je
+   **boost skillů na 1000**, „cestou hráče“ je rozepsané na **command cestu**
+   a **klik**, `prekryv` zůstává přiznaně jen výpis.
+
+**Co zůstává otevřené:** G20 měří jednu cestu (ne nákup), `--snimky` není v CI,
+`prekryv` se nehlídá a sonda zvedá skilly na 1000 (průchodnost, ne balance).
 
 ## 🚧 CO ODHALILA PRÁCE (obojí naměřeno, obojí v `LESSONS.md`)
 

@@ -79,7 +79,7 @@ ORDER = [
     # meri tezit -> vyrobit -> prodat jako JEDEN celek pres command cestu
     # klienta. Patri az ZA vsechny podsoucasti (G1-G19), protoze jejich vady
     # by ji jinak shodily z duvodu, ktery uz ma vlastni branu; a hned za G19,
-    # protoze obe spousti REALNOU scenu (drzi se u sebe). Pridano 2026-10-12:
+    # protoze obe spousti REALNOU scenu (drzi se u sebe). Pridano 2026-10-19:
     # kazda podsoustava mela zeleny test, ale "projde to cely" nemeril nikdo -
     # a presne tak prosla vada "okno obchodu neumi prodat" (session D).
     ("G20", "check-loop.py"),

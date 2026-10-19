@@ -24,7 +24,27 @@ Typy: `chyba` (moje vada) · `past-nástroje` (prostředí/nástroj, ne logika) 
 
 ---
 
-### 2026-10-12 — PODSOUČÁSTI ZELENÉ, SMYČKA ROZBITÁ (postup/nástroj)
+### 2026-10-19 — BRÁNA PROŠLA NA VADĚ, KVIRU VZNIKLA (chyba)
+**Co se stalo:** G20 vznikla proto, že se hráč nedostal k prodeji (okno obchodu
+nemělo přepínač na prodej). Sonda ale volala `vendor_gump.nastav_smer(...)`
+a `stiskni_*` přímo, takže na kopii, kde byl `Button` nahrazený `Label` a handler
+`_on_smer_pressed` smazaný, dala `exit 0`, `krok prodej: PASS` a `zlato 60 → 70`
+— tedy prošla na **přesně té vadě, kvůli které vznikla**. Doložil to až
+nezávislý verifikátor.
+**Doklad:** `python tools/gates/check-loop.py --mutace` má nově sabotáž
+`historicka_vada_button_label` (`Button` → `Label` + smazané handlery
+v `ui/vendor_gump.gd` a `ui/craft_gump.gd`) a čeká `exit 1`; naměřeno
+2026-10-19: **3 sabotáže, všechny `exit 1`** (`.tmp/g20o-mutace.log`). Sonda
+hlásí `tlacitko_smer/radek/potvrdit` a `signal_*` = `true` jen tehdy, když
+uzly v okně opravdu jsou a mají připojený `pressed`.
+**Ponaučení:** integrační brána musí jít **stejnou cestou jako hráč** — „umí to
+zavolat" není „hráč to umí zmáčknout". U UI se ptej na **signál a jeho handler**
+(`get_signal_connection_list`), vysílej **signál**, ne volej handler; a mutační
+sabotáž dělej přesně na té vadě, kvůli které brána vznikla.
+**Kde:** `tools/gates/loop_probe.gd` (`_najdi_tlacitko`, `_signal_pripojen`,
+`_stiskni`), `tools/gates/check-loop.py` (`--mutace`).
+
+### 2026-10-19 — PODSOUČÁSTI ZELENÉ, SMYČKA ROZBITÁ (postup/nástroj)
 **Co se stalo:** každá podsoučást měla zelený test (těžba, tavení, výroba,
 prodej) a přesto se hráč k prodeji nedostal — okno obchodu nemělo přepínač na
 „sell“. Prodej uměla jen sonda `_analyza/p34-smycka.gd`, ne hra. Testy to
@@ -38,7 +58,7 @@ zelený běh dává `exit 0` s rudou 0 → 8, ingoty 0 → 7, dýkou 0 → 1, zl
 viditelný důsledek** (žurnál, inventář, zlato) — jinak měří totéž co testy.
 **Kde:** `tools/gates/loop_probe.gd`, `tools/gates/check-loop.py`, `docs/08 §8.3.2`.
 
-### 2026-10-12 — HEADLESS NEUMÍ SNÍMEK, A MUSÍ TO ŘÍCT (past-nástroje)
+### 2026-10-19 — HEADLESS NEUMÍ SNÍMEK, A MUSÍ TO ŘÍCT (past-nástroje)
 **Co se stalo:** sonda smyčky chtěla uložit snímky po krocích, ale v `--headless`
 vrací `root.get_texture().get_image()` **null** (`ERROR: Parameter "t" is null`)
 — `save_png` nemá co zapsat. Kdyby to sonda zamlčela, „0 snímků“ by vypadalo
