@@ -57,7 +57,8 @@ vlastnost dat spawnu, ne teleportu.
 
 | Co | Hodnota | Postup / doklad |
 |---|---|---|
-| **G22** | `exit 0`, **13 měření** (data + sonda) | `python tools/gates/check-travel.py` |
+| **G22** | `exit 0`, **29 naměřených hodnot** (5 statických + 24 ze sondy) | `python tools/gates/check-travel.py` |
+| **G22 v čistém stromu bez dat UO** | `NEMĚŘENO` (exit 2, `SKIP: mapa neni nactena`) — **ne VADA** | `git worktree add .cache/wt-head HEAD` + `GODOT=… python tools/gates/check-travel.py`; data UO (`assets/uo/`) v gitu nejsou, takže bez nich by jinak všechny body vypadaly „mimo mapu“ |
 | **G22: sonda (živá scéna)** | `bodu 5`, `vad 0`; `pozice_presna 5`, `kamera 5`, `kamera_se_posunula 5`, `na_mape 5`, `vyska_sedi 5`, `prujezd 5`, `dosah 5`, `ruzne_body 1`, `druh_start/tezba/kovani/obchod/boj 1`, `panel_otevreni 1`, `panel_zavreni 1`, `escape_zavreni 1`, `skok_cislici 1`, `hlaseni 1`, `tick_po_teleportu 1`, `vstup_po_teleportu 1` | `python tools/gates/check-travel.py` (řádek `sonda_*`) |
 | **G22: self-test** | **18 případů, 0 chyb** | `python tools/gates/check-travel.py --self-test` |
 | **G22: mutace** | **5 sabotáží, 5 chyceno, `exit 0`** (M1 teleport bez pozice, M2 bez kamery, M3 chybějící bod `obchod`, M4 panel se neotevře, M5 bez hlášky) | `python tools/gates/check-travel.py --mutace` (5× `CHYCENO`) |
@@ -98,6 +99,15 @@ Godot… --headless --path . --script res://tests/run_tests.gd
 * **Dvě okna na stejné pozici nejsou „drobnost“.** První verze okna teleportu
   stála na `(340,300)`, tedy přes nápovědu — na snímku nebylo čitelné ani jedno.
   Přesunuto na `(460,8)` (vedle nápovědy).
+* **`map.land_at()` vrací `int`, NIKDY `null`** (mimo mapu `-1`). První verze
+  sondy srovnávala s `null`, takže v čistém worktree (bez `assets/uo/`, která
+  v gitu nejsou) prošla kontrola „mapa načtena“ a **všech 5 bodů** vyšlo jako
+  vada — falešná červeň na chybějícím vstupu. Opraveno na `< 0` a chybějící
+  mapa je od té doby **NĚMĚŘENO** (`exit 2`), ne VADA.
+* **Ověření commitu v čistém stromu je levné a našlo dvě věci**: (1) `ui/debug_travel.gd`
+  jsem zapomněl `git add` (preload v `app/main.gd` by v klonu spadl), (2) chybějící
+  data UO dělají z poctivé sondy falešnou vadu. `git worktree add .cache/wt-head HEAD`
+  + testy + brána = ~3 minuty a odhalí obojí.
 
 ## ⚠ OTEVŘENÉ BODY
 
