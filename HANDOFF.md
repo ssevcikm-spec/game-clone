@@ -1,3 +1,141 @@
+# Předání — game-clone (2026-10-20, SESSION „IMPORT-ANIM“: IMPORT ANIMACÍ OD PRODUCENTA PŘIPRAVENÝ JEDNÍM PŘÍKAZEM — hra beze změny)
+
+> **Co je tenhle blok JE:** **záznam o provedení** (příprava konzumenta pro
+> animované sprity postav z paralelní session `dsh-dev\_tools\tovarna\animace\`).
+> **Nemění chování hry** — hráč i NPC se dál kreslí z UO artu + `own-v3` chůze;
+> nová vrstva se **nezapíná**. Mění se jen `tools/` (nový konvertor + nová brána)
+> a dokumentace (`docs/04 §4.6.9`).
+> **Odkud brát detaily:** `docs/04 §4.6.9` (kontrakt konzumenta), konvertor
+> `tools/artgen/import_anim.py`, brána `tools/gates/check-anim-assets.py`.
+> **Současný stav se bere z tohohle bloku.**
+
+## ✅ CO JE HOTOVÉ (a čím je to doložené)
+
+| Co | Soubor | Důkaz |
+|---|---|---|
+| **Recon formátu konzumenta** (klíče, `DIR_MAP` 8→5, kotva, `frame_ms`, `groups`) | `docs/04 §4.6.9` | čteno z `render/anim_player.gd`, `render/own_art.gd`, `assets/own-art.json`, `own-v3/anim/anim-sheets.json`, `assets/uo/anim/anim-sheets.json` |
+| **Konvertor** producentská sada → herní formát | `tools/artgen/import_anim.py` | 2 reálné sady převedeny (12 a 16 framů), výstup měřen (viz níže) |
+| **Brána importu** (fixtury + reálná data, self-test, 4 mutace) | `tools/gates/check-anim-assets.py` | `exit 0` (12 měření), `--self-test` 2/2, `--mutace` 4/4 chyceno |
+| **Dokumentace kontraktu** | `docs/04 §4.6.9` | nová sekce s tabulkami; `HANDOFF` = tenhle blok |
+| **Důkaz v Godotu** | sonda `.tmp/probe_anim_import.gd` (NENÍ v gitu) | `render.anim_player` s vlastní vrstvou: `ok:true, own:true, count:12`, `anchor` = producentova kotva |
+
+**Nic z toho nezapíná novou vrstvu do hry.** `assets/own-art.json` je beze změny,
+`render/` je beze změny, `app/` je beze změny.
+
+## 📊 NAMĚŘENO (2026-10-20, každé číslo s postupem)
+
+| Co | Hodnota | Postup / doklad |
+|---|---|---|
+| rodina_walk → herní formát | **12 framů × 2 sprite směry** (1, 3), platno 41×97, kotva (20,5; 80,72), atlas 492×97 | `python tools/artgen/import_anim.py <…>/rodina_walk/walk --vystup .tmp/import-demo/rodina_walk` → `exit 2` („HRDINU NAHRADIT NEMUZE“) |
+| valecnik_walk → herní formát | **16 framů × 2 sprite směry** (1, 3), platno 42×96, kotva (21,0; 82,41), atlas 672×96 | totéž pro `valecnik_walk` → `exit 2` |
+| kotva `anchor = (cx, cy+h)` | **tři nezávislé sady** se stejným principem: UO 11 px, `own-v3` 22 px, producent 16,28 px nad spodní hranou | `docs/04 §4.6.9` tabulka; konvertor `cy = kotva.y − h` |
+| kotva ve hře po importu | `[20.5, 80.720001]` — **přesně** producentova | Godot sonda: `play(400, 0, dir, 0).anchor` vs `manifest.kotvy` |
+| mapování směrů (fáze prstence) | zrcadlové dvojice `(d0,d3)` IoU **0,996** / **0,969**, `(d1,d2)` **0,994** / **0,968**; ostatní 0,53–0,67 | `import_anim.py --overit-zrcadla <sada>` (posun o půl cyklu; bez posunu vyjde 0,71 na ŠPATNÉ dvojici) |
+| co 4-směrná sada pokryje | **2 z 5** sprite směrů (1 a 3) → hrdinu nahradit nelze | konvertor vypíše `kryto [1, 3]`, `chybi [0, 2, 4]` |
+| brána `check-anim-assets.py` | `exit 0`, **12 měření** (5dir/8dir/4dir/4×vadný vstup/platno/kotva/2×reálná data) | `python tools/gates/check-anim-assets.py` |
+| brána: self-test | **2 případy, 0 chyb** (dobrý konvertor → 0, sabotovaný → 1) | `--self-test` |
+| brána: mutace | **4 sabotáže, 4 chyceny** (kotva +1 px, `rect` +1 px, mapování směru, prázdný frame) | `--mutace`; každá sabotáž musí nechat konvertor funkční (jinak se „chycení“ počítá jako chyba) |
+| Godot sonda | `chyb: 0`, `vlastních: 2`, `světových směrů kryto: 4` (E, N, W, S), `count: 12`, `frame_ms: 80` | `Godot… --headless --path . --script res://.tmp/probe_anim_import.gd` |
+| godot testy | **0 selhání** | `--headless --path . --script res://tests/run_tests.gd` |
+| brány celkem | **20 bran, 0 chyb** (beze změny stavu) | `python tools/gates/run-all.py` |
+
+## ⛔ CO CHYBÍ OD PRODUCENTA (konkrétní požadavek, ne přání)
+
+1. **8 směrů po 45°** (nebo aspoň 5). Dnes rendruje `zamir(cam, d * π/2)` — 4 směry
+   po 90°, a ty leží **45° mimo** mřížku, kterou hra potřebuje. Naměřeno: 4 směry
+   dají sprite směry **1 a 3**, chybí **0 (čelní/SE), 2 (profil), 4 (zadní/NW)**.
+   * **Minimální změna u producenta:** `zamir(cam, d * π/4)` + `--smery 8`.
+     Prstenec začíná na azimutu 45° (`azimut_zacatek_deg`), takže 8 směrů po 45°
+     pokryje **všech 5** sprite směrů: `d0→1, d1→2, d2→3, d3→4, d4→3, d5→2,
+     d6→1, d7→0` (d4–d6 jsou zrcadlové duplikáty, hra si zrcadlí sama).
+   * **Nebo** 5 směrů na azimutech 0/45/90/135/180 (`d0→0 … d4→4`, konvence
+     `uo5`, konvertor ji umí).
+   * **`posun_smeru` musí být v manifestu** (rodina má 2, valecnik klíč NEMÁ).
+     Je to jediné pole, které rozhoduje o 180° otočení (u 4 směrů to data
+     nerozliší: zrcadlová dvojice je invariantní k otočení o 180°).
+2. **`work` a `attack`** — nejsou. Čísla skupin pro tělo 400: `attack = 9`
+   (import `400/9/*` fallback **obejde**), `work` skupinu v UO **nemá** →
+   konvertor ji zapíše pod volné číslo (5) a hra ji najde až po **jednom řádku**
+   v `GROUP_KEY` (to je změna hry, ne importu).
+3. **Měřítko:** producent má postavu **86,4 px** vysokou (smlouva `hra-48`,
+   dlaždice 48 px), UO/hra kreslí na dlaždici **44 px** (`ISO_STEP = 22`) a
+   postava má ~62–64 px. Naměřeno na framech: producent 81 px obsahu vs.
+   `own-v3` 62 px = **1,31×**. Bez rozhodnutí (přerendrovat na 44px dlaždici,
+   nebo zvětšit dlaždici ve hře) by hrdina byl o třetinu větší než NPC.
+
+## 🧾 FORMÁT PRODUCENTOVA MANIFESTU SE NEMĚNÍ
+
+Konvertor čte jen klíče, které tam **už jsou**: `sada, animace, framu, smery,
+frame_ms, loop, vrstvy, platna{d0…}, kotvy{d0…}, c_frame, anchor` + volitelně
+`posun_smeru`. Nové klíče **nepotřebuje** — jediné, co by mělo přibýt, je
+`posun_smeru` u každé sady (viz výš, bod 1).
+
+## 📚 STATICKÁ KNIHOVNA POSTAV (inventura; zapojení je SAMOSTATNÝ BĚH — ne teď)
+
+`dsh-dev\_tools\tovarna\postavy\vystup\hra\manifest.json` (jen ke čtení):
+**90 sad, 13 NPC, 0 NPC bez sady**; směry 0–7, ale **jediný frame `f0`** (jsou to
+jednosnímkové kompozity, ne animace). 88 sad je `je_sestava: true` (tělo+zbroj
+v jednom snímku, modularita je v 3D datech), 47 je označeno `vrstvene`.
+Smlouvy: `hra-48` 42, `paperdoll` 28, `zbran` 14, `hra-velka` 5, `ikona-batoh` 1.
+
+**Co by znamenalo je zapojit (odhad, ne plán):** každé NPC by potřebovalo
+**animaci** (knihovna dává jediný snímek) — 13 NPC × 5 sprite směrů × 12 framů
+= **7 800 framů**, tj. **12,4 MB** RGBA na jeden typ animace (0,95 MB na sadu).
+Producent měří render **0,27–0,4 s/frame**, takže 13 NPC × 1 animace × 4 vrstvy
+je ~50–80 min renderu; s `work`/`attack`/`idle` trojnásobek. **Statické snímky
+jako první krok** by šly (kotvy i směry knihovna má), ale hra dnes umí jen
+animace z `anim-sheets.json` — statická cesta by byla **nová větev kódu**
+(`render.textures` pro bytosti dnes neexistuje), takže to není „zapojení dat“,
+ale nová funkce.
+
+## 🔧 JEDEN PŘÍKAZ IMPORTU (až sada přijde)
+
+```
+python tools/artgen/import_anim.py "E:\Workspaces\dsh-dev\_tools\tovarna\animace\vystup\hra\<sada>\<anim>" --nazev <sada>
+# zapojení = jeden řádek v assets/own-art.json:
+#   {"name": "<sada>", "manifest": ".../manifest.json", "anim": "res://assets/own-anim/<sada>/anim-sheets.json", "sprites": {...}}
+```
+
+`render.own_art.gd` klíč `anim` už validuje (a hlásí chybu seznamem), `render.anim_player`
+vrstvy indexuje **před** UO manifestem — takže „vlastní vyhrává, kde je“ platí i pro animace.
+
+## 🧪 REGRESE (beze změny stavu)
+
+* `Godot… --headless --path . --script res://tests/run_tests.gd` → **0 selhání**.
+* `python tools/gates/run-all.py` → **20 bran, 0 chyb**.
+* Determinismus G8/G9: beze změny (měněné soubory jsou `tools/` a dokumentace;
+  `sim/`, `app/`, `render/`, `data/` se nedotkly).
+* **Herní vizuál beze změny** — doloženo obsahem commitu, ne dojmem: `git show --stat`
+  obsahuje jen `tools/artgen/import_anim.py`, `tools/gates/check-anim-assets.py`,
+  `docs/04-architektura-a-smlouvy.md`, `HANDOFF.md`. Žádný soubor, který hra čte,
+  se nezměnil → vizuál se změnit **nemůže**.
+
+## 🧠 CO SE NAUČILO (naměřeno v téhle session, ne odhad)
+
+* **Výchozí hodnota argumentu v Pythonu se váže při importu modulu**, takže
+  „root“ předaný parametrem se do `nalezeno = nacti_x()` nepropíše. Chytila to
+  až **kontrola, že sabotovaný konvertor ještě funguje** (mutace jinak „projde“
+  z jiného důvodu, než je vložená vada).
+* **Zrcadlové dvojice směrů se musí měřit s posunem o půl cyklu chůze.** Bez
+  posunu vyšla nejvyšší IoU (0,71) na **špatné** dvojici; se posunem je rozdíl
+  jednoznačný (0,996 vs 0,53) — a na tom rozdílu stojí celé mapování směrů.
+* **Producentský `dN.png` (atlas) není bajtově totéž co `frames/dN_fM.png`**
+  (8 303 px rozdíl, max ΔA 64). Konvertor proto skládá pruh z **framů**
+  (autorita pro revizi i brány podle producentova návrhu) a atlas nepoužívá.
+
+## ⚠ OTEVŘENÉ BODY
+
+| # | Co | Kdo to zavře |
+|---|---|---|
+| I-1 | **Brána `check-anim-assets.py` NENÍ v `run-all.py`** — nemá herní data (2 z 5 směrů), v sérii by hlásila NEMĚŘENO. Přihlášení = jeden řádek v `run-all.py`. | až sada pro hrdinu pokryje 5 směrů |
+| I-2 | **`frame_ms` je ve hře konstanta 80 ms**; import ho zapisuje do manifestu, ale hra ho nečte (cyklus 1008 → 960 ms, −4,8 %). Data-driven časování = ~11 řádků v `anim_player`, samostatná změna s vlastní bránou. | rozhodnutí uživatele |
+| I-3 | **`work` nemá v `GROUP_KEY` klíč** — vlastní práci hra nenajde, dokud nepřibude `ACTION_WORK: "work"` (1 řádek). | až bude sada `work` |
+| I-4 | **Měřítko postavy** 86,4 px (producent) vs 62–64 px (UO/hra) = 1,31× — bez rozhodnutí by hrdina byl o třetinu větší. | rozhodnutí uživatele + producent |
+| I-5 | **4-směrná sada má nejistotu 180°** (zrcadlová dvojice je invariantní) — řeší se `posun_smeru` v manifestu; valecnik ho nemá. | producent (doplnit `posun_smeru`) |
+| I-6 | Statická knihovna 90 sad / 13 NPC = **inventura hotová, zapojení je samostatný běh** (nová větev kódu, viz výš). | samostatné zadání |
+
+---
+
 # Předání — game-clone (2026-10-19, SESSION „BĚH 3“: OPRAVA VÝHRAD VERIFIKÁTORA K BĚHU 2)
 
 > **Co je tenhle soubor:** **stav projektu** pro další session agenta. Přepisuje

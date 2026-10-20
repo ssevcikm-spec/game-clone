@@ -813,6 +813,118 @@ objekt (po sloučení hromady nebo prodeji) **není** předmět ve světě — d
 2026-10-19 se kreslil na dlaždici, kde ležel naposledy („obrázek rudy na
 dlaždici“).
 
+### 4.6.9 Import animací postav od producenta (PŘIDÁNO 2026-10-20)
+
+*(Vzniklo z integrační session 2026-10-20. Producent animací běží jako
+**paralelní session** v `E:\Workspaces\dsh-dev\_tools\tovarna\animace\` a jeho
+soubory jsou pro tenhle projekt **jen ke čtení**. Tenhle oddíl je **kontrakt
+konzumenta**: co musí sada splnit, aby se dala importovat jedním příkazem, a co
+se s ní ve hře stane. Nic z toho hru nemění — nová vrstva se **nezapíná**.)*
+
+**Jeden příkaz (až producent dodá sadu s 5 směry):**
+
+```
+python tools/artgen/import_anim.py "<sada>/<anim>" --nazev <jmeno>
+# -> assets/own-anim/<jmeno>/anim-sheets.json + <jmeno>-400-0-<smer>.png
+```
+
+Zapojení do hry je pak **jeden řádek** v `assets/own-art.json` (`"anim":
+"res://assets/own-anim/<jmeno>/anim-sheets.json"`) — `render.own_art.gd` ten
+klíč už zná a validuje (`KINDS` se ho netýká, `anim` je samostatné pole vrstvy).
+**V téhle session se to NEDĚLÁ**: hrdina má vlastní jen 2 z 5 sprite směrů.
+
+#### Formát konzumenta (co hra opravdu čte)
+
+| Věc | Hodnota | Kde |
+|---|---|---|
+| klíč spritu | `"<telo>/<skupina>/<smer>"` (řetězec) | `anim_player._key` |
+| směr | **8 světových** → 5 sprite směrů + zrcadlení | `anim_player.DIR_MAP` |
+| frame | `{rect:[l,t,r,b], cx, cy, w, h}`; kreslí se `Rect2(rect[0], rect[1], w, h)` | `_texture` |
+| **kotva** | `anchor = (cx, cy + h)` — bod, který patří na patu dlaždice | `play()` |
+| zrcadlení | `mirror_x = int(w) − int(cx)`; kreslí se na `tile_x − mirror_x` | `play()` |
+| časování | `frame_ms(action) = Const.TURN_MS = **80 ms**` pro **všechny** akce | `anim_player` |
+| skupiny | `groups[telo] = {walk, idle, attack, die}` z `assets/uo/anim/anim-sheets.json` | `_prijmi_skupiny` |
+| vrstvy | `own_layers` se indexují **před** UO manifestem (vlastní vyhrává, kde je) | `_init` |
+
+**Kotva je měřená, ne dohodnutá.** Tři nezávislé sady se stejným principem
+(`anchor = (cx, cy+h)`, tedy „kontaktní bod je `h − (cy+h)` px nad spodní hranou"):
+
+| sada | `cx` | `cy` | `h` | `anchor.y = cy+h` | kontakt nad spodní hranou |
+|---|---|---|---|---|---|
+| UO `400/0/0` | 12 | −11 | 64 | 53 | 11 px |
+| vlastní `own-v3` `400/0/0` | 17 | −22 | 84 | 62 | 22 px |
+| producent `rodina_walk` | 20,5 | −16,28 | 97 | **80,72** | 16,28 px |
+
+Producentský manifest dává kotvu **absolutně v plátně** (`kotvy.d0 = [20.5, 80.72]`),
+takže konvertor počítá `cy = kotva.y − h`; tím je `(cx, cy+h)` **přesně** kotva
+producenta — ověřeno na obou reálných sadách (sonda v Godotu: `anchor` =
+`[20.5, 80.720001]`).
+
+#### Mapování směrů: 8 světových → 5 sprite (a co z toho plyne pro producenta)
+
+`DIR_MAP` (`core/const.gd`: 0 = E … 7 = SE) a projekce `screen = ((x−y),(x+y))`
+(`core/iso.gd`) dávají, pod jakým úhlem na obrazovce se který světový směr
+kreslí. **Naměřeno** (dvě nezávislé sady, zrcadlové dvojice s posunem o půl
+cyklu, IoU masky):
+
+| producent | úhel na obrazovce | světový směr | sprite směr | zrcadlit |
+|---|---|---|---|---|
+| 4 směry, `d0` | 225° (dolu-vlevo) | S (6) | **1** | ne |
+| `d1` | 135° (nahoru-vlevo) | W (4) | **3** | ne |
+| `d2` | 45° (nahoru-vpravo) | N (2) | 3 | ano (duplikát) |
+| `d3` | 315° (dolu-pravo) | E (0) | 1 | ano (duplikát) |
+
+Zrcadlové dvojice naměřené na obou sadách: `(d0,d3)` IoU **0,996 / 0,969** a
+`(d1,d2)` **0,994 / 0,968**; ostatní dvojice 0,53–0,67. To je fáze prstence
+smerů, na které stojí celé mapování (postup: `import_anim.py --overit-zrcadla`).
+Skript fázi neopisuje, bere ji z `posun_smeru` v manifestu (rodina má 2,
+valecnik klíč **nemá** → 0) — 4-směrná sada má totiž **inherentní nejistotu
+180°**, kterou data nerozliší.
+
+**Důsledek, který se nesmí zamlčet:** 4-směrná sada pokryje jen sprite směry
+**1 a 3**, tedy 2 z 5. Hra je 8směrná a potřebuje **0..4** (0 = čelní/SE,
+2 = profil, 4 = zadní/NW). Import 4-směrné sady proto skončí kódem **2**
+(„HRDINU NAHRADIT NEMUZE“), s `--pro-hrdinu` kódem **1**.
+
+#### `frame_ms`: co hra umí a co by musela umět
+
+Producent posílá `frame_ms` **84** (12 framů, cyklus 1008 ms) a **42**
+(16 framů, 672 ms). Hra má 80 ms **jako konstantu** (`frame_ms(action)` bere
+argument, ale hodnota na akci nezávisí). Import proto `frame_ms` **zapíše do
+manifestu** (klíč `import.frame_ms`, vedle `frame_ms_hra: 80`, `cyklus_ms`
+a `cyklus_ms_hra`) a **framy nepřevzorkovává**: 12 framů na 80 ms = 960 ms
+místo 1008 ms je **rozdíl 4,8 %**, který oko nepozná, kdežto změna kódu hry by
+byla zásah do chování. **Co by hra musela umět**, aby se časování řídilo daty:
+`frame_ms` číst z manifestu vrstvy (`_prijmi` ho dnes zahazuje) a spočítat
+z něj `tick / frame_ms` per vrstva — je to **jedenáct řádků** v `anim_player`,
+patří to do samostatné změny s vlastní bránou (G8/G9 se to netýká, časování
+obrazu není stav světa — `docs/01 §1.5 bod 3`).
+
+#### `work` a `attack`: kde vzít číslo skupiny
+
+| akce | číslo skupiny pro tělo 400 | zdroj | poznámka |
+|---|---|---|---|
+| `walk` | 0 | `groups["400"].walk` (UO export) | dnes ho používá `own-v3` |
+| `attack` | 9 | `groups["400"].attack` | export UO skupinu 9 **nemá** → dnes fallback na walk + svih; import `400/9/*` fallback **obejde** (klíč se najde dřív) |
+| `work` | **není** | — | `GROUP_KEY` v `anim_player` zná jen 0–4; `ACTION_WORK = 5` se mapuje fallbackem `["attack","walk"]`, takže **vlastní práci hra dnes nenajde** |
+
+`work` proto konvertor zapíše pod **volné číslo skupiny** (pro tělo 400: 5) a do
+manifestu dá `groups["400"].work = 5`; aby ji hra použila, musí do `GROUP_KEY`
+přibýt **jeden řádek** (`ACTION_WORK: "work"`). To je **změna hry**, ne importu
+— nedělá se, dokud sada neexistuje.
+
+#### Brána
+
+`tools/gates/check-anim-assets.py` měří **výstup** konvertoru (ne jeho kód) na
+syntetických fixturách se známými barvami smerů a na **reálných** datech
+producenta zkopírovaných do `.cache/`: počty framů a směrů, `rect` konzistence,
+kotva uvnitř plátna a symetrie `cx ≈ w/2`, žádný prázdný frame, **mapování 8→5
+pixelově podle barev**, odmítnutí 4-směrné sady (kód 2, s `--pro-hrdinu` 1)
+a fáze prstence směrů. `--self-test` (známý dobrý i vadný konvertor) a
+`--mutace` (4 sabotáže konvertoru, každá musí branu shodit).
+**V `run-all.py` záměrně NENÍ** — nemá herní data; přihlášení je jeden řádek,
+až sada pro hrdinu pokryje 5 směrů (viz HANDOFF).
+
 ## 4.7 Uložení, načtení, determinismus
 
 | Věc | Rozhodnutí |
