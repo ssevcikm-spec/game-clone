@@ -167,6 +167,19 @@ func _zkontroluj_body() -> void:
 	var veci: Dictionary = _pozice_veci()
 	var walk = _walk()
 	var mapa = _scene.map
+	# ⚠ MAPA MUSI BYT NACHTENA (2026-10-20, namereno v cistem worktree HEAD:
+	# bez dat UO vraci `land_at` -1 a `surface_z` -1, takze by VSECHNY body
+	# vypadaly jako vada - a to je lez: chybi vstup, ne body. Takovy stav je
+	# NEMERENO (docs/08 §8.6), ne VADA - jinak by brana cervenala na stroji,
+	# kde data UO nejsou (mapa je v `assets/uo/`, ktera v gitu NENI).
+	# ⚠ `land_at` vraci INT (-1 = mimo mapu), NIKDY `null` - srovnavat s null
+	# znamenalo, ze se chybejici mapa tvari jako "dlazdice existuje" (namereno).
+	if mapa == null or int(mapa.land_at(1495, 1630)) < 0:
+		_mereni["mapa_nactena"] = 0
+		print("[travel] NEMERENO: mapa neni nactena (chybi data UO) - "
+			+ "body, dosah ani krok po teleportu nejde overit")
+		return
+	_mereni["mapa_nactena"] = 1
 	var stanoviste := {"start": 0, "tezba": 0, "kovani": 0, "obchod": 0, "boj": 0}
 	var kamera_pred: Vector2 = _scene.world_view._camera.position \
 		if _scene.world_view._camera != null else Vector2.ZERO
@@ -176,8 +189,9 @@ func _zkontroluj_body() -> void:
 		var tile := Vector2i(int(bod["x"]), int(bod["y"]))
 		var z: int = int(bod["z"])
 		var kdo: String = "bod %d (%s, %s)" % [i, str(bod.get("id", "?")), str(tile)]
-		# (a) NA MAPE: dlazdice existuje a `z` je vyska povrchu = kam se stanе.
-		if mapa == null or mapa.land_at(tile.x, tile.y) == null:
+		# (a) NA MAPE: dlazdice existuje a `z` je vyska povrchu = kam se stane.
+		# `land_at` vraci -1 pro "mimo mapu" (nikdy null).
+		if mapa == null or int(mapa.land_at(tile.x, tile.y)) < 0:
 			_vada(kdo + ": dlazdice neni na mape")
 		else:
 			_pricti("na_mape")

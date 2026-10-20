@@ -226,6 +226,14 @@ def check(root: Path, gate: Gate) -> None:
         return
     gate.measure("bodu_mereno", d["bodu"])
     gate.measure("vad_ze_sondy", d["vad"])
+    # MAPA NENI NACHTENA = NEMERENO, ne VADA (docs/08 §8.6): v cistem worktree
+    # chybi data UO (mapa je v `.cache/`, ktera v gitu NENI) a vsechny body by
+    # vypadaly jako "mimo mapu" - to je chybejici vstup, ne vada bodu. Chybejici
+    # klic znamena "sonda ho nenahlasila" a zustava VADA nize.
+    mereni = d.get("mereni", {})
+    if "mapa_nactena" in mereni and int(mereni["mapa_nactena"]) == 0:
+        gate.skip("sonda: mapa neni nactena (chybi data UO) - G22 nemeri mapu a dosah")
+        return
     for klic in sorted(d.get("mereni", {})):
         gate.measure("sonda_" + klic, int(d["mereni"][klic]))
     for text in chyby_z_mereni(d, len(body)):
