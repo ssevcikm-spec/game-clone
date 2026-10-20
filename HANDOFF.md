@@ -1,3 +1,114 @@
+# Předání — game-clone (2026-10-20, SESSION „TELEPORT“: DEBUG TELEPORT MEZI TESTOVACÍMI BODY — F7 + číslice 1–9)
+
+> **Co je tenhle blok JE:** **záznam o provedení**. Uživatel chtěl „teleport nebo
+> jinou možnost, jak se pohybovat mezi testovacími body (těžba, boj, obchod)“.
+> Postavena je **DEBUG POMŮCKA, NE HERNÍ FUNKCE**: seznam bodů, `F7` ho
+> otevře/zavře, číslice `1`–`9` na bod skočí, `Esc` ho zavře. **Nemění se herní
+> pravidla, uložená data, art ani determinismus** (pozice hráče do `state_hash`
+> nevstupuje; G8/G9 zelené).
+> **Odkud brát detaily:** `data/test-points.json` (data), `app/debug_travel.gd`
+> (validace + teleport), `ui/debug_travel.gd` (okno), `app/player_controller.gd`
+> (`teleport_na`, klávesy), brána **G22** `tools/gates/check-travel.py` + sonda
+> `tools/gates/travel_probe.gd`, smlouva `docs/05 §5.3.1` a `docs/08 §8.2`.
+> **Současný stav se bere z tohohle bloku.**
+
+## ✅ CO JE HOTOVÉ (a čím je to doložené)
+
+| Co | Soubor | Důkaz |
+|---|---|---|
+| **Data bodů** (5 bodů: start, kování, obchod, těžba, boj) | `data/test-points.json` | čte je modul i brána; `app/main` vypíše `[main] debug travel: 5 bodu (...), vad 0` |
+| **Modul** (validace dat + teleport + hlášení) | `app/debug_travel.gd` | unit test `tests/cases/ui_debug_travel.gd` (26 kontrol), brána G22 |
+| **Okno** (tenký klient: řádky vstupem, vykreslí je) | `ui/debug_travel.gd` | unit test (řádky z UZLŮ, `flush`, prázdno se řekne), sonda G22 (`panel_otevreni/zavreni/escape`) |
+| **Teleport = pozice hráče + kamera** | `app/player_controller.gd` (`teleport_na`), `sim/systems/movement.gd` (`cancel_step`) | sonda G22: `pozice_presna 5/5`, `kamera 5/5`, `kamera_se_posunula 5/5` |
+| **Klávesy** `F7` (seznam), `1`–`9` (skok, jen při otevřeném seznamu), `Esc` (zavřít) | `app/player_controller.gd` (`UI_KEYS` + `TRAVEL_KEYS`), `app/main.gd` (`_zavri_okna`) | sonda G22 mačká **skutečné klávesy** (`Input.parse_input_event`); `help.json` je uvádí (anti-drift test `ui_hotkeys.gd` oběma směry) |
+| **Brána G22** (data + živá scéna) | `tools/gates/check-travel.py`, `tools/gates/travel_probe.gd`, `run-all.py` | `exit 0`, 13 měření; self-test **18/0**; mutace **5/5 chyceno** |
+| **Dokumentace** | `docs/05 §5.3.1` (klávesy), `docs/08 §8.2` (G22 + pořadí), tenhle blok | — |
+| **Snímek** | `.tmp/teleport-panel.png` (NENÍ v gitu) | 1600×900, okenní režim, panel otevřený `F7`, 5 řádků, hráč na `(1495, 1630, 10)` |
+
+## ⌨️ JAK TO HRÁČ POUŽIJE (přesné klávesy)
+
+1. `F7` — otevře seznam `TEST POZICE - teleport (debug)` (5 řádků: číslo, název,
+   `x,y,z`, druh, poznámka).
+2. `1` … `5` — skok na bod (číslice platí **jen při otevřeném seznamu**; jinde
+   by kradly klávesy hře). Do žurnálu jde `Teleport: <název> (debug)`.
+3. `F7` znovu nebo `Esc` — seznam zavře (jako ostatní okna).
+4. Po skoku se hraje dál: `E`/`T` na věc pod kurzorem, `A` útok, `Q` loot —
+   body jsou zvolené tak, aby od nich bylo to, kvůli čemu tam hráč jde, na dosah.
+
+## 📍 BODY (každý ověřený sondou na živé scéně, ne odhadem)
+
+| # | id | název | dlaždice (`x,y,z`) | `proc` | Co odsud jde (naměřeno) |
+|---|---|---|---|---|---|
+| 1 | `start` | Start (Britain, náměstí) | `1495,1630,10` | start | výchozí bod hry (`app/main.BRITAIN`), `z` = výška povrchu |
+| 2 | `kovani` | Výheň + kovadlina | `1494,1630,10` | kovani | výheň **2** dlaždice, kovadlina **1** (`STATION_RANGE = 2`) |
+| 3 | `obchod` | Kovář (obchod) | `1497,1629,10` | obchod | prodejce `blacksmith` na `(1496,1629)` = **1** dlaždice (`VENDOR_RANGE = 2`) |
+| 4 | `tezba` | Balvan (ruda) | `1495,1633,10` | tezba | rudný balvan na `(1495,1632)` = **1** dlaždice (dosah těžby z `harvest.BANKS["ore"].range`) |
+| 5 | `boj` | Hřbitov (monstra) | `1371,1482,10` | boj | spawn bod `graveyard_britain` (`data/spawns.json`, střed `1374,1482`, radius 6); nejbližší živé monstrum **3** dlaždice (limit `ATTACK_RANGE = 10`) |
+
+**Proč zrovna hřbitov:** je to **skutečný spawn bod z dat** (`spawns.json`), ne
+sešítek; v běhu tam stojí skeleton a krysa (`1378,1478` a `1374,1484`). Krysa
+u Britainu (`app/main._postav_monstra_u_hrace`, `1499,1632`) tam zůstává taky —
+je to druhá, „demo“ cesta. **Naměřená nesrovnalost, kterou jsem NEOPRAVOVAL:**
+monstra ze spawnu stojí na `z = 0`, ale povrch hřbitova je `z = 10` (data
+`spawns.json` výšku nepočítají) — hráč je po teleportu o 40 px výš. Je to
+vlastnost dat spawnu, ne teleportu.
+
+## 📊 NAMĚŘENO (2026-10-20, každé číslo s postupem)
+
+| Co | Hodnota | Postup / doklad |
+|---|---|---|
+| **G22** | `exit 0`, **13 měření** (data + sonda) | `python tools/gates/check-travel.py` |
+| **G22: sonda (živá scéna)** | `bodu 5`, `vad 0`; `pozice_presna 5`, `kamera 5`, `kamera_se_posunula 5`, `na_mape 5`, `vyska_sedi 5`, `prujezd 5`, `dosah 5`, `ruzne_body 1`, `druh_start/tezba/kovani/obchod/boj 1`, `panel_otevreni 1`, `panel_zavreni 1`, `escape_zavreni 1`, `skok_cislici 1`, `hlaseni 1`, `tick_po_teleportu 1`, `vstup_po_teleportu 1` | `python tools/gates/check-travel.py` (řádek `sonda_*`) |
+| **G22: self-test** | **18 případů, 0 chyb** | `python tools/gates/check-travel.py --self-test` |
+| **G22: mutace** | **5 sabotáží, 5 chyceno, `exit 0`** (M1 teleport bez pozice, M2 bez kamery, M3 chybějící bod `obchod`, M4 panel se neotevře, M5 bez hlášky) | `python tools/gates/check-travel.py --mutace` (5× `CHYCENO`) |
+| **Godot testy** | **2900 kontrol, 0 selhání, 91 case souborů, `exit 0`** | `Godot… --headless --path . --script res://tests/run_tests.gd` |
+| **Brány celkem** | **21 měřeno, 0 čeká, 0 chyb** (nově G22) | `python tools/gates/run-all.py` (`.tmp/beh4-runall.log`) |
+| **Determinismus a replaye** | G8 `OK`, G9 `OK` po **posledním** stavu kódu | `python tools/gates/run-all.py --only g8,g9` |
+| **Snímek** | `.tmp/teleport-panel.png`, 1600×900, PNG, 5 řádků panelu | `godot --path . --fixed-fps 60 --script res://.tmp/probe_snimek_teleport.gd` (okenní režim) |
+
+## 🧪 JAK TO OVĚŘIT SÁM
+
+```
+python tools/gates/check-travel.py                 # G22: data + živá scéna
+python tools/gates/check-travel.py --self-test     # 18 případů offline
+python tools/gates/check-travel.py --mutace        # 5 sabotáží musí dát exit 1
+python tools/gates/run-all.py                      # 21 bran
+Godot… --headless --path . --script res://tests/run_tests.gd
+```
+
+## 🧠 CO SE NAUČILO (naměřeno v téhle session)
+
+* **PowerShell není editor.** `(Get-Content) -replace ... | Set-Content -NoNewline`
+  mi **spojil celý soubor do jednoho řádku** (byl to nový `check-travel.py`) —
+  `py_compile` to chytil, `write` tool soubor odmítl přepsat („file changed since
+  it was read"), takže se musel založit znovu. Textové soubory se editují
+  `edit`/`write`, ne PowerShellem (stanice to má v pravidlech a je to pravda).
+* **Regulární výraz bez `re.MULTILINE` nenajde řádek uprostřed výstupu.**
+  `MERENI: ...$` prošlo jen proto, že `$` je konec stringu; brána pak hlásila
+  „sonda NEUVEDLA 21 měření“ a vypadalo to jako rozbitá sonda. Chyba byla
+  v braně, ne v sondě (a odhalila ji až kontrola „co je v `mereni` prázdné“).
+* **Panel bez kontejneru si velikost nenastaví sám.** `PanelContainer` přidaný
+  do `Control` (ne do kontejneru) zůstal na `custom_minimum_size`, takže
+  zalomené poznámky přetekly pod pozadí a text ležel na mapě (vidět na snímku).
+  Řešení: po `flush()` nastavit `panel.size = panel.get_combined_minimum_size()`
+  (naměřeno: `460×320` místo `460×210`).
+* **Teleport musí zrušit běžící krok.** Kdyby `movement._pending` zůstal, aplikuje
+  se po skoku a hráč se posune o dlaždici z minulého místa. Přidána aditivní
+  metoda `sim.movement.cancel_step` (hra ji nevolá, takže determinismus beze změny).
+* **Dvě okna na stejné pozici nejsou „drobnost“.** První verze okna teleportu
+  stála na `(340,300)`, tedy přes nápovědu — na snímku nebylo čitelné ani jedno.
+  Přesunuto na `(460,8)` (vedle nápovědy).
+
+## ⚠ OTEVŘENÉ BODY
+
+| # | Co | Kdo to zavře |
+|---|---|---|
+| T-1 | **`data/spawns.json` nemá výšku** (`z: 0` u hřbitova, povrch je `10`) — monstra stojí o 40 px níž, než je země. Teleport to neovlivní, ale při pohledu na hřbitov je to vidět. | samostatné zadání (data spawnu) |
+| T-2 | **Číslice 1–9 fungují jen při otevřeném seznamu** (rozhodnutí, ne vada: jinak kradou klávesy hře). Kdyby je chtěl uživatel globálně, je to jeden řádek v `player_controller._process`. | rozhodnutí uživatele |
+| T-3 | **Panel je jen pro čtení** — body se needitují ve hře (data jsou v `data/test-points.json`; mod je může přebít, protože soubor je deklarovaný ve vrstvách obsahu). | až bude potřeba |
+
+---
+
 # Předání — game-clone (2026-10-20, SESSION „IMPORT-ANIM“: IMPORT ANIMACÍ OD PRODUCENTA PŘIPRAVENÝ JEDNÍM PŘÍKAZEM — hra beze změny)
 
 > **Co je tenhle blok JE:** **záznam o provedení** (příprava konzumenta pro

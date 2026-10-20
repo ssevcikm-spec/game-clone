@@ -161,6 +161,20 @@ func pending_step(serial: int) -> Dictionary:
 	return (_pending[serial] as Dictionary).duplicate()
 
 
+func cancel_step(serial: int) -> bool:
+	# ZRUSENI BEZICIHO KROKU (2026-10-20). Jediny volajici je DEBUG TELEPORT
+	# (`app/player_controller.teleport_na`): kdyby krok v letu zustal, aplikoval
+	# by se po skoku a hrac by se posunul o dlazdici zameru z MINULEHO mista -
+	# hrac by to videl jako "teleport a pak krok navic".
+	#
+	# NENI to herni pravidlo: hra tuhle metodu nevola (krok se normalne dojde),
+	# takze determinismus ani replaye se nemENI. Vraci true, kdyz bylo co rusi.
+	if not _pending.has(serial):
+		return false
+	_pending.erase(serial)
+	return true
+
+
 func request_step(m: int, dir: int, run: bool) -> Dictionary:
 	var mob = _registry.get_mobile(m)
 	if mob == null:

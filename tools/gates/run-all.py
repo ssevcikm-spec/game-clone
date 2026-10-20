@@ -90,6 +90,12 @@ ORDER = [
     # pet vad proslo vsemi zelenymi testy i G20, protoze zadna z nich neni
     # o systemech `sim/` - vsechny jsou o obrazu a o tom, na co se klika.
     ("G21", "check-feel.py"),
+    # G22 (DEBUG TELEPORT MEZI TESTOVACIMI BODY, 2026-10-20) stoji za G21: je to
+    # taky integracni brana nad ZIVOU scenou (kamera, panel, REALNE klavesy), ale
+    # meri DEBUG pomucku, ne herni funkci - tak patri na konec mereni.
+    # Hlida, ze body z `data/test-points.json` jsou na mape, dosazitelne a od
+    # sebe ruzne, ze teleport nastavi pozici PRESNE a ze panel/klavesy funguji.
+    ("G22", "check-travel.py"),
     ("G10", "check-render.py"),
 ]
 TESTS_GATE = "G3"

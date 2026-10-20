@@ -228,6 +228,38 @@ větev **a** test. Když větev chybí, hra na použití odpoví hláškou
 **Pravidlo UI:** UI je „tenký klient". Nikdy nepočítá pravidla (cenu, damage,
 úspěch výroby) — ta počítá simulace a UI je jen zobrazí.
 
+### 5.3.1 Klávesy klienta (co je dnes opravdu v `InputMap`)
+
+Zdroj pravdy jsou konstanty v `app/player_controller.gd` (`KEYS`, `TURN_KEYS`,
+`MOUSE`, `INTERACT_KEYS`, `ATTACK_KEYS`, `UI_KEYS`, `TRAVEL_KEYS`); nápověda ve
+hře (`H`/`F1`) je bere z `InputMap`, takže se nemůže rozejít s ovládáním
+(test `tests/cases/ui_hotkeys.gd` to hlídá oběma směry).
+
+| Klávesa | Co dělá | Druh |
+|---|---|---|
+| šipky / numpad 1–9 | krok jedním z 8 směrů | hra |
+| Ctrl + šipka | otočení na místě | hra |
+| Shift | přepnutí chůze / běh | hra |
+| pravé tlačítko myši (drž) | chůze za kurzorem | hra |
+| `E` / `T` | použij, co je pod kurzorem | hra |
+| `A` / levé tlačítko | útok na nejbližší monstrum / na cíl | hra |
+| `Q` | vezmi obsah nejbližšího těla | hra |
+| `B`, `K`, `P`, `H`/`F1` | batoh, skilly, pravidla, nápověda | hra |
+| `F2` | svět přes celé okno (bez černého pásu) | **debug/QoL** |
+| `F3` | technické hodnoty na obrazovce | **debug** |
+| **`F7`** | **seznam testovacích bodů (teleport)** | **debug** |
+| **`1`–`9`** | **skok na bod ze seznamu — jen při otevřeném `F7`** | **debug** |
+
+**`F7` + číslice 1–9 je DEBUG POMŮCKA, ne herní funkce** (2026-10-20): slouží
+k přesunu mezi testovacími body (těžba, boj, obchod, kování, start), aby se
+nemuselo dojít pěšky. Data jsou v `data/test-points.json` (ověřená bránou
+**G22**, `docs/08` §8.2), modul je `app/debug_travel.gd` a okno
+`ui/debug_travel.gd`. Teleport **jen nastaví pozici hráče a kamery** — neposílá
+příkaz do simulace, nemění uložená data, art ani determinismus (`state_hash`
+se po teleportu nehne; pozice hráče do hashe nevstupuje). Do žurnálu jde
+`Teleport: <název> (debug)`. Panel jde zavřít i `Esc` (jako ostatní okna).
+
+
 ## 5.4 Manipulace: předměty, kontejnery, výbava (§ V4)
 
 | Věc | Hodnota (ověřeno) | Poznámka |

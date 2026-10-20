@@ -25,6 +25,7 @@
     "data/spawns.json",
     "data/stairs.json",
     "data/teleports.json",
+    "data/test-points.json",
     "data/vendors.json",
     "data/weapons.json"
    ]

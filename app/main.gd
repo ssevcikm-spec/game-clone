@@ -79,6 +79,12 @@ const SkillListScript = preload("res://ui/skill_list.gd")
 # a z REALNYCH vazeb v `InputMap` (klavesy se do dat NEPISUJI - dve pravdy
 # o klavesach by znamenaly, ze hrac maze klavesu, ktera nic nedela).
 const HotkeysScript = preload("res://ui/hotkeys.gd")
+# DEBUG TELEPORT (2026-10-20): seznam testovacich bodu (tezba, boj, obchod,
+# kovani, start) a skok na ne. JE TO DEBUG POMUCKA, NE HERNI FUNKCE - viz
+# hlavicka `app/debug_travel.gd`; uzivatel o ni pozadal (aby se nemusel
+# prochazet mezi testovacimi body pesky). Data jsou v `data/test-points.json`.
+const DebugTravelScript = preload("res://app/debug_travel.gd")
+const DebugTravelPanelScript = preload("res://ui/debug_travel.gd")
 # `HELP_DATA` tu BYLO do 2026-10-11 (S1b): cestu k napovede drzi jen `help_data`
 # (plni ji `_nacti_obsah()` z vrstev obsahu). Mrtva konstanta je dluh - kdyby
 # zustala, cetl by z ni nekdo "zakladni" cestu a mod by u napovedy nefungoval.
@@ -180,6 +186,8 @@ var skill_list = null            # `ui.skill_list` (2026-10-10, D10)
 var vendor_gump = null           # `ui.vendor_gump` (2026-10-10, D10)
 var vendor = null                # `sim.vendor` (2026-10-10, D10)
 var hotkeys = null               # `ui.hotkeys` (session D) - napoveda pro hrace
+var debug_travel = null          # `app.debug_travel` (2026-10-20) - DEBUG teleport
+var debug_travel_panel = null    # `ui.debug_travel` - okno se seznamem bodu
 # NAPOVEDA Z DAT (`data/help.json`, session D): nacte se JEDNOU, aby se JSON
 # neparsoval pri kazdem otevreni okna. Prazdny slovnik = data se neprecetla
 # a kazdy, kdo se na ne ptá, to MUSI nahlasit (zadna ticha prazdna napoveda).
@@ -402,6 +410,17 @@ func _jmena_vrstev(vrstvy: Array) -> Array:
 	var out: Array = []
 	for v in vrstvy:
 		out.append(str(v.get("name", "?")))
+	return out
+
+
+func _jmena_bodu() -> Array:
+	# Jmena testovacich bodu do logu (2026-10-20). Kdyz se data neprectou, je
+	# seznam PRAZDNY a log to ukaze cislem 0 - nikdy falesne "vsechno je tu".
+	var out: Array = []
+	if debug_travel == null:
+		return out
+	for bod in debug_travel.body():
+		out.append(str(bod.get("id", "?")))
 	return out
 
 
@@ -678,6 +697,24 @@ func _setup_ui() -> void:
 	# Control s vychozi velikosti (0,0) text NEKRESLI, i kdyz data ma.
 	hotkeys.custom_minimum_size = Vector2(440.0, 540.0)
 	hotkeys.size = Vector2(440.0, 540.0)
+	# DEBUG TELEPORT (2026-10-20): okno se seznamem testovacich bodu. JE
+	# ZAVRENE, dokud hrac nezmackne `F7` (klavesa je v
+	# `app/player_controller.UI_KEYS`) - pri hrani nema co zakryvat svet.
+	# Obsah plni `_setup_player` (až je známý hráč a kamera) - UI samo o bodech
+	# nic nevi (tenky klient, docs/04 §4.1).
+	debug_travel_panel = DebugTravelPanelScript.new()
+	debug_travel_panel.name = "DebugTravel"
+	hud.add_child(debug_travel_panel)
+	debug_travel_panel.visible = false
+	# ⚠ POZICE: (460, 8) - VEDLE napovedy (ta je 440 siroka na x=8), aby si okna
+	# neprekryvala text (namereno 2026-10-20: na (340,300) lezelo okno teleportu
+	# pres napoved a ani jedno nebylo citelne).
+	if not hud.register_window("debug_travel", debug_travel_panel, Vector2(460.0, 8.0)):
+		push_warning("app.main: okno debug teleportu se nepodarilo zaregistrovat v HUD")
+	# ⚠ VELIKOST JE POVINNA (stejna past jako u `ui.journal`, `ui.skill_list`
+	# a `ui.hotkeys`): Control s vychozi velikosti (0,0) text NEKRESLI.
+	debug_travel_panel.custom_minimum_size = Vector2(460.0, 210.0)
+	debug_travel_panel.size = Vector2(460.0, 210.0)
 	# DEBUG OVERLAY: neni to okno (nema titul ani se neposouva) - je to vrstva
 	# textu v levem hornim rohu, VIDITELNA od startu, aby ji zachytil screenshot.
 	# `F3` ji prepina (`app/player_controller`). Hodnoty plni `_debug_values()`.
@@ -1124,6 +1161,20 @@ func _setup_player(view) -> void:
 	controller.hotkeys = hotkeys         # klavesa `H`/`F1` ukaze napovedu (D)
 	controller.debug_overlay = debug_overlay   # klavesa `F3` prepina overlay
 	controller.okno = self              # klavesa `F2` prepina fullsize (bod 5.2)
+	# DEBUG TELEPORT (2026-10-20): modul dostane hrace, klienta (kamera) a okno.
+	# Zaklada se TADY, po `controller.setup()`: potrebuje hotovy controller
+	# a take se az tady vi, ze svet stoji. Data jdou Pres `_cesta()` (vrstvy
+	# obsahu, S1b) - mod, ktery chce body prebit, to umi jednim souborem.
+	debug_travel = DebugTravelScript.new(_cesta("res://data/test-points.json"))
+	debug_travel.hlaseni = _hlaseni_do_zurnalu
+	debug_travel.setup(player, controller, debug_travel_panel)
+	controller.debug_travel = debug_travel      # `F7` seznam, `1`-`9` skok
+	for vada in debug_travel.vady():
+		push_warning("app.main: testovaci body: " + str(vada))
+	print("[main] debug travel: ", debug_travel.pocet(), " bodu (",
+		", ".join(PackedStringArray(_jmena_bodu())), "), vad ",
+		debug_travel.vady().size(), ", teleportu ", debug_travel.teleportu(),
+		" | F7 seznam, 1-9 skok (DEBUG, ne herni funkce)")
 	# NAPOVEDA A UVOD DO ZURNALU (session D): az TEDY, po `controller.setup()`,
 	# protoze se klavesy berou z `InputMap` (registruje je `register_actions()`)
 	# a z toho, co hra OPRAVDU umi. Kdyby se skladaly driv, byla by v napovede
@@ -1980,7 +2031,8 @@ func _zavri_okna() -> int:
 	# `api_zavri false`, `tlacitko_close false`). Vraci POCET zavrenych oken
 	# (0 = nebylo co zavrit); "zavreno" tak neni tiche.
 	var zavreno: int = 0
-	for okno in [vendor_gump, craft_gump, backpack, skill_list, policy_panel]:
+	for okno in [vendor_gump, craft_gump, backpack, skill_list, policy_panel,
+			debug_travel_panel]:
 		if okno == null or not okno.has_method("zavri"):
 			continue
 		if okno.has_method("je_otevreny") and not bool(okno.je_otevreny()):

@@ -1,0 +1,66 @@
+{
+  "_popis": [
+    "TESTOVACÍ BODY PRO DEBUG TELEPORT (2026-10-20, session TELEPORT).",
+    "Co je tenhle soubor: DATA pro DEBUG POMŮCKU, ne herní obsah. Hráč se na",
+    "body dostane klávesou F7 (seznam) a číslicí 1-9 (teleport). NENÍ to herní",
+    "funkce: nemá vliv na uložená data, determinismus ani art - jen nastaví",
+    "pozici hráče a kamery (docs/05 §5.1.9, docs/08 G22).",
+    "POZICE SE NEOPISUJÍ ODHADEM: každá je naměřená sondou",
+    "`tools/gates/travel_probe.gd` na ŽIVÉ scéně - ověřuje, že dlaždice je na",
+    "mapě (z = výška povrchu), že se z ní dá jít aspoň třemi směry a že je od ní",
+    "věc, kvůli které tam hráč jde, na dosah (kovadlina/výheň 2, prodejce 2,",
+    "balvan 2 dlaždice; monstrum do 10 = `ATTACK_RANGE` klienta).",
+    "Když se stanice/prodejce/balvan v `app/main.gd` posunou, brána G22 spadne -",
+    "data a realita se rozejdou VIDITELNĚ, ne tichým teleportem na prázdno.",
+    "`proc` je to, co bod hráči umožní: start / tezba / kovani / obchod / boj.",
+    "`x`, `y`, `z` jsou SOUŘADNICE DLAŽDICE (z = výška povrchu, viz `z` výš)."
+  ],
+  "titulek": "TEST POZICE - teleport (debug)",
+  "body": [
+    {
+      "id": "start",
+      "nazev": "Start (Britain, náměstí)",
+      "x": 1495,
+      "y": 1630,
+      "z": 10,
+      "proc": "start",
+      "poznamka": "výchozí bod hry (app/main.BRITAIN)"
+    },
+    {
+      "id": "kovani",
+      "nazev": "Výheň + kovadlina",
+      "x": 1494,
+      "y": 1630,
+      "z": 10,
+      "proc": "kovani",
+      "poznamka": "výheň (1496,1630) 2 dlaždice, kovadlina (1495,1631) 1 dlaždice"
+    },
+    {
+      "id": "obchod",
+      "nazev": "Kovář (obchod)",
+      "x": 1497,
+      "y": 1629,
+      "z": 10,
+      "proc": "obchod",
+      "poznamka": "prodejce 'blacksmith' na (1496,1629)"
+    },
+    {
+      "id": "tezba",
+      "nazev": "Balvan (ruda)",
+      "x": 1495,
+      "y": 1633,
+      "z": 10,
+      "proc": "tezba",
+      "poznamka": "rudný balvan na (1495,1632), další na (1496,1631)"
+    },
+    {
+      "id": "boj",
+      "nazev": "Hřbitov (monstra)",
+      "x": 1371,
+      "y": 1482,
+      "z": 10,
+      "proc": "boj",
+      "poznamka": "spawn bod 'graveyard_britain' (data/spawns.json, střed 1374,1482, radius 6); monstra stojí na z=0 - spawn data výšku nepočítají"
+    }
+  ]
+}

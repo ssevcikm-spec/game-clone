@@ -177,6 +177,24 @@ const UI_KEYS := {
 	# nedozvi, ze existuje - a "napoveda, kterou je potreba najit" je presne
 	# to, co zadani (DALSI-SESSION §D) odmitalo.
 	"hotkeys_toggle": [KEY_H, KEY_F1],
+	# DEBUG TELEPORT (2026-10-20): `F7` otevre/zavre seznam testovacich bodu
+	# (`app/debug_travel.gd` + `ui/debug_travel.gd`). JE TO DEBUG KLAVESA, ne
+	# herni - proto `F7` (jako `F2` fullsize a `F3` overlay) a ne pismeno,
+	# ktere hra pouziva. Cislice 1-9, ktere na body teleportuji, jsou
+	# v `TRAVEL_KEYS` niz - plati JEN kdyz je seznam otevreny (jinde by
+	# kradly klavesy jinym vecem).
+	"debug_travel_toggle": [KEY_F7],
+}
+
+# DEBUG TELEPORT (2026-10-20): cislice 1-9 = skok na testovaci bod ze seznamu
+# (`data/test-points.json`). Jsou to CISLICE NAD PISMENY, ne numpad - numpad
+# 1-9 je obsazeny pohybem (`KEYS`) a v UO je to klasika. Akce existuji vzdy
+# (aby je nasla napoveda a sonda), ale klient je CTE jen kdyz je seznam
+# otevreny - jinak by hrac pri chuzi "1" skakal po mape.
+const TRAVEL_KEYS := {
+	"travel_1": [KEY_1], "travel_2": [KEY_2], "travel_3": [KEY_3],
+	"travel_4": [KEY_4], "travel_5": [KEY_5], "travel_6": [KEY_6],
+	"travel_7": [KEY_7], "travel_8": [KEY_8], "travel_9": [KEY_9],
 }
 
 # Doba jednoho animacniho framu (docs/05 §5.1.1 = `core/const.gd` TURN_MS).
@@ -199,6 +217,11 @@ var skill_list = null              # `ui.skill_list` - K ho prepina (D10)
 var hotkeys = null                 # `ui.hotkeys` - H/F1 ho prepina (session D)
 var debug_overlay = null           # `ui.debug_overlay` - F3 ho prepina
 var okno = null                    # `app.main` - F2 prepina fullsize (bod 5.2)
+# DEBUG TELEPORT (2026-10-20): `app.debug_travel.gd` - F7 seznam testovacich
+# bodu a cislice 1-9 skok na bod. JE TO DEBUG POMUCKA, ne herni funkce;
+# controller na nem jen prepina okno a predava skok (kameru a pozici meni
+# `teleport_na` niz, protoze ta zna `_follow`).
+var debug_travel = null
 
 var _iso
 var _last_tile: Vector2i = Vector2i(-9999, -9999)
@@ -320,6 +343,18 @@ static func register_actions() -> int:
 			ui_klavesa.keycode = code
 			if not InputMap.action_has_event(action, ui_klavesa):
 				InputMap.action_add_event(action, ui_klavesa)
+				added += 1
+	# DEBUG TELEPORT (2026-10-20): cislice 1-9. Akce existuji VZDY (napoveda
+	# a sonda je hledaji v `InputMap`), ale klient je cte jen pri otevrenem
+	# seznamu (viz `_process`) - jinak by "1" kradla klavesu hre.
+	for action in TRAVEL_KEYS.keys():
+		if not InputMap.has_action(action):
+			InputMap.add_action(action)
+		for code in TRAVEL_KEYS[action]:
+			var skok := InputEventKey.new()
+			skok.keycode = code
+			if not InputMap.action_has_event(action, skok):
+				InputMap.action_add_event(action, skok)
 				added += 1
 	return added
 
@@ -444,6 +479,23 @@ func _process(_delta: float) -> void:
 			var plna: bool = bool(okno.prepni_fullsize())
 			print("[controller] fullsize: ", "ZAPNUT (svet = cele okno)" if plna \
 				else "VYPNUT (cerny pas GUI zpet)")
+	# DEBUG TELEPORT (2026-10-20): `F7` otevre/zavre seznam testovacich bodu.
+	# Je to DEBUG pomucka (viz hlavicka `app/debug_travel.gd`); kdyz modul neni
+	# (test, sonda bez nej), klavesa nic nedeje a NIC SE NEHLASI - ticho je
+	# spravne jen tehdy, kdyz modul vubec neni.
+	if debug_travel != null and input_map != null \
+			and input_map.akce_just_pressed("debug_travel_toggle"):
+		var seznam_videt: bool = bool(debug_travel.prepni())
+		print("[controller] debug travel: ", "OTEVREL" if seznam_videt else "ZAVREL")
+	# CISLICE 1-9 = SKOK NA BOD. Cte se JEN pri otevrenem seznamu: jinde by
+	# "1" kradla klavesu hre (a hrac by nechapal, proc se pohnul).
+	if debug_travel != null and input_map != null and debug_travel.je_otevreny():
+		for cislo in range(1, 10):
+			if not input_map.akce_just_pressed("travel_%d" % cislo):
+				continue
+			var skok: Dictionary = debug_travel.teleport_cislem(cislo)
+			print("[controller] teleport ", cislo, ": ", skok.get("ok"),
+				" / ", skok.get("reason", ""), " -> ", skok.get("tile", "?"))
 	# ⚠⚠ KAMERA SE POSOUVA KAZDY FRAME (17. session, 2026-10-08) - VADA
 	# "obraz se pohybuje skokove, ne plynule": do teto session se stred kamery
 	# prepsal JEN kdyz se zmenila DLAZDICE (`if tile != _last_tile: _follow()`),
@@ -638,6 +690,47 @@ func player_pixel_offset(now_ms: int = -1) -> Vector2:
 	# rozjizdeji. Zaokrouhleny posun je plynuly (1 px) a pritom ostry.
 	var posun: Vector2 = (kam_px - od) * f
 	return Vector2(roundf(posun.x), roundf(posun.y))
+
+
+func teleport_na(tile: Vector2i, z: int) -> Dictionary:
+	# DEBUG TELEPORT (2026-10-20): nastavi pozici HRACE i KAMERY na dlazdici.
+	# JE TO DEBUG POMUCKA (`app/debug_travel`), ne herni funkce: neposila zadny
+	# prikaz do simulace, nemeni `state_hash` a nic neuklada.
+	#
+	# Duvod, proc to je TADY a ne v `app/debug_travel`: jedine tohle misto zna
+	# kameru (`_follow`), bezici krok (`_step`) a posun v pixelech
+	# (`player_pixel_offset`). Kdyby si je modul nastavoval sam, vznikla by
+	# druha pravda o tom, kde stoji hrac - a po teleportu by obraz zustal
+	# na starem miste do prvniho kroku.
+	#
+	# Vraci `{ok, reason, tile, z, kamera}` (kamera = svetovy offset obrazu;
+	# sonda z nej pozna, ze se obraz opravdu posunul).
+	if player == null:
+		return {"ok": false, "reason": "no_player"}
+	# KROK V LETU SE RUSI: kdyby zustal, `apply_step` by hrace po teleportu
+	# posunul o dlazdici z JEHO směru (a hrac by videl "teleport, pak krok
+	# navic"). `cancel_step` je verejna metoda `sim.movement` (aditivni).
+	if movement != null and movement.has_method("cancel_step"):
+		movement.cancel_step(int(player.serial))
+	player.pos = Vector3i(tile.x, tile.y, z)
+	# KLIENT UVOLNI KROK: `_step` je kopie z minuleho framu a `_wall_start_ms`
+	# cas zacatku - oboji by po skoku posunulo obraz pres celou mapu.
+	_step = {}
+	_predchozi_krok = {}
+	_wall_start_ms = -1
+	_action = ACTION_IDLE
+	if view != null and view.has_method("set_action"):
+		view.set_action(_action)
+	if view != null and view.has_method("set_player_offset"):
+		view.set_player_offset(Vector2.ZERO)
+	# KAMERA: `_follow()` prepise `_last_tile`, zavola `view.look_at_tile` se
+	# SPRÁVNOU výškou (`player.pos.z`) a obnovi `loop.player_tile/player_z/
+	# camera_offset` - bez toho by klik i interakce mirily o 40 px vedle.
+	_follow()
+	if view != null and view.has_method("queue_redraw"):
+		view.queue_redraw()
+	return {"ok": true, "reason": "", "tile": player_tile(), "z": int(player.pos.z),
+		"kamera": _camera_offset()}
 
 
 func _follow(offset: Vector2 = Vector2.ZERO) -> void:

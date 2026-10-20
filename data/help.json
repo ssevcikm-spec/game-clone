@@ -87,6 +87,10 @@
     {"id": "overlay", "skupina": "okna", "poradi": 50,
       "akce": ["debug_overlay_toggle"],
       "popis": "technické hodnoty na obrazovce (vývojářské)"},
+    {"id": "teleport", "skupina": "okna", "poradi": 55,
+      "akce": ["debug_travel_toggle", "travel_1", "travel_2", "travel_3",
+        "travel_4", "travel_5", "travel_6", "travel_7", "travel_8", "travel_9"],
+      "popis": "seznam testovacích bodů (těžba, boj, obchod) a skok na bod 1-9 (vývojářské)"},
     {"id": "pravidla", "skupina": "okna", "poradi": 60,
       "akce": ["policy_toggle"],
       "popis": "okno pravidel automatizace (jen ke čtení)"}
