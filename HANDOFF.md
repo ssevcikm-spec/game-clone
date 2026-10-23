@@ -8,6 +8,28 @@
 > G8/G9 (`check-determinism`, `check-replay`) — obě zelené.
 > **Současný stav se bere z tohohle bloku.**
 
+## ⚠ 23. 10. 2026 17:10 — SEHRÁNÍ: **REVERT** hrdinovy animace (art nevyhověl)
+
+Uživatel si hru zahrál a nahlásil tři vady. **Hrdinova chůze je proto vrácena na původní
+`own-v3` art** (commit „revert hra-44“); integrační pipeline (`wire_anim.py`, `styl_anim.py`,
+smlouva `hra-44`) **zůstává** — je ověřená, jen tenhle konkrétní art nevyhověl.
+
+| Vada (uživatel) | Co naměřeno |
+|---|---|
+| **„o čtvrtinu menší než původní model“** | nové framy mají průměrnou výšku **53–60 px** (d2–d4), původní own-v3 **62 px** a UO **58–62 px**; navíc je silueta **výrazně užší** (první frame 14 px vs UO 24 px) — postava působí menší a titěrně |
+| **„chybí jí obrovské množství detailů, paže jako okousaná párátka“** | nové framy mají **1 271–1 430** neprůhledných px, původní own-v3 **1 922**, UO **2 096–2 522** → ~⅓ pixelů chybí; tmavý plátový model při 64 px + paleta 40 z tenkých paží udělá 1–2px drátky |
+| **„hýbe se opačným směrem, než kam míří chůze; šoupá“** | příčina **nebyla změřena** (vizuální kontrola nestačí) — podezření na fázi mapování 8→5 směrů nebo na nesoulad fáze animace s pohybem; **změřit před další integrací** |
+
+**Proč se to stalo (poučení):** brány měřily *zapojení a styl*, ne *použitelnost* — G15/G16/G10/G21
+byly zelené a hráč přesto vidí regresi. **Sehrání uživatele je rozhodující brána**, ne zelené CI.
+Render z tmavého plátového modelu v 64 px navíc nemá na detaily — potřebuje větší měřítko
+(blíž UO: postava ~86 px jako `hra-48`), světlejší/čitelnější model a ověřený směr.
+
+**Další krok (rozhodnutí uživatele):** buď (A) nechat hrdinu na původním artu a hra-44 pipeline
+použít pro NPC/monstra, (B) přerenderovat hrdinu z **jiného, světlejšího modelu** ve větším
+měřítku (8 směrů, styl, ~2–3 h), nebo (C) opravit jen měřítko/kontrast/směr u stávajícího
+modelu (~1–2 h) s rizikem, že “titěrnost” zůstane.
+
 ## ✅ CO JE HOTOVÉ (měřeno, ne tvrzeno)
 
 | Co | Soubor | Důkaz |
