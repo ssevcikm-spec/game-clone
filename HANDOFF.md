@@ -1,3 +1,80 @@
+# Předání — game-clone (2026-10-23, FÁZE B ASSETOVÉ ZÁKLADNY: `hra-44` ANIMACE HRDINY)
+
+> **Co tenhle blok JE:** **záznam o provedení** — zapojení producentských animací
+> z `dsh-dev\_tools\tovarna\animace` (kontrakt `hra-44`, dlaždice 44 px / postava 64 px)
+> do hry, a co to naměřilo. Uživatel 23. 10. 2026 výslovně svolil k zápisu do projektu
+> („Fáze B“ zadání `_sprava\ZADANI-ASSET-HRA-44-2026-10-23.md`).
+> **Co se NEMĚNILO:** herní pravidla, determinismus, save formát, UO art; žádná změna
+> G8/G9 (`check-determinism`, `check-replay`) — obě zelené.
+> **Současný stav se bere z tohohle bloku.**
+
+## ✅ CO JE HOTOVÉ (měřeno, ne tvrzeno)
+
+| Co | Soubor | Důkaz |
+|---|---|---|
+| **Hrdinova chůze = producentská `hra-44` animace** (8 směrů → 5 herních, 12 framů, postava 64 px) | `assets/own-v3/anim/anim-sheets.json` + `hra44-walk-400-0-*.png` | G15 OK (klíč je z vlastní vrstvy), G21: `list res://assets/own-v3/anim/hra44-walk-400-0-1.png` |
+| **Pixel-art styl** (tvrdá alfa 0/255, paleta 40 barev) | tytéž PNG | G16 OK (0 poloprůhledných na siluetě, ≤ 40 barev) |
+| **Hra sprite OPRAVDU kreslí** | `.cache/render/snapshot.png` (mimo git) | G10: `vlastni_pixelu 573`, po erozi **114** (dřív 0 = kreslil se UO art) |
+| **Nástroje integrace** | `tools/artgen/wire_anim.py` (slije import do anim listu vrstvy), `tools/artgen/styl_anim.py` (render → pixel art: tvrdá alfa + paleta) | oba spuštěny, `--help`; vstup validován, výstup měří G15/G16 |
+| **Všechny brány projektu** | — | `python tools/gates/run-all.py` → **21 měřeno, 0 chyb** (G13 poradní NEMĚŘENO) |
+
+**Naměřená cesta (proč dva nástroje):** importér sám nestačí — první zapojení spadlo
+na **G16**: surový render měl **209 poloprůhledných pixelů** a **210 barev** (UO sprite:
+0 / 61). Řešení není vypnout bránu, ale použít týž styl jako ostatní vlastní art
+(`styl.py`), proto `styl_anim.py`. Až po stylu je zapojení zelené.
+
+## ⚠ CO SE NEPOVEDLO (a proč to zůstává otevřené)
+
+**Útok a práce NEBYLY zapojeny.** Producent je má hotové (`hra44-attack`, `hra44-work`,
+8 směrů, 5/5 herních směrů), ale jejich zapojení narazilo na dvě místa v kódu, která
+nejdou obejít daty:
+
+1. `render/anim_player._key()` zkouší **fallback dřív než primární skupinu**: pro akci
+   `work` (5) najde v `GROUP_FALLBACK` kandidáta `attack` (skupina 9) a použije ji místo
+   vlastní skupiny 5 → vlastní `work` animace by se nikdy nevykreslila. Pro `attack`
+   naopak zmizí fallback na chůzi+svih, který řeší B1/B2 (a G21 ho vyžaduje).
+2. **G21** dnes vyžaduje „útok má nakreslený svih“; s vlastní attack animací je svih 0
+   a gate (správně) hlásí vadu — její očekávání je psané pro éru „vlastní sada = jen chůze“.
+
+**Rozhodnutí:** attack/work se **nezapojovaly** (byly by to deklarace, kterou nikdo nečte,
+a rozbitá G21). Potřebují **změnu precedence ve `_key`** (vlastní skupina před fallbackem)
++ úpravu G21 s doložením (mutace, že nová podmínka umí selhat). To je samostatný krok,
+ne „ještě pár souborů“.
+
+## 🔧 JAK TO ZOPAKOVAT (celý postup)
+
+```powershell
+# 1) producentské sady (dsh-dev, kontrakt hra-44) -> herní formát
+python tools/artgen/import_anim.py "<sada>/walk" --nazev hra44-walk --akce walk `
+  --vystup .cache/wire-anim/hra44-walk --pro-hrdinu --json
+# 2) render -> pixel art (tvrdá alfa + paleta; měří to G16)
+python tools/artgen/styl_anim.py --slozka .cache/wire-anim/hra44-walk --vystup .cache/wire-anim/hra44-walk-styl
+# 3) slití do anim listu vlastní vrstvy (PNG ke stejnému listu, klíče telo/skupina/smer)
+python tools/artgen/wire_anim.py --anim-file assets/own-v3/anim/anim-sheets.json --import .cache/wire-anim/hra44-walk-styl
+# 4) brány (G15/G16 = zapojení a styl; G10 = důkaz v pixelech; celá sada)
+python tools/gates/run-all.py --root . --only g15,g16,g21
+```
+
+**Regenerace snímku pro G10** (po každé změně artu; jinak G10 hlásí „snímek je starší než
+vstup“ — a má pravdu): `Godot --path . --rendering-driver opengl3 --write-movie
+.cache/render/frame.png --script res://tools/gates/snapshot-walk.gd` a zkopírovat
+`frame00000150.png` → `.cache/render/snapshot.png`. Trvá ~96 s.
+
+## 📋 OTEVŘENÉ BODY
+
+1. **Zapojit attack + work** — nutná změna precedence `_key` (vlastní skupina před
+   fallbackem) + úprava G21 + mutace; produkční sady jsou hotové.
+2. **Časování:** produkce 117 (walk) / 181 (attack) / 156 (work) ms/frame vs. hra pevně
+   **80 ms/frame** — hra animaci zrychlí; rozhodnout (více framů, nebo fps ve hře), až
+   bude attack/work zapojený.
+3. **Staré `ownv3-400-0-*.png`** (předchozí vlastní chůze) jsou po nahrazení
+   **neodkazované**; zůstávají v repu jako historie, ale kandidát na úklid.
+4. **`tools/gates/check-anim-assets.py`** (brána konvertoru, dnes není v `run-all`) —
+   po dodání 5/8-směrných sad je na zvážení přihlásit; její real-data očekávání jsou psaná
+   na staré 4-směrné sady, takže by se měla rozšířit i o `hra-44` sady.
+
+---
+
 # Předání — game-clone (2026-10-20, SESSION „TELEPORT“: DEBUG TELEPORT MEZI TESTOVACÍMI BODY — F7 + číslice 1–9)
 
 > **Co je tenhle blok JE:** **záznam o provedení**. Uživatel chtěl „teleport nebo
